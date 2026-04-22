@@ -2476,15 +2476,6 @@ export default function Dashboard() {
                
                {/* 🟢 PROFESSIONAL HEADER: REFINED ALIGNMENT BASED ON IMAGES */}
                <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-amber-100/50 shrink-0 relative overflow-hidden group">
-                 {/* Close Icon - Professional X in corner */}
-                 <button 
-                    onClick={() => setActiveTab('reports')} 
-                    className="absolute top-6 right-8 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-300 z-30"
-                    title="Close Admin"
-                 >
-                    <X size={24} strokeWidth={1.5}/>
-                 </button>
-
                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 relative z-10">
                    <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-amber-100/50 flex items-center justify-center text-amber-800 shadow-sm mt-1 shrink-0">
@@ -2571,7 +2562,7 @@ export default function Dashboard() {
                          )}
                       </div>
 
-                      {/* Approvals Button - Placed next to Dropdown */}
+                      {/* Approvals Button */}
                       <button 
                          onClick={() => setShowApprovalPanel(true)} 
                          className="px-6 py-3.5 rounded-2xl text-xs font-black border-2 border-amber-100 text-[#3e2723] hover:bg-amber-50 bg-amber-50/20 shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-3 group"
@@ -2581,6 +2572,15 @@ export default function Dashboard() {
                          <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-[10px] font-black shadow-inner">
                            {employees.filter(e => e.status === 'Pending').length}
                          </span>
+                      </button>
+
+                      {/* 🔴 CLOSE ADMIN BUTTON - Now next to Approvals */}
+                      <button 
+                         onClick={() => setActiveTab('reports')} 
+                         className="px-4 py-3.5 rounded-2xl text-xs font-black border-2 border-red-100 text-red-600 hover:bg-red-600 hover:text-white bg-white shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 group"
+                         title="Exit Admin Panel"
+                      >
+                         <X size={20} strokeWidth={3}/>
                       </button>
                    </div>
                  </div>
