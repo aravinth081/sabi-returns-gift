@@ -2475,32 +2475,32 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
                
                {/* 🟢 PROFESSIONAL HEADER: REFINED ALIGNMENT BASED ON IMAGES */}
-               <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-amber-100/50 shrink-0 relative overflow-hidden group">
-                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 relative z-10">
-                   <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-100/50 flex items-center justify-center text-amber-800 shadow-sm mt-1 shrink-0">
-                        <TrendingUp size={24} strokeWidth={2.5}/>
+               <div className="bg-white py-5 px-6 rounded-[2rem] shadow-xl border border-amber-100/50 shrink-0 relative overflow-hidden group">
+                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 relative z-10">
+                   <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-[14px] bg-amber-100/50 flex items-center justify-center text-amber-800 shadow-sm mt-1 shrink-0">
+                        <TrendingUp size={20} strokeWidth={2.5}/>
                       </div>
                       <div>
-                        <h2 className="text-3xl font-black text-[#3e2723] tracking-tight leading-tight mb-1">
+                        <h2 className="text-2xl font-black text-[#3e2723] tracking-tight leading-tight mb-0.5">
                           {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
                         </h2>
-                        <p className="text-[11px] font-black text-amber-600/80 uppercase tracking-[0.15em] flex items-center gap-2">
+                        <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-[0.15em] flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                           Sticker (₹1.5) | Labour (₹1) | Order wise mapped data
                         </p>
                       </div>
                    </div>
 
-                   <div className="flex flex-wrap items-center gap-4">
+                   <div className="flex flex-wrap items-center gap-3">
                       {/* Date Filter Group - Matches Image Style */}
-                      <div className="flex items-center gap-3 bg-amber-50/30 px-5 py-3 rounded-2xl border border-amber-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-                        <div className="flex items-center gap-2 pr-4 border-r-2 border-amber-200">
-                          <Calendar size={16} className="text-amber-700"/>
+                      <div className="flex items-center gap-3 bg-amber-50/30 px-4 py-2.5 rounded-2xl border border-amber-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+                        <div className="flex items-center gap-2 pr-3 border-r-2 border-amber-200">
+                          <Calendar size={14} className="text-amber-700"/>
                           <select
                             value={adminDateType}
                             onChange={(e) => setAdminDateType(e.target.value)}
-                            className="font-black text-[#3e2723] bg-transparent outline-none cursor-pointer text-xs uppercase tracking-wider"
+                            className="font-black text-[#3e2723] bg-transparent outline-none cursor-pointer text-[11px] uppercase tracking-wider"
                           >
                             <option value="Delivery Date">Delivery Date</option>
                             <option value="Order Date">Order Date</option>
@@ -2509,24 +2509,24 @@ export default function Dashboard() {
                           <ChevronDown size={14} className="text-amber-700 ml-[-4px]"/>
                         </div>
                         
-                        <div className="flex items-center gap-4 pl-2">
+                        <div className="flex items-center gap-3 pl-1">
                           <div className="flex flex-col">
-                            <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest mb-0.5">From</span>
+                            <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-0.5">From</span>
                             <input
                               type="date"
                               value={adminDateRange.from}
                               onChange={(e) => setAdminDateRange({ ...adminDateRange, from: e.target.value })}
-                              className="text-xs font-black bg-transparent outline-none text-[#3e2723] cursor-pointer"
+                              className="text-[11px] font-black bg-transparent outline-none text-[#3e2723] cursor-pointer"
                             />
                           </div>
-                          <div className="w-4 h-[2px] bg-amber-200 rounded-full mt-2"></div>
+                          <div className="w-3 h-[2px] bg-amber-200 rounded-full mt-1.5"></div>
                           <div className="flex flex-col">
-                            <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest mb-0.5">To</span>
+                            <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-0.5">To</span>
                             <input
                               type="date"
                               value={adminDateRange.to}
                               onChange={(e) => setAdminDateRange({ ...adminDateRange, to: e.target.value })}
-                              className="text-xs font-black bg-transparent outline-none text-[#3e2723] cursor-pointer"
+                              className="text-[11px] font-black bg-transparent outline-none text-[#3e2723] cursor-pointer"
                             />
                           </div>
                           {(adminDateRange.from || adminDateRange.to) && (
@@ -2541,22 +2541,22 @@ export default function Dashboard() {
                       <div className="relative">
                          <button 
                             onClick={() => setAdminReportMenuOpen(!adminReportMenuOpen)}
-                            className="px-6 py-3.5 rounded-2xl text-xs font-black border-2 border-amber-100 text-[#3e2723] hover:bg-white bg-white shadow-sm hover:shadow-md transition-all flex items-center gap-3 group min-w-[160px]"
+                            className="px-5 py-2.5 rounded-2xl text-[11px] font-black border-2 border-amber-100 text-[#3e2723] hover:bg-white bg-white shadow-sm hover:shadow-md transition-all flex items-center gap-2 group min-w-[140px]"
                          >
-                            <Book size={18} className="text-amber-800"/> 
+                            <Book size={16} className="text-amber-800"/> 
                             <span className="uppercase tracking-widest flex-1 text-left">{adminReportDash === 'None' ? 'Table View' : adminReportDash}</span>
-                            <ChevronDown size={16} className={`transition-transform duration-300 text-amber-800 ${adminReportMenuOpen ? 'rotate-180' : ''}`}/>
+                            <ChevronDown size={14} className={`transition-transform duration-300 text-amber-800 ${adminReportMenuOpen ? 'rotate-180' : ''}`}/>
                          </button>
                          {adminReportMenuOpen && (
-                            <div className="absolute right-0 mt-3 w-52 bg-white border border-amber-100 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                               <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] border-b border-amber-50 flex items-center gap-3 uppercase tracking-widest">
-                                 <Menu size={16} className="text-amber-800"/> Table View
+                            <div className="absolute right-0 mt-2 w-48 bg-white border border-amber-100 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                               <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] border-b border-amber-50 flex items-center gap-3 uppercase tracking-widest">
+                                 <Menu size={14} className="text-amber-800"/> Table View
                                </button>
-                               <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] border-b border-amber-50 flex items-center gap-3 uppercase tracking-widest">
-                                 <TrendingUp size={16} className="text-amber-800"/> Dashboard 1
+                               <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] border-b border-amber-50 flex items-center gap-3 uppercase tracking-widest">
+                                 <TrendingUp size={14} className="text-amber-800"/> Dashboard 1
                                </button>
-                               <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-6 py-4 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] flex items-center gap-3 uppercase tracking-widest">
-                                 <Package size={16} className="text-amber-800"/> Dashboard 2
+                               <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] flex items-center gap-3 uppercase tracking-widest">
+                                 <Package size={14} className="text-amber-800"/> Dashboard 2
                                </button>
                             </div>
                          )}
@@ -2565,11 +2565,11 @@ export default function Dashboard() {
                       {/* Approvals Button */}
                       <button 
                          onClick={() => setShowApprovalPanel(true)} 
-                         className="px-6 py-3.5 rounded-2xl text-xs font-black border-2 border-amber-100 text-[#3e2723] hover:bg-amber-50 bg-amber-50/20 shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-3 group"
+                         className="px-5 py-2.5 rounded-2xl text-[11px] font-black border-2 border-amber-100 text-[#3e2723] hover:bg-amber-50 bg-amber-50/20 shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 group"
                       >
-                         <Lock size={18} className="text-amber-800"/> 
+                         <Lock size={16} className="text-amber-800"/> 
                          <span className="uppercase tracking-widest">Approvals</span>
-                         <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-[10px] font-black shadow-inner">
+                         <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-lg text-[9px] font-black shadow-inner">
                            {employees.filter(e => e.status === 'Pending').length}
                          </span>
                       </button>
@@ -2577,10 +2577,10 @@ export default function Dashboard() {
                       {/* 🔴 CLOSE ADMIN BUTTON - Now next to Approvals */}
                       <button 
                          onClick={() => setActiveTab('reports')} 
-                         className="px-4 py-3.5 rounded-2xl text-xs font-black border-2 border-red-100 text-red-600 hover:bg-red-600 hover:text-white bg-white shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 group"
+                         className="px-3.5 py-2.5 rounded-2xl text-[11px] font-black border-2 border-red-100 text-red-600 hover:bg-red-600 hover:text-white bg-white shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 group"
                          title="Exit Admin Panel"
                       >
-                         <X size={20} strokeWidth={3}/>
+                         <X size={18} strokeWidth={3}/>
                       </button>
                    </div>
                  </div>
