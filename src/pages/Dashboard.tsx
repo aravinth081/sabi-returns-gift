@@ -615,9 +615,11 @@ export default function Dashboard() {
     }
 
     const itemCounts: Record<string, number> = {};
+    const itemProfits: Record<string, number> = {};
     let totalRev = 0;
     let totalItems = 0;
     let totalDelivery = 0;
+    let totalCost = 0;
 
     baseOrders.forEach(order => {
       const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus);
@@ -625,17 +627,57 @@ export default function Dashboard() {
       totalItems += Number(order.count || 0);
       totalDelivery += priceInfo.deliveryCharge;
 
+      // Profit/Cost Calculation logic
+      const count = Number(order.count || 0);
+      const chocs = String(order.chocolate).split(',').map(c => c.trim()).filter(Boolean);
+      let sumPurchase = 0;
+      chocs.forEach(c => {
+        if (order.category === 'product') {
+           // For dashboard 2, assume cost is roughly 60% of price if not specified, 
+           // or we can just use 0 if no purchase map exists. 
+           // But as per 'procedure', let's stick to known costs.
+           sumPurchase += 0; 
+        } else {
+           sumPurchase += (CHOCOLATE_PURCHASE_MAP[c.toLowerCase()] || 0);
+        }
+      });
+      const purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
+      const stickerCost = count * 1.5;
+      const labourCost = count * 1;
+      const totalPurchase = purchasePricePerItem * count;
+      const finalCost = stickerCost + labourCost + totalPurchase;
+      totalCost += finalCost;
+
+      const orderProfit = priceInfo.revenue - finalCost;
+
       if (order.chocolate) {
         String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
-          itemCounts[key] = (itemCounts[key] || 0) + Number(order.count || 0);
+          itemCounts[key] = (itemCounts[key] || 0) + count;
+          itemProfits[key] = (itemProfits[key] || 0) + (orderProfit / chocs.length);
         });
       }
     });
 
     const topChocs = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
     const chartData = topChocs.slice(0, 8).map(([name, count]) => ({ name, count }));
+    const profitChartData = Object.entries(itemProfits)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, profit]) => ({ name, profit: Math.round(profit) }));
 
-    return { filteredOrders: baseOrders, topChocs, chartData, totalRev, totalItems, totalDeliveryCharge: totalDelivery };
+    const totalProfit = totalRev - totalCost;
+
+    return { 
+      filteredOrders: baseOrders, 
+      topChocs, 
+      chartData, 
+      profitChartData,
+      totalRev, 
+      totalItems, 
+      totalDeliveryCharge: totalDelivery,
+      totalProfit,
+      totalCost
+    };
   }, [orders, adminDateRange, adminDateType, adminReportDash, customPricesMap]);
 
   const trackingSearchResults = useMemo(() => {
@@ -2605,20 +2647,45 @@ export default function Dashboard() {
                                 <Tooltip cursor={{fill: '#f5f5f5'}} contentStyle={{borderRadius: '12px', fontWeight: 'bold'}} />
                                 <Bar 
                                   dataKey="count" 
+                                  fill="#3b82f6"
                                   radius={[8, 8, 0, 0]}
                                   isAnimationActive={true} 
                                   animationBegin={0} 
                                   animationDuration={1500} 
                                   animationEasing="ease-out"
-                                >
-                                  {adminReportData.chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                  ))}
-                                </Bar>
+                                />
                               </BarChart>
                             </ResponsiveContainer>
                           ) : (
                             <div className="flex h-full items-center justify-center text-gray-400 font-bold">No Data for Graph</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
+                        <h2 className="text-xl font-black text-[#3e2723] mb-6 flex items-center gap-2">
+                          <TrendingUp className="text-green-600"/> Profit Analytics (by Item)
+                        </h2>
+                        <div className="h-72 w-full">
+                          {adminReportData.profitChartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={adminReportData.profitChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                                <XAxis dataKey="name" tick={{fontSize: 12, fill: '#5d4037', fontWeight: 'bold'}} />
+                                <YAxis tick={{fontSize: 12, fill: '#5d4037', fontWeight: 'bold'}} />
+                                <Tooltip cursor={{fill: '#f5f5f5'}} contentStyle={{borderRadius: '12px', fontWeight: 'bold'}} />
+                                <Bar 
+                                  dataKey="profit" 
+                                  fill="#10b981"
+                                  radius={[8, 8, 0, 0]}
+                                  isAnimationActive={true} 
+                                  animationBegin={0} 
+                                  animationDuration={1500} 
+                                  animationEasing="ease-out"
+                                />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-gray-400 font-bold">No Profit Data</div>
                           )}
                         </div>
                       </div>
@@ -2650,12 +2717,16 @@ export default function Dashboard() {
                               <span className="font-black text-[#3e2723] text-2xl">{adminReportData.totalItems}</span>
                             </li>
                             <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                              <span className="text-[#a46c3b] font-bold">Total Delivery Charge</span>
-                              <span className="font-black text-[#3e2723] text-2xl">₹{adminReportData.totalDeliveryCharge.toLocaleString()}</span>
-                            </li>
-                            <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
                               <span className="text-[#a46c3b] font-bold">Total Revenue</span>
                               <span className="font-black text-[#15803d] text-2xl">₹{adminReportData.totalRev.toLocaleString()}</span>
+                            </li>
+                            <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
+                              <span className="text-red-700 font-bold">Total Cost</span>
+                              <span className="font-black text-red-600 text-2xl">₹{adminReportData.totalCost.toLocaleString()}</span>
+                            </li>
+                            <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70 bg-green-50/50 p-2 rounded-xl">
+                              <span className="text-green-800 font-black">NET PROFIT</span>
+                              <span className="font-black text-green-700 text-3xl">₹{adminReportData.totalProfit.toLocaleString()}</span>
                             </li>
                           </ul>
 
