@@ -2474,78 +2474,114 @@ export default function Dashboard() {
           {(activeTab as any) === 'admin_panel' && (
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
                
-               {/* 🟢 MODIFIED HEADER: ADDED BOOK DROPDOWN AND SMALLER CLOSE BUTTON */}
-               <div className="flex justify-between items-center bg-[#f2eee6] p-4 rounded-2xl shadow-sm border border-[#d7ccc8] shrink-0 z-20 relative">
-                 <div>
-                    <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                      <TrendingUp className="text-amber-700"/> {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
-                    </h2>
-                    <p className="text-sm font-medium text-amber-700 mt-1">Sticker (₹1.5) | Labour (₹1) | Order wise mapped data.</p>
-                 </div>
+               {/* 🟢 PREMIUM HEADER: REDESIGNED FOR PROFESSIONAL LOOK */}
+               <div className="bg-white p-6 rounded-[2rem] shadow-[0_10px_30px_rgba(0,0,0,0.05)] border border-amber-100/50 shrink-0 relative overflow-hidden group">
+                 {/* Close Icon in Corner */}
+                 <button 
+                    onClick={() => setActiveTab('reports')} 
+                    className="absolute top-4 right-4 p-2 rounded-full text-amber-900/40 hover:text-red-600 hover:bg-red-50 transition-all duration-300 z-30"
+                    title="Close Admin"
+                 >
+                    <X size={22} strokeWidth={3}/>
+                 </button>
 
-                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#d7ccc8] shadow-sm">
-                      <select
-                        value={adminDateType}
-                        onChange={(e) => setAdminDateType(e.target.value)}
-                        className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
-                      >
-                        <option value="Delivery Date">Delivery Date</option>
-                        <option value="Order Date">Order Date</option>
-                        <option value="Function Date">Function Date</option>
-                      </select>
-                      <div className="h-4 w-[1px] bg-amber-200 mx-1"></div>
-                      <span className="text-xs font-bold text-amber-800">From:</span>
-                      <input
-                        type="date"
-                        value={adminDateRange.from}
-                        onChange={(e) => setAdminDateRange({ ...adminDateRange, from: e.target.value })}
-                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
-                      />
-                      <span className="text-xs font-bold text-amber-800">To:</span>
-                      <input
-                        type="date"
-                        value={adminDateRange.to}
-                        onChange={(e) => setAdminDateRange({ ...adminDateRange, to: e.target.value })}
-                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
-                      />
-                      {(adminDateRange.from || adminDateRange.to) && (
-                        <button onClick={() => setAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
+                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                   <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 shadow-sm">
+                          <TrendingUp size={22} strokeWidth={2.5}/>
+                        </div>
+                        <h2 className="text-2xl font-black text-[#3e2723] tracking-tight">
+                          {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
+                        </h2>
+                      </div>
+                      <p className="text-xs font-bold text-amber-600/70 uppercase tracking-widest ml-13 flex items-center gap-2">
+                        <span className="w-1 h-1 rounded-full bg-amber-400"></span>
+                        Sticker (₹1.5) | Labour (₹1) | Order wise mapped data
+                      </p>
+                   </div>
 
-                    {/* 🟢 NEW BOOK DROPDOWN TO TOGGLE ADMIN REPORTS */}
-                    <div className="relative">
-                       <button 
-                          onClick={() => setAdminReportMenuOpen(!adminReportMenuOpen)}
-                          className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-amber-50 bg-white shadow-sm transition-all flex items-center gap-1.5"
-                       >
-                          <Book size={16}/> {adminReportDash === 'None' ? 'Table View' : adminReportDash} <ChevronDown size={14}/>
-                       </button>
-                       {adminReportMenuOpen && (
-                          <div className="absolute right-0 mt-2 w-40 bg-white border border-[#d7ccc8] rounded-xl shadow-lg z-50 overflow-hidden">
-                             <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
-                             <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
-                             <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">Dashboard 2</button>
+                   <div className="flex flex-wrap items-center gap-3">
+                      {/* Date Filter Group */}
+                      <div className="flex items-center gap-2 bg-amber-50/50 px-4 py-2.5 rounded-2xl border border-amber-100 shadow-inner">
+                        <div className="flex items-center gap-2 pr-3 border-r border-amber-200">
+                          <Calendar size={14} className="text-amber-700"/>
+                          <select
+                            value={adminDateType}
+                            onChange={(e) => setAdminDateType(e.target.value)}
+                            className="font-black text-amber-900 bg-transparent outline-none cursor-pointer text-xs uppercase tracking-tighter"
+                          >
+                            <option value="Delivery Date">Delivery Date</option>
+                            <option value="Order Date">Order Date</option>
+                            <option value="Function Date">Function Date</option>
+                          </select>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 pl-1">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-amber-500 uppercase leading-none mb-0.5">From</span>
+                            <input
+                              type="date"
+                              value={adminDateRange.from}
+                              onChange={(e) => setAdminDateRange({ ...adminDateRange, from: e.target.value })}
+                              className="text-xs font-black bg-transparent outline-none text-amber-950 cursor-pointer"
+                            />
                           </div>
-                       )}
-                    </div>
+                          <div className="w-3 h-[2px] bg-amber-200 rounded-full"></div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-amber-500 uppercase leading-none mb-0.5">To</span>
+                            <input
+                              type="date"
+                              value={adminDateRange.to}
+                              onChange={(e) => setAdminDateRange({ ...adminDateRange, to: e.target.value })}
+                              className="text-xs font-black bg-transparent outline-none text-amber-950 cursor-pointer"
+                            />
+                          </div>
+                          {(adminDateRange.from || adminDateRange.to) && (
+                            <button onClick={() => setAdminDateRange({ from: "", to: "" })} className="ml-2 text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors">
+                              <X size={14} strokeWidth={3}/>
+                            </button>
+                          )}
+                        </div>
+                      </div>
 
-                    <button 
-                       onClick={() => setShowApprovalPanel(true)} 
-                       className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-amber-700 hover:bg-amber-50 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
-                    >
-                       <Lock size={16}/> Approvals ({employees.filter(e => e.status === 'Pending').length})
-                    </button>
-                    
-                    <button 
-                       onClick={() => setActiveTab('reports')} 
-                       className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-red-50 hover:text-red-700 hover:border-red-200 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
-                    >
-                       <X size={16}/> Close Admin
-                    </button>
+                      {/* View Toggle */}
+                      <div className="relative">
+                         <button 
+                            onClick={() => setAdminReportMenuOpen(!adminReportMenuOpen)}
+                            className="px-5 py-2.5 rounded-2xl text-xs font-black border-2 border-amber-100 text-[#5d4037] hover:bg-white bg-white shadow-[0_4px_10px_rgba(0,0,0,0.03)] hover:shadow-md transition-all flex items-center gap-2 group"
+                         >
+                            <Book size={16} className="text-amber-700"/> 
+                            <span className="uppercase tracking-tighter">{adminReportDash === 'None' ? 'Table View' : adminReportDash}</span>
+                            <ChevronDown size={14} className={`transition-transform duration-300 ${adminReportMenuOpen ? 'rotate-180' : ''}`}/>
+                         </button>
+                         {adminReportMenuOpen && (
+                            <div className="absolute right-0 mt-3 w-44 bg-white border border-amber-100 rounded-2xl shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                               <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-xs font-black text-amber-900 border-b border-amber-50 flex items-center gap-2 uppercase">
+                                 <Menu size={14}/> Table View
+                               </button>
+                               <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-xs font-black text-amber-900 border-b border-amber-50 flex items-center gap-2 uppercase">
+                                 <TrendingUp size={14}/> Dashboard 1
+                               </button>
+                               <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-xs font-black text-amber-900 flex items-center gap-2 uppercase">
+                                 <Package size={14}/> Dashboard 2
+                               </button>
+                            </div>
+                         )}
+                      </div>
+
+                      {/* Approvals Button */}
+                      <button 
+                         onClick={() => setShowApprovalPanel(true)} 
+                         className="px-5 py-2.5 rounded-2xl text-xs font-black border-2 border-amber-600/20 text-amber-800 hover:bg-amber-600 hover:text-white bg-amber-50 shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                      >
+                         <Lock size={16}/> 
+                         <span className="uppercase tracking-tighter">Approvals</span>
+                         <span className="bg-amber-200 text-amber-900 px-2 py-0.5 rounded-lg text-[10px] group-hover:bg-white/20 group-hover:text-white">
+                           {employees.filter(e => e.status === 'Pending').length}
+                         </span>
+                      </button>
+                   </div>
                  </div>
                </div>
 
