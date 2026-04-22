@@ -2475,7 +2475,7 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
                
                {/* 🟢 PROFESSIONAL HEADER: REFINED ALIGNMENT BASED ON IMAGES */}
-               <div className="bg-white py-5 px-6 rounded-[2rem] shadow-xl border border-amber-100/50 shrink-0 relative overflow-hidden group">
+               <div className="bg-white py-5 px-6 rounded-[2rem] shadow-xl border border-amber-100/50 shrink-0 relative group z-20">
                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 relative z-10">
                    <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-[14px] bg-amber-100/50 flex items-center justify-center text-amber-800 shadow-sm mt-1 shrink-0">
