@@ -132,12 +132,20 @@ const parseDateToYYYYMMDD = (displayDate: string) => {
   return `${d.getFullYear()}-${month}-${day}`;
 };
 
-const formatToDisplayDate = (dateStr: string) => {
+const formatToDisplayDate = (dateStr: any) => {
   if (!dateStr) return "";
-  if (!String(dateStr).includes("-")) return dateStr; 
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr; 
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  if (typeof dateStr === 'number') {
+    const date = new Date(Math.round((dateStr - 25569) * 86400 * 1000));
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+  if (typeof dateStr === 'string') {
+    const str = dateStr.trim();
+    if (/^\d{1,2}\s+[a-zA-Z]{3}$/.test(str)) return str;
+    if (!str.includes("-") && !str.includes("/")) return str;
+    const date = new Date(str);
+    if (!isNaN(date.getTime())) return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+  return String(dateStr);
 };
 
 const PREDEFINED_CHOCOLATES = [
@@ -615,11 +623,9 @@ export default function Dashboard() {
     }
 
     const itemCounts: Record<string, number> = {};
-    const itemProfits: Record<string, number> = {};
     let totalRev = 0;
     let totalItems = 0;
     let totalDelivery = 0;
-    let totalCost = 0;
 
     baseOrders.forEach(order => {
       const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus);
@@ -627,57 +633,17 @@ export default function Dashboard() {
       totalItems += Number(order.count || 0);
       totalDelivery += priceInfo.deliveryCharge;
 
-      // Profit/Cost Calculation logic
-      const count = Number(order.count || 0);
-      const chocs = String(order.chocolate).split(',').map(c => c.trim()).filter(Boolean);
-      let sumPurchase = 0;
-      chocs.forEach(c => {
-        if (order.category === 'product') {
-           // For dashboard 2, assume cost is roughly 60% of price if not specified, 
-           // or we can just use 0 if no purchase map exists. 
-           // But as per 'procedure', let's stick to known costs.
-           sumPurchase += 0; 
-        } else {
-           sumPurchase += (CHOCOLATE_PURCHASE_MAP[c.toLowerCase()] || 0);
-        }
-      });
-      const purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
-      const stickerCost = count * 1.5;
-      const labourCost = count * 1;
-      const totalPurchase = purchasePricePerItem * count;
-      const finalCost = stickerCost + labourCost + totalPurchase;
-      totalCost += finalCost;
-
-      const orderProfit = priceInfo.revenue - finalCost;
-
       if (order.chocolate) {
         String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
-          itemCounts[key] = (itemCounts[key] || 0) + count;
-          itemProfits[key] = (itemProfits[key] || 0) + (orderProfit / chocs.length);
+          itemCounts[key] = (itemCounts[key] || 0) + Number(order.count || 0);
         });
       }
     });
 
     const topChocs = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
     const chartData = topChocs.slice(0, 8).map(([name, count]) => ({ name, count }));
-    const profitChartData = Object.entries(itemProfits)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name, profit]) => ({ name, profit: Math.round(profit) }));
 
-    const totalProfit = totalRev - totalCost;
-
-    return { 
-      filteredOrders: baseOrders, 
-      topChocs, 
-      chartData, 
-      profitChartData,
-      totalRev, 
-      totalItems, 
-      totalDeliveryCharge: totalDelivery,
-      totalProfit,
-      totalCost
-    };
+    return { filteredOrders: baseOrders, topChocs, chartData, totalRev, totalItems, totalDeliveryCharge: totalDelivery };
   }, [orders, adminDateRange, adminDateType, adminReportDash, customPricesMap]);
 
   const trackingSearchResults = useMemo(() => {
@@ -1092,56 +1058,41 @@ export default function Dashboard() {
       reader.onload = async (event) => {
         try {
           const bstr = event.target?.result;
-          const workbook = XLSX.read(bstr, { type: 'binary', cellDates: true });
+          const workbook = XLSX.read(bstr, { type: 'binary' });
           const worksheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[worksheetName];
           const data = XLSX.utils.sheet_to_json(worksheet);
           
           if (data && data.length > 0) {
             for(const row of (data as any[])) {
-              const formatDate = (val: any) => {
-                if (!val) return "";
-                if (val instanceof Date) return val.toISOString().split('T')[0];
-                if (typeof val === 'number') {
-                   // Handle Excel serial numbers just in case cellDates didn't catch it
-                   const date = new Date(Math.round((val - 25569) * 864e5));
-                   return date.toISOString().split('T')[0];
-                }
-                return String(val);
-              };
-
-              const chocolate = row['Chocolate Name'] || row.Chocolate || row.chocolate || "";
-              const count = Number(row.Count || row.count) || 0;
-              const discount = Number(row.Discount || row.discount) || 0;
-              const isDeliveryFree = row['Delivery Charge'] === 'Free' || row.isDeliveryFree === true;
-              const paymentStatus = row.Payment || row['Payment Status'] || row.paymentStatus || "Pending";
-              const orderStatus = row['Order Status'] || row.orderStatus || "image edited (not paid)";
-              const category = row.Category || row.category || "chocolate";
-
-              const priceData = calculatePriceInfo(chocolate, count, discount, isDeliveryFree, paymentStatus, category, customPricesMap, 0, orderStatus);
-
               const orderObj = {
                 id: Date.now() + Math.random(),
-                orderDate: formatDate(row['Order Date'] || row.orderDate || row['Function Date']),
+                orderDate: formatToDisplayDate(row['Order Date'] || row.orderDate || row['Function Date'] || ""),
                 name: row.Name || row.name || "",
                 phone: String(row['Contact Number'] || row.Phone || row.phone || ""),
-                deliveryDate: formatDate(row['Delivery Date'] || row.deliveryDate),
-                functionDate: formatDate(row['Function Date'] || row.functionDate || row['Delivery Date'] || row.deliveryDate),
-                chocolate,
-                count,
+                deliveryDate: formatToDisplayDate(row['Delivery Date'] || row.deliveryDate || ""),
+                functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Delivery Date'] || row.deliveryDate || ""),
+                chocolate: row['Chocolate Name'] || row.Chocolate || row.chocolate || "",
+                count: Number(row.Count || row.count) || 0,
                 status: row.Status || row.status || "In Process",
-                paymentStatus,
-                orderStatus,
+                paymentStatus: row.Payment || row['Payment Status'] || row.paymentStatus || "Pending",
                 address: row.Address || row.address || "",
-                discount,
-                isDeliveryFree,
-                totalPrice: priceData.totalPrice,
-                totalOrderPrice: priceData.totalPrice,
-                itemSubtotal: priceData.chocolatePrice,
-                calculatedDeliveryFee: priceData.deliveryCharge,
-                category
+                discount: Number(row.Discount || row.discount) || 0,
+                isDeliveryFree: row['Delivery Charge'] === 'Free' || false,
+                orderStatus: row['Order Status'] || row.orderStatus || "image edit (pending)",
+                category: row.Category || row.category || "chocolate",
+                orderType: row['Order Type'] || row.orderType || "Others",
+                manualDeliveryFee: Number(row['Delivery Fee'] || row.manualDeliveryFee) || 0,
+                advanceAmount: Number(row['Advance Amount'] || row.advanceAmount) || 0,
               };
-              await addDoc(collection(db, "orders"), orderObj);
+              const priceData = calculatePriceInfo(orderObj.chocolate, orderObj.count, orderObj.discount, orderObj.isDeliveryFree, orderObj.paymentStatus, orderObj.category, customPricesMap, orderObj.manualDeliveryFee, orderObj.orderStatus);
+              const finalOrderObj = {
+                  ...orderObj,
+                  totalOrderPrice: priceData.fullTotalPrice || 0,
+                  itemSubtotal: priceData.fullChocolatePrice || 0,
+                  calculatedDeliveryFee: priceData.fullDeliveryCharge || 0
+              };
+              await addDoc(collection(db, "orders"), finalOrderObj);
             }
             alert(`✅ Successfully imported ${data.length} orders to Database!`);
           } else {
@@ -1853,10 +1804,10 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="overflow-auto print:overflow-visible min-h-[300px] max-h-[800px] relative scrollbar-thin scrollbar-thumb-amber-200">
-                  <table className="w-full text-left border-collapse min-w-[1450px] print:min-w-0 print:w-full">
-                    <thead className="sticky top-0 z-30 shadow-sm">
-                      <tr className={`text-sm border-b uppercase tracking-wider bg-[#fdf8f3] text-amber-800 border-amber-100 print:bg-gray-100 print:text-black`}>
+                <div className="w-full overflow-x-auto overflow-y-auto max-h-[70vh] print:overflow-visible print:max-h-none shadow-inner bg-white/50 rounded-lg">
+                  <table className="w-full text-left border-collapse min-w-[1450px] print:min-w-0 print:w-full relative">
+                    <thead className="sticky top-0 z-20 shadow-sm print:static">
+                      <tr className={`text-sm border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
                         <th className="p-4 w-12 text-center print:hidden align-top">
                           <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded"/>
                         </th>
@@ -1965,23 +1916,26 @@ export default function Dashboard() {
                           </div>
                         </th>
                         
-                        <th className="p-4 font-bold align-top min-w-[150px]">
-                          <div className="flex items-center gap-1 group">
-                            <span>Order Status</span>
-                            <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Self/Others)">
-                              <ChevronDown size={14} className={tableTypeFilter !== 'All' ? 'text-amber-800' : 'text-amber-800/30 group-hover:text-amber-800 transition-opacity'} />
-                              <select 
-                                value={tableTypeFilter} 
-                                onChange={(e) => setTableTypeFilter(e.target.value)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              >
-                                <option value="All">All Types</option>
-                                <option value="Self">Self</option>
-                                <option value="Others">Others</option>
-                              </select>
+                        {/* 🟢 CONDITIONALLY HIDE ORDER STATUS FOR DASHBOARD 2 */}
+                        {activeTab === 'dashboard1' && (
+                          <th className="p-4 font-bold align-top min-w-[150px]">
+                            <div className="flex items-center gap-1 group">
+                              <span>Order Status</span>
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Self/Others)">
+                                <ChevronDown size={14} className={tableTypeFilter !== 'All' ? 'text-amber-800' : 'text-amber-800/30 group-hover:text-amber-800 transition-opacity'} />
+                                <select 
+                                  value={tableTypeFilter} 
+                                  onChange={(e) => setTableTypeFilter(e.target.value)}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                >
+                                  <option value="All">All Types</option>
+                                  <option value="Self">Self</option>
+                                  <option value="Others">Others</option>
+                                </select>
+                              </div>
                             </div>
-                          </div>
-                        </th>
+                          </th>
+                        )}
 
                         <th className="p-4 font-bold align-top">{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</th>
                         <th className="p-4 font-bold text-center align-top min-w-[100px]">
@@ -2009,7 +1963,7 @@ export default function Dashboard() {
 
                         <th className="p-4 font-bold text-right align-top">Total Price</th>
                         <th className="p-4 font-bold text-center align-top">Payment</th>
-                        <th className="p-4 font-bold text-center align-top">Status</th>
+                        <th className="p-4 font-bold text-center align-top">Delivery Status</th>
 
                         <th className="p-4 font-bold text-center print:hidden align-top">Actions</th>
                       </tr>
@@ -2035,28 +1989,31 @@ export default function Dashboard() {
                               <td className={`p-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>
                               <td className={`p-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate}</td>
                               
-                              <td className="p-4 text-center align-middle">
-                                <div className="print:hidden">
-                                  <select 
-                                    value={order.orderStatus || "image edited (not paid)"}
-                                    onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${
-                                      order.orderStatus === 'image edit (pending)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' : 
-                                      order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : 
-                                      order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
-                                      order.orderStatus === 'delivered' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
-                                      'bg-[#ffe4e6] text-[#be123c] border-[#fda4af]'
-                                    }`}
-                                  >
-                                    <option value="image edit (pending)">Image Edit (Pending)</option>
-                                    <option value="image edited (not paid)">Image Edited (Not Paid)</option>
-                                    <option value="forward to print (paid)">Forward to Print (Paid)</option>
-                                    <option value="delivered">Delivered</option>
-                                    <option value="cancelled">Cancelled</option>
-                                  </select>
-                                </div>
-                                <span className="hidden print:inline text-[10px] font-bold text-black uppercase">{order.orderStatus || "image edited (not paid)"}</span>
-                              </td>
+                              {/* 🟢 CONDITIONALLY HIDE ORDER STATUS FOR DASHBOARD 2 */}
+                              {activeTab === 'dashboard1' && (
+                                <td className="p-4 text-center align-middle">
+                                  <div className="print:hidden">
+                                    <select 
+                                      value={order.orderStatus || "image edited (not paid)"}
+                                      onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
+                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${
+                                        order.orderStatus === 'image edit (pending)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' : 
+                                        order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : 
+                                        order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
+                                        order.orderStatus === 'delivered' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
+                                        'bg-[#ffe4e6] text-[#be123c] border-[#fda4af]'
+                                      }`}
+                                    >
+                                      <option value="image edit (pending)">Image Edit (Pending)</option>
+                                      <option value="image edited (not paid)">Image Edited (Not Paid)</option>
+                                      <option value="forward to print (paid)">Forward to Print (Paid)</option>
+                                      <option value="delivered">Delivered</option>
+                                      <option value="cancelled">Cancelled</option>
+                                    </select>
+                                  </div>
+                                  <span className="hidden print:inline text-[10px] font-bold text-black uppercase">{order.orderStatus || "image edited (not paid)"}</span>
+                                </td>
+                              )}
 
                               <td className={`p-4 print:text-gray-800 align-middle`}>
                                 {renderChocolateBadges(order.chocolate)}
@@ -2474,115 +2431,78 @@ export default function Dashboard() {
           {(activeTab as any) === 'admin_panel' && (
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
                
-               {/* 🟢 PROFESSIONAL HEADER: REFINED ALIGNMENT BASED ON IMAGES */}
-               <div className="bg-white py-5 px-6 rounded-[2rem] shadow-xl border border-amber-100/50 shrink-0 relative group z-20">
-                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 relative z-10">
-                   <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-[14px] bg-amber-100/50 flex items-center justify-center text-amber-800 shadow-sm mt-1 shrink-0">
-                        <TrendingUp size={20} strokeWidth={2.5}/>
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-black text-[#3e2723] tracking-tight leading-tight mb-0.5">
-                          {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
-                        </h2>
-                        <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-[0.15em] flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                          Sticker (₹1.5) | Labour (₹1) | Order wise mapped data
-                        </p>
-                      </div>
-                   </div>
+               {/* 🟢 MODIFIED HEADER: ADDED BOOK DROPDOWN AND SMALLER CLOSE BUTTON */}
+               <div className="flex justify-between items-center bg-[#f2eee6] p-4 rounded-2xl shadow-sm border border-[#d7ccc8] shrink-0 z-20 relative">
+                 <div>
+                    <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
+                      <TrendingUp className="text-amber-700"/> {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
+                    </h2>
+                    <p className="text-sm font-medium text-amber-700 mt-1">Sticker (₹1.5) | Labour (₹1) | Order wise mapped data.</p>
+                 </div>
 
-                   <div className="flex flex-wrap items-center gap-3">
-                      {/* Date Filter Group - Matches Image Style */}
-                      <div className="flex items-center gap-3 bg-amber-50/30 px-4 py-2.5 rounded-2xl border border-amber-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-                        <div className="flex items-center gap-2 pr-3 border-r-2 border-amber-200">
-                          <Calendar size={14} className="text-amber-700"/>
-                          <select
-                            value={adminDateType}
-                            onChange={(e) => setAdminDateType(e.target.value)}
-                            className="font-black text-[#3e2723] bg-transparent outline-none cursor-pointer text-[11px] uppercase tracking-wider"
-                          >
-                            <option value="Delivery Date">Delivery Date</option>
-                            <option value="Order Date">Order Date</option>
-                            <option value="Function Date">Function Date</option>
-                          </select>
-                          <ChevronDown size={14} className="text-amber-700 ml-[-4px]"/>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 pl-1">
-                          <div className="flex flex-col">
-                            <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-0.5">From</span>
-                            <input
-                              type="date"
-                              value={adminDateRange.from}
-                              onChange={(e) => setAdminDateRange({ ...adminDateRange, from: e.target.value })}
-                              className="text-[11px] font-black bg-transparent outline-none text-[#3e2723] cursor-pointer"
-                            />
-                          </div>
-                          <div className="w-3 h-[2px] bg-amber-200 rounded-full mt-1.5"></div>
-                          <div className="flex flex-col">
-                            <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-0.5">To</span>
-                            <input
-                              type="date"
-                              value={adminDateRange.to}
-                              onChange={(e) => setAdminDateRange({ ...adminDateRange, to: e.target.value })}
-                              className="text-[11px] font-black bg-transparent outline-none text-[#3e2723] cursor-pointer"
-                            />
-                          </div>
-                          {(adminDateRange.from || adminDateRange.to) && (
-                            <button onClick={() => setAdminDateRange({ from: "", to: "" })} className="ml-2 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition-colors">
-                              <X size={16} strokeWidth={3}/>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Dropdown - TABLE VIEW */}
-                      <div className="relative">
-                         <button 
-                            onClick={() => setAdminReportMenuOpen(!adminReportMenuOpen)}
-                            className="px-5 py-2.5 rounded-2xl text-[11px] font-black border-2 border-amber-100 text-[#3e2723] hover:bg-white bg-white shadow-sm hover:shadow-md transition-all flex items-center gap-2 group min-w-[140px]"
-                         >
-                            <Book size={16} className="text-amber-800"/> 
-                            <span className="uppercase tracking-widest flex-1 text-left">{adminReportDash === 'None' ? 'Table View' : adminReportDash}</span>
-                            <ChevronDown size={14} className={`transition-transform duration-300 text-amber-800 ${adminReportMenuOpen ? 'rotate-180' : ''}`}/>
-                         </button>
-                         {adminReportMenuOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border border-amber-100 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                               <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] border-b border-amber-50 flex items-center gap-3 uppercase tracking-widest">
-                                 <Menu size={14} className="text-amber-800"/> Table View
-                               </button>
-                               <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] border-b border-amber-50 flex items-center gap-3 uppercase tracking-widest">
-                                 <TrendingUp size={14} className="text-amber-800"/> Dashboard 1
-                               </button>
-                               <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-5 py-3 hover:bg-amber-50 text-[10px] font-black text-[#3e2723] flex items-center gap-3 uppercase tracking-widest">
-                                 <Package size={14} className="text-amber-800"/> Dashboard 2
-                               </button>
-                            </div>
-                         )}
-                      </div>
-
-                      {/* Approvals Button */}
-                      <button 
-                         onClick={() => setShowApprovalPanel(true)} 
-                         className="px-5 py-2.5 rounded-2xl text-[11px] font-black border-2 border-amber-100 text-[#3e2723] hover:bg-amber-50 bg-amber-50/20 shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 group"
+                 <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#d7ccc8] shadow-sm">
+                      <select
+                        value={adminDateType}
+                        onChange={(e) => setAdminDateType(e.target.value)}
+                        className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
                       >
-                         <Lock size={16} className="text-amber-800"/> 
-                         <span className="uppercase tracking-widest">Approvals</span>
-                         <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-lg text-[9px] font-black shadow-inner">
-                           {employees.filter(e => e.status === 'Pending').length}
-                         </span>
-                      </button>
+                        <option value="Delivery Date">Delivery Date</option>
+                        <option value="Order Date">Order Date</option>
+                        <option value="Function Date">Function Date</option>
+                      </select>
+                      <div className="h-4 w-[1px] bg-amber-200 mx-1"></div>
+                      <span className="text-xs font-bold text-amber-800">From:</span>
+                      <input
+                        type="date"
+                        value={adminDateRange.from}
+                        onChange={(e) => setAdminDateRange({ ...adminDateRange, from: e.target.value })}
+                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
+                      />
+                      <span className="text-xs font-bold text-amber-800">To:</span>
+                      <input
+                        type="date"
+                        value={adminDateRange.to}
+                        onChange={(e) => setAdminDateRange({ ...adminDateRange, to: e.target.value })}
+                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
+                      />
+                      {(adminDateRange.from || adminDateRange.to) && (
+                        <button onClick={() => setAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
 
-                      {/* 🔴 CLOSE ADMIN BUTTON - Now next to Approvals */}
-                      <button 
-                         onClick={() => setActiveTab('reports')} 
-                         className="px-3.5 py-2.5 rounded-2xl text-[11px] font-black border-2 border-red-100 text-red-600 hover:bg-red-600 hover:text-white bg-white shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 group"
-                         title="Exit Admin Panel"
-                      >
-                         <X size={18} strokeWidth={3}/>
-                      </button>
-                   </div>
+                    {/* 🟢 NEW BOOK DROPDOWN TO TOGGLE ADMIN REPORTS */}
+                    <div className="relative">
+                       <button 
+                          onClick={() => setAdminReportMenuOpen(!adminReportMenuOpen)}
+                          className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-amber-50 bg-white shadow-sm transition-all flex items-center gap-1.5"
+                       >
+                          <Book size={16}/> {adminReportDash === 'None' ? 'Table View' : adminReportDash} <ChevronDown size={14}/>
+                       </button>
+                       {adminReportMenuOpen && (
+                          <div className="absolute right-0 mt-2 w-40 bg-white border border-[#d7ccc8] rounded-xl shadow-lg z-50 overflow-hidden">
+                             <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
+                             <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
+                             <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">Dashboard 2</button>
+                          </div>
+                       )}
+                    </div>
+
+                    <button 
+                       onClick={() => setShowApprovalPanel(true)} 
+                       className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-amber-700 hover:bg-amber-50 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                    >
+                       <Lock size={16}/> Approvals ({employees.filter(e => e.status === 'Pending').length})
+                    </button>
+                    
+                    <button 
+                       onClick={() => setActiveTab('reports')} 
+                       className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-red-50 hover:text-red-700 hover:border-red-200 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                    >
+                       <X size={16}/> Close Admin
+                    </button>
                  </div>
                </div>
 
@@ -2624,17 +2544,17 @@ export default function Dashboard() {
                             )}
                         </tbody>
                         {costAnalyticsData.rows.length > 0 && (
-                          <tfoot className="sticky bottom-0 bg-[#3e2723] text-amber-50 z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
-                            <tr className="text-xs uppercase tracking-widest">
-                              <td className="p-6 border-r border-amber-900/50"></td>
-                              <td className="p-6 border-r border-amber-900/50"></td>
-                              <td className="p-6 border-r border-amber-900/50"></td>
-                              <td className="p-6 text-right font-black border-r border-amber-900/50 text-amber-200/60 uppercase">Grand Total:</td>
-                              <td className="p-6 text-center font-black border-r border-amber-900/50 bg-black/10">{costAnalyticsData.grandTotals.count.toLocaleString()}</td>
-                              <td className="p-6 text-right font-black border-r border-amber-900/50">₹{costAnalyticsData.grandTotals.stickerCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                              <td className="p-6 text-right font-black border-r border-amber-900/50">₹{costAnalyticsData.grandTotals.labourCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                              <td className="p-6 text-right font-black border-r border-amber-900/50">₹{costAnalyticsData.grandTotals.totalPurchase.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                              <td className="p-6 text-right font-black text-[#ffb300] text-2xl bg-black/20">₹{costAnalyticsData.grandTotals.finalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                          <tfoot className="sticky bottom-0 bg-[#3e2723] text-amber-50 z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.2)]">
+                            <tr className="text-sm">
+                              <td className="p-4 border-r border-[#5d4037]"></td>
+                              <td className="p-4 border-r border-[#5d4037]"></td>
+                              <td className="p-4 border-r border-[#5d4037]"></td>
+                              <td className="p-4 text-right font-black uppercase tracking-widest border-r border-[#5d4037]">Grand Total:</td>
+                              <td className="p-4 text-center font-black border-r border-[#5d4037]">{costAnalyticsData.grandTotals.count.toLocaleString()}</td>
+                              <td className="p-4 text-right font-bold border-r border-[#5d4037]">₹{costAnalyticsData.grandTotals.stickerCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="p-4 text-right font-bold border-r border-[#5d4037]">₹{costAnalyticsData.grandTotals.labourCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="p-4 text-right font-bold border-r border-[#5d4037]">₹{costAnalyticsData.grandTotals.totalPurchase.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="p-4 text-right font-black text-[#ffb300] text-lg">₹{costAnalyticsData.grandTotals.finalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                             </tr>
                           </tfoot>
                         )}
@@ -2684,45 +2604,20 @@ export default function Dashboard() {
                                 <Tooltip cursor={{fill: '#f5f5f5'}} contentStyle={{borderRadius: '12px', fontWeight: 'bold'}} />
                                 <Bar 
                                   dataKey="count" 
-                                  fill="#3b82f6"
                                   radius={[8, 8, 0, 0]}
                                   isAnimationActive={true} 
                                   animationBegin={0} 
                                   animationDuration={1500} 
                                   animationEasing="ease-out"
-                                />
+                                >
+                                  {adminReportData.chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                                </Bar>
                               </BarChart>
                             </ResponsiveContainer>
                           ) : (
                             <div className="flex h-full items-center justify-center text-gray-400 font-bold">No Data for Graph</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
-                        <h2 className="text-xl font-black text-[#3e2723] mb-6 flex items-center gap-2">
-                          <TrendingUp className="text-green-600"/> Profit Analytics (by Item)
-                        </h2>
-                        <div className="h-72 w-full">
-                          {adminReportData.profitChartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={adminReportData.profitChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                                <XAxis dataKey="name" tick={{fontSize: 12, fill: '#5d4037', fontWeight: 'bold'}} />
-                                <YAxis tick={{fontSize: 12, fill: '#5d4037', fontWeight: 'bold'}} />
-                                <Tooltip cursor={{fill: '#f5f5f5'}} contentStyle={{borderRadius: '12px', fontWeight: 'bold'}} />
-                                <Bar 
-                                  dataKey="profit" 
-                                  fill="#10b981"
-                                  radius={[8, 8, 0, 0]}
-                                  isAnimationActive={true} 
-                                  animationBegin={0} 
-                                  animationDuration={1500} 
-                                  animationEasing="ease-out"
-                                />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          ) : (
-                            <div className="flex h-full items-center justify-center text-gray-400 font-bold">No Profit Data</div>
                           )}
                         </div>
                       </div>
@@ -2754,16 +2649,12 @@ export default function Dashboard() {
                               <span className="font-black text-[#3e2723] text-2xl">{adminReportData.totalItems}</span>
                             </li>
                             <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                              <span className="text-[#a46c3b] font-bold">Total Revenue</span>
-                              <span className="font-black text-[#15803d] text-2xl">₹{adminReportData.totalRev.toLocaleString()}</span>
+                              <span className="text-[#a46c3b] font-bold">Total Delivery Charge</span>
+                              <span className="font-black text-[#3e2723] text-2xl">₹{adminReportData.totalDeliveryCharge.toLocaleString()}</span>
                             </li>
                             <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                              <span className="text-red-700 font-bold">Total Cost</span>
-                              <span className="font-black text-red-600 text-2xl">₹{adminReportData.totalCost.toLocaleString()}</span>
-                            </li>
-                            <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70 bg-green-50/50 p-2 rounded-xl">
-                              <span className="text-green-800 font-black">NET PROFIT</span>
-                              <span className="font-black text-green-700 text-3xl">₹{adminReportData.totalProfit.toLocaleString()}</span>
+                              <span className="text-[#a46c3b] font-bold">Total Revenue</span>
+                              <span className="font-black text-[#15803d] text-2xl">₹{adminReportData.totalRev.toLocaleString()}</span>
                             </li>
                           </ul>
 
@@ -2900,7 +2791,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 print:overflow-visible print:p-4">
+            <div className="p-6 overflow-auto flex-1 print:overflow-visible print:p-4">
                <div className="flex flex-wrap gap-6 mb-6 print:mb-8">
                   <div className="bg-white border border-amber-200 p-4 rounded-xl flex-1 min-w-[150px] print:border-gray-400">
                     <p className="text-xs font-bold text-amber-600 uppercase tracking-wider print:text-gray-500">Total Records</p>
@@ -3357,7 +3248,7 @@ export default function Dashboard() {
               <button onClick={() => setIsReportPreviewOpen(false)} className="text-gray-600 hover:bg-gray-200 hover:text-red-600 p-1.5 rounded-full transition-colors"><X size={24} /></button>
             </div>
 
-            <div id="final-report-document" className="p-8 overflow-y-auto bg-white flex-1 relative">
+            <div id="final-report-document" className="p-8 overflow-auto bg-white flex-1 relative">
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-black text-amber-900 uppercase tracking-wider">Sabi Return Gifts</h1>
                 <h2 className="text-xl font-bold text-gray-600 mt-2">Official Sales & Analytics Report</h2>
