@@ -141,7 +141,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
       </div>
 
       {/* Invoice Main Content */}
-      <div ref={invoiceRef} className="p-10 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
+      <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-0 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
         
         {/* Header Section */}
         <div className="flex justify-between items-start mb-6">
