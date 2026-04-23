@@ -249,6 +249,19 @@ export default function Dashboard() {
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const jumpToActions = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({ left: tableContainerRef.current.scrollWidth, behavior: 'smooth' });
+    }
+  };
+
+  const jumpToSerial = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  };
   
   const [customProducts, setCustomProducts] = useState<any[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -1759,7 +1772,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden print:border-none print:shadow-none`}>
+              <div className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-[calc(100vh-320px)] min-h-[550px] print:h-auto print:min-h-0 print:border-none print:shadow-none`}>
                 <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row justify-between items-center gap-4 border-amber-100 print:hidden`}>
                   
                   <div className="flex items-center gap-4 w-full md:w-auto">
@@ -1816,7 +1829,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)] min-h-[400px] shadow-inner bg-white/50 rounded-lg custom-scrollbar relative">
+                <div ref={tableContainerRef} className="flex-1 w-full overflow-x-auto overflow-y-auto shadow-inner bg-white/50 custom-scrollbar relative">
                   <table className="w-full text-left border-separate border-spacing-0 min-w-[1450px] print:min-w-0 print:w-full relative">
                     <thead className="sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm print:static">
                       <tr className={`text-sm border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
@@ -1824,7 +1837,10 @@ export default function Dashboard() {
                           <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded"/>
                         </th>
                         <th className="p-4 font-bold align-top">
-                          <div className="flex items-center gap-1 group">
+                          <div className="flex items-center gap-2 group">
+                            <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
+                              <ChevronRight size={14} strokeWidth={3} />
+                            </button>
                             <span>Serial No</span>
                             <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
                               <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
@@ -1977,7 +1993,14 @@ export default function Dashboard() {
                         <th className="p-4 font-bold text-center align-top">Payment</th>
                         <th className="p-4 font-bold text-center align-top">Delivery Status</th>
 
-                        <th className="p-4 font-bold text-center print:hidden align-top">Actions</th>
+                        <th className="p-4 font-bold text-center print:hidden align-top min-w-[100px]">
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
+                              <ChevronLeft size={14} strokeWidth={3} />
+                            </button>
+                            <span>Actions</span>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

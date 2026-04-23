@@ -64,7 +64,13 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   const handleDownload = async () => {
     if (invoiceRef.current) {
-      const canvas = await html2canvas(invoiceRef.current, { scale: 3, useCORS: true });
+      // Ensure smooth capture by setting temporary width if needed, though max-w-850 is already set
+      const canvas = await html2canvas(invoiceRef.current, { 
+        scale: 3, 
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `Invoice_${order.name || 'Customer'}.png`;
@@ -156,7 +162,6 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
                 className="w-64 h-40 object-contain"
                 crossOrigin="anonymous" 
               />
-              <p className="text-center font-serif italic text-red-600 font-black text-xl -mt-5">Sabi Return Gifts</p>
             </div>
           </div>
         </div>
