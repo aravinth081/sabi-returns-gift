@@ -12,13 +12,13 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   // Pricing Logic matching Dashboard
   const discountAmount = Number(order.discount) || 0;
-  const finalTotal = Number(order.totalPrice) || 0; 
+  const finalTotal = Number(order.totalPrice) || 0;
   const totalQty = Number(order.count) || 1;
-  
+
   // Reconstruct prices per item
   const items = String(order.chocolate || 'Gift Item').split(',').map(item => item.trim()).filter(Boolean);
   const itemCount = items.length;
-  
+
   // Calculate subtotal and unit prices
   // In Dashboard, totalPrice = (unitPrice * qty) + delivery - discount
   // We'll assume delivery is 0 for simplicity in the item list, or included in the first item
@@ -64,8 +64,8 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   const handleDownload = async () => {
     if (invoiceRef.current) {
-      const canvas = await html2canvas(invoiceRef.current, { 
-        scale: 2, 
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
@@ -84,8 +84,8 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
   const handleCopyAsImage = async () => {
     if (invoiceRef.current) {
       try {
-        const canvas = await html2canvas(invoiceRef.current, { 
-          scale: 2, 
+        const canvas = await html2canvas(invoiceRef.current, {
+          scale: 2,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
@@ -127,7 +127,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   return (
     <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-[850px] mx-auto border border-gray-300 font-sans text-black">
-      
+
       {/* Top Action Bar */}
       <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center print:hidden">
         <div className="flex gap-2">
@@ -135,7 +135,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
             <Download size={16} /> Download Invoice
           </button>
           <button onClick={handleCopyAsImage} className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold transition-all text-sm ${isCopied ? 'bg-green-600 text-white' : 'bg-gray-800 text-white hover:bg-black'}`}>
-            {isCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />} 
+            {isCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
             {isCopied ? 'Copied!' : 'Copy Image'}
           </button>
         </div>
@@ -146,7 +146,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
       {/* Invoice Main Content */}
       <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-4 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
-        
+
         {/* Header Section */}
         <div className="flex justify-between items-start mb-6">
           <div className="flex-1">
@@ -162,16 +162,16 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
               </p>
             </div>
           </div>
-          
+
           <div className="flex flex-col items-end ml-auto">
             <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-3 text-right">ORIGINAL FOR RECIPIENT</p>
-            <div className="flex items-center justify-end w-[420px] h-[170px] bg-white overflow-hidden">
-              <img 
-                src={`/sabi-logo.png?v=${refreshKey}`} 
-                alt="Logo" 
-                style={{ width: '400px', height: '160px', minWidth: '400px', minHeight: '160px', objectFit: 'cover', objectPosition: 'top' }}
-                className="object-top"
-                crossOrigin="anonymous" 
+            <div className="flex items-center justify-end w-[420px] h-[220px] bg-white overflow-hidden">
+              <img
+                src={`/sabi-logo.png?v=${refreshKey}`}
+                alt="Logo"
+                style={{ width: '400px', height: '200px', minWidth: '400px', minHeight: '200px' }}
+                className="object-contain object-right"
+                crossOrigin="anonymous"
               />
             </div>
           </div>
@@ -211,7 +211,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
               const itemRateBefore = avgRateBeforeDiscount;
               const itemQty = index === 0 ? totalQty : 0; // The total qty is usually for the whole "order line"
               const itemAmount = itemRate * (index === 0 ? totalQty : 0);
-              
+
               if (index > 0 && !order.chocolate.includes(',')) return null; // Safety check
 
               return (
@@ -221,16 +221,16 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
                     <p className="font-black text-[14px]">{item}</p>
                   </td>
                   <td className="py-5 px-1 align-top text-right">
-                    <p className="font-black text-[14px]">{itemRate.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                    <p className="font-black text-[14px]">{itemRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                     {discountAmount > 0 && index === 0 && (
                       <p className="text-gray-500 text-[11px] font-bold mt-1">
-                        {itemRateBefore.toFixed(2)} (-{((discountAmount/subTotal)*100).toFixed(2)}%)
+                        {itemRateBefore.toFixed(2)} (-{((discountAmount / subTotal) * 100).toFixed(2)}%)
                       </p>
                     )}
                   </td>
                   <td className="py-5 px-1 align-top text-center font-black text-[14px]">{index === 0 ? totalQty : '-'}</td>
                   <td className="py-5 px-1 align-top text-right font-black text-[14px]">
-                    {itemAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                    {itemAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
               );
@@ -246,17 +246,17 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
           <div className="w-[55%] text-right">
             <div className="flex justify-between py-1 border-t-2 border-black items-center">
               <span className="font-black text-[20px]">Total</span>
-              <span className="font-black text-[24px]">₹{finalTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              <span className="font-black text-[24px]">₹{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between py-1 font-black text-[14px]">
               <span>Total Discount</span>
-              <span>₹{discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              <span>₹{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="text-[11px] mt-2 text-gray-800 font-bold border-t border-gray-200 pt-2 tracking-tight">
               Total amount (in words): {numberToWords(finalTotal)}
             </div>
             <div className="flex justify-end items-center gap-1.5 text-[#38a169] font-black text-[13px] mt-2 uppercase">
-              <CheckCircle2 size={16} className="fill-[#38a169] text-white" /> 
+              <CheckCircle2 size={16} className="fill-[#38a169] text-white" />
               Amount Paid
             </div>
           </div>
@@ -270,7 +270,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
               <img src={qrCodeUrl} alt="QR" className="w-full h-full object-contain" crossOrigin="anonymous" />
             </div>
           </div>
-          
+
           <div>
             <p className="font-black mb-3 uppercase text-[12px]">Bank Details:</p>
             <div className="grid grid-cols-[100px_1fr] gap-y-1 font-bold text-[11px] leading-tight">
@@ -285,9 +285,9 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
           <div className="text-right flex flex-col items-end">
             <p className="mb-4 text-sm text-gray-500 font-bold italic">For Sabi return gifts</p>
-            <img 
-              src={`/signature.png?v=${refreshKey}`} 
-              alt="Sign" 
+            <img
+              src={`/signature.png?v=${refreshKey}`}
+              alt="Sign"
               className="mb-1 w-64 h-32 object-contain grayscale contrast-150"
               crossOrigin="anonymous"
             />
