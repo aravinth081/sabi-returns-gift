@@ -64,12 +64,12 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   const handleDownload = async () => {
     if (invoiceRef.current) {
-      // Ensure smooth capture by setting temporary width if needed, though max-w-850 is already set
       const canvas = await html2canvas(invoiceRef.current, { 
         scale: 3, 
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        windowWidth: 800
       });
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
@@ -82,7 +82,13 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
   const handleCopyAsImage = async () => {
     if (invoiceRef.current) {
       try {
-        const canvas = await html2canvas(invoiceRef.current, { scale: 3, useCORS: true });
+        const canvas = await html2canvas(invoiceRef.current, { 
+          scale: 3, 
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: 800
+        });
         canvas.toBlob(async (blob) => {
           if (blob) {
             try {
@@ -135,7 +141,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
       </div>
 
       {/* Invoice Main Content */}
-      <div ref={invoiceRef} className="p-10 bg-white text-black select-text text-[13px] leading-tight font-sans">
+      <div ref={invoiceRef} className="p-10 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
         
         {/* Header Section */}
         <div className="flex justify-between items-start mb-6">
