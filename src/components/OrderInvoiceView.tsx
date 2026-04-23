@@ -65,11 +65,13 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
   const handleDownload = async () => {
     if (invoiceRef.current) {
       const canvas = await html2canvas(invoiceRef.current, { 
-        scale: 3, 
+        scale: 2, 
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 800
+        windowWidth: 800,
+        scrollX: 0,
+        scrollY: 0
       });
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
@@ -83,11 +85,13 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
     if (invoiceRef.current) {
       try {
         const canvas = await html2canvas(invoiceRef.current, { 
-          scale: 3, 
+          scale: 2, 
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          windowWidth: 800
+          windowWidth: 800,
+          scrollX: 0,
+          scrollY: 0
         });
         canvas.toBlob(async (blob) => {
           if (blob) {
@@ -141,7 +145,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
       </div>
 
       {/* Invoice Main Content */}
-      <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-0 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
+      <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-4 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
         
         {/* Header Section */}
         <div className="flex justify-between items-start mb-6">
