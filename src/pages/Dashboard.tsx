@@ -16,7 +16,7 @@ import {
 // ------------------------------
 
 import { 
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, Upload, MoreVertical, Truck, ChevronDown, Archive, Book
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -1466,7 +1466,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 print:p-0 print:overflow-visible">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 print:p-0 print:overflow-visible">
 
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
@@ -1804,9 +1804,9 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="w-full overflow-x-auto overflow-y-auto max-h-[70vh] print:overflow-visible print:max-h-none shadow-inner bg-white/50 rounded-lg">
+                <div className="w-full overflow-x-auto shadow-inner bg-white/50 rounded-lg custom-scrollbar">
                   <table className="w-full text-left border-collapse min-w-[1450px] print:min-w-0 print:w-full relative">
-                    <thead className="sticky top-0 z-20 shadow-sm print:static">
+                    <thead className="sticky top-0 z-20 shadow-sm bg-amber-50 print:static">
                       <tr className={`text-sm border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
                         <th className="p-4 w-12 text-center print:hidden align-top">
                           <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded"/>
@@ -2114,7 +2114,7 @@ export default function Dashboard() {
                                       <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
                                       <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
                                       {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
-                                      <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Invoice"><span className="text-xl">🧾</span></button>
+                                      <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Invoice"><Receipt size={20} /></button>
                                     </div>
                                   </>
                                 )}

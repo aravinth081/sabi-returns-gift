@@ -1,51 +1,70 @@
- import React, { useRef, useMemo } from 'react';
-import { X, Download, Copy, CheckCircle2 } from "lucide-react";
+import React, { useRef, useMemo, useState } from 'react';
+import { X, Download, Copy, CheckCircle2, ClipboardCheck } from "lucide-react";
 import html2canvas from 'html2canvas';
 
 export default function OrderInvoiceView({ order, onClose }: { order: any; onClose: () => void }) {
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   if (!order) return null;
 
-  // 1. FORCE REFRESH KEY (To bypass Vercel/Browser Cache)
   const refreshKey = useMemo(() => Date.now(), []);
 
+  // Pricing Logic matching Dashboard
   const discountAmount = Number(order.discount) || 0;
   const finalTotal = Number(order.totalPrice) || 0; 
-  const subTotal = finalTotal + discountAmount;     
-
-  const itemCount = order.count || 1;
-  const unitPrice = subTotal / itemCount;
+  const totalQty = Number(order.count) || 1;
+  
+  // Reconstruct prices per item
+  const items = String(order.chocolate || 'Gift Item').split(',').map(item => item.trim()).filter(Boolean);
+  const itemCount = items.length;
+  
+  // Calculate subtotal and unit prices
+  // In Dashboard, totalPrice = (unitPrice * qty) + delivery - discount
+  // We'll assume delivery is 0 for simplicity in the item list, or included in the first item
+  const subTotal = finalTotal + discountAmount;
+  const avgRateAfterDiscount = finalTotal / totalQty;
+  const avgRateBeforeDiscount = subTotal / totalQty;
 
   const numberToWords = (num: number) => {
-    return `INR ${num.toLocaleString('en-IN')} Only`;
-  };
+    if (num === 0) return 'INR Zero Only';
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
 
-  const handleCopyAsImage = async () => {
-    if (invoiceRef.current) {
-      try {
-        const canvas = await html2canvas(invoiceRef.current, { scale: 2, useCORS: true });
-        canvas.toBlob(async (blob) => {
-          if (blob) {
-            try {
-              const item = new ClipboardItem({ "image/png": blob });
-              await navigator.clipboard.write([item]);
-              alert("Copied successfully");
-            } catch (err) {
-              console.error(err);
-              alert("Clipboard error. Use download button instead.");
-            }
-          }
-        }, "image/png");
-      } catch (err) {
-        console.error("Failed to copy image: ", err);
+    const convertLessThanThousand = (n: number): string => {
+      if (n === 0) return '';
+      let res = '';
+      if (n >= 100) {
+        res += ones[Math.floor(n / 100)] + ' Hundred ';
+        n %= 100;
       }
-    }
+      if (n >= 10 && n <= 19) {
+        res += teens[n - 10];
+      } else {
+        if (n >= 20) {
+          res += tens[Math.floor(n / 10)] + ' ';
+          n %= 10;
+        }
+        if (n > 0) {
+          res += ones[n];
+        }
+      }
+      return res.trim();
+    };
+
+    let n = Math.floor(num);
+    let res = '';
+    if (n >= 10000000) { res += convertLessThanThousand(Math.floor(n / 10000000)) + ' Crore '; n %= 10000000; }
+    if (n >= 100000) { res += convertLessThanThousand(Math.floor(n / 100000)) + ' Lakh '; n %= 100000; }
+    if (n >= 1000) { res += convertLessThanThousand(Math.floor(n / 1000)) + ' Thousand '; n %= 1000; }
+    res += convertLessThanThousand(n);
+    return `INR ${res.trim()} Rupees Only.`;
   };
 
   const handleDownload = async () => {
     if (invoiceRef.current) {
-      const canvas = await html2canvas(invoiceRef.current, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(invoiceRef.current, { scale: 3, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `Invoice_${order.name || 'Customer'}.png`;
@@ -54,173 +73,224 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
     }
   };
 
-  // 2. STRICT DYNAMIC SERIAL NUMBER LOGIC
+  const handleCopyAsImage = async () => {
+    if (invoiceRef.current) {
+      try {
+        const canvas = await html2canvas(invoiceRef.current, { scale: 3, useCORS: true });
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            try {
+              const item = new ClipboardItem({ "image/png": blob });
+              await navigator.clipboard.write([item]);
+              setIsCopied(true);
+              setTimeout(() => setIsCopied(false), 2000);
+            } catch (err) {
+              console.error(err);
+              alert("Browser block clipboad. Use Download.");
+            }
+          }
+        }, "image/png");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   const getInvoiceNumber = () => {
     const rawId = order.serialNo || order.serialNumber || order.orderId || order.fireId || order.id || "001";
     let id = String(rawId).toUpperCase();
-    
-    // Firebase long ID handling
-    if (id.length > 15) {
-      id = id.slice(-5);
-    }
-
+    if (id.length > 15) id = id.slice(-5);
     return id.startsWith("INV-") ? id : `INV-${id}`;
   };
 
   const invoiceNumber = getInvoiceNumber();
-  const currentDate = order.functionDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const currentDate = order.deliveryDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
-  const upiData = `upi://pay?pa=50100712876632@HDFC0000500.ifsc.npci&pn=Sabi return gifts&cu=INR&am=${finalTotal.toFixed(2)}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiData)}`;
+  const upiData = `upi://pay?pa=8220638753@upi&pn=SUBASH%20G&am=${finalTotal.toFixed(2)}&cu=INR`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiData)}`;
 
   return (
-    <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-[900px] mx-auto border border-gray-300 font-sans text-black">
+    <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-[850px] mx-auto border border-gray-300 font-sans text-black">
       
       {/* Top Action Bar */}
       <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center print:hidden">
-        <div className="flex gap-3">
-          <button onClick={handleDownload} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-blue-700 transition-all text-sm">
-            <Download size={16} /> Download
+        <div className="flex gap-2">
+          <button onClick={handleDownload} className="flex items-center gap-2 bg-[#1a365d] text-white px-5 py-2 rounded-lg font-bold hover:bg-[#2c5282] transition-all text-sm">
+            <Download size={16} /> Download Invoice
           </button>
-          <button onClick={handleCopyAsImage} className="flex items-center gap-2 bg-gray-800 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition-all text-sm">
-            <Copy size={16} /> Copy
+          <button onClick={handleCopyAsImage} className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold transition-all text-sm ${isCopied ? 'bg-green-600 text-white' : 'bg-gray-800 text-white hover:bg-black'}`}>
+            {isCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />} 
+            {isCopied ? 'Copied!' : 'Copy Image'}
           </button>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-gray-300 rounded-full transition-all text-gray-700">
+        <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-all text-gray-700">
           <X size={24} />
         </button>
       </div>
 
       {/* Invoice Main Content */}
-      <div ref={invoiceRef} className="p-10 bg-white text-black select-text text-[13px] leading-snug tracking-wide">
+      <div ref={invoiceRef} className="p-10 bg-white text-black select-text text-[13px] leading-tight font-sans">
         
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h2 className="text-blue-600 font-bold tracking-[0.2em] uppercase text-lg mb-4">INVOICE</h2>
-            <h1 className="text-3xl font-extrabold text-black mb-1 leading-tight">Sabi return gifts</h1>
-            <p className="font-bold text-sm mb-0.5">PAN <span className="font-extrabold">FTZPS7678B</span></p>
-            <p className="text-sm">2/35, 57th Street, 10th Sector, Ayyavupuram, west K.K.Nagar</p>
-            <p className="text-sm mb-2">Chennai City South, TAMIL NADU, 600078</p>
-            <p className="text-sm">
-              <span className="font-bold">Mobile</span> +91 9345260698, 8220638753 <span className="font-bold ml-3">Email</span> sabireturngifts@gmail.com
-            </p>
+        {/* Header Section */}
+        <div className="flex justify-between items-start mb-6">
+          <div className="flex-1">
+            <h2 className="text-[#3182ce] font-bold tracking-widest uppercase text-lg mb-4">INVOICE</h2>
+            <h1 className="text-2xl font-black text-black mb-1">Sabi return gifts</h1>
+            <div className="text-[13px] font-bold space-y-0.5">
+              <p>PAN <span className="font-extrabold uppercase">FTZPS7678B</span></p>
+              <p>2/35, 57th Street, 10th Sector</p>
+              <p>Ayyavupuram, west K.K.Nagar</p>
+              <p>Chennai City South, TAMIL NADU, 600078</p>
+              <p>
+                Mobile <span className="font-extrabold">+91 9345260698, 8220638753</span> <span className="ml-2">Email sabireturngifts@gmail.com</span>
+              </p>
+            </div>
           </div>
           
-          {/* Logo with Strict Center Alignment and Cache Breaker */}
-          <div className="flex flex-col items-center pt-2 ml-auto">
-            <p className="text-gray-600 font-bold uppercase text-[11px] tracking-widest mb-1 text-center font-sans">ORIGINAL FOR RECIPIENT</p>
-            <img 
-              src={`/sabi-logo.png?v=${refreshKey}`} 
-              alt="Logo" 
-              className="w-60 h-36 object-contain mix-blend-darken"
-              crossOrigin="anonymous" 
-            />
+          <div className="text-right">
+            <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-3">ORIGINAL FOR RECIPIENT</p>
+            <div className="flex flex-col items-center">
+              <img 
+                src={`/sabi-logo.png?v=${refreshKey}`} 
+                alt="Logo" 
+                className="w-64 h-40 object-contain"
+                crossOrigin="anonymous" 
+              />
+              <p className="text-center font-serif italic text-red-600 font-black text-xl -mt-5">Sabi Return Gifts</p>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6 font-bold text-sm border-y border-gray-100 py-4">
-          <div>Invoice #: <span className="font-normal">{invoiceNumber}</span></div>
-          <div>Invoice Date: <span className="font-normal">{currentDate}</span></div>
-          <div>Due Date: <span className="font-normal">{currentDate}</span></div>
+        {/* Meta Row */}
+        <div className="flex justify-between items-center mb-8 border-y border-gray-100 py-3 font-bold text-[13px]">
+          <div>Invoice #: <span className="font-black">{invoiceNumber}</span></div>
+          <div>Invoice Date: <span className="font-black">{currentDate}</span></div>
+          <div>Due Date: <span className="font-black">{currentDate}</span></div>
         </div>
 
-        <div className="mb-8 text-sm">
-          <p className="font-extrabold mb-1 uppercase tracking-tighter text-gray-500">Customer Details:</p>
-          <p className="font-extrabold text-lg">{order.name}</p>
+        {/* Customer Details */}
+        <div className="mb-6">
+          <p className="font-bold text-gray-500 mb-1">Customer Details:</p>
+          <p className="font-black text-lg leading-none mb-1">{order.name}</p>
           <p className="font-bold">Ph: {order.phone}</p>
         </div>
 
         {/* Items Table */}
-        <table className="w-full border-collapse mb-2">
+        <table className="w-full border-collapse mb-1">
           <thead>
-            <tr className="border-y-[3px] border-blue-500 text-left bg-blue-50/30">
-              <th className="py-3 px-2 font-bold w-10">#</th>
-              <th className="py-3 px-2 font-bold uppercase text-[11px]">Item</th>
-              <th className="py-3 px-2 font-bold text-right w-32 uppercase text-[11px]">Rate / Item</th>
-              <th className="py-3 px-2 font-bold text-center w-24 uppercase text-[11px]">Qty</th>
-              <th className="py-3 px-2 font-bold text-right w-36 uppercase text-[11px]">Amount</th>
+            <tr className="border-y-2 border-[#3182ce] text-left text-[11px] uppercase tracking-wider">
+              <th className="py-2 px-1 font-black w-8">#</th>
+              <th className="py-2 px-1 font-black">Item</th>
+              <th className="py-2 px-1 font-black text-right w-48">Rate / Item</th>
+              <th className="py-2 px-1 font-black text-center w-24">Qty</th>
+              <th className="py-2 px-1 font-black text-right w-36">Amount</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b-[3px] border-black">
-              <td className="py-5 px-2 align-top text-sm font-bold">1</td>
-              <td className="py-5 px-2 align-top">
-                <p className="font-extrabold text-base mb-1 uppercase text-black leading-none">{order.category || 'Surprise Package'}</p>
-                <p className="text-gray-500 text-[12px] font-bold">{order.chocolate ? `Type: ${order.chocolate}` : 'Custom Gift Package'}</p>
-              </td>
-              <td className="py-5 px-2 align-top text-right text-sm">{unitPrice.toFixed(2)}</td>
-              <td className="py-5 px-2 align-top text-center text-sm font-bold">{itemCount}</td>
-              <td className="py-5 px-2 align-top text-right text-sm font-black">{(subTotal).toFixed(2)}</td>
-            </tr>
+            {items.map((item, index) => {
+              // Logic to distribute prices:
+              // For now, we assume the first item takes the total and the others are part of the set
+              // OR we split the total equally. Equal split is safer for "Kitkat" style lists.
+              const itemRate = avgRateAfterDiscount;
+              const itemRateBefore = avgRateBeforeDiscount;
+              const itemQty = index === 0 ? totalQty : 0; // The total qty is usually for the whole "order line"
+              const itemAmount = itemRate * (index === 0 ? totalQty : 0);
+              
+              if (index > 0 && !order.chocolate.includes(',')) return null; // Safety check
+
+              return (
+                <tr key={index} className={index === items.length - 1 ? 'border-b-2 border-black' : 'border-b border-gray-100'}>
+                  <td className="py-5 px-1 align-top font-bold">{index + 1}</td>
+                  <td className="py-5 px-1 align-top">
+                    <p className="font-black text-[14px]">{item}</p>
+                  </td>
+                  <td className="py-5 px-1 align-top text-right">
+                    <p className="font-black text-[14px]">{itemRate.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                    {discountAmount > 0 && index === 0 && (
+                      <p className="text-gray-500 text-[11px] font-bold mt-1">
+                        {itemRateBefore.toFixed(2)} (-{((discountAmount/subTotal)*100).toFixed(2)}%)
+                      </p>
+                    )}
+                  </td>
+                  <td className="py-5 px-1 align-top text-center font-black text-[14px]">{index === 0 ? totalQty : '-'}</td>
+                  <td className="py-5 px-1 align-top text-right font-black text-[14px]">
+                    {itemAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
-        {/* Calculation Summary */}
-        <div className="flex justify-between items-start mb-10 pt-4">
-          <div className="text-gray-400 mt-6 text-sm italic font-bold">
-            Total Items / Qty : 1 / {itemCount}
+        {/* Summary Area */}
+        <div className="flex justify-between items-start mb-6 pt-2">
+          <div className="text-gray-500 font-bold text-[12px]">
+            Total Items / Qty : {itemCount} / {totalQty}
           </div>
-          <div className="w-[45%]">
-            <div className="flex justify-between py-2 font-bold text-lg border-b border-gray-50">
-              <span>Sub-Total</span>
-              <span>₹{(subTotal).toFixed(2)}</span>
+          <div className="w-[55%] text-right">
+            <div className="flex justify-between py-1 border-t-2 border-black items-center">
+              <span className="font-black text-[20px]">Total</span>
+              <span className="font-black text-[24px]">₹{finalTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
             </div>
-            
-            <div className="flex justify-between py-2 font-bold text-sm mb-2 text-red-600">
+            <div className="flex justify-between py-1 font-black text-[14px]">
               <span>Total Discount</span>
-              <span>- ₹{(discountAmount).toFixed(2)}</span>
+              <span>₹{discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
             </div>
-
-            <div className="text-right text-[11px] mb-3 text-gray-500 font-bold italic">
+            <div className="text-[11px] mt-2 text-gray-800 font-bold border-t border-gray-200 pt-2 tracking-tight">
               Total amount (in words): {numberToWords(finalTotal)}
             </div>
-            <div className="flex justify-end items-center gap-1.5 text-green-600 font-black text-xl">
-              <CheckCircle2 size={20} className="fill-green-600 text-white" /> 
-              Amount Paid: ₹{(finalTotal).toFixed(2)}
+            <div className="flex justify-end items-center gap-1.5 text-[#38a169] font-black text-[13px] mt-2 uppercase">
+              <CheckCircle2 size={16} className="fill-[#38a169] text-white" /> 
+              Amount Paid
             </div>
           </div>
         </div>
 
-        {/* Bank & Signature Section */}
-        <div className="flex justify-between items-start border-t border-gray-300 pt-8 mb-12">
-          <div className="w-[20%]">
-            <p className="font-extrabold mb-3 text-[11px] uppercase tracking-widest text-blue-600">Pay using UPI:</p>
-            <div className="w-28 h-28 bg-white rounded-xl p-2 border-2 border-gray-100 shadow-inner">
+        {/* UPI & Bank Details Row */}
+        <div className="grid grid-cols-[1fr_1.2fr_1fr] gap-8 border-t border-gray-300 pt-8 mb-10">
+          <div>
+            <p className="font-black mb-3 uppercase text-[12px]">Pay using UPI:</p>
+            <div className="w-32 h-32 bg-white border border-gray-100 p-1">
               <img src={qrCodeUrl} alt="QR" className="w-full h-full object-contain" crossOrigin="anonymous" />
             </div>
           </div>
-          <div className="w-[45%]">
-            <p className="font-extrabold mb-3 text-[11px] uppercase tracking-widest text-blue-600">Bank Details:</p>
-            <div className="grid grid-cols-[110px_1fr] gap-y-1 text-[12px] font-bold">
-              <span className="text-gray-400">Bank:</span><span className="text-black uppercase">HDFC Bank</span>
-              <span className="text-gray-400">Account:</span><span className="text-black uppercase text-[11px]">Sabi return gifts</span>
-              <span className="text-gray-400">A/C No:</span><span className="text-black">50100712876632</span>
-              <span className="text-gray-400">IFSC:</span><span className="text-black">HDFC0000500</span>
-              <span className="text-gray-400">Branch:</span><span className="text-black uppercase text-[11px]">KoTTIVAKKAM (Subash G)</span>
+          
+          <div>
+            <p className="font-black mb-3 uppercase text-[12px]">Bank Details:</p>
+            <div className="grid grid-cols-[100px_1fr] gap-y-1 font-bold text-[11px] leading-tight">
+              <span className="text-gray-500">Bank:</span><span className="font-black uppercase">HDFC Bank</span>
+              <span className="text-gray-500">Account Holder:</span><span className="font-black uppercase">Sabi return gifts</span>
+              <span className="text-gray-500">Account #:</span><span className="font-black">50100712876632</span>
+              <span className="text-gray-500">IFSC Code:</span><span className="font-black uppercase">HDFC0000500</span>
+              <span className="text-gray-500">Branch:</span><span className="font-black uppercase">KOTTIVAKKAM</span>
+              <span className="text-gray-500"></span><span className="font-black text-[10px]">Subash G</span>
             </div>
           </div>
-          <div className="w-[30%] text-right flex flex-col items-end pt-2">
-            <p className="mb-2 text-sm text-gray-400 font-bold italic">For Sabi return gifts</p>
-            
-            {/* Signature with Cache Breaker and Proper Size */}
+
+          <div className="text-right flex flex-col items-end">
+            <p className="mb-4 text-sm text-gray-500 font-bold italic">For Sabi return gifts</p>
             <img 
               src={`/signature.png?v=${refreshKey}`} 
               alt="Sign" 
-              className="mb-2 w-44 h-24 object-contain mix-blend-darken grayscale contrast-125"
+              className="mb-1 w-64 h-32 object-contain grayscale contrast-150"
               crossOrigin="anonymous"
             />
-            
-            <p className="text-[12px] text-black font-black pt-1 border-t-2 border-gray-200 w-44 text-center uppercase tracking-tighter">Authorized Signatory</p>
+            <p className="text-[12px] text-black font-black pt-1 border-t-2 border-gray-200 w-64 text-center uppercase tracking-tighter">Authorized Signatory</p>
           </div>
         </div>
 
-        {/* Terms and Conditions */}
-        <div className="text-[10px] leading-relaxed text-gray-500 border-t border-gray-100 pt-6 font-medium italic">
-          <p className="font-black text-[11px] mb-2 text-black uppercase not-italic underline">Terms and Conditions:</p>
-          <ul className="list-disc pl-4 space-y-1">
-            <li>Order Confirmation: Orders will be confirmed only after the payment is received.</li>
-            <li>Customized products cannot be cancelled, returned, or refunded once production has started.</li>
-            <li>Damage During Transit: Any issues must be reported within 24 hours of delivery with photo proof.</li>
+        {/* Terms and Conditions Section */}
+        <div className="text-[10px] leading-relaxed text-gray-600 border-t border-gray-100 pt-6 font-bold">
+          <p className="font-black text-[11px] mb-2 text-black uppercase underline">Terms and Conditions:</p>
+          <ul className="list-none space-y-1">
+            <li>* Order Confirmation: Orders will be confirmed only after the payment is received.</li>
+            <li>* Customized products cannot be cancelled, returned, or refunded once production has started.</li>
+            <li>* Customization Approval: Customers must verify and approve all customization details (name, photo, spelling, design, quantity) before production. Sabi Return Gifts will not be responsible for errors approved by the customer.</li>
+            <li>* Delivery & Dispatch: Delivery timelines depend on order quantity and customization requirements. Sabi Return Gifts will not be responsible for delays caused by courier or third-party delivery services.</li>
+            <li>* All India Delivery: Delivery is available across Chennai and all over India. Shipping charges may apply depending on location and order size.</li>
+            <li>* Damage During Transit: Any issues must be reported within 24 hours of delivery with photo proof.</li>
+            <li>* Sabi Return Gifts is not responsible for courier delays or transit damages.</li>
+            <li>* For orders with advance payment, the balance amount must be paid before delivery or dispatch.</li>
           </ul>
         </div>
 
