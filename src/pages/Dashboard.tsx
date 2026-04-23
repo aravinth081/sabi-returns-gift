@@ -16,7 +16,7 @@ import {
 // ------------------------------
 
 import { 
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -247,6 +247,8 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   const [customProducts, setCustomProducts] = useState<any[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -684,6 +686,16 @@ export default function Dashboard() {
     }
     return sortable;
   }, [filteredDashboardOrders, sortConfig]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredDashboardOrders, activeTab]);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedDashboardOrders.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedDashboardOrders, currentPage]);
 
   const reportData = useMemo(() => {
     let filtered = orders;
@@ -1804,9 +1816,9 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="w-full overflow-x-auto shadow-inner bg-white/50 rounded-lg custom-scrollbar">
-                  <table className="w-full text-left border-collapse min-w-[1450px] print:min-w-0 print:w-full relative">
-                    <thead className="sticky top-0 z-20 shadow-sm bg-amber-50 print:static">
+                <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)] min-h-[400px] shadow-inner bg-white/50 rounded-lg custom-scrollbar relative">
+                  <table className="w-full text-left border-separate border-spacing-0 min-w-[1450px] print:min-w-0 print:w-full relative">
+                    <thead className="sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm print:static">
                       <tr className={`text-sm border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
                         <th className="p-4 w-12 text-center print:hidden align-top">
                           <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded"/>
@@ -1969,10 +1981,10 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedDashboardOrders.length === 0 ? (
+                      {paginatedOrders.length === 0 ? (
                         <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
                       ) : (
-                        sortedDashboardOrders.map((order) => {
+                        paginatedOrders.map((order) => {
                           const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus);
                           const isSelected = selectedOrders.includes(order.id);
                           
@@ -2127,6 +2139,52 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {sortedDashboardOrders.length > itemsPerPage && (
+                  <div className="bg-amber-50/80 backdrop-blur-sm border-t border-amber-100 p-4 flex items-center justify-between print:hidden">
+                    <div className="text-sm font-bold text-amber-800">
+                      Showing <span className="text-amber-950">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-amber-950">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="text-amber-950">{sortedDashboardOrders.length}</span> records
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-amber-800 border-amber-200 hover:bg-amber-100 active:scale-95'}`}
+                        title="Previous Page"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => page === 1 || page === Math.ceil(sortedDashboardOrders.length / itemsPerPage) || Math.abs(page - currentPage) <= 1)
+                          .map((page, index, array) => (
+                            <React.Fragment key={page}>
+                              {index > 0 && array[index - 1] !== page - 1 && <span className="px-1 text-amber-400">...</span>}
+                              <button
+                                onClick={() => setCurrentPage(page)}
+                                className={`w-9 h-9 rounded-lg font-bold transition-all ${currentPage === page ? 'bg-amber-600 text-white shadow-md' : 'bg-white text-amber-800 border border-amber-200 hover:bg-amber-100'}`}
+                              >
+                                {page}
+                              </button>
+                            </React.Fragment>
+                          ))
+                        }
+                      </div>
+
+                      <button 
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(sortedDashboardOrders.length / itemsPerPage), prev + 1))}
+                        disabled={currentPage === Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
+                        className={`p-2 rounded-lg border transition-all ${currentPage === Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-amber-800 border-amber-200 hover:bg-amber-100 active:scale-95'}`}
+                        title="Next Page"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
