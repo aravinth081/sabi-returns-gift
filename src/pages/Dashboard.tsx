@@ -708,7 +708,7 @@ export default function Dashboard() {
   const paginatedOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return sortedDashboardOrders.slice(startIndex, startIndex + itemsPerPage);
-  }, [sortedDashboardOrders, currentPage]);
+  }, [sortedDashboardOrders, currentPage, itemsPerPage]);
 
   const reportData = useMemo(() => {
     let filtered = orders;
@@ -1772,7 +1772,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-[calc(100vh-320px)] min-h-[550px] print:h-auto print:min-h-0 print:border-none print:shadow-none`}>
+              <div className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8`}>
                 <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row justify-between items-center gap-4 border-amber-100 print:hidden`}>
                   
                   <div className="flex items-center gap-4 w-full md:w-auto">
@@ -1829,7 +1829,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div ref={tableContainerRef} className="flex-1 w-full overflow-x-auto overflow-y-auto shadow-inner bg-white/50 custom-scrollbar relative">
+                <div ref={tableContainerRef} className="flex-1 w-full overflow-x-auto overflow-y-hidden shadow-inner bg-white/50 custom-scrollbar relative">
                   <table className="w-full text-left border-separate border-spacing-0 min-w-[1450px] print:min-w-0 print:w-full relative">
                     <thead className="sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm print:static">
                       <tr className={`text-sm border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
@@ -2164,48 +2164,21 @@ export default function Dashboard() {
                 </div>
 
                 {/* Pagination Controls */}
-                {sortedDashboardOrders.length > itemsPerPage && (
-                  <div className="bg-amber-50/80 backdrop-blur-sm border-t border-amber-100 p-4 flex items-center justify-between print:hidden">
-                    <div className="text-sm font-bold text-amber-800">
-                      Showing <span className="text-amber-950">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-amber-950">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="text-amber-950">{sortedDashboardOrders.length}</span> records
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-amber-800 border-amber-200 hover:bg-amber-100 active:scale-95'}`}
-                        title="Previous Page"
-                      >
-                        <ChevronLeft size={20} />
-                      </button>
-                      
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }, (_, i) => i + 1)
-                          .filter(page => page === 1 || page === Math.ceil(sortedDashboardOrders.length / itemsPerPage) || Math.abs(page - currentPage) <= 1)
-                          .map((page, index, array) => (
-                            <React.Fragment key={page}>
-                              {index > 0 && array[index - 1] !== page - 1 && <span className="px-1 text-amber-400">...</span>}
-                              <button
-                                onClick={() => setCurrentPage(page)}
-                                className={`w-9 h-9 rounded-lg font-bold transition-all ${currentPage === page ? 'bg-amber-600 text-white shadow-md' : 'bg-white text-amber-800 border border-amber-200 hover:bg-amber-100'}`}
-                              >
-                                {page}
-                              </button>
-                            </React.Fragment>
-                          ))
+                {/* Next Page Arrow Button */}
+                {sortedDashboardOrders.length > currentPage * itemsPerPage && (
+                  <div className="flex justify-center p-6 bg-transparent print:hidden">
+                    <button 
+                      onClick={() => {
+                        setCurrentPage(prev => prev + 1);
+                        if (tableContainerRef.current) {
+                           tableContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
                         }
-                      </div>
-
-                      <button 
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(sortedDashboardOrders.length / itemsPerPage), prev + 1))}
-                        disabled={currentPage === Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
-                        className={`p-2 rounded-lg border transition-all ${currentPage === Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-amber-800 border-amber-200 hover:bg-amber-100 active:scale-95'}`}
-                        title="Next Page"
-                      >
-                        <ChevronRight size={20} />
-                      </button>
-                    </div>
+                      }}
+                      className="group p-2 rounded-full bg-amber-600/10 text-amber-600 border-2 border-amber-600/20 hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all shadow-sm active:scale-90"
+                      title="Next 10 Orders"
+                    >
+                      <ChevronRight size={24} />
+                    </button>
                   </div>
                 )}
               </div>
