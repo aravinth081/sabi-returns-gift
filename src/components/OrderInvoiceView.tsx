@@ -12,8 +12,10 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   // Pricing Logic matching Dashboard
   const discountAmount = Number(order.discount) || 0;
-  const finalTotal = Number(order.totalPrice) || 0;
+  const finalTotal = Number(order.totalOrderPrice || order.totalPrice) || 0;
   const totalQty = Number(order.count) || 1;
+  const advancePaid = Number(order.advanceAmount) || 0;
+  const pendingBalance = finalTotal - advancePaid;
 
   // Reconstruct prices per item
   const items = String(order.chocolate || 'Gift Item').split(',').map(item => item.trim()).filter(Boolean);
@@ -252,12 +254,24 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
               <span>Total Discount</span>
               <span>₹{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
+            {advancePaid > 0 && (
+              <div className="flex justify-between py-1 font-black text-[14px] text-green-700">
+                <span>Advance Paid</span>
+                <span>₹{advancePaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {pendingBalance > 0 && (
+              <div className="flex justify-between py-1 font-black text-[14px] text-red-600 border-t border-gray-200 mt-1">
+                <span>Pending Balance</span>
+                <span>₹{pendingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="text-[11px] mt-2 text-gray-800 font-bold border-t border-gray-200 pt-2 tracking-tight">
               Total amount (in words): {numberToWords(finalTotal)}
             </div>
-            <div className="flex justify-end items-center gap-1.5 text-[#38a169] font-black text-[13px] mt-2 uppercase">
-              <CheckCircle2 size={16} className="fill-[#38a169] text-white" />
-              Amount Paid
+            <div className={`flex justify-end items-center gap-1.5 font-black text-[13px] mt-2 uppercase ${order.paymentStatus === 'Full Paid' ? 'text-[#38a169]' : 'text-orange-600'}`}>
+              <CheckCircle2 size={16} className={`fill-current text-white`} />
+              {order.paymentStatus || 'Payment Pending'}
             </div>
           </div>
         </div>

@@ -37,11 +37,26 @@ const db = getFirestore(app);
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
 
-const CHOCOLATE_PRICES_MAP: Record<string, number> = {
-  "kitkat": 20, "dairy milk": 15, "dairymilk": 15, "peanut candy": 17, "5 star": 15,
-  "10 rs dairy milk": 20, "dairymilk shots": 10, "10 rs 5 star": 22, "1 rs chocolate": 8,
-  "milky bar": 10, "snickers": 20, "bounty": 20, "munch": 10, "perk": 10,
-  "ferrero rocher": 50, "toblerone": 50, "kinder joy": 40, "hershey's": 30, "gems": 10,
+const CHOCOLATE_PRICES_MAP: Record<string, { retail: number; wholesale: number }> = {
+  "kitkat": { retail: 20, wholesale: 18 },
+  "dairy milk": { retail: 15, wholesale: 13 },
+  "dairymilk": { retail: 15, wholesale: 13 },
+  "peanut candy": { retail: 17, wholesale: 15 },
+  "5 star": { retail: 15, wholesale: 13 },
+  "10 rs dairy milk": { retail: 20, wholesale: 18 },
+  "dairymilk shots": { retail: 10, wholesale: 8 },
+  "10 rs 5 star": { retail: 22, wholesale: 20 },
+  "1 rs chocolate": { retail: 8, wholesale: 6 },
+  "milky bar": { retail: 10, wholesale: 8 },
+  "snickers": { retail: 20, wholesale: 18 },
+  "bounty": { retail: 20, wholesale: 18 },
+  "munch": { retail: 10, wholesale: 8 },
+  "perk": { retail: 10, wholesale: 8 },
+  "ferrero rocher": { retail: 50, wholesale: 45 },
+  "toblerone": { retail: 50, wholesale: 45 },
+  "kinder joy": { retail: 40, wholesale: 35 },
+  "hershey's": { retail: 30, wholesale: 25 },
+  "gems": { retail: 10, wholesale: 8 },
 };
 
 const CHOCOLATE_PURCHASE_MAP: Record<string, number> = {
@@ -74,7 +89,7 @@ const normalizeChocName = (name: string, dynamicInventory: string[] = []) => {
 };
 
 
-const calculatePriceInfo = (chocolateString: string, count: number | string, discountValue: number | string = 0, isDeliveryFree: boolean = false, paymentStatus: string = "Full Paid", category: string = "chocolate", customPricesMap: Record<string, number> = {}, manualDeliveryFee: number | string = 0, orderStatus: string = "", managedChocPricesMap: Record<string, number> = {}) => {
+const calculatePriceInfo = (chocolateString: string, count: number | string, discountValue: number | string = 0, isDeliveryFree: boolean = false, paymentStatus: string = "Full Paid", category: string = "chocolate", customPricesMap: Record<string, number> = {}, manualDeliveryFee: number | string = 0, orderStatus: string = "", managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {}, pricingType: 'retail' | 'wholesale' = 'retail') => {
   const quantity = Number(count) || 0;
   if (!chocolateString || quantity === 0) return { unitPrice: 0, chocolatePrice: 0, deliveryCharge: 0, discount: 0, totalPrice: 0, revenue: 0, fullChocolatePrice: 0, fullDeliveryCharge: 0, fullTotalPrice: 0 };
 
@@ -84,7 +99,8 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
     if (category === 'product') {
       sumPrice += (customPricesMap[c.toLowerCase()] || 0);
     } else {
-      sumPrice += (managedChocPricesMap[c.toLowerCase()] || CHOCOLATE_PRICES_MAP[c.toLowerCase()] || 0);
+      const priceObj = managedChocPricesMap[c.toLowerCase()] || CHOCOLATE_PRICES_MAP[c.toLowerCase()] || { retail: 0, wholesale: 0 };
+      sumPrice += priceObj[pricingType] || 0;
     }
   });
 
@@ -164,7 +180,7 @@ const PREDEFINED_CHOCOLATES = [
   "Milky Bar",
 ];
 
-const ChocolateMultiSelect = ({ value, onChange, suggestions, pricesMap, placeholderText = "Select chocolates..." }: { value: string, onChange: (val: string) => void, suggestions: string[], pricesMap?: Record<string, number>, placeholderText?: string }) => {
+const ChocolateMultiSelect = ({ value, onChange, suggestions, pricesMap, placeholderText = "Select chocolates..." }: { value: string, onChange: (val: string) => void, suggestions: string[], pricesMap?: Record<string, { retail: number; wholesale: number } | number>, placeholderText?: string }) => {
   const [input, setInput] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -218,16 +234,26 @@ const ChocolateMultiSelect = ({ value, onChange, suggestions, pricesMap, placeho
       </div>
       {isOpen && filteredSuggestions.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-amber-200 rounded-lg shadow-lg max-h-48 overflow-y-auto py-1">
-          {filteredSuggestions.map((s, i) => (
-            <div key={i} className="px-4 py-2 cursor-pointer hover:bg-amber-50 text-amber-900 text-sm font-medium flex justify-between items-center" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAdd(s); }}>
-              <span>{s}</span>
-              {pricesMap ? (
-                pricesMap[s.toLowerCase()] !== undefined && (<span className="text-xs text-amber-500 font-bold">₹{pricesMap[s.toLowerCase()]}</span>)
-              ) : (
-                CHOCOLATE_PRICES_MAP[s.toLowerCase()] && (<span className="text-xs text-amber-500 font-bold">₹{CHOCOLATE_PRICES_MAP[s.toLowerCase()]}</span>)
-              )}
-            </div>
-          ))}
+          {filteredSuggestions.map((s, i) => {
+            const priceInfo = pricesMap ? pricesMap[s.toLowerCase()] : CHOCOLATE_PRICES_MAP[s.toLowerCase()];
+            return (
+              <div key={i} className="px-4 py-2 cursor-pointer hover:bg-amber-50 text-amber-900 text-sm font-medium flex justify-between items-center" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAdd(s); }}>
+                <span>{s}</span>
+                {priceInfo && (
+                  <div className="flex gap-2">
+                    {typeof priceInfo === 'object' ? (
+                      <>
+                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">W: ₹{priceInfo.wholesale}</span>
+                        <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-bold">R: ₹{priceInfo.retail}</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-amber-500 font-bold">₹{priceInfo}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -281,7 +307,7 @@ export default function Dashboard() {
 
   const [managedChocolates, setManagedChocolates] = useState<any[]>([]);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
-  const [newChocForm, setNewChocForm] = useState({ name: "", price: "" });
+  const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -305,11 +331,15 @@ export default function Dashboard() {
       let list = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
       if (list.length === 0) {
         const defaults = [
-          { name: "Kitkat", price: 20, costPrice: 15 }, { name: "Dairy Milk", price: 15, costPrice: 10 },
-          { name: "Peanut Candy", price: 17, costPrice: 12 }, { name: "5 Star", price: 15, costPrice: 10 },
-          { name: "10 rs Dairy Milk", price: 20, costPrice: 14 }, { name: "Dairymilk Shots", price: 10, costPrice: 6 },
-          { name: "10 rs 5 Star", price: 22, costPrice: 16 }, { name: "1 rs Chocolate", price: 8, costPrice: 5 },
-          { name: "Milky Bar", price: 10, costPrice: 7 }
+          { name: "Kitkat", retailPrice: 20, wholesalePrice: 18, costPrice: 15 },
+          { name: "Dairy Milk", retailPrice: 15, wholesalePrice: 13, costPrice: 10 },
+          { name: "Peanut Candy", retailPrice: 17, wholesalePrice: 15, costPrice: 12 },
+          { name: "5 Star", retailPrice: 15, wholesalePrice: 13, costPrice: 10 },
+          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 18, costPrice: 14 },
+          { name: "Dairymilk Shots", retailPrice: 10, wholesalePrice: 8, costPrice: 6 },
+          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 20, costPrice: 16 },
+          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 6, costPrice: 5 },
+          { name: "Milky Bar", retailPrice: 10, wholesalePrice: 8, costPrice: 7 }
         ];
 
         defaults.forEach(d => addDoc(collection(db, "managed_chocolates"), d));
@@ -409,7 +439,7 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "" });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", pricingType: 'retail' as 'retail' | 'wholesale' });
   const [previewData, setPreviewData] = useState<any>(null);
 
   const [dashboardSearch, setDashboardSearch] = useState("");
@@ -432,8 +462,8 @@ export default function Dashboard() {
   }, [orders]);
   const getSerial = (id: number) => `SR${String(orderSerialMap[id] || id).padStart(3, '0')}`;
   const managedChocPricesMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    managedChocolates.forEach(c => map[c.name.toLowerCase()] = Number(c.price));
+    const map: Record<string, { retail: number; wholesale: number }> = {};
+    managedChocolates.forEach(c => map[c.name.toLowerCase()] = { retail: Number(c.retailPrice || c.price || 0), wholesale: Number(c.wholesalePrice || c.price || 0) });
     return map;
   }, [managedChocolates]);
 
@@ -519,7 +549,7 @@ export default function Dashboard() {
           if (order.category !== 'product') {
             const orderQty = Number(order.count || 0);
             count += orderQty;
-            const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+            const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
             revenue += priceInfo.chocolatePrice;
           }
         } else {
@@ -603,7 +633,7 @@ export default function Dashboard() {
     let totalDelivery = 0;
 
     filteredDashboardOrders.forEach(o => {
-      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap);
+      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType);
 
       netRevenue += priceInfo.revenue;
       if (o.paymentStatus !== 'Pending') {
@@ -819,7 +849,7 @@ export default function Dashboard() {
 
     filtered.forEach(order => {
       if (order.status === "Delivered" || order.status === "In Process") {
-        const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+        const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
         totalRev += priceInfo.revenue;
         totalItems += Number(order.count || 0);
         totalDelivery += priceInfo.deliveryCharge;
@@ -841,7 +871,7 @@ export default function Dashboard() {
 
   const displayRevenue = useMemo(() => {
     return filteredDashboardOrders.reduce((sum, o) => {
-      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap);
+      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType);
       return sum + priceInfo.totalPrice;
     }, 0);
   }, [filteredDashboardOrders, customPricesMap, managedChocPricesMap]);
@@ -882,7 +912,7 @@ export default function Dashboard() {
           updatedOrder.paymentStatus = actionType;
         }
 
-        const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap);
+        const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
 
 
         await updateDoc(orderRef, {
@@ -915,7 +945,7 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, discount: numValue };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, discount: numValue, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -929,7 +959,7 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, paymentStatus: newPaymentStatus };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus: newPaymentStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -943,7 +973,7 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, status: newStatus };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -957,7 +987,7 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, orderStatus: newOrderStatus };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -992,7 +1022,8 @@ export default function Dashboard() {
       orderStatus: order.orderStatus || "image edit (pending)",
       category: order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate'),
       manualDeliveryFee: order.manualDeliveryFee || "",
-      advanceAmount: order.advanceAmount || ""
+      advanceAmount: order.advanceAmount || "",
+      pricingType: order.pricingType || 'retail'
     });
     setIsModalOpen(true);
   };
@@ -1015,7 +1046,7 @@ export default function Dashboard() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap);
+    const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType);
 
 
     const formattedOrder: any = {
@@ -1299,7 +1330,7 @@ export default function Dashboard() {
     );
   };
 
-  const liveFormPrice = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap);
+  const liveFormPrice = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType);
 
   const profilePicUrl = "/logo.jpeg";
 
@@ -2103,7 +2134,7 @@ export default function Dashboard() {
                         <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
                       ) : (
                         paginatedOrders.map((order) => {
-                          const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+                          const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
                           const isSelected = selectedOrders.includes(order.id);
 
 
@@ -3020,7 +3051,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {filteredDashboardOrders.map((order, idx) => {
-                    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus);
+                    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
                     return (
                       <tr key={idx} className="border-b border-amber-100 text-sm print:border-gray-400">
                         <td className="p-3 font-bold text-amber-950 border-r border-amber-100 print:border-gray-400 print:text-black">{order.name}</td>
@@ -3158,6 +3189,22 @@ export default function Dashboard() {
                   </div>
                 )}
 
+                {formData.category !== 'product' && (
+                  <div className="col-span-2">
+                    <label className={`block text-sm font-bold mb-2 text-[#5d4037]`}>Pricing Type</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-4 py-2 rounded-xl focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm">
+                        <input type="radio" name="pricingType" value="retail" checked={formData.pricingType === "retail"} onChange={handleInputChange} className="w-4 h-4 accent-[#8d6e63]" />
+                        Retail
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-4 py-2 rounded-xl focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm">
+                        <input type="radio" name="pricingType" value="wholesale" checked={formData.pricingType === "wholesale"} onChange={handleInputChange} className="w-4 h-4 accent-[#8d6e63]" />
+                        Wholesale
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Payment Status</label>
                   <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
@@ -3245,7 +3292,7 @@ export default function Dashboard() {
 
       {/* 🟢 PREVIEW MODAL WITH SCREENSHOT CAPTURE ICON */}
       {isPreviewOpen && previewData && (() => {
-        const previewPrice = calculatePriceInfo(previewData.chocolate, previewData.count, previewData.discount, previewData.isDeliveryFree, previewData.paymentStatus, previewData.category, customPricesMap, previewData.manualDeliveryFee, previewData.orderStatus, managedChocPricesMap);
+        const previewPrice = calculatePriceInfo(previewData.chocolate, previewData.count, previewData.discount, previewData.isDeliveryFree, previewData.paymentStatus, previewData.category, customPricesMap, previewData.manualDeliveryFee, previewData.orderStatus, managedChocPricesMap, previewData.pricingType);
         return (
 
           <div
@@ -3311,14 +3358,14 @@ export default function Dashboard() {
                   </div>
 
                   <div className={`flex flex-col gap-2`}>
-                    <div className="flex justify-between items-center text-sm font-bold"><span className={`text-[#8d6e63]`}>Item Subtotal</span><span className={`text-[#3e2723]`}>₹{(previewPrice.chocolatePrice || 0).toLocaleString()}</span></div>
+                    <div className="flex justify-between items-center text-sm font-bold"><span className={`text-[#8d6e63]`}>Item Subtotal</span><span className={`text-[#3e2723]`}>₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span></div>
 
                     <div className="flex justify-between items-center text-sm font-bold"><span className={`text-[#8d6e63]`}>Delivery Fee</span><span className={`text-[#3e2723]`}>{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span></div>
 
                     {previewData.discount > 0 && <div className="flex justify-between items-center text-sm font-black text-red-600"><span>Applied Discount</span><span>-₹{previewData.discount}</span></div>}
                     <div className="flex justify-between items-center pt-3 border-t-2 border-dashed border-[#d7ccc8]"><span className={`font-black text-[#5d4037] uppercase tracking-tighter`}>Grand Total</span><span className={`font-black text-3xl text-green-700`}>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span></div>
                     {previewData.paymentStatus === 'Pending' && (
-                      <div className="flex justify-between items-center text-sm font-bold text-red-600 border-t border-[#d7ccc8] pt-2 mt-1"><span>Pending Balance</span><span>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span></div>
+                      <div className="flex justify-between items-center text-sm font-bold text-red-600 border-t border-[#d7ccc8] pt-2 mt-1"><span>Pending Balance</span><span>₹{((previewPrice.fullTotalPrice || 0) - Number(previewData.advanceAmount || 0)).toLocaleString()}</span></div>
                     )}
                     {previewData.paymentStatus === 'Partially Paid' && (
                       <>
@@ -3615,22 +3662,33 @@ export default function Dashboard() {
                 <h3 className="text-lg font-black text-[#8d6e63] mb-4 flex items-center gap-2"><Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}</h3>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
-                  const data = { name: newChocForm.name, price: Number(newChocForm.price), costPrice: 0 };
+                  const data = { 
+                    name: newChocForm.name, 
+                    retailPrice: Number(newChocForm.retailPrice), 
+                    wholesalePrice: Number(newChocForm.wholesalePrice), 
+                    costPrice: 0 
+                  };
                   if (editChocId) {
                     await updateDoc(doc(db, "managed_chocolates", editChocId), data);
                     setEditChocId(null);
                   } else {
                     await addDoc(collection(db, "managed_chocolates"), data);
                   }
-                  setNewChocForm({ name: "", price: "" });
+                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" });
                 }} className="space-y-4">
                   <div>
                     <label className="block text-xs font-black text-amber-800 uppercase mb-1">Chocolate Name</label>
                     <input required type="text" value={newChocForm.name} onChange={(e) => setNewChocForm({ ...newChocForm, name: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. Munch" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-black text-amber-800 uppercase mb-1">Price</label>
-                    <input required type="number" value={newChocForm.price} onChange={(e) => setNewChocForm({ ...newChocForm, price: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 20" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Wholesale Price</label>
+                      <input required type="number" value={newChocForm.wholesalePrice} onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 18" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Retail Price</label>
+                      <input required type="number" value={newChocForm.retailPrice} onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 20" />
+                    </div>
                   </div>
                   <button type="submit" className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
                     {editChocId ? 'Update Item' : 'Add to List'}
@@ -3649,10 +3707,13 @@ export default function Dashboard() {
                     <div key={choc.fireId} className="bg-white p-4 rounded-2xl border-2 border-amber-50 shadow-sm flex justify-between items-center group hover:border-amber-200 transition-all">
                       <div>
                         <p className="font-black text-amber-950">{choc.name}</p>
-                        <p className="text-sm font-bold text-emerald-600">₹{choc.price}</p>
+                        <div className="flex gap-2 mt-1">
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">W: ₹{choc.wholesalePrice || choc.price}</span>
+                          <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold">R: ₹{choc.retailPrice || choc.price}</span>
+                        </div>
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditChocId(choc.fireId); setNewChocForm({ name: choc.name, price: choc.price.toString() }); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
+                        <button onClick={() => { setEditChocId(choc.fireId); setNewChocForm({ name: choc.name, retailPrice: (choc.retailPrice || choc.price || "").toString(), wholesalePrice: (choc.wholesalePrice || choc.price || "").toString() }); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
 
 
                         <button onClick={() => deleteDoc(doc(db, "managed_chocolates", choc.fireId))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
@@ -3723,7 +3784,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="bg-white">
                   {reportData.filteredOrders.map((order: any) => {
-                    const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+                    const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
                     
                     // Calculate Total Cost
                     let totalCost = 0;
