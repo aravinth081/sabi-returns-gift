@@ -3340,50 +3340,70 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className={`rounded-2xl p-4 text-left space-y-3 mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]`}>
+                <div className={`rounded-2xl p-4 text-left space-y-3 mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] relative overflow-hidden`}>
                   
-                  <div className="grid grid-cols-2 gap-4 border-b border-[#f5f5f5] pb-3">
-                    <div className="flex flex-col gap-1">
-                      <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>{previewData.category === 'product' ? 'Product' : 'Chocolate'}</span>
-                      <div className="w-full">{renderChocolateBadges(previewData.chocolate)}</div>
+                  {/* Subtle vertical divider */}
+                  <div className="absolute left-1/2 top-4 bottom-4 w-px bg-[#f0e6db] hidden sm:block"></div>
+
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                    {/* Column 1: Item Details */}
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-1 border-b border-[#f5f5f5] pb-2">
+                        <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>{previewData.category === 'product' ? 'Product' : 'Chocolate'}</span>
+                        <div className="w-full min-h-[24px]">{renderChocolateBadges(previewData.chocolate)}</div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-[12px] font-bold">
+                        <span className={`text-[#8d6e63]`}>Subtotal</span>
+                        <span className={`text-[#3e2723]`}>₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-[#f5f5f5]">
+                        <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Function Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.functionDate}</span></div>
+                        <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Delivery Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.deliveryDate}</span></div>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>Quantity</span>
-                      <span className={`font-black text-[#3e2723] text-lg leading-none`}>{previewData.count} Items</span>
-                      {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
-                        <span className="text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8]">
-                          ₹{previewPrice.unitPrice} x {previewData.count}
-                        </span>
-                      )}
+
+                    {/* Column 2: Order Summary */}
+                    <div className="space-y-3 text-right">
+                      <div className="flex flex-col items-end gap-1 border-b border-[#f5f5f5] pb-2">
+                        <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>Quantity</span>
+                        <span className={`font-black text-[#3e2723] text-lg leading-none`}>{previewData.count} Items</span>
+                        {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
+                          <span className="text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8]">
+                            ₹{previewPrice.unitPrice} x {previewData.count}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center text-[12px] font-bold">
+                        <span className={`text-[#8d6e63] text-left`}>Delivery</span>
+                        <span className={`text-[#3e2723]`}>{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-[#f5f5f5] flex flex-col items-end">
+                        <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Payment</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span></div>
+                        <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span></div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] font-bold border-b border-[#f5f5f5] pb-3">
-                    <div className="flex justify-between items-center"><span className={`text-[#8d6e63]`}>Subtotal</span><span className={`text-[#3e2723]`}>₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span></div>
-                    <div className="flex justify-between items-center"><span className={`text-[#8d6e63]`}>Delivery</span><span className={`text-[#3e2723]`}>{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span></div>
-                    {previewData.discount > 0 && <div className="flex justify-between items-center text-red-600 col-span-2"><span>Applied Discount</span><span>-₹{previewData.discount}</span></div>}
-                  </div>
+                  {previewData.discount > 0 && (
+                    <div className="flex justify-between items-center text-red-600 font-black text-xs border-t border-[#f5f5f5] pt-2">
+                      <span>Applied Discount</span>
+                      <span>-₹{previewData.discount}</span>
+                    </div>
+                  )}
 
-                  <div className="flex justify-between items-center py-2 border-b-2 border-dashed border-[#d7ccc8]">
+                  <div className="flex justify-between items-center py-2 border-b-2 border-t-2 border-dashed border-[#d7ccc8]">
                     <span className={`font-black text-[#5d4037] uppercase text-sm tracking-widest`}>Grand Total</span>
                     <span className={`font-black text-3xl text-green-700`}>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <div className="space-y-2">
-                      <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Function Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.functionDate}</span></div>
-                      <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Delivery Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.deliveryDate}</span></div>
-                    </div>
-                    <div className="space-y-2 text-right">
-                      <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Payment</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span></div>
-                      <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Delivery Status</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span></div>
-                    </div>
-                  </div>
-
                   {previewData.address && (
-                    <div className="pt-2 border-t border-[#f5f5f5]">
+                    <div className="pt-1">
                       <span className={`font-bold text-[#8d6e63] text-[9px] uppercase tracking-widest mb-0.5 block`}>Delivery Address</span>
-                      <span className={`font-bold text-[10px] text-[#3e2723] bg-[#f5f5f5] p-2 rounded-lg border border-[#d7ccc8] block`}>{previewData.address}</span>
+                      <span className={`font-bold text-[10px] text-[#3e2723] bg-[#f5f5f5] p-2 rounded-lg border border-[#d7ccc8] block truncate`}>{previewData.address}</span>
                     </div>
                   )}
                 </div>
