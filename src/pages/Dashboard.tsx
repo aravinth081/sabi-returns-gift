@@ -1277,9 +1277,12 @@ export default function Dashboard() {
         }
 
         const canvas = await html2canvasObj(element, {
-          backgroundColor: "#fffbeb",
-          scale: 2,
-          useCORS: true
+          backgroundColor: "#fffcf9",
+          scale: 3,
+          useCORS: true,
+          windowWidth: 480,
+          logging: false,
+          allowTaint: true
         });
 
         canvas.toBlob(async (blob) => {
@@ -3340,14 +3343,11 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className={`rounded-2xl p-4 text-left space-y-3 mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] relative overflow-hidden`}>
+                <div className={`rounded-2xl p-4 text-left space-y-3 mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden`}>
                   
-                  {/* Subtle vertical divider */}
-                  <div className="absolute left-1/2 top-4 bottom-4 w-px bg-[#f0e6db] hidden sm:block"></div>
-
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="flex gap-0">
                     {/* Column 1: Item Details */}
-                    <div className="space-y-3">
+                    <div className="w-1/2 pr-4 border-r border-[#f0e6db] space-y-3">
                       <div className="flex flex-col gap-1 border-b border-[#f5f5f5] pb-2">
                         <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>{previewData.category === 'product' ? 'Product' : 'Chocolate'}</span>
                         <div className="w-full min-h-[24px]">{renderChocolateBadges(previewData.chocolate)}</div>
@@ -3365,7 +3365,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Column 2: Order Summary */}
-                    <div className="space-y-3 text-right">
+                    <div className="w-1/2 pl-4 space-y-3 text-right">
                       <div className="flex flex-col items-end gap-1 border-b border-[#f5f5f5] pb-2">
                         <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>Quantity</span>
                         <span className={`font-black text-[#3e2723] text-lg leading-none`}>{previewData.count} Items</span>
@@ -3396,7 +3396,10 @@ export default function Dashboard() {
                   )}
 
                   <div className="flex justify-between items-center py-2 border-b-2 border-t-2 border-dashed border-[#d7ccc8]">
-                    <span className={`font-black text-[#5d4037] uppercase text-sm tracking-widest`}>Grand Total</span>
+                    <div className="flex flex-col">
+                      <span className={`font-black text-[#5d4037] uppercase text-[10px] tracking-widest`}>Grand Total</span>
+                      <span className="text-[9px] font-bold text-gray-400 leading-none">Net Payable Amount</span>
+                    </div>
                     <span className={`font-black text-3xl text-green-700`}>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span>
                   </div>
 
