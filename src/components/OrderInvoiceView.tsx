@@ -178,7 +178,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
                   height: 'auto'
                 }}
                 className="block"
-                crossOrigin="anonymous"
+                crossOrigin="anonymous" 
               />
             </div>
           </div>
