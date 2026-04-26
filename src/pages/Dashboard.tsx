@@ -3300,7 +3300,7 @@ export default function Dashboard() {
             onClick={() => setIsPreviewOpen(false)}
           >
             <div
-              className={`rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm p-6 text-center bg-[#fffcf9] max-h-[90vh] overflow-y-auto relative border border-amber-100`}
+              className={`rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-[480px] p-6 text-center bg-[#fffcf9] max-h-[95vh] overflow-y-auto relative border border-amber-100`}
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -3311,101 +3311,90 @@ export default function Dashboard() {
                 <Camera size={18} />
               </button>
 
-              <div id="preview-modal-content" className="bg-[#fffcf9] p-3 rounded-xl">
-                <div className="flex justify-between items-start mb-6 border-b-2 border-dashed border-[#d7ccc8] pb-5 pt-2">
+              <div id="preview-modal-content" className="bg-[#fffcf9] p-3 rounded-xl aspect-square flex flex-col justify-center">
+                <div className="flex justify-between items-center mb-4 border-b-2 border-dashed border-[#d7ccc8] pb-4 pt-1">
                   <div className="text-left flex flex-col justify-center">
-                    <div className={`w-16 h-16 rounded-xl mb-3 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner`}>
+                    <div className={`w-14 h-14 rounded-xl mb-2 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner`}>
                       <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
-                      <User size={28} className="absolute -z-10" />
+                      <User size={24} className="absolute -z-10" />
                     </div>
-                    <h2 className={`text-2xl font-black text-[#3e2723]`}>{previewData.name}</h2>
-                    <p className={`font-bold text-amber-700 text-sm mb-1`}>{previewData.phone}</p>
-                    <span className="inline-block bg-amber-200 text-amber-950 px-2 py-0.5 rounded text-xs font-black tracking-widest border border-amber-300 w-max shadow-sm mb-1">
+                    <h2 className={`text-xl font-black text-[#3e2723]`}>{previewData.name}</h2>
+                    <p className={`font-bold text-amber-700 text-[12px] mb-1`}>{previewData.phone}</p>
+                    <span className="inline-block bg-amber-200 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black tracking-widest border border-amber-300 w-max shadow-sm mb-0.5">
                       INV: {getSerial(previewData.id)}
                     </span>
-                    <span className="text-[11px] font-bold text-amber-800/70 flex items-center gap-1 mt-0.5">
-                      <Calendar size={12} /> Order Date: {previewData.orderDate}
+                    <span className="text-[10px] font-bold text-amber-800/70 flex items-center gap-1">
+                      <Calendar size={10} /> Order Date: {previewData.orderDate}
                     </span>
                   </div>
 
-                  <div className="shrink-0 flex flex-col items-center bg-white p-2 rounded-xl border-2 border-dashed border-amber-200 shadow-sm mt-2">
+                  <div className="shrink-0 flex flex-col items-center bg-white p-2 rounded-xl border-2 border-dashed border-amber-200 shadow-sm">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
                       alt="Payment QR Code"
-                      className="w-20 h-20 rounded-lg"
+                      className="w-16 h-16 rounded-lg"
                       crossOrigin="anonymous"
                     />
-                    <span className="text-[10px] font-bold text-amber-600 mt-1 uppercase tracking-wider">Scan to Pay</span>
-                    <span className="text-[10px] font-bold text-amber-800 tracking-wide mt-0.5">SUBASH G</span>
-                    <span className="text-[10px] font-bold text-amber-600 tracking-wide mt-0.5">8220638753</span>
+                    <span className="text-[9px] font-bold text-amber-600 mt-1 uppercase tracking-wider">Scan to Pay</span>
+                    <span className="text-[9px] font-bold text-amber-800 tracking-wide mt-0.5">SUBASH G</span>
                   </div>
                 </div>
 
-                <div className={`rounded-2xl p-5 text-left space-y-4 mb-4 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]`}>
-                  <div className="flex justify-between items-center border-b border-[#f5f5f5] pb-2"><span className={`font-bold text-[#8d6e63] uppercase text-xs tracking-wider`}>{previewData.category === 'product' ? 'Product' : 'Chocolate'}</span><span className={`font-black text-right w-1/2`}>{renderChocolateBadges(previewData.chocolate)}</span></div>
-
-                  {/* 🟢 MODAL PREVIEW COUNT WITH BREAKDOWN TEXT */}
-                  <div className="flex justify-between items-start border-b border-[#f5f5f5] pb-2">
-                    <span className={`font-bold text-[#8d6e63] uppercase text-xs tracking-wider mt-1`}>Quantity</span>
-                    <div className="flex flex-col items-end">
-                      <span className={`font-black text-[#3e2723] text-xl`}>{previewData.count} Items</span>
+                <div className={`rounded-2xl p-4 text-left space-y-3 mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)]`}>
+                  
+                  <div className="grid grid-cols-2 gap-4 border-b border-[#f5f5f5] pb-3">
+                    <div className="flex flex-col gap-1">
+                      <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>{previewData.category === 'product' ? 'Product' : 'Chocolate'}</span>
+                      <div className="w-full">{renderChocolateBadges(previewData.chocolate)}</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>Quantity</span>
+                      <span className={`font-black text-[#3e2723] text-lg leading-none`}>{previewData.count} Items</span>
                       {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
-                        <span className="text-[11px] text-[#8d6e63] font-black tracking-widest mt-0.5 bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8]">
+                        <span className="text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8]">
                           ₹{previewPrice.unitPrice} x {previewData.count}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className={`flex flex-col gap-2`}>
-                    <div className="flex justify-between items-center text-sm font-bold"><span className={`text-[#8d6e63]`}>Item Subtotal</span><span className={`text-[#3e2723]`}>₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span></div>
-
-                    <div className="flex justify-between items-center text-sm font-bold"><span className={`text-[#8d6e63]`}>Delivery Fee</span><span className={`text-[#3e2723]`}>{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span></div>
-
-                    {previewData.discount > 0 && <div className="flex justify-between items-center text-sm font-black text-red-600"><span>Applied Discount</span><span>-₹{previewData.discount}</span></div>}
-                    <div className="flex justify-between items-center pt-3 border-t-2 border-dashed border-[#d7ccc8]"><span className={`font-black text-[#5d4037] uppercase tracking-tighter`}>Grand Total</span><span className={`font-black text-3xl text-green-700`}>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span></div>
-                    {previewData.paymentStatus === 'Pending' && (
-                      <div className="flex justify-between items-center text-sm font-bold text-red-600 border-t border-[#d7ccc8] pt-2 mt-1"><span>Pending Balance</span><span>₹{((previewPrice.fullTotalPrice || 0) - Number(previewData.advanceAmount || 0)).toLocaleString()}</span></div>
-                    )}
-                    {previewData.paymentStatus === 'Partially Paid' && (
-                      <>
-                        <div className="flex justify-between items-center text-sm font-bold text-green-700 border-t border-[#d7ccc8] pt-2 mt-1"><span>Paid (Advance)</span><span>₹{Number(previewData.advanceAmount || 0).toLocaleString()}</span></div>
-                        <div className="flex justify-between items-center text-sm font-bold text-red-600"><span>Pending Balance</span><span>₹{((previewPrice.fullTotalPrice || 0) - Number(previewData.advanceAmount || 0)).toLocaleString()}</span></div>
-                      </>
-                    )}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] font-bold border-b border-[#f5f5f5] pb-3">
+                    <div className="flex justify-between items-center"><span className={`text-[#8d6e63]`}>Subtotal</span><span className={`text-[#3e2723]`}>₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span></div>
+                    <div className="flex justify-between items-center"><span className={`text-[#8d6e63]`}>Delivery</span><span className={`text-[#3e2723]`}>{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span></div>
+                    {previewData.discount > 0 && <div className="flex justify-between items-center text-red-600 col-span-2"><span>Applied Discount</span><span>-₹{previewData.discount}</span></div>}
                   </div>
 
-                  <div className="flex justify-between items-center pt-3 text-[13px] font-bold"><span className={`text-[#8d6e63]`}>Function Date</span><span className={`text-[#3e2723] flex items-center gap-1`}><Calendar size={14} /> {previewData.functionDate}</span></div>
-                  <div className="flex justify-between items-center text-[13px] font-bold"><span className={`text-[#8d6e63]`}>Delivery Date</span><span className={`text-[#3e2723] flex items-center gap-1`}><Calendar size={14} /> {previewData.deliveryDate}</span></div>
+                  <div className="flex justify-between items-center py-2 border-b-2 border-dashed border-[#d7ccc8]">
+                    <span className={`font-black text-[#5d4037] uppercase text-sm tracking-widest`}>Grand Total</span>
+                    <span className={`font-black text-3xl text-green-700`}>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-2">
+                      <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Function Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.functionDate}</span></div>
+                      <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Delivery Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.deliveryDate}</span></div>
+                    </div>
+                    <div className="space-y-2 text-right">
+                      <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Payment</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span></div>
+                      <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Delivery Status</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span></div>
+                    </div>
+                  </div>
 
                   {previewData.address && (
-                    <div className="flex flex-col pt-3 mt-1 border-t border-[#f5f5f5]">
-                      <span className={`font-bold text-[#8d6e63] text-[10px] uppercase tracking-widest mb-1`}>Delivery Address</span>
-                      <span className={`font-bold text-xs text-[#3e2723] bg-[#f5f5f5] p-2.5 rounded-lg border border-[#d7ccc8]`}>{previewData.address}</span>
+                    <div className="pt-2 border-t border-[#f5f5f5]">
+                      <span className={`font-bold text-[#8d6e63] text-[9px] uppercase tracking-widest mb-0.5 block`}>Delivery Address</span>
+                      <span className={`font-bold text-[10px] text-[#3e2723] bg-[#f5f5f5] p-2 rounded-lg border border-[#d7ccc8] block`}>{previewData.address}</span>
                     </div>
                   )}
-
-                  <div className={`flex justify-between items-center pt-2 border-t border-amber-100`}>
-                    <span className={`font-bold text-amber-800`}>Payment</span>
-                    <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
-                        previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' :
-                          'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
-                      }`}>{previewData.paymentStatus || 'Pending'}</span>
-                  </div>
-
-                  <div className={`flex justify-between items-center pt-2 border-t border-amber-100`}>
-                    <span className={`font-bold text-amber-800`}>Delivery Status</span>
-                    <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
-                  </div>
                 </div>
 
-                <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-center">
-                  <span className="text-[10px] font-black text-red-600 uppercase leading-none block">Note: Order will be confirmed once the amount paid.</span>
+                <div className="mb-2 p-2 bg-red-50 border border-red-100 rounded-xl text-center">
+                  <span className="text-[9px] font-black text-red-600 uppercase leading-none block">Note: Order will be confirmed once the amount paid.</span>
                 </div>
-                <p className="text-xs font-black text-amber-600 uppercase tracking-tighter mb-2 italic opacity-80">Thank you for your order! ❤️</p>
+                <p className="text-[10px] font-black text-amber-600 uppercase tracking-tighter italic opacity-80">Thank you for your order! ❤️</p>
               </div>
 
-              <button onClick={() => setIsPreviewOpen(false)} className={`w-full py-3.5 mt-2 rounded-xl font-black text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-lg transition-transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest`}>
+              <button onClick={() => setIsPreviewOpen(false)} className={`w-full py-3 mt-3 rounded-xl font-black text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-lg transition-transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest text-xs`}>
                 Close Preview
               </button>
             </div>
