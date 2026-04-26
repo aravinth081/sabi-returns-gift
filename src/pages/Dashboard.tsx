@@ -1504,8 +1504,8 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/20 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`bg-slate-50 border-r border-blue-100 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-64' : 'w-0 border-none'}`}>
-        <div className="w-64 h-full flex flex-col justify-between">
+      <aside className={`bg-slate-50 border-r border-blue-100 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0 border-none'}`}>
+        <div className="w-56 h-full flex flex-col justify-between">
           <div>
             <div className={`p-8 flex flex-col items-center border-b border-blue-200 relative`}>
               <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 md:hidden p-1 text-blue-600 hover:bg-blue-50 rounded-lg">
@@ -1613,12 +1613,12 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 print:p-0 print:overflow-visible">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible">
 
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
 
-              <div className="bg-gradient-to-br from-red-600 to-red-800 p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)] border-4 border-red-500/50">
+              <div className="bg-gradient-to-br from-red-600 to-red-800 p-4 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)] border-4 border-red-500/50">
                 <h2 className="text-2xl font-black text-white mb-6 text-center tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                   {dynamicInventory.map((choc, i) => {
@@ -1638,7 +1638,7 @@ export default function Dashboard() {
 
                 <div className="flex flex-col h-full">
 
-                  <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col h-full">
+                  <div className="bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col h-full">
                     <h3 className="text-lg font-black text-[#3e2723] mb-4 border-b-2 border-[#d7ccc8] pb-2 flex items-center gap-2"><TrendingUp size={18} /> Sales Tracker</h3>
 
                     <div className="space-y-4">
@@ -1692,7 +1692,7 @@ export default function Dashboard() {
 
                 </div>
 
-                <div className="lg:col-span-2 bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-full min-h-[500px]">
+                <div className="lg:col-span-2 bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-full min-h-[500px]">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-black text-[#3e2723]">Inventory Log</h3>
                     <button onClick={() => setIsInvModalOpen(true)} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
@@ -1739,9 +1739,9 @@ export default function Dashboard() {
 
           {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 md:gap-6 mb-8 print:hidden mt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6 print:hidden mt-1">
 
-                <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                   <div className="flex justify-between items-start mb-2 relative z-10">
                     <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
                     <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={18} /></div>
@@ -1749,7 +1749,7 @@ export default function Dashboard() {
                   <h3 className="text-4xl font-black text-[#3e2723] relative z-10">{filteredDashboardOrders.length}</h3>
                 </div>
 
-                <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                   <div className="flex justify-between items-start mb-3 relative z-10">
                     <p className="text-sm font-black text-[#c2410c] tracking-wide">Payment Filter</p>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 shadow-inner"><IndianRupee size={16} /></div>
@@ -1762,7 +1762,7 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                   <div className="flex justify-between items-start mb-3 relative z-10">
                     <p className="text-sm font-black text-[#c2410c] tracking-wide">Delivery Filter</p>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner"><Package size={16} /></div>
@@ -1958,11 +1958,11 @@ export default function Dashboard() {
 
                   <table className="w-full text-left border-separate border-spacing-0 min-w-[1450px] print:min-w-0 print:w-full relative">
                     <thead className="sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm print:static">
-                      <tr className={`text-sm border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
-                        <th className="p-4 w-12 text-center print:hidden align-top">
+                      <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
+                        <th className="py-3 px-4 w-12 text-center print:hidden align-top">
                           <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                         </th>
-                        <th className="p-4 font-bold align-top">
+                        <th className="py-3 px-4 font-bold align-top">
                           <div className="flex items-center gap-2 group">
                             <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
                               <ChevronRight size={14} strokeWidth={3} />
@@ -1985,7 +1985,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </th>
-                        <th className="p-4 font-bold align-top min-w-[140px]">
+                        <th className="py-3 px-4 font-bold align-top min-w-[140px]">
                           <div className="flex items-center gap-1 group">
                             <span>Order Date</span>
                             <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
@@ -2005,10 +2005,10 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </th>
-                        <th className="p-4 font-bold align-top">Name</th>
-                        <th className="p-4 font-bold align-top">Contact Number</th>
+                        <th className="py-3 px-4 font-bold align-top">Name</th>
+                        <th className="py-3 px-4 font-bold align-top">Contact Number</th>
 
-                        <th className="p-4 font-bold align-top min-w-[140px]">
+                        <th className="py-3 px-4 font-bold align-top min-w-[140px]">
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
                               <span>Function Date</span>
@@ -2039,7 +2039,7 @@ export default function Dashboard() {
                           </div>
                         </th>
 
-                        <th className="p-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
+                        <th className="py-3 px-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
                               <span>Delivery Date</span>
@@ -2072,7 +2072,7 @@ export default function Dashboard() {
 
                         {/* 🟢 CONDITIONALLY HIDE ORDER STATUS FOR DASHBOARD 2 */}
                         {activeTab === 'dashboard1' && (
-                          <th className="p-4 font-bold align-top min-w-[150px]">
+                          <th className="py-3 px-4 font-bold align-top min-w-[150px]">
                             <div className="flex items-center gap-1 group">
                               <span>Order Status</span>
                               <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Self/Others)">
@@ -2091,8 +2091,8 @@ export default function Dashboard() {
                           </th>
                         )}
 
-                        <th className="p-4 font-bold align-top">{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</th>
-                        <th className="p-4 font-bold text-center align-top min-w-[100px]">
+                        <th className="py-3 px-4 font-bold align-top">{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</th>
+                        <th className="py-3 px-4 font-bold text-center align-top min-w-[100px]">
                           <div className="flex items-center justify-center gap-1">
                             <span>Count</span>
                             <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Count">
@@ -2111,15 +2111,15 @@ export default function Dashboard() {
                           </div>
                         </th>
 
-                        <th className="p-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>
-                        <th className="p-4 font-bold text-right align-top">Delivery Charge</th>
-                        <th className="p-4 font-bold text-center align-top print:hidden">Discount</th>
+                        <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>
+                        <th className="py-3 px-4 font-bold text-right align-top">Delivery Charge</th>
+                        <th className="py-3 px-4 font-bold text-center align-top print:hidden">Discount</th>
 
-                        <th className="p-4 font-bold text-right align-top">Total Price</th>
-                        <th className="p-4 font-bold text-center align-top">Payment</th>
-                        <th className="p-4 font-bold text-center align-top">Delivery Status</th>
+                        <th className="py-3 px-4 font-bold text-right align-top">Total Price</th>
+                        <th className="py-3 px-4 font-bold text-center align-top">Payment</th>
+                        <th className="py-3 px-4 font-bold text-center align-top">Delivery Status</th>
 
-                        <th className="p-4 font-bold text-center print:hidden align-top min-w-[100px]">
+                        <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
                           <div className="flex items-center justify-center gap-2">
                             <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
                               <ChevronLeft size={14} strokeWidth={3} />
@@ -2140,20 +2140,20 @@ export default function Dashboard() {
 
                           return (
                             <tr key={order.fireId || order.id} className={`border-b transition-colors border-amber-50 hover:bg-orange-50/50 print:border-gray-200 ${isSelected ? 'bg-amber-50/80 print:bg-transparent' : ''}`}>
-                              <td className="p-4 text-center print:hidden align-middle">
+                              <td className="py-2.5 px-4 text-center print:hidden align-middle">
                                 <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                               </td>
-                              <td className="p-4 font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap">{getSerial(order.id)}</td>
-                              <td className="p-4 font-medium text-[#5d4037] align-middle">{order.orderDate}</td>
+                              <td className="py-2.5 px-4 font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap">{getSerial(order.id)}</td>
+                              <td className="py-2.5 px-4 font-medium text-[#5d4037] align-middle">{order.orderDate}</td>
 
-                              <td className={`p-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
-                              <td className={`p-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>
-                              <td className={`p-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>
-                              <td className={`p-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate}</td>
+                              <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
+                              <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>
+                              <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>
+                              <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate}</td>
 
                               {/* 🟢 CONDITIONALLY HIDE ORDER STATUS FOR DASHBOARD 2 */}
                               {activeTab === 'dashboard1' && (
-                                <td className="p-4 text-center align-middle">
+                                <td className="py-2.5 px-4 text-center align-middle">
                                   <div className="print:hidden">
                                     <select
                                       value={order.orderStatus || "image edited (not paid)"}
@@ -2176,23 +2176,23 @@ export default function Dashboard() {
                                 </td>
                               )}
 
-                              <td className={`p-4 print:text-gray-800 align-middle`}>
+                              <td className={`py-2.5 px-4 print:text-gray-800 align-middle`}>
                                 {renderChocolateBadges(order.chocolate)}
                               </td>
 
-                              <td className={`p-4 text-center font-bold text-amber-950 print:text-black align-middle`}>
+                              <td className={`py-2.5 px-4 text-center font-bold text-amber-950 print:text-black align-middle`}>
                                 {order.count}
                               </td>
 
-                              <td className="p-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
+                              <td className="py-2.5 px-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
                                 <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
                               </td>
 
-                              <td className={`p-4 text-right font-medium text-amber-900 align-middle`}>
+                              <td className={`py-2.5 px-4 text-right font-medium text-amber-900 align-middle`}>
                                 {order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`}
                               </td>
 
-                              <td className="p-4 text-center print:hidden align-middle">
+                              <td className="py-2.5 px-4 text-center print:hidden align-middle">
                                 <input
                                   type="number"
                                   list="discount-suggestions"
@@ -2203,7 +2203,7 @@ export default function Dashboard() {
                                 />
                               </td>
 
-                              <td className={`p-4 text-right align-middle`}>
+                              <td className={`py-2.5 px-4 text-right align-middle`}>
                                 <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
                                 {order.paymentStatus === 'Pending' && (
                                   <div className="text-[11px] font-bold text-red-600 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
@@ -2216,7 +2216,7 @@ export default function Dashboard() {
                                 )}
                               </td>
 
-                              <td className="p-4 text-center align-middle">
+                              <td className="py-2.5 px-4 text-center align-middle">
                                 <div className="print:hidden">
                                   <select
                                     value={order.paymentStatus || "Pending"}
@@ -2236,7 +2236,7 @@ export default function Dashboard() {
                                 <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
                               </td>
 
-                              <td className="p-4 text-center align-middle">
+                              <td className="py-2.5 px-4 text-center align-middle">
                                 <div className="print:hidden">
                                   <select
                                     value={order.status}
@@ -2253,7 +2253,7 @@ export default function Dashboard() {
                                 <span className="hidden print:inline text-sm font-bold text-black">{order.status}</span>
                               </td>
 
-                              <td className="p-4 print:hidden align-middle text-center relative">
+                              <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
                                 <button
                                   onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
                                   className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
@@ -2273,7 +2273,7 @@ export default function Dashboard() {
                                       <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
                                       <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
                                       {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
-                                      <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Invoice"><Receipt size={20} /></button>
+                                      <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
                                     </div>
                                   </>
                                 )}
