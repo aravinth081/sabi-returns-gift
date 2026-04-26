@@ -3333,7 +3333,7 @@ export default function Dashboard() {
 
                   <div className="shrink-0 flex flex-col items-center bg-white p-2 rounded-xl border-2 border-dashed border-amber-200 shadow-sm">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
                       alt="Payment QR Code"
                       className="w-16 h-16 rounded-lg"
                       crossOrigin="anonymous"
@@ -3346,65 +3346,83 @@ export default function Dashboard() {
                 <div className="rounded-2xl p-4 text-left mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
                   <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                     <tbody>
+                      {/* Row 1: Labels */}
                       <tr>
-                        {/* Column 1 */}
-                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] align-top">
-                          <div className="border-b border-[#f5f5f5] pb-2 mb-3">
-                            <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider mb-1">{previewData.category === 'product' ? 'Product' : 'Chocolate'}</p>
-                            <div className="w-full min-h-[24px]">{renderChocolateBadges(previewData.chocolate)}</div>
-                          </div>
-                          <table className="w-full mb-3">
-                            <tbody>
-                              <tr>
-                                <td className="text-left text-[12px] font-bold text-[#8d6e63]">Subtotal</td>
-                                <td className="text-right text-[12px] font-bold text-[#3e2723]">₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                          <div className="space-y-2 pt-2 border-t border-[#f5f5f5]">
-                            <div>
-                              <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Function Date</p>
-                              <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.functionDate}</p>
-                            </div>
-                            <div>
-                              <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Delivery Date</p>
-                              <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate}</p>
-                            </div>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] align-bottom pb-1">
+                          <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider">{previewData.category === 'product' ? 'Product' : 'Chocolate'}</p>
+                        </td>
+                        <td className="w-1/2 pl-4 align-bottom pb-1 text-right">
+                          <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider">Quantity</p>
+                        </td>
+                      </tr>
+                      {/* Row 2: Values (Badges & Items) */}
+                      <tr>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] align-top border-b border-[#f5f5f5] pb-3">
+                          <div className="w-full min-h-[24px]">{renderChocolateBadges(previewData.chocolate)}</div>
+                        </td>
+                        <td className="w-1/2 pl-4 align-top border-b border-[#f5f5f5] pb-3 text-right">
+                          <p className="font-black text-[#3e2723] text-lg leading-none">{previewData.count} Items</p>
+                          {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
+                            <span className="inline-block text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8] mt-1">
+                              ₹{previewPrice.unitPrice} x {previewData.count}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      {/* Row 3: Subtotal & Delivery */}
+                      <tr>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] pt-3 pb-3">
+                          <div className="flex justify-between items-center text-[12px] font-bold">
+                            <span className="text-[#8d6e63]">Subtotal</span>
+                            <span className="text-[#3e2723]">₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span>
                           </div>
                         </td>
-                        {/* Column 2 */}
-                        <td className="w-1/2 pl-4 align-top">
-                          <div className="border-b border-[#f5f5f5] pb-2 mb-3 text-right">
-                            <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider mb-1">Quantity</p>
-                            <p className="font-black text-[#3e2723] text-lg leading-none">{previewData.count} Items</p>
-                            {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
-                              <span className="inline-block text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8] mt-1">
-                                ₹{previewPrice.unitPrice} x {previewData.count}
-                              </span>
-                            )}
+                        <td className="w-1/2 pl-4 pt-3 pb-3 text-right">
+                          <div className="flex justify-between items-center text-[12px] font-bold">
+                            <span className="text-[#8d6e63] text-left">Delivery</span>
+                            <span className="text-[#3e2723]">{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span>
                           </div>
-                          <table className="w-full mb-3">
-                            <tbody>
-                              <tr>
-                                <td className="text-left text-[12px] font-bold text-[#8d6e63]">Delivery</td>
-                                <td className="text-right text-[12px] font-bold text-[#3e2723]">{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                          <div className="space-y-2 pt-2 border-t border-[#f5f5f5] text-right">
-                            <div>
-                              <p className="text-amber-800 text-[10px] uppercase font-bold mb-1">Payment</p>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span>
-                            </div>
-                            <div>
-                              <p className="text-amber-800 text-[10px] uppercase font-bold mb-1">Status</p>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
-                            </div>
-                          </div>
+                        </td>
+                      </tr>
+                      {/* Row 4: Dates & Statuses Labels */}
+                      <tr>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] pt-2 border-t border-[#f5f5f5]">
+                          <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Function Date</p>
+                        </td>
+                        <td className="w-1/2 pl-4 pt-2 border-t border-[#f5f5f5] text-right">
+                          <p className="text-amber-800 text-[10px] uppercase font-bold">Payment</p>
+                        </td>
+                      </tr>
+                      {/* Row 5: Dates & Statuses Values */}
+                      <tr>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] pb-2">
+                          <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.functionDate}</p>
+                        </td>
+                        <td className="w-1/2 pl-4 pb-2 text-right">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span>
+                        </td>
+                      </tr>
+                      {/* Row 6: Dates & Statuses labels bottom */}
+                      <tr>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db]">
+                          <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Delivery Date</p>
+                        </td>
+                        <td className="w-1/2 pl-4 text-right">
+                          <p className="text-amber-800 text-[10px] uppercase font-bold">Status</p>
+                        </td>
+                      </tr>
+                      {/* Row 7: Dates & Statuses values bottom */}
+                      <tr>
+                        <td className="w-1/2 pr-4 border-r border-[#f0e6db] pb-2">
+                          <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate}</p>
+                        </td>
+                        <td className="w-1/2 pl-4 pb-2 text-right">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
                         </td>
                       </tr>
                     </tbody>
                   </table>
+
                   {previewData.discount > 0 && (
                     <table className="w-full border-t border-[#f5f5f5] pt-3 mt-3">
                       <tbody>
@@ -3415,6 +3433,7 @@ export default function Dashboard() {
                       </tbody>
                     </table>
                   )}
+
                   <table className="w-full border-b-2 border-t-2 border-dashed border-[#d7ccc8] mt-3 py-2">
                     <tbody>
                       <tr>
@@ -3426,6 +3445,7 @@ export default function Dashboard() {
                       </tr>
                     </tbody>
                   </table>
+
                   {previewData.address && (
                     <div className="pt-2">
                       <span className="font-bold text-[#8d6e63] text-[9px] uppercase tracking-widest mb-1 block">Delivery Address</span>
