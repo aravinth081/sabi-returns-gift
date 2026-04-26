@@ -3297,13 +3297,12 @@ export default function Dashboard() {
       {isPreviewOpen && previewData && (() => {
         const previewPrice = calculatePriceInfo(previewData.chocolate, previewData.count, previewData.discount, previewData.isDeliveryFree, previewData.paymentStatus, previewData.category, customPricesMap, previewData.manualDeliveryFee, previewData.orderStatus, managedChocPricesMap, previewData.pricingType);
         return (
-
           <div
             className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
             onClick={() => setIsPreviewOpen(false)}
           >
             <div
-              className={`rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-[480px] p-6 text-center bg-[#fffcf9] max-h-[95vh] overflow-y-auto relative border border-amber-100`}
+              className="rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-[500px] p-6 text-center bg-[#fffcf9] max-h-[95vh] overflow-y-auto relative border border-amber-100"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -3314,15 +3313,16 @@ export default function Dashboard() {
                 <Camera size={18} />
               </button>
 
-              <div id="preview-modal-content" className="bg-[#fffcf9] p-3 rounded-xl aspect-square flex flex-col justify-center">
+              {/* CAPTURE AREA */}
+              <div id="preview-modal-content" className="bg-[#fffcf9] p-4 rounded-xl mx-auto" style={{ width: '450px', minHeight: '450px' }}>
                 <div className="flex justify-between items-center mb-4 border-b-2 border-dashed border-[#d7ccc8] pb-4 pt-1">
                   <div className="text-left flex flex-col justify-center">
-                    <div className={`w-14 h-14 rounded-xl mb-2 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner`}>
+                    <div className="w-14 h-14 rounded-xl mb-2 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner relative">
                       <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                       <User size={24} className="absolute -z-10" />
                     </div>
-                    <h2 className={`text-xl font-black text-[#3e2723]`}>{previewData.name}</h2>
-                    <p className={`font-bold text-amber-700 text-[12px] mb-1`}>{previewData.phone}</p>
+                    <h2 className="text-xl font-black text-[#3e2723]">{previewData.name}</h2>
+                    <p className="font-bold text-amber-700 text-[12px] mb-1">{previewData.phone}</p>
                     <span className="inline-block bg-amber-200 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black tracking-widest border border-amber-300 w-max shadow-sm mb-0.5">
                       INV: {getSerial(previewData.id)}
                     </span>
@@ -3343,74 +3343,93 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className={`rounded-2xl p-4 text-left mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden`}>
-                  
+                <div className="rounded-2xl p-4 text-left mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
                   <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                     <tbody>
                       <tr>
-                        {/* Column 1: Item Details */}
+                        {/* Column 1 */}
                         <td className="w-1/2 pr-4 border-r border-[#f0e6db] align-top">
-                          <div className="flex flex-col gap-1 border-b border-[#f5f5f5] pb-2 mb-3">
-                            <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>{previewData.category === 'product' ? 'Product' : 'Chocolate'}</span>
+                          <div className="border-b border-[#f5f5f5] pb-2 mb-3">
+                            <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider mb-1">{previewData.category === 'product' ? 'Product' : 'Chocolate'}</p>
                             <div className="w-full min-h-[24px]">{renderChocolateBadges(previewData.chocolate)}</div>
                           </div>
-                          
-                          <div className="flex justify-between items-center text-[12px] font-bold mb-3">
-                            <span className={`text-[#8d6e63]`}>Subtotal</span>
-                            <span className={`text-[#3e2723]`}>₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</span>
-                          </div>
-
+                          <table className="w-full mb-3">
+                            <tbody>
+                              <tr>
+                                <td className="text-left text-[12px] font-bold text-[#8d6e63]">Subtotal</td>
+                                <td className="text-right text-[12px] font-bold text-[#3e2723]">₹{(previewPrice.fullChocolatePrice || 0).toLocaleString()}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                           <div className="space-y-2 pt-2 border-t border-[#f5f5f5]">
-                            <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Function Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.functionDate}</span></div>
-                            <div className="flex flex-col"><span className={`text-[#8d6e63] text-[10px] uppercase font-bold`}>Delivery Date</span><span className={`text-[#3e2723] font-bold flex items-center gap-1 text-[11px]`}><Calendar size={12} /> {previewData.deliveryDate}</span></div>
+                            <div>
+                              <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Function Date</p>
+                              <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.functionDate}</p>
+                            </div>
+                            <div>
+                              <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Delivery Date</p>
+                              <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate}</p>
+                            </div>
                           </div>
                         </td>
-
-                        {/* Column 2: Order Summary */}
-                        <td className="w-1/2 pl-4 align-top text-right">
-                          <div className="flex flex-col items-end gap-1 border-b border-[#f5f5f5] pb-2 mb-3">
-                            <span className={`font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider`}>Quantity</span>
-                            <span className={`font-black text-[#3e2723] text-lg leading-none`}>{previewData.count} Items</span>
+                        {/* Column 2 */}
+                        <td className="w-1/2 pl-4 align-top">
+                          <div className="border-b border-[#f5f5f5] pb-2 mb-3 text-right">
+                            <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider mb-1">Quantity</p>
+                            <p className="font-black text-[#3e2723] text-lg leading-none">{previewData.count} Items</p>
                             {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
-                              <span className="text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8]">
+                              <span className="inline-block text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8] mt-1">
                                 ₹{previewPrice.unitPrice} x {previewData.count}
                               </span>
                             )}
                           </div>
-
-                          <div className="flex justify-between items-center text-[12px] font-bold mb-3">
-                            <span className={`text-[#8d6e63] text-left`}>Delivery</span>
-                            <span className={`text-[#3e2723]`}>{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span>
-                          </div>
-
-                          <div className="space-y-2 pt-2 border-t border-[#f5f5f5] flex flex-col items-end">
-                            <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Payment</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span></div>
-                            <div className="flex flex-col items-end"><span className={`text-amber-800 text-[10px] uppercase font-bold`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span></div>
+                          <table className="w-full mb-3">
+                            <tbody>
+                              <tr>
+                                <td className="text-left text-[12px] font-bold text-[#8d6e63]">Delivery</td>
+                                <td className="text-right text-[12px] font-bold text-[#3e2723]">{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <div className="space-y-2 pt-2 border-t border-[#f5f5f5] text-right">
+                            <div>
+                              <p className="text-amber-800 text-[10px] uppercase font-bold mb-1">Payment</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span>
+                            </div>
+                            <div>
+                              <p className="text-amber-800 text-[10px] uppercase font-bold mb-1">Status</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
+                            </div>
                           </div>
                         </td>
                       </tr>
                     </tbody>
                   </table>
-
                   {previewData.discount > 0 && (
-                    <div className="flex justify-between items-center text-red-600 font-black text-xs border-t border-[#f5f5f5] pt-3">
-                      <span>Applied Discount</span>
-                      <span>-₹{previewData.discount}</span>
-                    </div>
+                    <table className="w-full border-t border-[#f5f5f5] pt-3 mt-3">
+                      <tbody>
+                        <tr>
+                          <td className="text-left text-red-600 font-black text-xs">Applied Discount</td>
+                          <td className="text-right text-red-600 font-black text-xs">-₹{previewData.discount}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   )}
-
-                  <div className="flex justify-between items-center py-2 border-b-2 border-t-2 border-dashed border-[#d7ccc8] mt-3">
-                    <div className="flex flex-col">
-                      <span className={`font-black text-[#5d4037] uppercase text-[10px] tracking-widest`}>Grand Total</span>
-                      <span className="text-[9px] font-bold text-gray-400 leading-none">Net Payable Amount</span>
-                    </div>
-                    <span className={`font-black text-3xl text-green-700`}>₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</span>
-                  </div>
-
+                  <table className="w-full border-b-2 border-t-2 border-dashed border-[#d7ccc8] mt-3 py-2">
+                    <tbody>
+                      <tr>
+                        <td className="text-left">
+                          <p className="font-black text-[#5d4037] uppercase text-[10px] tracking-widest">Grand Total</p>
+                          <p className="text-[9px] font-bold text-gray-400 leading-none">Net Payable Amount</p>
+                        </td>
+                        <td className="text-right font-black text-3xl text-green-700">₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                   {previewData.address && (
                     <div className="pt-2">
-                      <span className={`font-bold text-[#8d6e63] text-[9px] uppercase tracking-widest mb-1 block`}>Delivery Address</span>
-                      <span className={`font-bold text-[10px] text-[#3e2723] bg-[#f5f5f5] p-2 rounded-lg border border-[#d7ccc8] block truncate`}>{previewData.address}</span>
+                      <span className="font-bold text-[#8d6e63] text-[9px] uppercase tracking-widest mb-1 block">Delivery Address</span>
+                      <span className="font-bold text-[10px] text-[#3e2723] bg-[#f5f5f5] p-2 rounded-lg border border-[#d7ccc8] block truncate">{previewData.address}</span>
                     </div>
                   )}
                 </div>
@@ -3418,10 +3437,13 @@ export default function Dashboard() {
                 <div className="mb-2 p-2 bg-red-50 border border-red-100 rounded-xl text-center">
                   <span className="text-[9px] font-black text-red-600 uppercase leading-none block">Note: Order will be confirmed once the amount paid.</span>
                 </div>
-                <p className="text-[10px] font-black text-amber-600 uppercase tracking-tighter italic opacity-80">Thank you for your order! ❤️</p>
+                <p className="text-[10px] font-black text-amber-600 uppercase tracking-tighter italic opacity-80 text-center">Thank you for your order! ❤️</p>
               </div>
 
-              <button onClick={() => setIsPreviewOpen(false)} className={`w-full py-3 mt-3 rounded-xl font-black text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-lg transition-transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest text-xs`}>
+              <button
+                onClick={() => setIsPreviewOpen(false)}
+                className="w-full py-3 mt-3 rounded-xl font-black text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-lg transition-transform hover:-translate-y-1 active:scale-95 uppercase tracking-widest text-xs"
+              >
                 Close Preview
               </button>
             </div>
