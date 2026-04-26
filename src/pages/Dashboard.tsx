@@ -3314,7 +3314,7 @@ export default function Dashboard() {
               <div id="preview-modal-content" className="bg-[#fffcf9] p-3 rounded-xl">
                 <div className="flex justify-between items-start mb-6 border-b-2 border-dashed border-[#d7ccc8] pb-5 pt-2">
                   <div className="text-left flex flex-col justify-center">
-                    <div className={`w-16 h-16 rounded-full mb-3 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner`}>
+                    <div className={`w-16 h-16 rounded-xl mb-3 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner`}>
                       <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                       <User size={28} className="absolute -z-10" />
                     </div>
