@@ -1,4 +1,4 @@
-// ==========================================
+ // ==========================================
 // 5 STEPS INTEGRATION
 // Step 1: Ensure dependencies are installed -> `npm install firebase lucide-react recharts xlsx html2canvas`
 // Step 2: Verify Firebase config credentials match your Firebase Console.
@@ -78,18 +78,19 @@ const normalizeChocName = (name: string, dynamicInventory: string[] = []) => {
   if (lower === 'dairy milk') return 'Dairy Milk';
   if (lower === '10 rs dairymilk') return '10 rs Dairy Milk';
   if (lower === '10 rs dairy milk') return '10 rs Dairy Milk';
-  
+
   const inventoryToSearch = dynamicInventory.length > 0 ? dynamicInventory : [
     "Kitkat", "Dairy Milk", "Peanut Candy", "5 Star",
     "10 rs Dairy Milk", "Dairymilk Shots", "10 rs 5 Star", "Milky Bar"
   ];
-  
+
   const found = inventoryToSearch.find(t => t.toLowerCase() === lower);
   return found || name.trim();
 };
 
 
-const calculatePriceInfo = (chocolateString: string, count: number | string, discountValue: number | string = 0, isDeliveryFree: boolean = false, paymentStatus: string = "Full Paid", category: string = "chocolate", customPricesMap: Record<string, number> = {}, manualDeliveryFee: number | string = 0, orderStatus: string = "", managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {}, pricingType: 'retail' | 'wholesale' = 'retail') => {
+const calculatePriceInfo = (chocolateString: string, count: number | string, discountValue: number | string = 0, isDeliveryFree: boolean = false, paymentStatus: string = "Full Paid", category: string = "chocolate", customPricesMap: Record<string, number> = {}, manualDeliveryFee: number | string = 0, orderStatus: string = "", managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {}, pricingType: 'retail' | 'wholesale' = 'retail', manualProductPrice: number | string = 0) => {
+
   const quantity = Number(count) || 0;
   if (!chocolateString || quantity === 0) return { unitPrice: 0, chocolatePrice: 0, deliveryCharge: 0, discount: 0, totalPrice: 0, revenue: 0, fullChocolatePrice: 0, fullDeliveryCharge: 0, fullTotalPrice: 0 };
 
@@ -107,6 +108,11 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
   let unitPrice = 0;
   if (chocs.length > 0) unitPrice = sumPrice / chocs.length;
 
+  // Use manualProductPrice as unitPrice if provided (for Dashboard 2)
+  if (category === 'product' && Number(manualProductPrice) > 0) {
+    unitPrice = Number(manualProductPrice);
+  }
+
   const baseChocolatePrice = Number((unitPrice * quantity).toFixed(2));
 
   let baseDeliveryCharge = 0;
@@ -118,8 +124,7 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
 
   const baseDiscountAmt = Number(discountValue) || 0;
 
-  let rawTotal = baseChocolatePrice + baseDeliveryCharge - baseDiscountAmt;
-  if (rawTotal < 0) rawTotal = 0;
+  const rawTotal = Math.max(0, baseChocolatePrice + baseDeliveryCharge - baseDiscountAmt);
 
   // Multiplier logic for perfectly scaling the prices up/down based on payment and status
   let multiplier = 1;
@@ -145,6 +150,7 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
     fullTotalPrice: Math.round(rawTotal)
   };
 };
+
 
 
 const parseDateToYYYYMMDD = (displayDate: string) => {
@@ -439,7 +445,8 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+
   const [previewData, setPreviewData] = useState<any>(null);
 
   const [dashboardSearch, setDashboardSearch] = useState("");
@@ -449,6 +456,18 @@ export default function Dashboard() {
   const uniqueCounts = useMemo(() => Array.from(new Set(orders.map(o => Number(o.count)))).sort((a, b) => a - b), [orders]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const [hiddenCols, setHiddenCols] = useState<Record<string, boolean>>({
+    serialNo: false,
+    orderDate: false,
+    deliveryCharge: false,
+    discount: false
+  });
+
+  const toggleCol = (col: string) => {
+    setHiddenCols(prev => ({ ...prev, [col]: !prev[col] }));
+  };
+
 
   const uniqueNames = useMemo(() => Array.from(new Set(orders.map(o => o.name))), [orders]);
   const uniquePhones = useMemo(() => Array.from(new Set(orders.map(o => o.phone))), [orders]);
@@ -576,7 +595,7 @@ export default function Dashboard() {
     return orders.filter(order => {
       const pMatch = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
       const dMatch = deliveryFilter === 'All' || order.status === deliveryFilter;
-      const osMatch = orderStatusFilter === 'All' || (order.orderStatus || "image edited (not paid)") === orderStatusFilter;
+      const osMatch = orderStatusFilter === 'All' || (order.orderStatus || "image edit (pending)") === orderStatusFilter;
 
       let rangeMatch = true;
       if (dateFilter.from || dateFilter.to) {
@@ -781,7 +800,7 @@ export default function Dashboard() {
       result = result.filter(o => o.status === deliveryFilter);
     }
     if (orderStatusFilter !== 'All') {
-      result = result.filter(o => (o.orderStatus || "image edited (not paid)") === orderStatusFilter);
+      result = result.filter(o => (o.orderStatus || "image edit (pending)") === orderStatusFilter);
     }
 
     if (trackingSearch.trim()) {
@@ -947,19 +966,46 @@ export default function Dashboard() {
     const updatedOrder = { ...orderToUpdate, discount: numValue };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
 
-
     setOrders(prev => prev.map(o => o.id === id ? { ...o, discount: numValue, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
     if (fireId) {
       try { await updateDoc(doc(db, "orders", fireId), { discount: numValue, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge }); } catch (e) { }
     }
   };
 
+  const handleAdvanceUpdate = async (id: number, fireId: string, value: string) => {
+    const numValue = Number(value) || 0;
+    const orderToUpdate = orders.find(o => o.id === id);
+    if (!orderToUpdate) return;
+
+    // Use current order data to calculate fullTotalPrice
+    const priceData = calculatePriceInfo(orderToUpdate.chocolate, orderToUpdate.count, orderToUpdate.discount, orderToUpdate.isDeliveryFree, orderToUpdate.paymentStatus, orderToUpdate.category, customPricesMap, orderToUpdate.manualDeliveryFee, orderToUpdate.orderStatus, managedChocPricesMap, orderToUpdate.pricingType);
+    
+    let newPaymentStatus = 'Pending';
+    if (numValue >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+      newPaymentStatus = 'Full Paid';
+    } else if (numValue > 0) {
+      newPaymentStatus = 'Partially Paid';
+    }
+
+    const updatedOrder = { ...orderToUpdate, advanceAmount: numValue, paymentStatus: newPaymentStatus };
+    // Recalculate priceData with new payment status if it affects calculations (though fullTotalPrice usually doesn't)
+    const finalPriceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.totalPrice, itemSubtotal: finalPriceData.chocolatePrice, calculatedDeliveryFee: finalPriceData.deliveryCharge } : o));
+    if (fireId) {
+      try { await updateDoc(doc(db, "orders", fireId), { advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.totalPrice, itemSubtotal: finalPriceData.chocolatePrice, calculatedDeliveryFee: finalPriceData.deliveryCharge }); } catch (e) { }
+    }
+  };
+
+
+
   const handlePaymentStatusUpdate = async (id: any, fireId: string, newPaymentStatus: string) => {
     const orderToUpdate = orders.find(o => o.id === id);
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, paymentStatus: newPaymentStatus };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
+
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus: newPaymentStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -973,7 +1019,8 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, status: newStatus };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
+
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -987,7 +1034,8 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, orderStatus: newOrderStatus };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
+
 
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
@@ -997,14 +1045,48 @@ export default function Dashboard() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    let newFormData = { ...formData, [name]: value };
+    
+    if (name === 'advanceAmount' || name === 'count' || name === 'discount' || name === 'chocolate' || name === 'manualDeliveryFee' || name === 'manualProductPrice') {
+
+      const currentAdvance = name === 'advanceAmount' ? Number(value) : Number(formData.advanceAmount);
+      const priceData = calculatePriceInfo(
+        name === 'chocolate' ? value : formData.chocolate,
+        name === 'count' ? value : formData.count,
+        name === 'discount' ? value : formData.discount,
+        formData.isDeliveryFree || formData.isChennai,
+        formData.paymentStatus,
+        formData.category,
+        customPricesMap,
+        name === 'manualDeliveryFee' ? value : formData.manualDeliveryFee,
+        formData.orderStatus,
+        managedChocPricesMap,
+        formData.pricingType,
+        name === 'manualProductPrice' ? value : formData.manualProductPrice
+      );
+
+
+      if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+        newFormData.paymentStatus = 'Full Paid';
+      } else if (currentAdvance > 0) {
+        newFormData.paymentStatus = 'Partially Paid';
+      } else {
+        newFormData.paymentStatus = 'Pending';
+      }
+    }
+    
+    setFormData(newFormData);
   };
+
+
 
   const handleAddClick = () => {
     const today = new Date().toISOString().split('T')[0];
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "" });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "" });
     setIsModalOpen(true);
   };
+
 
   const handleEditClick = (order: any) => {
     setFormData({
@@ -1023,7 +1105,9 @@ export default function Dashboard() {
       category: order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate'),
       manualDeliveryFee: order.manualDeliveryFee || "",
       advanceAmount: order.advanceAmount || "",
+      manualProductPrice: order.manualProductPrice || "",
       pricingType: order.pricingType || 'retail'
+
     });
     setIsModalOpen(true);
   };
@@ -1046,8 +1130,19 @@ export default function Dashboard() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType);
+    const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
 
+
+
+    const rawAdvance = Number(formData.advanceAmount) || 0;
+    let finalPaymentStatus = formData.paymentStatus;
+    if (rawAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+      finalPaymentStatus = 'Full Paid';
+    } else if (rawAdvance > 0) {
+      finalPaymentStatus = 'Partially Paid';
+    } else {
+      finalPaymentStatus = 'Pending';
+    }
 
     const formattedOrder: any = {
       ...formData,
@@ -1056,7 +1151,12 @@ export default function Dashboard() {
       deliveryDate: formatToDisplayDate(formData.deliveryDate) || "",
       discount: Number(formData.discount) || 0,
       manualDeliveryFee: Number(formData.manualDeliveryFee) || 0,
-      advanceAmount: Number(formData.advanceAmount) || 0,
+      advanceAmount: rawAdvance,
+      manualProductPrice: Number(formData.manualProductPrice) || 0,
+      paymentStatus: finalPaymentStatus,
+
+
+
       isDeliveryFree: Boolean(formData.isDeliveryFree || formData.isChennai),
       isChennai: Boolean(formData.isChennai),
       totalOrderPrice: priceData.fullTotalPrice || 0,
@@ -1086,7 +1186,8 @@ export default function Dashboard() {
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Others", orderStatus: "image edit (pending)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "" });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Others", orderStatus: "image edit (pending)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "" });
+
 
     } catch (err) {
       console.error("Error saving:", err);
@@ -1333,7 +1434,8 @@ export default function Dashboard() {
     );
   };
 
-  const liveFormPrice = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType);
+  const liveFormPrice = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
+
 
   const profilePicUrl = "/logo.jpeg";
 
@@ -1808,11 +1910,12 @@ export default function Dashboard() {
                     <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider relative z-10">
                       <option value="All">All Statuses</option>
                       <option value="image edit (pending)">Image Edit (Pending)</option>
-                      <option value="image edited (not paid)">Image Edited (Not Paid)</option>
+                      <option value="image edit (completed)">Image Edit (Completed)</option>
                       <option value="forward to print (paid)">Forward to Print (Paid)</option>
                       <option value="delivered">Delivered</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
+
                   </div>
                 ) : (
                   <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col hover:-translate-y-1 transition-all duration-300">
@@ -1965,47 +2068,61 @@ export default function Dashboard() {
                         <th className="py-3 px-4 w-12 text-center print:hidden align-top">
                           <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                         </th>
-                        <th className="py-3 px-4 font-bold align-top">
-                          <div className="flex items-center gap-2 group">
-                            <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
-                              <ChevronRight size={14} strokeWidth={3} />
+                        <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
+                          <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
+                            <button onClick={() => toggleCol('serialNo')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.serialNo ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.serialNo ? "Show Serial No" : "Hide Serial No"}>
+                              {hiddenCols.serialNo ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
                             </button>
-                            <span>Serial No</span>
-                            <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
-                              <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                              <select
-                                value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
-                                onChange={(e) => {
-                                  if (!e.target.value) setSortConfig(null);
-                                  else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
-                                }}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              >
-                                <option value="">Sort...</option>
-                                <option value="asc">new  to old</option>
-                                <option value="desc">old to new </option>
-                              </select>
-                            </div>
+                            {!hiddenCols.serialNo && (
+                              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                                <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
+                                  <ChevronRight size={14} strokeWidth={3} />
+                                </button>
+                                <span className="whitespace-nowrap">Serial No</span>
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
+                                  <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                  <select
+                                    value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
+                                    onChange={(e) => {
+                                      if (!e.target.value) setSortConfig(null);
+                                      else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  >
+                                    <option value="">Sort...</option>
+                                    <option value="asc">new  to old</option>
+                                    <option value="desc">old to new </option>
+                                  </select>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </th>
-                        <th className="py-3 px-4 font-bold align-top min-w-[140px]">
-                          <div className="flex items-center gap-1 group">
-                            <span>Order Date</span>
-                            <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
-                              <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                              <select
-                                value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
-                                onChange={(e) => {
-                                  if (!e.target.value) setSortConfig(null);
-                                  else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
-                                }}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              >
-                                <option value="">Sort...</option>
-                                <option value="asc">new to Old</option>
-                                <option value="desc">old to new </option>
-                              </select>
-                            </div>
+                        <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
+                          <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
+                            <button onClick={() => toggleCol('orderDate')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.orderDate ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.orderDate ? "Show Order Date" : "Hide Order Date"}>
+                              {hiddenCols.orderDate ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
+                            </button>
+                            {!hiddenCols.orderDate && (
+                              <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                                <span className="whitespace-nowrap">Order Date</span>
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
+                                  <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                  <select
+                                    value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
+                                    onChange={(e) => {
+                                      if (!e.target.value) setSortConfig(null);
+                                      else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  >
+                                    <option value="">Sort...</option>
+                                    <option value="asc">new to Old</option>
+                                    <option value="desc">old to new </option>
+                                  </select>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </th>
                         <th className="py-3 px-4 font-bold align-top">Name</th>
@@ -2073,8 +2190,8 @@ export default function Dashboard() {
                           </div>
                         </th>
 
-                        {/* 🟢 CONDITIONALLY HIDE ORDER STATUS FOR DASHBOARD 2 */}
-                        {activeTab === 'dashboard1' && (
+                        {/* 🟢 ORDER STATUS VISIBLE FOR BOTH DASHBOARDS */}
+                        {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
                           <th className="py-3 px-4 font-bold align-top min-w-[150px]">
                             <div className="flex items-center gap-1 group">
                               <span>Order Status</span>
@@ -2115,8 +2232,24 @@ export default function Dashboard() {
                         </th>
 
                         <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>
-                        <th className="py-3 px-4 font-bold text-right align-top">Delivery Charge</th>
-                        <th className="py-3 px-4 font-bold text-center align-top print:hidden">Discount</th>
+                        <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
+                          <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
+                            {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
+                            <button onClick={() => toggleCol('deliveryCharge')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.deliveryCharge ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.deliveryCharge ? "Show Delivery Charge" : "Hide Delivery Charge"}>
+                              {hiddenCols.deliveryCharge ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
+                            </button>
+                          </div>
+                        </th>
+                        <th className="py-3 px-4 font-bold text-center align-top">Advance</th>
+                        <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
+                          <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
+                            <button onClick={() => toggleCol('discount')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.discount ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.discount ? "Show Discount" : "Hide Discount"}>
+                              {hiddenCols.discount ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
+                            </button>
+                            {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
+                          </div>
+                        </th>
+
 
                         <th className="py-3 px-4 font-bold text-right align-top">Total Price</th>
                         <th className="py-3 px-4 font-bold text-center align-top">Payment</th>
@@ -2146,36 +2279,42 @@ export default function Dashboard() {
                               <td className="py-2.5 px-4 text-center print:hidden align-middle">
                                 <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                               </td>
-                              <td className="py-2.5 px-4 font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap">{getSerial(order.id)}</td>
-                              <td className="py-2.5 px-4 font-medium text-[#5d4037] align-middle">{order.orderDate}</td>
+                              <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
+                                {!hiddenCols.serialNo && getSerial(order.id)}
+                              </td>
+                              <td className={`py-2.5 ${hiddenCols.orderDate ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-medium text-[#5d4037] align-middle transition-all duration-300`}>
+                                {!hiddenCols.orderDate && order.orderDate}
+                              </td>
 
                               <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
                               <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>
                               <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>
                               <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate}</td>
 
-                              {/* 🟢 CONDITIONALLY HIDE ORDER STATUS FOR DASHBOARD 2 */}
-                              {activeTab === 'dashboard1' && (
+                              {/* 🟢 ORDER STATUS VISIBLE FOR BOTH DASHBOARDS */}
+                              {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
                                 <td className="py-2.5 px-4 text-center align-middle">
                                   <div className="print:hidden">
                                     <select
-                                      value={order.orderStatus || "image edited (not paid)"}
+                                      value={order.orderStatus || "image edit (pending)"}
                                       onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
                                       className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${order.orderStatus === 'image edit (pending)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' :
-                                          order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
-                                            order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
-                                              order.orderStatus === 'delivered' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
-                                                'bg-[#ffe4e6] text-[#be123c] border-[#fda4af]'
+                                        order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
+                                          order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
+                                            order.orderStatus === 'delivered' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
+                                              'bg-[#f3e8ff] text-[#7e22ce] border-[#e9d5ff]'
                                         }`}
                                     >
                                       <option value="image edit (pending)">Image Edit (Pending)</option>
-                                      <option value="image edited (not paid)">Image Edited (Not Paid)</option>
+                                      <option value="image edit (completed)">Image Edit (Completed)</option>
                                       <option value="forward to print (paid)">Forward to Print (Paid)</option>
                                       <option value="delivered">Delivered</option>
                                       <option value="cancelled">Cancelled</option>
                                     </select>
+
                                   </div>
-                                  <span className="hidden print:inline text-[10px] font-bold text-black uppercase">{order.orderStatus || "image edited (not paid)"}</span>
+                                  <span className="hidden print:inline text-[10px] font-bold text-black uppercase">{order.orderStatus || "image edit (pending)"}</span>
+
                                 </td>
                               )}
 
@@ -2191,20 +2330,35 @@ export default function Dashboard() {
                                 <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
                               </td>
 
-                              <td className={`py-2.5 px-4 text-right font-medium text-amber-900 align-middle`}>
-                                {order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`}
+                              <td className={`py-2.5 ${hiddenCols.deliveryCharge ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-right font-medium text-amber-900 align-middle transition-all duration-300`}>
+                                {!hiddenCols.deliveryCharge && (
+                                  order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`
+                                )}
                               </td>
 
-                              <td className="py-2.5 px-4 text-center print:hidden align-middle">
+                              <td className="py-2.5 px-4 text-center align-middle">
                                 <input
                                   type="number"
-                                  list="discount-suggestions"
                                   placeholder="0"
-                                  value={order.discount || ''}
-                                  onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
-                                  className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                                  value={order.advanceAmount || ''}
+                                  onChange={(e) => handleAdvanceUpdate(order.id, order.fireId, e.target.value)}
+                                  className="w-20 p-1.5 border border-emerald-300 rounded text-center text-sm font-bold text-emerald-950 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                                 />
                               </td>
+
+                              <td className={`py-2.5 ${hiddenCols.discount ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-center print:hidden align-middle transition-all duration-300`}>
+                                {!hiddenCols.discount && (
+                                  <input
+                                    type="number"
+                                    list="discount-suggestions"
+                                    placeholder="0"
+                                    value={order.discount || ''}
+                                    onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
+                                    className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                                  />
+                                )}
+                              </td>
+
 
                               <td className={`py-2.5 px-4 text-right align-middle`}>
                                 <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
@@ -2225,10 +2379,10 @@ export default function Dashboard() {
                                     value={order.paymentStatus || "Pending"}
                                     onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                        ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
-                                        : order.paymentStatus === 'Partially Paid'
-                                          ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
-                                          : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
+                                      ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
+                                      : order.paymentStatus === 'Partially Paid'
+                                        ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
+                                        : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
                                       }`}
                                   >
                                     <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
@@ -2245,8 +2399,8 @@ export default function Dashboard() {
                                     value={order.status}
                                     onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
-                                        ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
-                                        : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
+                                      ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
+                                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
                                       }`}
                                   >
                                     <option value="Delivered" className="font-bold text-green-700">Delivered</option>
@@ -2289,15 +2443,15 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
-                
+
                 {/* 🟢 STICKY PAGINATION FOOTER */}
                 <div className="sticky bottom-0 z-30 bg-[#ebe6df]/95 backdrop-blur-md border-t border-amber-200 p-4 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)] print:hidden">
                   <div className="text-sm font-bold text-amber-800">
                     Showing <span className="font-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black">{sortedDashboardOrders.length}</span> orders
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       disabled={currentPage === 1}
                       onClick={() => {
                         setCurrentPage(prev => prev - 1);
@@ -2307,7 +2461,7 @@ export default function Dashboard() {
                     >
                       <ChevronLeft size={20} />
                     </button>
-                    
+
                     <div className="flex items-center gap-1 bg-white/50 p-1 rounded-xl border border-amber-100">
                       {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }).map((_, i) => {
                         const pageNum = i + 1;
@@ -2331,7 +2485,7 @@ export default function Dashboard() {
                       })}
                     </div>
 
-                    <button 
+                    <button
                       disabled={currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
                       onClick={() => {
                         setCurrentPage(prev => prev + 1);
@@ -2367,11 +2521,12 @@ export default function Dashboard() {
                     <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider">
                       <option value="All">All Statuses</option>
                       <option value="image edit (pending)">Image Edit (Pending)</option>
-                      <option value="image edited (not paid)">Image Edited (Not Paid)</option>
+                      <option value="image edit (completed)">Image Edit (Completed)</option>
                       <option value="forward to print (paid)">Forward to Print (Paid)</option>
                       <option value="delivered">Delivered</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
+
 
                     <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-sm font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)]">
                       <option value="All">All Payments</option>
@@ -2448,8 +2603,8 @@ export default function Dashboard() {
                             {order.status}
                           </span>
                           <span className={`px-4 py-1.5 rounded-full text-xs font-bold border inline-block text-center ${order.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
-                              order.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' :
-                                'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
+                            order.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' :
+                              'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
                             }`}>
                             {order.paymentStatus || 'Pending'}
                           </span>
@@ -3136,6 +3291,14 @@ export default function Dashboard() {
                   <input required type="date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
                 </div>
 
+                {formData.category === 'product' && (
+                  <div className="col-span-2">
+                    <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Product Unit Price (₹)</label>
+                    <input type="number" name="manualProductPrice" value={formData.manualProductPrice || ''} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter price per unit" />
+                  </div>
+                )}
+
+
                 <div className="col-span-2">
                   <div className="flex justify-between items-end mb-1">
                     <label className={`block text-sm font-bold text-[#5d4037]`}>{formData.category === 'product' ? 'Product Name' : 'Chocolate Name'}</label>
@@ -3208,36 +3371,44 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Payment Status</label>
-                  <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
-                    <option value="Pending">Pending</option>
-                    <option value="Partially Paid">Partially Paid</option>
-                    <option value="Full Paid">Full Paid</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Delivery Status</label>
-                  <select required name="status" value={formData.status} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
-                    <option value="In Process">In Process</option>
-                    <option value="Delivered">Delivered</option>
-                  </select>
-                </div>
-
-                {/* 🟢 CONDITIONALLY HIDE DETAILED ORDER STATUS FOR DASHBOARD 2 */}
                 {formData.category !== 'product' && (
-                  <div className="col-span-2">
-                    <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Detailed Order Status</label>
-                    <select required name="orderStatus" value={formData.orderStatus} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
-                      <option value="image edit (pending)">Image Edit (Pending)</option>
-                      <option value="image edited (not paid)">Image Edited (Not Paid)</option>
-                      <option value="forward to print (paid)">Forward to Print (Paid)</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Payment Status</label>
+                      <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
+                        <option value="Pending">Pending</option>
+                        <option value="Partially Paid">Partially Paid</option>
+                        <option value="Full Paid">Full Paid</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Delivery Status</label>
+                      <select required name="status" value={formData.status} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
+                        <option value="In Process">In Process</option>
+                        <option value="Delivered">Delivered</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Detailed Order Status</label>
+                      <select
+                        name="orderStatus"
+                        value={formData.orderStatus}
+                        onChange={handleInputChange}
+                        className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}
+                      >
+                        <option value="image edit (pending)">Image Edit (Pending)</option>
+                        <option value="image edit (completed)">Image Edit (Completed)</option>
+                        <option value="forward to print (paid)">Forward to Print (Paid)</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </>
                 )}
+
+
 
                 <div className="col-span-2">
                   <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Advance Amount Paid (₹)</label>
@@ -3314,7 +3485,9 @@ export default function Dashboard() {
               </button>
 
               {/* CAPTURE AREA */}
-              <div id="preview-modal-content" className="bg-[#fffcf9] p-4 rounded-xl mx-auto" style={{ width: '450px', minHeight: '450px' }}>
+              <div id="preview-modal-content" className="bg-[#fffcf9] p-5 rounded-xl mx-auto" style={{ width: '550px', minHeight: '450px' }}>
+
+
                 <div className="flex justify-between items-center mb-4 border-b-2 border-dashed border-[#d7ccc8] pb-4 pt-1">
                   <div className="text-left flex flex-col justify-center">
                     <div className="w-14 h-14 rounded-xl mb-2 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner relative">
@@ -3333,7 +3506,7 @@ export default function Dashboard() {
 
                   <div className="shrink-0 flex flex-col items-center bg-white p-2 rounded-xl border-2 border-dashed border-amber-200 shadow-sm">
                     <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
                       alt="Payment QR Code"
                       className="w-16 h-16 rounded-lg"
                       crossOrigin="anonymous"
@@ -3343,27 +3516,32 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl p-4 text-left mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
-                  <table className="w-full border-collapse" style={{ tableLayout: 'fixed', width: '418px' }}>
+                <div className="rounded-2xl p-5 text-left mb-3 bg-white border border-[#d7ccc8] shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+                  <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+
+
                     <tbody>
                       {/* Row 1: Chocolate & Quantity Labels */}
                       <tr>
-                        <td style={{ width: '100px' }} className="align-bottom pb-1">
+                        <td style={{ width: '140px' }} className="align-bottom pb-1">
                           <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider">{previewData.category === 'product' ? 'Product' : 'Chocolate'}</p>
                         </td>
-                        <td style={{ width: '109px' }} className="border-r border-[#f0e6db] pb-1"></td>
-                        <td style={{ width: '100px' }} className="pl-4 align-bottom pb-1">
+                        <td style={{ width: '105px' }} className="border-r border-[#f0e6db] pb-1"></td>
+                        <td style={{ width: '140px' }} className="pl-4 align-bottom pb-1">
                           <p className="font-bold text-[#8d6e63] uppercase text-[10px] tracking-wider">Quantity</p>
                         </td>
-                        <td style={{ width: '109px' }} className="pb-1"></td>
+                        <td style={{ width: '105px' }} className="pb-1 pr-4"></td>
+
+
                       </tr>
                       {/* Row 2: Chocolate & Quantity Values */}
                       <tr>
                         <td colSpan={2} className="border-r border-[#f0e6db] align-top border-b border-[#f5f5f5] pb-3">
                           <div className="w-full min-h-[24px]">{renderChocolateBadges(previewData.chocolate)}</div>
                         </td>
-                        <td colSpan={2} className="pl-4 align-top border-b border-[#f5f5f5] pb-3 text-right">
+                        <td colSpan={2} className="pl-4 align-top border-b border-[#f5f5f5] pb-3 text-right pr-4">
                           <p className="font-black text-[#3e2723] text-lg leading-none">{previewData.count} Items</p>
+
                           {previewPrice.unitPrice > 0 && Number(previewData.count) > 0 && (
                             <span className="inline-block text-[10px] text-[#8d6e63] font-black tracking-widest bg-[#f5f5f5] px-2 py-0.5 rounded-full border border-[#d7ccc8] mt-1">
                               ₹{previewPrice.unitPrice} x {previewData.count}
@@ -3382,9 +3560,10 @@ export default function Dashboard() {
                         <td className="pl-4 pt-3 pb-3">
                           <span className="text-[#8d6e63] font-bold text-[12px]">Delivery</span>
                         </td>
-                        <td className="pt-3 pb-3 text-right">
+                        <td className="pt-3 pb-3 text-right pr-4">
                           <span className="text-[#3e2723] font-bold text-[12px]">{previewData.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${previewPrice.fullDeliveryCharge || 0}`}</span>
                         </td>
+
                       </tr>
                       {/* Row 4: Dates & Status Labels */}
                       <tr>
@@ -3402,9 +3581,10 @@ export default function Dashboard() {
                         <td colSpan={2} className="border-r border-[#f0e6db] pb-2">
                           <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.functionDate}</p>
                         </td>
-                        <td colSpan={2} className="pl-4 pb-2 text-right">
+                        <td colSpan={2} className="pl-4 pb-2 text-right pr-4">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span>
                         </td>
+
                       </tr>
                       {/* Row 6: Delivery Date & Status Label */}
                       <tr>
@@ -3422,9 +3602,10 @@ export default function Dashboard() {
                         <td colSpan={2} className="border-r border-[#f0e6db] pb-2">
                           <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate}</p>
                         </td>
-                        <td colSpan={2} className="pl-4 pb-2 text-right">
+                        <td colSpan={2} className="pl-4 pb-2 text-right pr-4">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
                         </td>
+
                       </tr>
                     </tbody>
                   </table>
@@ -3447,7 +3628,8 @@ export default function Dashboard() {
                           <p className="font-black text-[#5d4037] uppercase text-[10px] tracking-widest">Grand Total</p>
                           <p className="text-[9px] font-bold text-gray-400 leading-none">Net Payable Amount</p>
                         </td>
-                        <td className="text-right font-black text-3xl text-green-700">₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</td>
+                        <td className="text-right font-black text-3xl text-green-700 pr-4">₹{(previewPrice.fullTotalPrice || 0).toLocaleString()}</td>
+
                       </tr>
                     </tbody>
                   </table>
@@ -3727,11 +3909,11 @@ export default function Dashboard() {
                 <h3 className="text-lg font-black text-[#8d6e63] mb-4 flex items-center gap-2"><Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}</h3>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
-                  const data = { 
-                    name: newChocForm.name, 
-                    retailPrice: Number(newChocForm.retailPrice), 
-                    wholesalePrice: Number(newChocForm.wholesalePrice), 
-                    costPrice: 0 
+                  const data = {
+                    name: newChocForm.name,
+                    retailPrice: Number(newChocForm.retailPrice),
+                    wholesalePrice: Number(newChocForm.wholesalePrice),
+                    costPrice: 0
                   };
                   if (editChocId) {
                     await updateDoc(doc(db, "managed_chocolates", editChocId), data);
@@ -3833,7 +4015,7 @@ export default function Dashboard() {
               <h2 className="text-2xl font-black text-emerald-900 uppercase tracking-widest flex items-center gap-2"><DollarSign /> Profit Analytics Table</h2>
               <button onClick={() => setIsProfitModalOpen(false)} className="text-emerald-700 hover:text-red-500 transition-colors bg-white p-1 rounded-full shadow-sm"><X size={28} /></button>
             </div>
-            
+
             <div className="overflow-auto flex-1 p-4">
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 z-10 bg-emerald-600 text-white shadow-md">
@@ -3850,7 +4032,7 @@ export default function Dashboard() {
                 <tbody className="bg-white">
                   {reportData.filteredOrders.map((order: any) => {
                     const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
-                    
+
                     // Calculate Total Cost
                     let totalCost = 0;
                     if (order.category !== 'product') {
@@ -3860,12 +4042,12 @@ export default function Dashboard() {
                         totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length;
                       });
                     } else {
-                        // For products, assume 70% of price is cost if not defined
-                        totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
+                      // For products, assume 70% of price is cost if not defined
+                      totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
                     }
-                    
+
                     const profit = priceInfo.revenue - totalCost;
-                    
+
                     return (
                       <tr key={order.fireId} className="border-b border-emerald-50 hover:bg-emerald-50/30 transition-colors">
                         <td className="p-4 text-xs font-bold text-gray-600">{order.orderDate || order.functionDate}</td>
@@ -3883,38 +4065,38 @@ export default function Dashboard() {
             </div>
 
             <div className="p-6 bg-emerald-50 border-t-2 border-emerald-100 grid grid-cols-3 gap-4">
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
-                  <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Revenue</p>
-                  <p className="text-xl font-black text-green-700">₹{Math.round(reportData.totalRev).toLocaleString()}</p>
-               </div>
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
-                  <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Cost</p>
-                  <p className="text-xl font-black text-red-600">₹{Math.round(reportData.filteredOrders.reduce((acc: any, order: any) => {
-                     let totalCost = 0;
-                     if (order.category !== 'product') {
-                       const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
-                       const qty = Number(order.count || 0);
-                       chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length; });
-                     } else {
-                        totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
-                     }
-                     return acc + totalCost;
-                  }, 0)).toLocaleString()}</p>
-               </div>
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
-                  <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Net Profit</p>
-                  <p className="text-xl font-black text-emerald-600">₹{Math.round(reportData.totalRev - reportData.filteredOrders.reduce((acc: any, order: any) => {
-                     let totalCost = 0;
-                     if (order.category !== 'product') {
-                       const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
-                       const qty = Number(order.count || 0);
-                       chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length; });
-                     } else {
-                        totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
-                     }
-                     return acc + totalCost;
-                  }, 0)).toLocaleString()}</p>
-               </div>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
+                <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Revenue</p>
+                <p className="text-xl font-black text-green-700">₹{Math.round(reportData.totalRev).toLocaleString()}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
+                <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Cost</p>
+                <p className="text-xl font-black text-red-600">₹{Math.round(reportData.filteredOrders.reduce((acc: any, order: any) => {
+                  let totalCost = 0;
+                  if (order.category !== 'product') {
+                    const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
+                    const qty = Number(order.count || 0);
+                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length; });
+                  } else {
+                    totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
+                  }
+                  return acc + totalCost;
+                }, 0)).toLocaleString()}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
+                <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Net Profit</p>
+                <p className="text-xl font-black text-emerald-600">₹{Math.round(reportData.totalRev - reportData.filteredOrders.reduce((acc: any, order: any) => {
+                  let totalCost = 0;
+                  if (order.category !== 'product') {
+                    const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
+                    const qty = Number(order.count || 0);
+                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length; });
+                  } else {
+                    totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
+                  }
+                  return acc + totalCost;
+                }, 0)).toLocaleString()}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -3923,4 +4105,6 @@ export default function Dashboard() {
     </div>
   );
 }
-
+
+
+
