@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState } from 'react';
+ import React, { useRef, useMemo, useState } from 'react';
 import { X, Download, Copy, CheckCircle2, ClipboardCheck } from "lucide-react";
 import html2canvas from 'html2canvas';
 
@@ -171,14 +171,14 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
               <img
                 src={`/sabi-logo.png?v=${refreshKey}`}
                 alt="Logo"
-                style={{ 
-                  maxWidth: '400px', 
+                style={{
+                  maxWidth: '400px',
                   maxHeight: '160px',
                   width: 'auto',
                   height: 'auto'
                 }}
                 className="block"
-                crossOrigin="anonymous" 
+                crossOrigin="anonymous"
               />
             </div>
           </div>
