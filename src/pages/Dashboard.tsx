@@ -1,4 +1,4 @@
- // ==========================================
+// ==========================================
 // 5 STEPS INTEGRATION
 // Step 1: Ensure dependencies are installed -> `npm install firebase lucide-react recharts xlsx html2canvas`
 // Step 2: Verify Firebase config credentials match your Firebase Console.
@@ -16,7 +16,9 @@ import {
 // ------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign
+
+
 
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -278,7 +280,7 @@ export default function Dashboard() {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<any>(null);
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [adminDateType, setAdminDateType] = useState<string>('Delivery Date');
+  const [adminDateType, setAdminDateType] = useState<string>('Dispatch Date');
   const [adminDateRange, setAdminDateRange] = useState({ from: "", to: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -391,7 +393,7 @@ export default function Dashboard() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
   const [tableTypeFilter, setTableTypeFilter] = useState<string>('All');
 
-  const [revenueDateType, setRevenueDateType] = useState<string>('Delivery Date');
+  const [revenueDateType, setRevenueDateType] = useState<string>('Dispatch Date');
   const [dateFilter, setDateFilter] = useState({ from: "", to: "" });
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [reportDashboardFilter, setReportDashboardFilter] = useState("All");
@@ -453,7 +455,12 @@ export default function Dashboard() {
   const [trackingSearch, setTrackingSearch] = useState("");
 
   const [countFilter, setCountFilter] = useState<string>('All');
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [whatsAppMessage, setWhatsAppMessage] = useState("");
+  const [whatsAppOrder, setWhatsAppOrder] = useState<any>(null);
+
   const uniqueCounts = useMemo(() => Array.from(new Set(orders.map(o => Number(o.count)))).sort((a, b) => a - b), [orders]);
+
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
@@ -568,7 +575,7 @@ export default function Dashboard() {
           if (order.category !== 'product') {
             const orderQty = Number(order.count || 0);
             count += orderQty;
-            const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
+            const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
             revenue += priceInfo.chocolatePrice;
           }
         } else {
@@ -652,7 +659,7 @@ export default function Dashboard() {
     let totalDelivery = 0;
 
     filteredDashboardOrders.forEach(o => {
-      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType);
+      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
 
       netRevenue += priceInfo.revenue;
       if (o.paymentStatus !== 'Pending') {
@@ -771,7 +778,7 @@ export default function Dashboard() {
     let totalDelivery = 0;
 
     baseOrders.forEach(order => {
-      const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+      const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
       totalRev += priceInfo.revenue;
       totalItems += Number(order.count || 0);
       totalDelivery += priceInfo.deliveryCharge;
@@ -868,7 +875,7 @@ export default function Dashboard() {
 
     filtered.forEach(order => {
       if (order.status === "Delivered" || order.status === "In Process") {
-        const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
+        const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
         totalRev += priceInfo.revenue;
         totalItems += Number(order.count || 0);
         totalDelivery += priceInfo.deliveryCharge;
@@ -890,7 +897,7 @@ export default function Dashboard() {
 
   const displayRevenue = useMemo(() => {
     return filteredDashboardOrders.reduce((sum, o) => {
-      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType);
+      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
       return sum + priceInfo.totalPrice;
     }, 0);
   }, [filteredDashboardOrders, customPricesMap, managedChocPricesMap]);
@@ -931,7 +938,7 @@ export default function Dashboard() {
           updatedOrder.paymentStatus = actionType;
         }
 
-        const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+        const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
 
         await updateDoc(orderRef, {
@@ -964,7 +971,7 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     const updatedOrder = { ...orderToUpdate, discount: numValue };
-    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+    const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, discount: numValue, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
     if (fireId) {
@@ -978,7 +985,7 @@ export default function Dashboard() {
     if (!orderToUpdate) return;
 
     // Use current order data to calculate fullTotalPrice
-    const priceData = calculatePriceInfo(orderToUpdate.chocolate, orderToUpdate.count, orderToUpdate.discount, orderToUpdate.isDeliveryFree, orderToUpdate.paymentStatus, orderToUpdate.category, customPricesMap, orderToUpdate.manualDeliveryFee, orderToUpdate.orderStatus, managedChocPricesMap, orderToUpdate.pricingType);
+    const priceData = calculatePriceInfo(orderToUpdate.chocolate, orderToUpdate.count, orderToUpdate.discount, orderToUpdate.isDeliveryFree, orderToUpdate.paymentStatus, orderToUpdate.category, customPricesMap, orderToUpdate.manualDeliveryFee, orderToUpdate.orderStatus, managedChocPricesMap, orderToUpdate.pricingType, orderToUpdate.manualProductPrice);
     
     let newPaymentStatus = 'Pending';
     if (numValue >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
@@ -989,7 +996,7 @@ export default function Dashboard() {
 
     const updatedOrder = { ...orderToUpdate, advanceAmount: numValue, paymentStatus: newPaymentStatus };
     // Recalculate priceData with new payment status if it affects calculations (though fullTotalPrice usually doesn't)
-    const finalPriceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType);
+    const finalPriceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.totalPrice, itemSubtotal: finalPriceData.chocolatePrice, calculatedDeliveryFee: finalPriceData.deliveryCharge } : o));
     if (fireId) {
@@ -1262,7 +1269,7 @@ export default function Dashboard() {
     try {
       const XLSX = await import("xlsx");
       const exportData = filteredDashboardOrders.map(order => {
-        const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+        const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
         return {
           "Order ID": getSerial(order.id),
@@ -1270,7 +1277,7 @@ export default function Dashboard() {
           "Name": order.name,
           "Contact Number": order.phone,
           "Function Date": order.functionDate,
-          "Delivery Date": order.deliveryDate,
+          "Dispatch Date": order.deliveryDate,
           "Chocolate Name": order.chocolate,
           "Count": order.count,
           "Chocolate Price": priceData.chocolatePrice,
@@ -1316,8 +1323,8 @@ export default function Dashboard() {
                 orderDate: formatToDisplayDate(row['Order Date'] || row.orderDate || row['Function Date'] || ""),
                 name: row.Name || row.name || "",
                 phone: String(row['Contact Number'] || row.Phone || row.phone || ""),
-                deliveryDate: formatToDisplayDate(row['Delivery Date'] || row.deliveryDate || ""),
-                functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Delivery Date'] || row.deliveryDate || ""),
+                deliveryDate: formatToDisplayDate(row['Dispatch Date'] || row.deliveryDate || ""),
+                functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Dispatch Date'] || row.deliveryDate || ""),
                 chocolate: row['Chocolate Name'] || row.Chocolate || row.chocolate || "",
                 count: Number(row.Count || row.count) || 0,
                 status: row.Status || row.status || "In Process",
@@ -1331,7 +1338,7 @@ export default function Dashboard() {
                 manualDeliveryFee: Number(row['Delivery Fee'] || row.manualDeliveryFee) || 0,
                 advanceAmount: Number(row['Advance Amount'] || row.advanceAmount) || 0,
               };
-              const priceData = calculatePriceInfo(orderObj.chocolate, orderObj.count, orderObj.discount, orderObj.isDeliveryFree, orderObj.paymentStatus, orderObj.category, customPricesMap, orderObj.manualDeliveryFee, orderObj.orderStatus);
+              const priceData = calculatePriceInfo(orderObj.chocolate, orderObj.count, orderObj.discount, orderObj.isDeliveryFree, orderObj.paymentStatus, orderObj.category, customPricesMap, orderObj.manualDeliveryFee, orderObj.orderStatus, managedChocPricesMap, orderObj.pricingType, orderObj.manualProductPrice);
               const finalOrderObj = {
                 ...orderObj,
                 totalOrderPrice: priceData.fullTotalPrice || 0,
@@ -1357,12 +1364,34 @@ export default function Dashboard() {
   };
 
   const handleSendSMS = (order: any) => {
-    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
-    const message = `Hello ${order.name},\nThank you for your order with SABI Return Gifts!\n\nTotal Items: ${order.count}\nTotal Amount: Rs.${priceData.totalPrice.toLocaleString()}\nDelivery Date: ${order.deliveryDate}\nPayment Status: ${order.paymentStatus || 'Pending'}\n\nThank you!`;
+    const message = `Hello ${order.name},\nThank you for your order with SABI Return Gifts!\n\nTotal Items: ${order.count}\nTotal Amount: Rs.${priceData.totalPrice.toLocaleString()}\nDispatch Date: ${order.deliveryDate}\nPayment Status: ${order.paymentStatus || 'Pending'}\n\nThank you!`;
     const smsUrl = `sms:+91${order.phone}?body=${encodeURIComponent(message)}`;
     window.open(smsUrl, '_self');
   };
+
+  const generateWhatsAppMessage = (order: any) => {
+    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
+
+    return `Hello ${order.name},\nThank you for your order with SABI Return Gifts!\n\nOrder Details:\nItem: ${order.chocolate}\nQuantity: ${order.count}\nTotal Amount: Rs.${priceData.totalPrice.toLocaleString()}\nDispatch Date: ${order.deliveryDate}\nPayment Status: ${order.paymentStatus || 'Pending'}\n\nThank you!`;
+  };
+
+  const handleWhatsAppClick = (order: any) => {
+    setWhatsAppOrder(order);
+    setWhatsAppMessage(generateWhatsAppMessage(order));
+    setIsWhatsAppModalOpen(true);
+  };
+
+
+  const handleWhatsAppShare = () => {
+    if (!whatsAppOrder) return;
+    const phone = whatsAppOrder.phone.replace(/\D/g, '');
+    const waUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(whatsAppMessage)}`;
+    window.open(waUrl, '_blank');
+    setIsWhatsAppModalOpen(false);
+  };
+
 
   const handleCapturePreview = async () => {
     const element = document.getElementById("preview-modal-content");
@@ -1958,7 +1987,7 @@ export default function Dashboard() {
                           <option value="Serial No">Serial No</option>
                           <option value="Order Date">Order Date</option>
                           <option value="Function Date">Function Date</option>
-                          <option value="Delivery Date">Delivery Date</option>
+                          <option value="Dispatch Date">Dispatch Date</option>
                         </select>
                       </div>
                     </div>
@@ -2007,7 +2036,30 @@ export default function Dashboard() {
 
 
                   <div className="flex items-center gap-4 w-full md:w-auto">
-                    <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
+                      <button 
+                        onClick={() => {
+                          const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
+                          setHiddenCols({
+                            ...hiddenCols,
+                            serialNo: isAnyVisible,
+                            orderDate: isAnyVisible,
+                            deliveryCharge: isAnyVisible,
+                            discount: isAnyVisible
+                          });
+                        }}
+                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${
+                          (hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
+                            ? 'bg-amber-600 text-white border-amber-700' 
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
+                        }`}
+                        title={(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
+                      >
+                        {(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+                      </button>
+                    </div>
+
                     <div className="relative w-full md:w-64">
                       <Search className="absolute left-3 top-2.5 text-amber-400" size={18} />
                       <input
@@ -2070,15 +2122,13 @@ export default function Dashboard() {
                         </th>
                         <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
                           <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
-                            <button onClick={() => toggleCol('serialNo')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.serialNo ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.serialNo ? "Show Serial No" : "Hide Serial No"}>
-                              {hiddenCols.serialNo ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
+                            <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
+                              <ChevronRight size={14} strokeWidth={3} />
                             </button>
                             {!hiddenCols.serialNo && (
                               <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
-                                  <ChevronRight size={14} strokeWidth={3} />
-                                </button>
                                 <span className="whitespace-nowrap">Serial No</span>
+
                                 <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
                                   <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
                                   <select
@@ -2100,9 +2150,7 @@ export default function Dashboard() {
                         </th>
                         <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
                           <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
-                            <button onClick={() => toggleCol('orderDate')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.orderDate ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.orderDate ? "Show Order Date" : "Hide Order Date"}>
-                              {hiddenCols.orderDate ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
-                            </button>
+
                             {!hiddenCols.orderDate && (
                               <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
                                 <span className="whitespace-nowrap">Order Date</span>
@@ -2162,7 +2210,7 @@ export default function Dashboard() {
                         <th className="py-3 px-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
-                              <span>Delivery Date</span>
+                              <span>Dispatch Date</span>
                               <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-orange-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
                                 <Calendar size={16} className="text-orange-700 pointer-events-none" />
                                 <input
@@ -2235,19 +2283,15 @@ export default function Dashboard() {
                         <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
                           <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
                             {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
-                            <button onClick={() => toggleCol('deliveryCharge')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.deliveryCharge ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.deliveryCharge ? "Show Delivery Charge" : "Hide Delivery Charge"}>
-                              {hiddenCols.deliveryCharge ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
-                            </button>
                           </div>
+
                         </th>
                         <th className="py-3 px-4 font-bold text-center align-top">Advance</th>
                         <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
                           <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
-                            <button onClick={() => toggleCol('discount')} className={`p-1 rounded-full transition-all duration-300 print:hidden ${hiddenCols.discount ? 'bg-amber-600 text-white shadow-lg scale-110' : 'text-amber-500 hover:bg-amber-100 hover:scale-110'}`} title={hiddenCols.discount ? "Show Discount" : "Hide Discount"}>
-                              {hiddenCols.discount ? <EyeOff size={14} strokeWidth={3} /> : <Eye size={14} strokeWidth={3} />}
-                            </button>
                             {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
                           </div>
+
                         </th>
 
 
@@ -2270,7 +2314,7 @@ export default function Dashboard() {
                         <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
                       ) : (
                         paginatedOrders.map((order) => {
-                          const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
+                          const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
                           const isSelected = selectedOrders.includes(order.id);
 
 
@@ -2431,6 +2475,8 @@ export default function Dashboard() {
                                       <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
                                       {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
                                       <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
+                                      <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Share on WhatsApp"><MessageCircle size={20} /></button>
+
                                     </div>
                                   </>
                                 )}
@@ -2551,7 +2597,7 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   trackingSearchResults.map(order => {
-                    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap);
+                    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
                     return (
 
                       <div key={order.fireId || order.id} className="bg-[#ebe6df] rounded-3xl p-6 shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:-translate-y-1 transition-all duration-300">
@@ -2824,7 +2870,7 @@ export default function Dashboard() {
                       onChange={(e) => setAdminDateType(e.target.value)}
                       className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
                     >
-                      <option value="Delivery Date">Delivery Date</option>
+                      <option value="Dispatch Date">Dispatch Date</option>
                       <option value="Order Date">Order Date</option>
                       <option value="Function Date">Function Date</option>
                     </select>
@@ -2893,7 +2939,7 @@ export default function Dashboard() {
                       <thead className="sticky top-0 bg-amber-50 z-30 shadow-md border-b-2 border-amber-200">
                         <tr className="text-xs uppercase tracking-widest text-[#5d4037]">
                           <th className="p-4 font-black border-r border-amber-200/50">Serial No</th>
-                          <th className="p-4 font-black border-r border-amber-200/50">Delivery Date</th>
+                          <th className="p-4 font-black border-r border-amber-200/50">Dispatch Date</th>
                           <th className="p-4 font-black">Chocolate Name</th>
                           <th className="p-4 font-black text-right border-l border-amber-200/50">Purch. Cost <br /><span className="text-[9px] font-bold text-amber-600">(Per Item)</span></th>
                           <th className="p-4 font-black text-center border-l border-amber-200/50">Count</th>
@@ -3194,7 +3240,7 @@ export default function Dashboard() {
                   <tr className="bg-amber-100 text-amber-900 text-sm border-b border-amber-200 print:bg-gray-200 print:text-black print:border-black">
                     <th className="p-3 font-bold border-r border-amber-200 print:border-black">Name</th>
                     <th className="p-3 font-bold border-r border-amber-200 print:border-black">Phone</th>
-                    <th className="p-3 font-bold border-r border-amber-200 print:border-black">Delivery Date</th>
+                    <th className="p-3 font-bold border-r border-amber-200 print:border-black">Dispatch Date</th>
                     <th className="p-3 font-bold border-r border-amber-200 print:border-black">Chocolate</th>
                     <th className="p-3 font-bold border-r border-amber-200 print:border-black text-center">Count</th>
 
@@ -3209,7 +3255,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {filteredDashboardOrders.map((order, idx) => {
-                    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
+                    const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
                     return (
                       <tr key={idx} className="border-b border-amber-100 text-sm print:border-gray-400">
                         <td className="p-3 font-bold text-amber-950 border-r border-amber-100 print:border-gray-400 print:text-black">{order.name}</td>
@@ -3287,7 +3333,7 @@ export default function Dashboard() {
                   <input required type="date" name="functionDate" value={formData.functionDate} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
                 </div>
                 <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Delivery Date</label>
+                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Dispatch Date</label>
                   <input required type="date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
                 </div>
 
@@ -3466,7 +3512,7 @@ export default function Dashboard() {
 
       {/* 🟢 PREVIEW MODAL WITH SCREENSHOT CAPTURE ICON */}
       {isPreviewOpen && previewData && (() => {
-        const previewPrice = calculatePriceInfo(previewData.chocolate, previewData.count, previewData.discount, previewData.isDeliveryFree, previewData.paymentStatus, previewData.category, customPricesMap, previewData.manualDeliveryFee, previewData.orderStatus, managedChocPricesMap, previewData.pricingType);
+        const previewPrice = calculatePriceInfo(previewData.chocolate, previewData.count, previewData.discount, previewData.isDeliveryFree, previewData.paymentStatus, previewData.category, customPricesMap, previewData.manualDeliveryFee, previewData.orderStatus, managedChocPricesMap, previewData.pricingType, previewData.manualProductPrice);
         return (
           <div
             className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
@@ -3586,7 +3632,7 @@ export default function Dashboard() {
                         </td>
 
                       </tr>
-                      {/* Row 6: Delivery Date & Status Label */}
+                      {/* Row 6: Dispatch Date & Status Label */}
                       <tr>
                         <td className="">
                           <p className="text-[#8d6e63] text-[10px] uppercase font-bold">Delivery</p>
@@ -3597,7 +3643,7 @@ export default function Dashboard() {
                         </td>
                         <td className=""></td>
                       </tr>
-                      {/* Row 7: Delivery Date & Status Value */}
+                      {/* Row 7: Dispatch Date & Status Value */}
                       <tr>
                         <td colSpan={2} className="border-r border-[#f0e6db] pb-2">
                           <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate}</p>
@@ -4031,7 +4077,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="bg-white">
                   {reportData.filteredOrders.map((order: any) => {
-                    const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType);
+                    const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
                     // Calculate Total Cost
                     let totalCost = 0;
@@ -4102,9 +4148,61 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 🟢 NEW: WHATSAPP MESSAGE EDITOR MODAL */}
+      {isWhatsAppModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsWhatsAppModalOpen(false)}>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg border-2 border-[#d7ccc8] overflow-hidden transform transition-all" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-br from-green-600 to-green-700 p-6 text-center relative border-b-4 border-green-800">
+              <button type="button" onClick={() => setIsWhatsAppModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"><X size={20} /></button>
+              <div className="w-16 h-16 bg-white rounded-full mx-auto flex items-center justify-center shadow-inner mb-3 text-green-600">
+                <MessageCircle size={32} strokeWidth={2.5} />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-wide">WhatsApp Share</h2>
+              <p className="text-green-100/80 text-xs font-bold mt-1 tracking-widest uppercase">Edit message before sharing</p>
+            </div>
+
+            <div className="p-7 space-y-5">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-black text-gray-500 uppercase tracking-wider">Message Content</label>
+                  <button 
+                    onClick={() => {
+                      if (whatsAppOrder) {
+                        setWhatsAppMessage(generateWhatsAppMessage(whatsAppOrder));
+                      }
+                    }}
+                    className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg border border-green-200 hover:bg-green-100 transition-colors uppercase tracking-widest"
+                  >
+                    Auto-Fill Details
+                  </button>
+                </div>
+
+                <textarea
+                  value={whatsAppMessage}
+                  onChange={(e) => setWhatsAppMessage(e.target.value)}
+                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-green-500 font-medium text-gray-800 transition-colors shadow-inner resize-none h-48"
+                  placeholder="Enter message..."
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setIsWhatsAppModalOpen(false)} className="flex-1 py-3 bg-white border-2 border-gray-100 text-gray-500 rounded-xl font-black uppercase tracking-widest hover:bg-gray-50 transition-all">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleWhatsAppShare}
+                  className="flex-1 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-black uppercase tracking-widest shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Share2 size={18} /> Share
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-
 
 
