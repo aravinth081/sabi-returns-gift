@@ -124,6 +124,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
   const invoiceNumber = getInvoiceNumber();
   const currentDate = order.deliveryDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
+
   const upiData = `upi://pay?pa=8220638753@upi&pn=SUBASH%20G&am=${finalTotal.toFixed(2)}&cu=INR`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiData)}`;
 
