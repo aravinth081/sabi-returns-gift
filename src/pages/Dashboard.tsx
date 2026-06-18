@@ -40,15 +40,22 @@ const db = getFirestore(app);
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
 
 const CHOCOLATE_PRICES_MAP: Record<string, { retail: number; wholesale: number }> = {
+  "10 rs 5 star": { retail: 22, wholesale: 9 },
+  "10 rs kitkat": { retail: 20, wholesale: 20 },
+  "10 rs dairy milk": { retail: 20, wholesale: 9 },
+  "5 rs peanut candy": { retail: 17, wholesale: 17 },
+  "5 rs 5 star": { retail: 15, wholesale: 15 },
+  "5 rs dairy milk": { retail: 15, wholesale: 15 },
+  "2 rs dairymilk shots": { retail: 10, wholesale: 10 },
+  "5 rs milky bar": { retail: 10, wholesale: 10 },
+  "1 rs chocolate": { retail: 8, wholesale: 8 },
+  // Keep legacy options for safety and parsing existing orders:
   "kitkat": { retail: 20, wholesale: 18 },
   "dairy milk": { retail: 15, wholesale: 13 },
   "dairymilk": { retail: 15, wholesale: 13 },
   "peanut candy": { retail: 17, wholesale: 15 },
   "5 star": { retail: 15, wholesale: 13 },
-  "10 rs dairy milk": { retail: 20, wholesale: 18 },
   "dairymilk shots": { retail: 10, wholesale: 8 },
-  "10 rs 5 star": { retail: 22, wholesale: 20 },
-  "1 rs chocolate": { retail: 8, wholesale: 6 },
   "milky bar": { retail: 10, wholesale: 8 },
   "snickers": { retail: 20, wholesale: 18 },
   "bounty": { retail: 20, wholesale: 18 },
@@ -62,15 +69,26 @@ const CHOCOLATE_PRICES_MAP: Record<string, { retail: number; wholesale: number }
 };
 
 const CHOCOLATE_PURCHASE_MAP: Record<string, number> = {
+  "10 rs 5 star": 9.5,
+  "10 rs kitkat": 9.5,
+  "10 rs dairy milk": 9.5,
+  "5 rs peanut candy": 4.5,
+  "5 rs 5 star": 4.5,
+  "5 rs dairy milk": 4.5,
+  "2 rs dairymilk shots": 1.5,
+  "5 rs milky bar": 4.5,
+  "1 rs chocolate": 0.5,
+  // Keep legacy mappings:
   "dairymilk": 4.5, "dairy milk": 4.5, "5 star": 4.5, "kitkat": 9.5,
-  "10 rs dairy milk": 9.5, "dairymilk shots": 1.5, "peanut candy": 4.5,
-  "milky bar": 4.5, "10 rs 5 star": 9.5, "1 rs chocolate": 0.5,
+  "dairymilk shots": 1.5, "peanut candy": 4.5,
+  "milky bar": 4.5,
   "snickers": 10, "bounty": 10, "munch": 5, "perk": 5
 };
 
 const TRACKED_INVENTORY = [
-  "Kitkat", "Dairy Milk", "Peanut Candy", "5 Star",
-  "10 rs Dairy Milk", "Dairymilk Shots", "10 rs 5 Star", "Milky Bar"
+  "10 rs 5 Star", "10 rs Kitkat", "10 rs Dairy Milk", "5 rs Peanut Candy",
+  "5 rs 5 Star", "5 rs Dairy Milk", "2 rs Dairymilk Shots", "5 rs Milky Bar",
+  "1 rs Chocolate"
 ];
 
 // --- SHARED UTILS ---
@@ -118,10 +136,14 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
   const baseChocolatePrice = Number((unitPrice * quantity).toFixed(2));
 
   let baseDeliveryCharge = 0;
-  if (category === 'product') {
-    baseDeliveryCharge = isDeliveryFree ? 0 : Number(manualDeliveryFee) || 0;
+  if (isDeliveryFree) {
+    baseDeliveryCharge = 0;
+  } else if (Number(manualDeliveryFee) > 0) {
+    baseDeliveryCharge = Number(manualDeliveryFee);
+  } else if (category === 'product') {
+    baseDeliveryCharge = 0;
   } else {
-    baseDeliveryCharge = isDeliveryFree ? 0 : (quantity > 99 ? 200 : 150);
+    baseDeliveryCharge = quantity > 99 ? 200 : 150;
   }
 
   const baseDiscountAmt = Number(discountValue) || 0;
@@ -183,82 +205,98 @@ const formatToDisplayDate = (dateStr: any) => {
 };
 
 const PREDEFINED_CHOCOLATES = [
-  "Kitkat", "Dairy Milk", "Peanut Candy", "5 Star", "10 rs Dairy Milk",
-  "Dairymilk Shots", "10 rs 5 Star", "1 rs Chocolate",
-  "Milky Bar",
+  "10 rs 5 Star", "10 rs Kitkat", "10 rs Dairy Milk", "5 rs Peanut Candy",
+  "5 rs 5 Star", "5 rs Dairy Milk", "2 rs Dairymilk Shots", "5 rs Milky Bar",
+  "1 rs Chocolate"
 ];
 
-const ChocolateMultiSelect = ({ value, onChange, suggestions, pricesMap, placeholderText = "Select chocolates..." }: { value: string, onChange: (val: string) => void, suggestions: string[], pricesMap?: Record<string, { retail: number; wholesale: number } | number>, placeholderText?: string }) => {
-  const [input, setInput] = useState("");
+const ChocolateSingleSelect = ({
+  value,
+  onChange,
+  suggestions,
+  pricesMap,
+  placeholderText = "Select chocolate..."
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  suggestions: string[];
+  pricesMap?: Record<string, { retail: number; wholesale: number } | number>;
+  placeholderText?: string;
+}) => {
   const [isOpen, setIsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
-  const selected = value ? String(value).split(',').map(s => s.trim()).filter(Boolean) : [];
-
-  const filteredSuggestions = suggestions.filter(
-    s => s.toLowerCase().includes(input.toLowerCase()) && !selected.some(sel => sel.toLowerCase() === s.toLowerCase())
-  );
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setIsOpen(false);
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAdd = (choc: string) => {
-    if (!choc) return;
-    if (!selected.some(s => s.toLowerCase() === choc.toLowerCase())) onChange([...selected, choc].join(', '));
-    setInput("");
-    inputRef.current?.focus();
-  };
+  const priceInfo = pricesMap && value
+    ? pricesMap[value.toLowerCase()]
+    : (value ? CHOCOLATE_PRICES_MAP[value.toLowerCase()] : null);
 
-  const handleRemove = (chocToRemove: string) => onChange(selected.filter(c => c !== chocToRemove).join(', '));
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (input.trim()) {
-        const exactMatch = filteredSuggestions.find(s => s.toLowerCase() === input.trim().toLowerCase());
-        if (exactMatch) handleAdd(exactMatch);
-        else if (filteredSuggestions.length > 0) handleAdd(filteredSuggestions[0]);
-        else handleAdd(input.trim());
-      }
-    } else if (e.key === 'Backspace' && !input && selected.length > 0) handleRemove(selected[selected.length - 1]);
-  };
+  let priceSuffix = "";
+  if (priceInfo !== undefined && priceInfo !== null) {
+    if (typeof priceInfo === 'object') {
+      priceSuffix = ` (W: ₹${priceInfo.wholesale} | R: ₹${priceInfo.retail})`;
+    } else {
+      priceSuffix = ` (₹${priceInfo})`;
+    }
+  }
 
   return (
     <div ref={wrapperRef} className="relative w-full">
-      <div onClick={() => inputRef.current?.focus()} className={`flex flex-wrap gap-2 p-2 border rounded-lg bg-white focus-within:ring-2 focus-within:ring-amber-500 border-amber-200 min-h-[46px] max-h-[100px] overflow-y-auto items-center cursor-text`}>
-        {selected.map((choc, idx) => (
-          <span key={idx} className="flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-1 rounded-md text-sm font-bold">
-            {choc}
-            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(choc); }} className="text-amber-600 hover:text-red-500 rounded-full focus:outline-none"><X size={14} /></button>
-          </span>
-        ))}
-        <input ref={inputRef} type="text" value={input} onChange={(e) => { setInput(e.target.value); setIsOpen(true); }} onKeyDown={handleKeyDown} onFocus={() => setIsOpen(true)} className="flex-1 min-w-[120px] outline-none bg-transparent text-amber-950 font-medium placeholder-amber-400 text-sm" placeholder={selected.length === 0 ? placeholderText : ""} />
-      </div>
-      {isOpen && filteredSuggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-amber-200 rounded-lg shadow-lg max-h-48 overflow-y-auto py-1">
-          {filteredSuggestions.map((s, i) => {
-            const priceInfo = pricesMap ? pricesMap[s.toLowerCase()] : CHOCOLATE_PRICES_MAP[s.toLowerCase()];
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner flex justify-between items-center text-left cursor-pointer"
+      >
+        <span className="truncate pr-2">
+          {value ? `${value}${priceSuffix}` : placeholderText}
+        </span>
+        <ChevronDown size={18} className="text-gray-500 shrink-0" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-0.5 bg-white border border-gray-400 shadow-[2px_2px_5px_rgba(0,0,0,0.15)] max-h-60 overflow-y-auto py-0.5 rounded-none text-left">
+          <div
+            className="px-3 py-1.5 cursor-pointer hover:bg-[#555555] hover:text-white text-black text-sm font-normal select-none"
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+            }}
+          >
+            {placeholderText}
+          </div>
+          {suggestions.map((item, index) => {
+            const itemPriceInfo = pricesMap
+              ? pricesMap[item.toLowerCase()]
+              : CHOCOLATE_PRICES_MAP[item.toLowerCase()];
+
+            let itemPriceSuffix = "";
+            if (itemPriceInfo !== undefined && itemPriceInfo !== null) {
+              if (typeof itemPriceInfo === 'object') {
+                itemPriceSuffix = ` (W: ₹${itemPriceInfo.wholesale} | R: ₹${itemPriceInfo.retail})`;
+              } else {
+                itemPriceSuffix = ` (₹${itemPriceInfo})`;
+              }
+            }
+
             return (
-              <div key={i} className="px-4 py-2 cursor-pointer hover:bg-amber-50 text-amber-900 text-sm font-medium flex justify-between items-center" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAdd(s); }}>
-                <span>{s}</span>
-                {priceInfo && (
-                  <div className="flex gap-2">
-                    {typeof priceInfo === 'object' ? (
-                      <>
-                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">W: ₹{priceInfo.wholesale}</span>
-                        <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-bold">R: ₹{priceInfo.retail}</span>
-                      </>
-                    ) : (
-                      <span className="text-xs text-amber-500 font-bold">₹{priceInfo}</span>
-                    )}
-                  </div>
-                )}
+              <div
+                key={index}
+                className="px-3 py-1.5 cursor-pointer hover:bg-[#555555] hover:text-white text-black text-sm font-normal select-none"
+                onClick={() => {
+                  onChange(item);
+                  setIsOpen(false);
+                }}
+              >
+                {item}{itemPriceSuffix}
               </div>
             );
           })}
@@ -278,6 +316,7 @@ export default function Dashboard() {
   const [role, setRole] = useState<'Admin' | 'Employee'>(() => (localStorage.getItem('role') as any) || 'Admin');
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<any>(null);
+  const [headerActionOpen, setHeaderActionOpen] = useState(false);
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [adminDateType, setAdminDateType] = useState<string>('Dispatch Date');
@@ -337,17 +376,37 @@ export default function Dashboard() {
     });
     const unsubManagedChocs = onSnapshot(collection(db, "managed_chocolates"), (snapshot) => {
       let list = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
-      if (list.length === 0) {
+
+      // Auto-detect and migrate old legacy defaults in DB:
+      const hasOldDefaults = list.some(item =>
+        item.name === "Kitkat" ||
+        item.name === "Dairy Milk" ||
+        item.name === "Peanut Candy" ||
+        item.name === "5 Star" ||
+        item.name === "Dairymilk Shots" ||
+        item.name === "Milky Bar"
+      );
+
+      if (list.length === 0 || hasOldDefaults) {
+        // Clear all existing managed_chocolates to reset with correct names/prices matching the user's requirements
+        list.forEach(async (item) => {
+          try {
+            await deleteDoc(doc(db, "managed_chocolates", item.fireId));
+          } catch (e) {
+            console.error("Error clearing old chocolate item:", e);
+          }
+        });
+
         const defaults = [
-          { name: "Kitkat", retailPrice: 20, wholesalePrice: 18, costPrice: 15 },
-          { name: "Dairy Milk", retailPrice: 15, wholesalePrice: 13, costPrice: 10 },
-          { name: "Peanut Candy", retailPrice: 17, wholesalePrice: 15, costPrice: 12 },
-          { name: "5 Star", retailPrice: 15, wholesalePrice: 13, costPrice: 10 },
-          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 18, costPrice: 14 },
-          { name: "Dairymilk Shots", retailPrice: 10, wholesalePrice: 8, costPrice: 6 },
-          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 20, costPrice: 16 },
-          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 6, costPrice: 5 },
-          { name: "Milky Bar", retailPrice: 10, wholesalePrice: 8, costPrice: 7 }
+          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5 },
+          { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5 },
+          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 9, costPrice: 9.5 },
+          { name: "5 rs Peanut Candy", retailPrice: 17, wholesalePrice: 17, costPrice: 4.5 },
+          { name: "5 rs 5 Star", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5 },
+          { name: "5 rs Dairy Milk", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5 },
+          { name: "2 rs Dairymilk Shots", retailPrice: 10, wholesalePrice: 10, costPrice: 1.5 },
+          { name: "5 rs Milky Bar", retailPrice: 10, wholesalePrice: 10, costPrice: 4.5 },
+          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5 }
         ];
 
         defaults.forEach(d => addDoc(collection(db, "managed_chocolates"), d));
@@ -388,13 +447,73 @@ export default function Dashboard() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const [paymentFilter, setPaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
-  const [deliveryFilter, setDeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
-  const [tableTypeFilter, setTableTypeFilter] = useState<string>('All');
+  // --- INDEPENDENT FILTER STATES PER TAB ---
+  // Dashboard 1 filters
+  const [d1PaymentFilter, setD1PaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
+  const [d1DeliveryFilter, setD1DeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
+  const [d1OrderStatusFilter, setD1OrderStatusFilter] = useState<string>('All');
+  const [d1TableTypeFilter, setD1TableTypeFilter] = useState<string>('All');
+  const [d1RevenueDateType, setD1RevenueDateType] = useState<string>('Dispatch Date');
+  const [d1DateFilter, setD1DateFilter] = useState({ from: "", to: "" });
+  const [d1CountFilter, setD1CountFilter] = useState<string>('All');
+  const [d1DashboardSearch, setD1DashboardSearch] = useState("");
+  const [d1FunctionDates, setD1FunctionDates] = useState<string[]>([]);
+  const [d1DeliveryDates, setD1DeliveryDates] = useState<string[]>([]);
+  const [d1ChocFilter, setD1ChocFilter] = useState<string>('');
+  const [d1ChennaiFilter, setD1ChennaiFilter] = useState<boolean>(false);
+  const [d1ShowSearch, setD1ShowSearch] = useState<boolean>(false);
 
-  const [revenueDateType, setRevenueDateType] = useState<string>('Dispatch Date');
-  const [dateFilter, setDateFilter] = useState({ from: "", to: "" });
+  // Dashboard 2 filters
+  const [d2PaymentFilter, setD2PaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
+  const [d2DeliveryFilter, setD2DeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
+  const [d2OrderStatusFilter, setD2OrderStatusFilter] = useState<string>('All');
+  const [d2TableTypeFilter, setD2TableTypeFilter] = useState<string>('All');
+  const [d2RevenueDateType, setD2RevenueDateType] = useState<string>('Dispatch Date');
+  const [d2DateFilter, setD2DateFilter] = useState({ from: "", to: "" });
+  const [d2CountFilter, setD2CountFilter] = useState<string>('All');
+  const [d2DashboardSearch, setD2DashboardSearch] = useState("");
+  const [d2FunctionDates, setD2FunctionDates] = useState<string[]>([]);
+  const [d2DeliveryDates, setD2DeliveryDates] = useState<string[]>([]);
+  const [d2ChocFilter, setD2ChocFilter] = useState<string>('');
+  const [d2ChennaiFilter, setD2ChennaiFilter] = useState<boolean>(false);
+  const [d2ShowSearch, setD2ShowSearch] = useState<boolean>(false);
+
+  // Order Tracking filters
+  const [trkPaymentFilter, setTrkPaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
+  const [trkDeliveryFilter, setTrkDeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
+  const [trkOrderStatusFilter, setTrkOrderStatusFilter] = useState<string>('All');
+  const [trkSearch, setTrkSearch] = useState("");
+
+  // Computed active filters based on current tab
+  const paymentFilter = activeTab === 'tracking' ? trkPaymentFilter : activeTab === 'dashboard2' ? d2PaymentFilter : d1PaymentFilter;
+  const setPaymentFilter = activeTab === 'tracking' ? setTrkPaymentFilter : activeTab === 'dashboard2' ? setD2PaymentFilter : setD1PaymentFilter;
+  const deliveryFilter = activeTab === 'tracking' ? trkDeliveryFilter : activeTab === 'dashboard2' ? d2DeliveryFilter : d1DeliveryFilter;
+  const setDeliveryFilter = activeTab === 'tracking' ? setTrkDeliveryFilter : activeTab === 'dashboard2' ? setD2DeliveryFilter : setD1DeliveryFilter;
+  const orderStatusFilter = activeTab === 'tracking' ? trkOrderStatusFilter : activeTab === 'dashboard2' ? d2OrderStatusFilter : d1OrderStatusFilter;
+  const setOrderStatusFilter = activeTab === 'tracking' ? setTrkOrderStatusFilter : activeTab === 'dashboard2' ? setD2OrderStatusFilter : setD1OrderStatusFilter;
+  const tableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
+  const setTableTypeFilter = activeTab === 'dashboard2' ? setD2TableTypeFilter : setD1TableTypeFilter;
+  const revenueDateType = activeTab === 'dashboard2' ? d2RevenueDateType : d1RevenueDateType;
+  const setRevenueDateType = activeTab === 'dashboard2' ? setD2RevenueDateType : setD1RevenueDateType;
+  const dateFilter = activeTab === 'dashboard2' ? d2DateFilter : d1DateFilter;
+  const setDateFilter = activeTab === 'dashboard2' ? setD2DateFilter : setD1DateFilter;
+  const countFilter = activeTab === 'dashboard2' ? d2CountFilter : d1CountFilter;
+  const setCountFilter = activeTab === 'dashboard2' ? setD2CountFilter : setD1CountFilter;
+  const dashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
+  const setDashboardSearch = activeTab === 'dashboard2' ? setD2DashboardSearch : setD1DashboardSearch;
+  const functionDates = activeTab === 'dashboard2' ? d2FunctionDates : d1FunctionDates;
+  const setFunctionDates = activeTab === 'dashboard2' ? setD2FunctionDates : setD1FunctionDates;
+  const deliveryDates = activeTab === 'dashboard2' ? d2DeliveryDates : d1DeliveryDates;
+  const setDeliveryDates = activeTab === 'dashboard2' ? setD2DeliveryDates : setD1DeliveryDates;
+  const chocFilter = activeTab === 'dashboard2' ? d2ChocFilter : d1ChocFilter;
+  const setChocFilter = activeTab === 'dashboard2' ? setD2ChocFilter : setD1ChocFilter;
+  const chennaiFilter = activeTab === 'dashboard2' ? d2ChennaiFilter : d1ChennaiFilter;
+  const setChennaiFilter = activeTab === 'dashboard2' ? setD2ChennaiFilter : setD1ChennaiFilter;
+  const showSearch = activeTab === 'dashboard2' ? d2ShowSearch : d1ShowSearch;
+  const setShowSearch = activeTab === 'dashboard2' ? setD2ShowSearch : setD1ShowSearch;
+  const trackingSearch = trkSearch;
+  const setTrackingSearch = setTrkSearch;
+
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [reportDashboardFilter, setReportDashboardFilter] = useState("All");
 
@@ -410,6 +529,7 @@ export default function Dashboard() {
     boxCount: "",
     itemsPerBox: ""
   });
+  const [editInvId, setEditInvId] = useState<string | null>(null);
 
   const [salesTrackerChoc, setSalesTrackerChoc] = useState("All");
   const [salesTrackerFrom, setSalesTrackerFrom] = useState("");
@@ -434,10 +554,6 @@ export default function Dashboard() {
   };
 
 
-  const [functionDates, setFunctionDates] = useState<string[]>([]);
-
-
-  const [deliveryDates, setDeliveryDates] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -447,14 +563,9 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
 
   const [previewData, setPreviewData] = useState<any>(null);
-
-  const [dashboardSearch, setDashboardSearch] = useState("");
-  const [trackingSearch, setTrackingSearch] = useState("");
-
-  const [countFilter, setCountFilter] = useState<string>('All');
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [whatsAppMessage, setWhatsAppMessage] = useState("");
   const [whatsAppOrder, setWhatsAppOrder] = useState<any>(null);
@@ -470,6 +581,9 @@ export default function Dashboard() {
     deliveryCharge: false,
     discount: false
   });
+
+  const [isScreenshotMode, setIsScreenshotMode] = useState(false);
+  const screenshotTableRef = useRef<HTMLDivElement>(null);
 
   const toggleCol = (col: string) => {
     setHiddenCols(prev => ({ ...prev, [col]: !prev[col] }));
@@ -599,54 +713,79 @@ export default function Dashboard() {
   }, [orders, salesTrackerChoc, salesTrackerFrom, salesTrackerTo, customPricesMap]);
 
   const filteredDashboardOrders = useMemo(() => {
+    // Use the correct per-tab filter values
+    const curPaymentFilter = activeTab === 'dashboard2' ? d2PaymentFilter : d1PaymentFilter;
+    const curDeliveryFilter = activeTab === 'dashboard2' ? d2DeliveryFilter : d1DeliveryFilter;
+    const curOrderStatusFilter = activeTab === 'dashboard2' ? d2OrderStatusFilter : d1OrderStatusFilter;
+    const curDateFilter = activeTab === 'dashboard2' ? d2DateFilter : d1DateFilter;
+    const curRevenueDateType = activeTab === 'dashboard2' ? d2RevenueDateType : d1RevenueDateType;
+    const curFunctionDates = activeTab === 'dashboard2' ? d2FunctionDates : d1FunctionDates;
+    const curDeliveryDates = activeTab === 'dashboard2' ? d2DeliveryDates : d1DeliveryDates;
+    const curDashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
+    const curCountFilter = activeTab === 'dashboard2' ? d2CountFilter : d1CountFilter;
+    const curTableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
+    const curChocFilter = activeTab === 'dashboard2' ? d2ChocFilter : d1ChocFilter;
+    const curChennaiFilter = activeTab === 'dashboard2' ? d2ChennaiFilter : d1ChennaiFilter;
+
     return orders.filter(order => {
-      const pMatch = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
-      const dMatch = deliveryFilter === 'All' || order.status === deliveryFilter;
-      const osMatch = orderStatusFilter === 'All' || (order.orderStatus || "image edit (pending)") === orderStatusFilter;
+      const pMatch = curPaymentFilter === 'All' || order.paymentStatus === curPaymentFilter;
+      const dMatch = curDeliveryFilter === 'All' || order.status === curDeliveryFilter;
+      const osMatch = curOrderStatusFilter === 'All' || (order.orderStatus || "image edited (not paid)") === curOrderStatusFilter;
 
       let rangeMatch = true;
-      if (dateFilter.from || dateFilter.to) {
+      if (curDateFilter.from || curDateFilter.to) {
         let targetDateStr = "";
-        if (revenueDateType === 'Serial No') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
-        else if (revenueDateType === 'Order Date') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
-        else if (revenueDateType === 'Function Date') targetDateStr = parseDateToYYYYMMDD(order.functionDate);
-        else targetDateStr = parseDateToYYYYMMDD(order.deliveryDate);
+        if (curRevenueDateType === 'Serial No') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
+        else if (curRevenueDateType === 'Order Date') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
+        else if (curRevenueDateType === 'Function Date') targetDateStr = parseDateToYYYYMMDD(order.functionDate);
+        else targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
 
         if (targetDateStr) {
           const orderTime = new Date(targetDateStr).getTime();
-          const fromTime = dateFilter.from ? new Date(dateFilter.from).getTime() : 0;
-          const toTime = dateFilter.to ? new Date(dateFilter.to).getTime() : Infinity;
+          const fromTime = curDateFilter.from ? new Date(curDateFilter.from).getTime() : 0;
+          const toTime = curDateFilter.to ? new Date(curDateFilter.to).getTime() : Infinity;
           rangeMatch = orderTime >= fromTime && orderTime <= toTime;
+        } else {
+          rangeMatch = false;
         }
       }
 
       let fDateMatch = true;
-      if (functionDates.length > 0) {
+      if (curFunctionDates.length > 0) {
         const orderFDate = parseDateToYYYYMMDD(order.functionDate);
-        fDateMatch = functionDates.includes(orderFDate);
+        fDateMatch = curFunctionDates.includes(orderFDate);
       }
 
       let tDelDateMatch = true;
-      if (deliveryDates.length > 0) {
-        const orderDDate = parseDateToYYYYMMDD(order.deliveryDate);
-        tDelDateMatch = deliveryDates.includes(orderDDate);
+      if (curDeliveryDates.length > 0) {
+        const orderDDate = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
+        tDelDateMatch = curDeliveryDates.includes(orderDDate);
       }
 
       let searchMatch = true;
-      if (dashboardSearch.trim()) {
-        const query = dashboardSearch.toLowerCase().trim();
+      if (curDashboardSearch.trim()) {
+        const query = curDashboardSearch.toLowerCase().trim();
         searchMatch = order.name.toLowerCase().includes(query) || order.phone.includes(query);
       }
 
-      const countMatch = countFilter === 'All' || order.count.toString() === countFilter;
-      const typeMatch = tableTypeFilter === 'All' || (order.orderType || "Others") === tableTypeFilter;
+      const countMatch = curCountFilter === 'All' || order.count.toString() === curCountFilter;
+      const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Others") === curTableTypeFilter;
+
+      let chocMatch = true;
+      if (curChocFilter.trim()) {
+        const chocQuery = curChocFilter.toLowerCase().trim();
+        const orderChocs = order.chocolate ? String(order.chocolate).toLowerCase() : '';
+        chocMatch = orderChocs.includes(chocQuery);
+      }
+
+      const chennaiMatch = !curChennaiFilter || order.isChennai === true;
 
       const isProduct = order.category === 'product';
       const categoryMatch = activeTab === 'dashboard2' ? isProduct : !isProduct;
 
-      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && categoryMatch;
+      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && chennaiMatch;
     });
-  }, [activeTab, orders, paymentFilter, deliveryFilter, orderStatusFilter, dateFilter, functionDates, deliveryDates, dashboardSearch, countFilter, revenueDateType, tableTypeFilter]);
+  }, [activeTab, orders, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1ChennaiFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2ChennaiFilter]);
 
   const { totalOrders, deliveredCount, inProcessCount, totalItems, topChocolates, totalRevenue, totalDeliveryCharge } = useMemo(() => {
     const total = filteredDashboardOrders.length;
@@ -709,14 +848,15 @@ export default function Dashboard() {
 
     const rows = baseOrders.map(order => {
       const serialNo = getSerial(order.id);
-      const deliveryDate = order.deliveryDate || "-";
+      const deliveryDate = formatToDisplayDate(order.deliveryDate || order.functionDate || order.orderDate) || "-";
       const chocolateName = order.chocolate || "N/A";
       const count = Number(order.count) || 0;
 
       const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
       let sumPurchase = 0;
       chocs.forEach(c => {
-        sumPurchase += (managedChocCostsMap[c.toLowerCase()] || 0);
+        const key = c.toLowerCase();
+        sumPurchase += (managedChocCostsMap[key] || CHOCOLATE_PURCHASE_MAP[key] || 0);
       });
 
       const purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
@@ -741,7 +881,7 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, adminDateRange, adminDateType]);
+  }, [orders, adminDateRange, adminDateType, managedChocCostsMap]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
@@ -779,7 +919,7 @@ export default function Dashboard() {
 
     baseOrders.forEach(order => {
       const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
-      totalRev += priceInfo.revenue;
+      totalRev += priceInfo.fullTotalPrice;
       totalItems += Number(order.count || 0);
       totalDelivery += priceInfo.deliveryCharge;
 
@@ -800,23 +940,23 @@ export default function Dashboard() {
   const trackingSearchResults = useMemo(() => {
     let result = orders;
 
-    if (paymentFilter !== 'All') {
-      result = result.filter(o => o.paymentStatus === paymentFilter);
+    if (trkPaymentFilter !== 'All') {
+      result = result.filter(o => o.paymentStatus === trkPaymentFilter);
     }
-    if (deliveryFilter !== 'All') {
-      result = result.filter(o => o.status === deliveryFilter);
+    if (trkDeliveryFilter !== 'All') {
+      result = result.filter(o => o.status === trkDeliveryFilter);
     }
-    if (orderStatusFilter !== 'All') {
-      result = result.filter(o => (o.orderStatus || "image edit (pending)") === orderStatusFilter);
+    if (trkOrderStatusFilter !== 'All') {
+      result = result.filter(o => (o.orderStatus || "image edited (not paid)") === trkOrderStatusFilter);
     }
 
-    if (trackingSearch.trim()) {
-      const lowerSearch = trackingSearch.toLowerCase().trim();
+    if (trkSearch.trim()) {
+      const lowerSearch = trkSearch.toLowerCase().trim();
       result = result.filter(o => o.name.toLowerCase().includes(lowerSearch) || o.phone.includes(lowerSearch));
     }
 
     return result;
-  }, [orders, trackingSearch, paymentFilter, deliveryFilter, orderStatusFilter]);
+  }, [orders, trkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter]);
 
   const sortedDashboardOrders = useMemo(() => {
     let sortable = [...filteredDashboardOrders];
@@ -828,6 +968,11 @@ export default function Dashboard() {
         if (sortConfig.key === 'orderDate') {
           const dateA = new Date(parseDateToYYYYMMDD(a.orderDate) || 0).getTime();
           const dateB = new Date(parseDateToYYYYMMDD(b.orderDate) || 0).getTime();
+          return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+        if (sortConfig.key === 'deliveryDate') {
+          const dateA = new Date(parseDateToYYYYMMDD(a.deliveryDate || a.functionDate || a.orderDate) || 0).getTime();
+          const dateB = new Date(parseDateToYYYYMMDD(b.deliveryDate || b.functionDate || b.orderDate) || 0).getTime();
           return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
         }
         return 0;
@@ -876,7 +1021,7 @@ export default function Dashboard() {
     filtered.forEach(order => {
       if (order.status === "Delivered" || order.status === "In Process") {
         const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
-        totalRev += priceInfo.revenue;
+        totalRev += priceInfo.fullTotalPrice;
         totalItems += Number(order.count || 0);
         totalDelivery += priceInfo.deliveryCharge;
 
@@ -944,9 +1089,9 @@ export default function Dashboard() {
         await updateDoc(orderRef, {
           status: updatedOrder.status,
           paymentStatus: updatedOrder.paymentStatus,
-          totalOrderPrice: priceData.totalPrice,
-          itemSubtotal: priceData.chocolatePrice,
-          calculatedDeliveryFee: priceData.deliveryCharge
+          totalOrderPrice: priceData.fullTotalPrice,
+          itemSubtotal: priceData.fullChocolatePrice,
+          calculatedDeliveryFee: priceData.fullDeliveryCharge
         });
       }
       setSelectedOrders([]);
@@ -973,9 +1118,9 @@ export default function Dashboard() {
     const updatedOrder = { ...orderToUpdate, discount: numValue };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, discount: numValue, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, discount: numValue, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { discount: numValue, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge }); } catch (e) { }
+      try { await updateDoc(doc(db, "orders", fireId), { discount: numValue, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
     }
   };
 
@@ -986,7 +1131,7 @@ export default function Dashboard() {
 
     // Use current order data to calculate fullTotalPrice
     const priceData = calculatePriceInfo(orderToUpdate.chocolate, orderToUpdate.count, orderToUpdate.discount, orderToUpdate.isDeliveryFree, orderToUpdate.paymentStatus, orderToUpdate.category, customPricesMap, orderToUpdate.manualDeliveryFee, orderToUpdate.orderStatus, managedChocPricesMap, orderToUpdate.pricingType, orderToUpdate.manualProductPrice);
-    
+
     let newPaymentStatus = 'Pending';
     if (numValue >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
       newPaymentStatus = 'Full Paid';
@@ -998,13 +1143,11 @@ export default function Dashboard() {
     // Recalculate priceData with new payment status if it affects calculations (though fullTotalPrice usually doesn't)
     const finalPriceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.totalPrice, itemSubtotal: finalPriceData.chocolatePrice, calculatedDeliveryFee: finalPriceData.deliveryCharge } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.fullTotalPrice, itemSubtotal: finalPriceData.fullChocolatePrice, calculatedDeliveryFee: finalPriceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.totalPrice, itemSubtotal: finalPriceData.chocolatePrice, calculatedDeliveryFee: finalPriceData.deliveryCharge }); } catch (e) { }
+      try { await updateDoc(doc(db, "orders", fireId), { advanceAmount: numValue, paymentStatus: newPaymentStatus, totalOrderPrice: finalPriceData.fullTotalPrice, itemSubtotal: finalPriceData.fullChocolatePrice, calculatedDeliveryFee: finalPriceData.fullDeliveryCharge }); } catch (e) { }
     }
   };
-
-
 
   const handlePaymentStatusUpdate = async (id: any, fireId: string, newPaymentStatus: string) => {
     const orderToUpdate = orders.find(o => o.id === id);
@@ -1013,11 +1156,9 @@ export default function Dashboard() {
     const updatedOrder = { ...orderToUpdate, paymentStatus: newPaymentStatus };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
-
-
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus: newPaymentStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus: newPaymentStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { paymentStatus: newPaymentStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge }); } catch (e) { }
+      try { await updateDoc(doc(db, "orders", fireId), { paymentStatus: newPaymentStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
     }
   };
 
@@ -1028,11 +1169,9 @@ export default function Dashboard() {
     const updatedOrder = { ...orderToUpdate, status: newStatus };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
-
-
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { status: newStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge }); } catch (e) { }
+      try { await updateDoc(doc(db, "orders", fireId), { status: newStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
     }
   };
 
@@ -1043,18 +1182,16 @@ export default function Dashboard() {
     const updatedOrder = { ...orderToUpdate, orderStatus: newOrderStatus };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
-
-
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { orderStatus: newOrderStatus, totalOrderPrice: priceData.totalPrice, itemSubtotal: priceData.chocolatePrice, calculatedDeliveryFee: priceData.deliveryCharge }); } catch (e) { }
+      try { await updateDoc(doc(db, "orders", fireId), { orderStatus: newOrderStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let newFormData = { ...formData, [name]: value };
-    
+
     if (name === 'advanceAmount' || name === 'count' || name === 'discount' || name === 'chocolate' || name === 'manualDeliveryFee' || name === 'manualProductPrice') {
 
       const currentAdvance = name === 'advanceAmount' ? Number(value) : Number(formData.advanceAmount);
@@ -1082,7 +1219,7 @@ export default function Dashboard() {
         newFormData.paymentStatus = 'Pending';
       }
     }
-    
+
     setFormData(newFormData);
   };
 
@@ -1090,7 +1227,7 @@ export default function Dashboard() {
 
   const handleAddClick = () => {
     const today = new Date().toISOString().split('T')[0];
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, orderType: "Others", orderStatus: "image edit (pending)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "" });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setIsModalOpen(true);
   };
 
@@ -1102,13 +1239,13 @@ export default function Dashboard() {
       id: order.id,
       orderDate: order.orderDate ? parseDateToYYYYMMDD(order.orderDate) : parseDateToYYYYMMDD(order.functionDate),
       functionDate: parseDateToYYYYMMDD(order.functionDate),
-      deliveryDate: parseDateToYYYYMMDD(order.deliveryDate),
+      deliveryDate: parseDateToYYYYMMDD(order.deliveryDate || order.functionDate),
       address: order.address || "",
       discount: order.discount || 0,
       isDeliveryFree: order.isDeliveryFree || false,
       isChennai: order.isChennai || false,
       orderType: order.orderType || "Others",
-      orderStatus: order.orderStatus || "image edit (pending)",
+      orderStatus: order.orderStatus || "image edited (not paid)",
       category: order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate'),
       manualDeliveryFee: order.manualDeliveryFee || "",
       advanceAmount: order.advanceAmount || "",
@@ -1193,7 +1330,7 @@ export default function Dashboard() {
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Others", orderStatus: "image edit (pending)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "" });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
 
 
     } catch (err) {
@@ -1206,19 +1343,28 @@ export default function Dashboard() {
     e.preventDefault();
     if (!invForm.boxCount || !invForm.itemsPerBox) return alert("Please fill all fields");
 
-    const newEntry = {
-      ...invForm,
+    const entryData = {
+      date: invForm.date,
+      chocolate: invForm.chocolate,
       boxCount: Number(invForm.boxCount),
       itemsPerBox: Number(invForm.itemsPerBox),
       totalChocolates: Number(invForm.boxCount) * Number(invForm.itemsPerBox),
-      type: "Purchase",
-      timestamp: Date.now()
+      type: "Purchase"
     };
 
-    setInventoryLogs(prev => [{ fireId: Date.now().toString(), ...newEntry }, ...prev]);
-
     try {
-      await addDoc(collection(db, "inventory"), newEntry);
+      if (editInvId) {
+        await updateDoc(doc(db, "inventory", editInvId), entryData);
+        setInventoryLogs(prev => prev.map(log => log.fireId === editInvId ? { ...log, ...entryData } : log));
+        setEditInvId(null);
+      } else {
+        const fireId = Date.now().toString();
+        setInventoryLogs(prev => [{ fireId, ...entryData, timestamp: Date.now() }, ...prev]);
+        await addDoc(collection(db, "inventory"), {
+          ...entryData,
+          timestamp: Date.now()
+        });
+      }
       setInvForm(prev => ({ ...prev, boxCount: "", itemsPerBox: "" }));
       setIsInvModalOpen(false);
     } catch (err) { console.error(err); }
@@ -1323,8 +1469,8 @@ export default function Dashboard() {
                 orderDate: formatToDisplayDate(row['Order Date'] || row.orderDate || row['Function Date'] || ""),
                 name: row.Name || row.name || "",
                 phone: String(row['Contact Number'] || row.Phone || row.phone || ""),
-                deliveryDate: formatToDisplayDate(row['Dispatch Date'] || row.deliveryDate || ""),
-                functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Dispatch Date'] || row.deliveryDate || ""),
+                deliveryDate: formatToDisplayDate(row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || row['Function Date'] || row.functionDate || row['Order Date'] || row.orderDate || ""),
+                functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || ""),
                 chocolate: row['Chocolate Name'] || row.Chocolate || row.chocolate || "",
                 count: Number(row.Count || row.count) || 0,
                 status: row.Status || row.status || "In Process",
@@ -1332,7 +1478,7 @@ export default function Dashboard() {
                 address: row.Address || row.address || "",
                 discount: Number(row.Discount || row.discount) || 0,
                 isDeliveryFree: row['Delivery Charge'] === 'Free' || false,
-                orderStatus: row['Order Status'] || row.orderStatus || "image edit (pending)",
+                orderStatus: row['Order Status'] || row.orderStatus || "image edited (not paid)",
                 category: row.Category || row.category || "chocolate",
                 orderType: row['Order Type'] || row.orderType || "Others",
                 manualDeliveryFee: Number(row['Delivery Fee'] || row.manualDeliveryFee) || 0,
@@ -1366,7 +1512,13 @@ export default function Dashboard() {
   const handleSendSMS = (order: any) => {
     const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
-    const message = `Hello ${order.name},\nThank you for your order with SABI Return Gifts!\n\nTotal Items: ${order.count}\nTotal Amount: Rs.${priceData.totalPrice.toLocaleString()}\nDispatch Date: ${order.deliveryDate}\nPayment Status: ${order.paymentStatus || 'Pending'}\n\nThank you!`;
+    const qty = Number(order.count) || 0;
+    const itemSubtotal = priceData.fullChocolatePrice;
+    const deliveryAmt = priceData.fullDeliveryCharge;
+    const totalAmt = priceData.fullTotalPrice;
+    const unitPrice = priceData.unitPrice;
+
+    const message = `Hello ${order.name},\nThank you for your order with SABI Return Gifts!\n\nOrder Details:\nItem: ${order.chocolate}\nQuantity: ${qty} (${qty} x ${unitPrice} = ${itemSubtotal}rs)\nDelivery Charge: ${deliveryAmt}rs\nTotal Amount: Rs.${totalAmt.toLocaleString()}\nDispatch Date: ${order.deliveryDate || order.functionDate || order.orderDate || '-'}\nPayment Status: ${order.paymentStatus || 'Pending'}\n\nThank you!`;
     const smsUrl = `sms:+91${order.phone}?body=${encodeURIComponent(message)}`;
     window.open(smsUrl, '_self');
   };
@@ -1374,7 +1526,22 @@ export default function Dashboard() {
   const generateWhatsAppMessage = (order: any) => {
     const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
-    return `Hello ${order.name},\nThank you for your order with SABI Return Gifts!\n\nOrder Details:\nItem: ${order.chocolate}\nQuantity: ${order.count}\nTotal Amount: Rs.${priceData.totalPrice.toLocaleString()}\nDispatch Date: ${order.deliveryDate}\nPayment Status: ${order.paymentStatus || 'Pending'}\n\nThank you!`;
+    const qty = Number(order.count) || 0;
+    const itemSubtotal = priceData.fullChocolatePrice;
+    const deliveryAmt = priceData.fullDeliveryCharge;
+    const totalAmt = priceData.fullTotalPrice;
+    const unitPrice = priceData.unitPrice;
+
+    let msg = `Hello ${order.name},\n\nThank you for your order with SABI Return Gifts!\n\nOrder Details:\nItem: ${order.chocolate}\nQuantity: ${qty} (${qty} x ${unitPrice} = ${itemSubtotal}rs)`;
+    msg += `\nDelivery Charge: ${deliveryAmt}rs`;
+    if ((Number(order.discount) || 0) > 0) {
+      msg += `\nDiscount: -${Number(order.discount)}rs`;
+    }
+    msg += `\nTotal Amount: Rs.${totalAmt.toLocaleString()}`;
+    msg += `\nDispatch Date: ${order.deliveryDate || order.functionDate || order.orderDate || '-'}`;
+    msg += `\nPayment Status: ${order.paymentStatus || 'Pending'}`;
+    msg += `\n\nThank you!`;
+    return msg;
   };
 
   const handleWhatsAppClick = (order: any) => {
@@ -1450,6 +1617,47 @@ export default function Dashboard() {
     }
   };
 
+  // 📸 SCREENSHOT MODE: Show only Name, Dispatch Date, Chocolate Name, Count, Total Price, Payment Status → capture → copy to clipboard
+  const handleScreenshotCapture = async () => {
+    setIsScreenshotMode(true);
+
+    // Wait 2 seconds for the UI to render with only the selected columns
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const element = screenshotTableRef.current;
+    if (element) {
+      try {
+        const html2canvas = (await import("html2canvas")).default;
+        const canvas = await html2canvas(element, {
+          backgroundColor: "#ffffff",
+          scale: 3,
+          useCORS: true,
+          logging: false,
+          allowTaint: true
+        });
+
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            try {
+              const item = new ClipboardItem({ "image/png": blob });
+              await navigator.clipboard.write([item]);
+              alert("✅ Table Screenshot Copied to Clipboard!");
+            } catch (clipboardErr) {
+              console.error("Clipboard copy failed: ", clipboardErr);
+              alert("❌ Failed to copy image. Please check browser permissions.");
+            }
+          }
+          setIsScreenshotMode(false);
+        }, "image/png");
+      } catch (error) {
+        console.error("Error generating screenshot:", error);
+        setIsScreenshotMode(false);
+      }
+    } else {
+      setIsScreenshotMode(false);
+    }
+  };
+
   const renderChocolateBadges = (chocString: string) => {
     if (!chocString) return null;
     return (
@@ -1463,7 +1671,7 @@ export default function Dashboard() {
     );
   };
 
-  const liveFormPrice = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
+  const liveFormPrice = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
 
 
   const profilePicUrl = "/logo.jpeg";
@@ -1699,9 +1907,12 @@ export default function Dashboard() {
             </nav>
           </div>
 
-          <div className="p-4 border-t border-blue-200">
-            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-red-600 bg-white shadow-[inset_2px_2px_5px_rgba(255,255,255,1),5px_5px_10px_rgba(0,0,0,0.05)] hover:shadow-[inset_2px_2px_5px_rgba(255,255,255,1),2px_2px_5px_rgba(0,0,0,0.1)] active:scale-95 font-black transition-all" style={{ textShadow: "1px 1px 1px rgba(255,0,0,0.2)" }}>
-              <Power size={20} className="drop-shadow-sm" /> Logout
+          <div className="p-4 border-t border-blue-100">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-rose-600 bg-gradient-to-r from-rose-50/70 to-blue-50/40 border border-rose-100/70 hover:from-rose-500 hover:to-rose-600 hover:text-white hover:border-rose-600 hover:shadow-[0_8px_16px_rgba(244,63,94,0.2)] active:scale-95 font-black transition-all duration-300 shadow-sm cursor-pointer"
+            >
+              <Power size={18} /> Logout
             </button>
           </div>
         </div>
@@ -1753,13 +1964,13 @@ export default function Dashboard() {
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
 
               <div className="bg-gradient-to-br from-red-600 to-red-800 p-4 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)] border-4 border-red-500/50">
-                <h2 className="text-2xl font-black text-white mb-6 text-center tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                <h2 className="text-3xl font-black text-white mb-6 text-center tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
+                <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
                   {dynamicInventory.map((choc, i) => {
                     const bal = inventoryBalances[choc] || 0;
                     return (
-                      <div key={i} className="bg-[#fffdf7] p-3 rounded-xl shadow-inner text-center border-2 border-transparent flex flex-col justify-center items-center transform hover:scale-105 transition-transform">
-                        <span className="text-[10px] font-extrabold text-red-900 uppercase leading-tight mb-2 h-8 flex items-center justify-center">{choc}</span>
+                      <div key={i} className="bg-[#fffdf7] p-3 rounded-xl shadow-inner text-center border-2 border-transparent flex flex-col justify-center items-center transform hover:scale-105 transition-transform shrink-0 min-w-[100px] sm:min-w-[120px] flex-1">
+                        <span className="text-[11px] font-black text-red-900 uppercase leading-tight mb-2 h-8 flex items-center justify-center">{choc}</span>
                         <span className={`text-2xl font-black ${bal < 0 ? 'text-red-600' : 'text-green-600'}`}>{bal}</span>
                       </div>
                     )
@@ -1773,7 +1984,7 @@ export default function Dashboard() {
                 <div className="flex flex-col h-full">
 
                   <div className="bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col h-full">
-                    <h3 className="text-lg font-black text-[#3e2723] mb-4 border-b-2 border-[#d7ccc8] pb-2 flex items-center gap-2"><TrendingUp size={18} /> Sales Tracker</h3>
+                    <h3 className="text-2xl font-black text-[#3e2723] mb-4 border-b-2 border-[#d7ccc8] pb-2 flex items-center gap-2"><TrendingUp size={22} /> Sales Tracker</h3>
 
                     <div className="space-y-4">
                       <div className="relative">
@@ -1812,11 +2023,11 @@ export default function Dashboard() {
 
                       <div className="flex gap-4">
                         <div className="bg-[#fff8e1] border border-[#ffe082] p-4 rounded-xl text-center shadow-sm flex-1">
-                          <p className="text-[10px] font-bold text-[#8d6e63] uppercase tracking-wider mb-1">Total Items Sold</p>
+                          <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-1">Total Items Sold</p>
                           <p className="text-3xl font-black text-[#d35400]">{trackedSalesResult.count}</p>
                         </div>
                         <div className="bg-[#e6f7ec] border border-[#9fe2bf] p-4 rounded-xl text-center shadow-sm flex-1">
-                          <p className="text-[10px] font-bold text-[#047857] uppercase tracking-wider mb-1">Sales Amount</p>
+                          <p className="text-xs font-black text-[#047857] uppercase tracking-wider mb-1">Sales Amount</p>
                           <p className="text-3xl font-black text-[#047857]">₹{trackedSalesResult.revenue.toLocaleString()}</p>
                         </div>
                       </div>
@@ -1828,15 +2039,24 @@ export default function Dashboard() {
 
                 <div className="lg:col-span-2 bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-full min-h-[500px]">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-black text-[#3e2723]">Inventory Log</h3>
-                    <button onClick={() => setIsInvModalOpen(true)} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
+                    <h3 className="text-2xl font-black text-[#3e2723]">Inventory Log</h3>
+                    <button onClick={() => {
+                      setInvForm({
+                        date: new Date().toISOString().split('T')[0],
+                        chocolate: "Kitkat",
+                        boxCount: "",
+                        itemsPerBox: ""
+                      });
+                      setEditInvId(null);
+                      setIsInvModalOpen(true);
+                    }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
                       <Plus size={16} /> Add Entry
                     </button>
                   </div>
                   <div className="overflow-auto flex-1 custom-scrollbar bg-white rounded-xl border border-[#d7ccc8] shadow-inner">
                     <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead className="sticky top-0 bg-[#fff59d] z-10 shadow-sm border-b-2 border-[#fbc02d]">
-                        <tr className="text-xs uppercase tracking-widest text-[#5d4037]">
+                        <tr className="text-sm uppercase tracking-wider text-[#5d4037]">
                           <th className="p-4 font-black border-r border-[#fff176]">Date</th>
                           <th className="p-4 font-black border-r border-[#fff176]">Chocolate Name</th>
                           <th className="p-4 font-black text-center border-r border-[#fff176]">Boxes</th>
@@ -1856,8 +2076,18 @@ export default function Dashboard() {
                               <td className="p-4 text-center font-bold text-amber-800">{log.boxCount}</td>
                               <td className="p-4 text-center font-bold text-amber-800">{log.itemsPerBox}</td>
                               <td className="p-4 text-center font-black text-[#3e2723] bg-amber-50/50">+{log.totalChocolates}</td>
-                              <td className="p-4 text-center">
-                                <button onClick={() => handleDeleteInventory(log.fireId)} className="text-red-400 hover:text-red-600 transition-colors"><Trash2 size={18} /></button>
+                              <td className="p-4 text-center flex items-center justify-center gap-3">
+                                <button onClick={() => {
+                                  setInvForm({
+                                    date: log.date || new Date().toISOString().split('T')[0],
+                                    chocolate: log.chocolate || "Kitkat",
+                                    boxCount: String(log.boxCount || ""),
+                                    itemsPerBox: String(log.itemsPerBox || "")
+                                  });
+                                  setEditInvId(log.fireId);
+                                  setIsInvModalOpen(true);
+                                }} className="text-blue-500 hover:text-blue-700 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
+                                <button onClick={() => handleDeleteInventory(log.fireId)} className="text-red-400 hover:text-red-600 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
                               </td>
                             </tr>
                           ))
@@ -1938,10 +2168,9 @@ export default function Dashboard() {
 
                     <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider relative z-10">
                       <option value="All">All Statuses</option>
-                      <option value="image edit (pending)">Image Edit (Pending)</option>
-                      <option value="image edit (completed)">Image Edit (Completed)</option>
-                      <option value="forward to print (paid)">Forward to Print (Paid)</option>
-                      <option value="delivered">Delivered</option>
+                      <option value="image edited (not paid)">I E (Not Paid)</option>
+                      <option value="forward to print (paid)">F 2 P (Paid)</option>
+                      <option value="order complete">Order Complete</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
 
@@ -2031,14 +2260,14 @@ export default function Dashboard() {
 
               </div>
 
-              <div className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8`}>
-                <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row justify-between items-center gap-4 border-amber-100 print:hidden sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm`}>
+              <div ref={screenshotTableRef} className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8`}>
+                <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
 
 
                   <div className="flex items-center gap-4 w-full md:w-auto">
                     <div className="flex items-center gap-3">
                       <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
-                      <button 
+                      <button
                         onClick={() => {
                           const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
                           setHiddenCols({
@@ -2049,26 +2278,66 @@ export default function Dashboard() {
                             discount: isAnyVisible
                           });
                         }}
-                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${
-                          (hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
-                            ? 'bg-amber-600 text-white border-amber-700' 
+                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
+                            ? 'bg-amber-600 text-white border-amber-700'
                             : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
-                        }`}
+                          }`}
                         title={(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
                       >
                         {(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
                       </button>
-                    </div>
+                      <button
+                        onClick={handleScreenshotCapture}
+                        disabled={isScreenshotMode}
+                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${isScreenshotMode
+                            ? 'bg-green-500 text-white border-green-600 animate-pulse'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                          }`}
+                        title={isScreenshotMode ? "Capturing..." : "Screenshot Table (Name, Dispatch, Chocolate, Count, Total Price, Payment)"}
+                      >
+                        <Camera size={18} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        onClick={() => setChennaiFilter(!chennaiFilter)}
+                        className={`h-8 px-2.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border flex items-center gap-1 text-[10px] font-black tracking-wider uppercase ${chennaiFilter
+                            ? 'bg-amber-600 text-white border-amber-700 shadow-md scale-105'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                          }`}
+                        title={chennaiFilter ? "Clear Chennai Filter" : "Filter Chennai Orders Only"}
+                      >
+                        <MapPin size={12} strokeWidth={3} />
+                        Chennai
+                      </button>
 
-                    <div className="relative w-full md:w-64">
-                      <Search className="absolute left-3 top-2.5 text-amber-400" size={18} />
-                      <input
-                        type="text"
-                        placeholder="Search Name or Phone..."
-                        value={dashboardSearch}
-                        onChange={(e) => setDashboardSearch(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-white border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm w-full shadow-sm"
-                      />
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-black tracking-wider uppercase text-amber-600 hover:text-amber-800 transition-colors print:hidden bg-white border border-amber-200 px-2.5 h-8 rounded-xl shadow-sm hover:bg-amber-50">
+                        <input
+                          type="checkbox"
+                          checked={showSearch}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setShowSearch(checked);
+                            if (!checked) {
+                              setDashboardSearch("");
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                        />
+                        Search
+                      </label>
+
+                      {showSearch && (
+                        <div className="relative animate-in fade-in slide-in-from-left-2 duration-300 w-40 sm:w-48 md:w-56">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
+                          <input
+                            type="text"
+                            placeholder="Search..."
+                            value={dashboardSearch}
+                            onChange={(e) => setDashboardSearch(e.target.value)}
+                            className="pl-8 pr-3 py-1 bg-white border border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs w-full shadow-sm h-8"
+                            autoFocus
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2112,105 +2381,148 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div ref={tableContainerRef} className="flex-1 w-full overflow-x-auto overflow-y-auto max-h-[75vh] shadow-inner bg-white/50 custom-scrollbar relative">
+                <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-auto max-h-[75vh]'}`}>
 
-                  <table className="w-full text-left border-separate border-spacing-0 min-w-[1450px] print:min-w-0 print:w-full relative">
-                    <thead className="sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm print:static">
+                  {/* 📸 Screenshot Header - Only visible during screenshot capture */}
+                  {isScreenshotMode && (
+                    <div className="bg-gradient-to-r from-amber-100 via-orange-50 to-amber-100 px-6 py-4 border-b-2 border-amber-300">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h1 className="text-2xl font-black text-amber-950 tracking-tight">SABI Return Gifts</h1>
+                          <p className="text-sm font-bold text-amber-700 mt-0.5">Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-amber-600">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          <div className="flex gap-4 mt-1">
+                            <span className="text-xs font-black text-amber-900">Orders: {filteredDashboardOrders.length}</span>
+                            <span className="text-xs font-black text-amber-900">Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}</span>
+                            <span className="text-xs font-black text-green-700">Revenue: ₹{displayRevenue.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-0' : 'min-w-[1450px]'}`}>
+                    <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
                       <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
-                        <th className="py-3 px-4 w-12 text-center print:hidden align-top">
-                          <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
-                        </th>
-                        <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
-                          <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
-                            <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
-                              <ChevronRight size={14} strokeWidth={3} />
-                            </button>
-                            {!hiddenCols.serialNo && (
-                              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                <span className="whitespace-nowrap">Serial No</span>
+                        {!isScreenshotMode && (
+                          <th className="py-3 px-4 w-12 text-center print:hidden align-top">
+                            <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
+                          </th>
+                        )}
+                        {!isScreenshotMode && (
+                          <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
+                            <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
+                                <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
+                                  <ChevronRight size={14} strokeWidth={3} />
+                                </button>
+                              {!hiddenCols.serialNo && (
+                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                                  <span className="whitespace-nowrap">Serial No</span>
 
-                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
-                                  <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                                  <select
-                                    value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
-                                    onChange={(e) => {
-                                      if (!e.target.value) setSortConfig(null);
-                                      else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  >
-                                    <option value="">Sort...</option>
-                                    <option value="asc">new  to old</option>
-                                    <option value="desc">old to new </option>
-                                  </select>
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
+                                    <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                    <select
+                                      value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
+                                      onChange={(e) => {
+                                        if (!e.target.value) setSortConfig(null);
+                                        else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
+                                      }}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    >
+                                      <option value="">Sort...</option>
+                                      <option value="asc">new  to old</option>
+                                      <option value="desc">old to new </option>
+                                    </select>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        </th>
-                        <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
-                          <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
-
-                            {!hiddenCols.orderDate && (
-                              <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                                <span className="whitespace-nowrap">Order Date</span>
-                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
-                                  <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                                  <select
-                                    value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
-                                    onChange={(e) => {
-                                      if (!e.target.value) setSortConfig(null);
-                                      else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  >
-                                    <option value="">Sort...</option>
-                                    <option value="asc">new to Old</option>
-                                    <option value="desc">old to new </option>
-                                  </select>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </th>
-                        <th className="py-3 px-4 font-bold align-top">Name</th>
-                        <th className="py-3 px-4 font-bold align-top">Contact Number</th>
-
-                        <th className="py-3 px-4 font-bold align-top min-w-[140px]">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              <span>Function Date</span>
-                              <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
-                                <Calendar size={16} className="text-amber-700 pointer-events-none" />
-                                <input
-                                  type="date"
-                                  value=""
-                                  onChange={(e) => {
-                                    if (e.target.value && !functionDates.includes(e.target.value)) {
-                                      setFunctionDates([...functionDates, e.target.value]);
-                                    }
-                                  }}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                              </div>
+                              )}
                             </div>
-                            {functionDates.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {functionDates.map(d => (
-                                  <span key={d} className="flex items-center gap-1 bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                    {formatToDisplayDate(d)}
-                                    <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setFunctionDates(functionDates.filter(fd => fd !== d))} />
-                                  </span>
-                                ))}
+                          </th>
+                        )}
+                        {!isScreenshotMode && (
+                          <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
+                            <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
+
+                              {!hiddenCols.orderDate && (
+                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                                  <span className="whitespace-nowrap">Order Date</span>
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
+                                    <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                    <select
+                                      value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
+                                      onChange={(e) => {
+                                        if (!e.target.value) setSortConfig(null);
+                                        else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
+                                      }}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    >
+                                      <option value="">Sort...</option>
+                                      <option value="desc">new to old</option>
+                                      <option value="asc">old to new</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </th>
+                        )}
+                        <th className="py-3 px-4 font-bold align-top">Name</th>
+                        {!isScreenshotMode && <th className="py-3 px-4 font-bold align-top">Contact Number</th>}
+
+                        {!isScreenshotMode && (
+                          <th className="py-3 px-4 font-bold align-top min-w-[140px]">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <span>Function Date</span>
+                                <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
+                                  <Calendar size={16} className="text-amber-700 pointer-events-none" />
+                                  <input
+                                    type="date"
+                                    value=""
+                                    onChange={(e) => {
+                                      if (e.target.value && !functionDates.includes(e.target.value)) {
+                                        setFunctionDates([...functionDates, e.target.value]);
+                                      }
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  />
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        </th>
+                              {functionDates.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {functionDates.map(d => (
+                                    <span key={d} className="flex items-center gap-1 bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                      {formatToDisplayDate(d)}
+                                      <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setFunctionDates(functionDates.filter(fd => fd !== d))} />
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </th>
+                        )}
 
                         <th className="py-3 px-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
                               <span>Dispatch Date</span>
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Dispatch Date">
+                                <ChevronDown size={14} className="text-orange-700/30 group-hover:text-orange-700 transition-opacity" />
+                                <select
+                                  value={sortConfig?.key === 'deliveryDate' ? sortConfig.direction : ""}
+                                  onChange={(e) => {
+                                    if (!e.target.value) setSortConfig(null);
+                                    else setSortConfig({ key: 'deliveryDate', direction: e.target.value as 'asc' | 'desc' });
+                                  }}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                >
+                                  <option value="">Sort...</option>
+                                  <option value="desc">new to old</option>
+                                  <option value="asc">old to new</option>
+                                </select>
+                              </div>
                               <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-orange-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
                                 <Calendar size={16} className="text-orange-700 pointer-events-none" />
                                 <input
@@ -2239,7 +2551,7 @@ export default function Dashboard() {
                         </th>
 
                         {/* 🟢 ORDER STATUS VISIBLE FOR BOTH DASHBOARDS */}
-                        {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
+                        {!isScreenshotMode && (activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
                           <th className="py-3 px-4 font-bold align-top min-w-[150px]">
                             <div className="flex items-center gap-1 group">
                               <span>Order Status</span>
@@ -2259,7 +2571,54 @@ export default function Dashboard() {
                           </th>
                         )}
 
-                        <th className="py-3 px-4 font-bold align-top">{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</th>
+                        <th className="py-3 px-4 font-bold align-top min-w-[150px]">
+                          <div className="flex items-center gap-1.5 group">
+                            <span>{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</span>
+                            
+                            {/* Dropdown Filter for Chocolates or Products */}
+                            <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title={activeTab === 'dashboard2' ? "Filter by Product Name" : "Filter by Chocolate Name"}>
+                              <ChevronDown size={14} className={chocFilter ? 'text-amber-800' : 'text-amber-400'} />
+                              <select
+                                value={chocFilter}
+                                onChange={(e) => setChocFilter(e.target.value)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              >
+                                {activeTab === 'dashboard2' ? (
+                                  <>
+                                    <option value="">All Products</option>
+                                    {customProducts.map(p => (
+                                      <option key={p.fireId || p.id} value={p.name}>{p.name}</option>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <>
+                                    <option value="">All Chocolates</option>
+                                    <option value="10 rs 5 Star">10 rs 5 Star</option>
+                                    <option value="10 rs Kitkat">10 rs Kitkat</option>
+                                    <option value="10 rs Dairy Milk">10 rs Dairy Milk</option>
+                                    <option value="5 rs Peanut Candy">5 rs Peanut Candy</option>
+                                    <option value="5 rs 5 Star">5 rs 5 Star</option>
+                                    <option value="5 rs Dairy Milk">5 rs Dairy Milk</option>
+                                    <option value="2 rs Dairymilk Shots">2 rs Dairymilk Shots</option>
+                                    <option value="5 rs Milky Bar">5 rs Milky Bar</option>
+                                    <option value="1 rs Chocolate">1 rs Chocolate</option>
+                                  </>
+                                )}
+                              </select>
+                            </div>
+
+                            {/* Clear indicator if active */}
+                            {chocFilter && (
+                              <button
+                                onClick={() => setChocFilter('')}
+                                className="text-red-500 hover:scale-110 transition-transform ml-0.5"
+                                title="Clear filter"
+                              >
+                                <X size={12} strokeWidth={3} />
+                              </button>
+                            )}
+                          </div>
+                        </th>
                         <th className="py-3 px-4 font-bold text-center align-top min-w-[100px]">
                           <div className="flex items-center justify-center gap-1">
                             <span>Count</span>
@@ -2279,86 +2638,96 @@ export default function Dashboard() {
                           </div>
                         </th>
 
-                        <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>
-                        <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
-                          <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
-                            {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
-                          </div>
-
-                        </th>
-                        <th className="py-3 px-4 font-bold text-center align-top">Advance</th>
-                        <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
-                          <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
-                            {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
-                          </div>
-
-                        </th>
+                        {!isScreenshotMode && <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>}
+                        {!isScreenshotMode && (
+                          <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
+                            <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
+                              {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
+                            </div>
+                          </th>
+                        )}
+                        {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Advance</th>}
+                        {!isScreenshotMode && (
+                          <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
+                            <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
+                              {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
+                            </div>
+                          </th>
+                        )}
 
 
                         <th className="py-3 px-4 font-bold text-right align-top">Total Price</th>
                         <th className="py-3 px-4 font-bold text-center align-top">Payment</th>
-                        <th className="py-3 px-4 font-bold text-center align-top">Delivery Status</th>
+                        {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Delivery Status</th>}
 
-                        <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
-                          <div className="flex items-center justify-center gap-2">
-                            <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
-                              <ChevronLeft size={14} strokeWidth={3} />
-                            </button>
-                            <span>Actions</span>
-                          </div>
-                        </th>
+                        {!isScreenshotMode && (
+                          <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
+                            <div className="flex items-center justify-center gap-2">
+                              <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
+                                <ChevronLeft size={14} strokeWidth={3} />
+                              </button>
+                              <span>Actions</span>
+                            </div>
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedOrders.length === 0 ? (
+                      {(isScreenshotMode ? sortedDashboardOrders : paginatedOrders).length === 0 ? (
                         <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
                       ) : (
-                        paginatedOrders.map((order) => {
+                        (isScreenshotMode ? sortedDashboardOrders : paginatedOrders).map((order) => {
                           const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
                           const isSelected = selectedOrders.includes(order.id);
 
 
                           return (
                             <tr key={order.fireId || order.id} className={`border-b transition-colors border-amber-50 hover:bg-orange-50/50 print:border-gray-200 ${isSelected ? 'bg-amber-50/80 print:bg-transparent' : ''}`}>
-                              <td className="py-2.5 px-4 text-center print:hidden align-middle">
-                                <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
-                              </td>
-                              <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
-                                {!hiddenCols.serialNo && getSerial(order.id)}
-                              </td>
-                              <td className={`py-2.5 ${hiddenCols.orderDate ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-medium text-[#5d4037] align-middle transition-all duration-300`}>
-                                {!hiddenCols.orderDate && order.orderDate}
-                              </td>
+                              {!isScreenshotMode && (
+                                <td className="py-2.5 px-4 text-center print:hidden align-middle">
+                                  <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
+                                </td>
+                              )}
+                              {!isScreenshotMode && (
+                                <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
+                                  {!hiddenCols.serialNo && getSerial(order.id)}
+                                </td>
+                              )}
+                              {!isScreenshotMode && (
+                                <td className={`py-2.5 ${hiddenCols.orderDate ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-medium text-[#5d4037] align-middle transition-all duration-300`}>
+                                  {!hiddenCols.orderDate && order.orderDate}
+                                </td>
+                              )}
 
                               <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
-                              <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>
-                              <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>
-                              <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate}</td>
+                              {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>}
+                              {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
+                              <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
 
                               {/* 🟢 ORDER STATUS VISIBLE FOR BOTH DASHBOARDS */}
-                              {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
+                              {!isScreenshotMode && (activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
                                 <td className="py-2.5 px-4 text-center align-middle">
                                   <div className="print:hidden">
                                     <select
-                                      value={order.orderStatus || "image edit (pending)"}
+                                      value={order.orderStatus || "image edited (not paid)"}
                                       onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
-                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${order.orderStatus === 'image edit (pending)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' :
+                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${order.orderStatus === 'image edited (not paid)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' :
                                         order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
                                           order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
-                                            order.orderStatus === 'delivered' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
+                                            order.orderStatus === 'order complete' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
                                               'bg-[#f3e8ff] text-[#7e22ce] border-[#e9d5ff]'
                                         }`}
                                     >
-                                      <option value="image edit (pending)">Image Edit (Pending)</option>
-                                      <option value="image edit (completed)">Image Edit (Completed)</option>
-                                      <option value="forward to print (paid)">Forward to Print (Paid)</option>
-                                      <option value="delivered">Delivered</option>
+                                      <option value="image edited (not paid)">I E (Not Paid)</option>
+                                      <option value="forward to print (paid)">F 2 P (Paid)</option>
+                                      <option value="order complete">Order Complete</option>
                                       <option value="cancelled">Cancelled</option>
                                     </select>
 
                                   </div>
-                                  <span className="hidden print:inline text-[10px] font-bold text-black uppercase">{order.orderStatus || "image edit (pending)"}</span>
-
+                                  <span className="hidden print:inline text-[10px] font-bold text-black uppercase">
+                                     {(order.orderStatus || "image edited (not paid)") === 'image edited (not paid)' ? 'I E (Not Paid)' : (order.orderStatus === 'forward to print (paid)' ? 'F 2 P (Paid)' : order.orderStatus)}
+                                  </span>
                                 </td>
                               )}
 
@@ -2370,116 +2739,148 @@ export default function Dashboard() {
                                 {order.count}
                               </td>
 
-                              <td className="py-2.5 px-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
-                                <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
-                              </td>
+                              {!isScreenshotMode && (
+                                <td className="py-2.5 px-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
+                                  <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
+                                </td>
+                              )}
 
-                              <td className={`py-2.5 ${hiddenCols.deliveryCharge ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-right font-medium text-amber-900 align-middle transition-all duration-300`}>
-                                {!hiddenCols.deliveryCharge && (
-                                  order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`
-                                )}
-                              </td>
+                              {!isScreenshotMode && (
+                                <td className={`py-2.5 ${hiddenCols.deliveryCharge ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-right font-medium text-amber-900 align-middle transition-all duration-300`}>
+                                  {!hiddenCols.deliveryCharge && (
+                                    order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`
+                                  )}
+                                </td>
+                              )}
 
-                              <td className="py-2.5 px-4 text-center align-middle">
-                                <input
-                                  type="number"
-                                  placeholder="0"
-                                  value={order.advanceAmount || ''}
-                                  onChange={(e) => handleAdvanceUpdate(order.id, order.fireId, e.target.value)}
-                                  className="w-20 p-1.5 border border-emerald-300 rounded text-center text-sm font-bold text-emerald-950 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
-                                />
-                              </td>
-
-                              <td className={`py-2.5 ${hiddenCols.discount ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-center print:hidden align-middle transition-all duration-300`}>
-                                {!hiddenCols.discount && (
+                              {!isScreenshotMode && (
+                                <td className="py-2.5 px-4 text-center align-middle">
                                   <input
                                     type="number"
-                                    list="discount-suggestions"
                                     placeholder="0"
-                                    value={order.discount || ''}
-                                    onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
-                                    className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                                    value={order.advanceAmount || ''}
+                                    onChange={(e) => handleAdvanceUpdate(order.id, order.fireId, e.target.value)}
+                                    className="w-20 p-1.5 border border-emerald-300 rounded text-center text-sm font-bold text-emerald-950 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                                   />
-                                )}
-                              </td>
+                                </td>
+                              )}
+
+                              {!isScreenshotMode && (
+                                <td className={`py-2.5 ${hiddenCols.discount ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-center print:hidden align-middle transition-all duration-300`}>
+                                  {!hiddenCols.discount && (
+                                    <input
+                                      type="number"
+                                      list="discount-suggestions"
+                                      placeholder="0"
+                                      value={order.discount || ''}
+                                      onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
+                                      className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                  )}
+                                </td>
+                              )}
 
 
-                              <td className={`py-2.5 px-4 text-right align-middle`}>
-                                <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
-                                {order.paymentStatus === 'Pending' && (
-                                  <div className="text-[11px] font-bold text-red-600 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
-                                )}
-                                {order.paymentStatus === 'Partially Paid' && (
-                                  <>
-                                    <div className="text-[11px] font-bold text-green-700 leading-tight mt-0.5">Paid: ₹{Number(order.advanceAmount || 0).toLocaleString()}</div>
-                                    <div className="text-[11px] font-bold text-red-600 leading-tight">Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}</div>
-                                  </>
-                                )}
-                              </td>
+                              {isScreenshotMode ? (
+                                <td className="py-2.5 px-4 text-right align-middle font-bold text-amber-950 text-base">
+                                  ₹{priceData.fullTotalPrice.toLocaleString()}
+                                </td>
+                              ) : (
+                                <td className={`py-2.5 px-4 text-right align-middle`}>
+                                  <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
+                                  {order.paymentStatus === 'Pending' && (
+                                    <div className="text-[11px] font-bold text-red-600 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
+                                  )}
+                                  {order.paymentStatus === 'Partially Paid' && (
+                                    <>
+                                      <div className="text-[11px] font-bold text-green-700 leading-tight mt-0.5">Paid: ₹{Number(order.advanceAmount || 0).toLocaleString()}</div>
+                                      <div className="text-[11px] font-bold text-red-600 leading-tight">Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}</div>
+                                    </>
+                                  )}
+                                </td>
+                              )}
 
                               <td className="py-2.5 px-4 text-center align-middle">
-                                <div className="print:hidden">
-                                  <select
-                                    value={order.paymentStatus || "Pending"}
-                                    onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                      ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
-                                      : order.paymentStatus === 'Partially Paid'
-                                        ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
-                                        : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
-                                      }`}
+                                {isScreenshotMode ? (
+                                  <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
+                                    ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]'
+                                    : order.paymentStatus === 'Partially Paid'
+                                      ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]'
+                                      : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
+                                    }`}
                                   >
-                                    <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
-                                    <option value="Partially Paid" className="font-bold text-[#d35400] bg-white">Partially Paid</option>
-                                    <option value="Pending" className="font-bold text-[#b91c1c] bg-white">Pending</option>
-                                  </select>
-                                </div>
-                                <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
-                              </td>
-
-                              <td className="py-2.5 px-4 text-center align-middle">
-                                <div className="print:hidden">
-                                  <select
-                                    value={order.status}
-                                    onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
-                                      ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
-                                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
-                                      }`}
-                                  >
-                                    <option value="Delivered" className="font-bold text-green-700">Delivered</option>
-                                    <option value="In Process" className="font-bold text-amber-700">In Process</option>
-                                  </select>
-                                </div>
-                                <span className="hidden print:inline text-sm font-bold text-black">{order.status}</span>
-                              </td>
-
-                              <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
-                                <button
-                                  onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
-                                  className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
-                                  title="Actions Menu"
-                                >
-                                  <MoreVertical size={20} />
-                                </button>
-
-                                {openActionId === order.id && (
+                                    {order.paymentStatus || 'Pending'}
+                                  </span>
+                                ) : (
                                   <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setOpenActionId(null)}></div>
-
-                                    <div className="absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
-                                      <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Send SMS Bill"><MessageSquare size={20} /></button>
-                                      <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Shipping"><Truck size={20} /></button>
-                                      <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
-                                      <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
-                                      {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
-                                      <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
-                                      <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Share on WhatsApp"><MessageCircle size={20} /></button>
-
+                                    <div className="print:hidden">
+                                      <select
+                                        value={order.paymentStatus || "Pending"}
+                                        onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
+                                          ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
+                                          : order.paymentStatus === 'Partially Paid'
+                                            ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
+                                            : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
+                                          }`}
+                                      >
+                                        <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
+                                        <option value="Partially Paid" className="font-bold text-[#d35400] bg-white">Partially Paid</option>
+                                        <option value="Pending" className="font-bold text-[#b91c1c] bg-white">Pending</option>
+                                      </select>
                                     </div>
+                                    <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
                                   </>
                                 )}
                               </td>
+
+                              {!isScreenshotMode && (
+                                <td className="py-2.5 px-4 text-center align-middle">
+                                  <div className="print:hidden">
+                                    <select
+                                      value={order.status}
+                                      onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
+                                        ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
+                                        : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
+                                        }`}
+                                    >
+                                      <option value="Delivered" className="font-bold text-green-700">Delivered</option>
+                                      <option value="In Process" className="font-bold text-amber-700">In Process</option>
+                                    </select>
+                                  </div>
+                                  <span className="hidden print:inline text-sm font-bold text-black">{order.status}</span>
+                                </td>
+                              )}
+
+                              {!isScreenshotMode && (
+                                <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
+                                  <button
+                                    onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
+                                    className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
+                                    title="Actions Menu"
+                                  >
+                                    <MoreVertical size={20} />
+                                  </button>
+
+                                  {openActionId === order.id && (
+                                    <>
+                                      <div className="fixed inset-0 z-40" onClick={() => setOpenActionId(null)}></div>
+
+                                      <div className="absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
+                                        <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Send SMS Bill"><MessageSquare size={20} /></button>
+                                        <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Shipping"><Truck size={20} /></button>
+                                        <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
+                                        <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
+                                        {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
+                                        <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
+                                        <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Share on WhatsApp"><MessageCircle size={20} /></button>
+
+                                      </div>
+                                    </>
+                                  )}
+                                </td>
+                              )}
 
                             </tr>
                           );
@@ -2490,7 +2891,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* 🟢 STICKY PAGINATION FOOTER */}
-                <div className="sticky bottom-0 z-30 bg-[#ebe6df]/95 backdrop-blur-md border-t border-amber-200 p-4 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)] print:hidden">
+                <div className={`${isScreenshotMode ? 'hidden' : 'sticky bottom-0 z-30 bg-[#ebe6df]/95 backdrop-blur-md border-t border-amber-200 p-4 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)]'} print:hidden`}>
                   <div className="text-sm font-bold text-amber-800">
                     Showing <span className="font-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black">{sortedDashboardOrders.length}</span> orders
                   </div>
@@ -2565,10 +2966,9 @@ export default function Dashboard() {
                   <div className="flex flex-wrap flex-1 gap-3 w-full justify-end">
                     <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider">
                       <option value="All">All Statuses</option>
-                      <option value="image edit (pending)">Image Edit (Pending)</option>
-                      <option value="image edit (completed)">Image Edit (Completed)</option>
-                      <option value="forward to print (paid)">Forward to Print (Paid)</option>
-                      <option value="delivered">Delivered</option>
+                      <option value="image edited (not paid)">I E (Not Paid)</option>
+                      <option value="forward to print (paid)">F 2 P (Paid)</option>
+                      <option value="order complete">Order Complete</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
 
@@ -2638,7 +3038,7 @@ export default function Dashboard() {
                               </div>
                             </div>
                             <div className="text-center mt-3 text-sm font-bold text-amber-800">
-                              Function: <span className="text-amber-950">{order.functionDate}</span> • Est. Delivery: <span className="text-amber-950">{order.deliveryDate}</span>
+                              Function: <span className="text-amber-950">{order.functionDate}</span> • Est. Delivery: <span className="text-amber-950">{order.deliveryDate || order.functionDate || order.orderDate || "-"}</span>
                             </div>
                           </div>
                         </div>
@@ -3155,9 +3555,11 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: INVENTORY MODAL */}
       {isInvModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsInvModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsInvModalOpen(false); setEditInvId(null); }}>
           <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#fffcf9] border border-amber-100" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-extrabold mb-6 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4">Add Inventory Entry</h2>
+            <h2 className="text-2xl font-extrabold mb-6 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4">
+              {editInvId ? "Edit Inventory Entry" : "Add Inventory Entry"}
+            </h2>
             <form onSubmit={handleAddInventory} className="space-y-4">
               <div>
                 <label className="block text-sm font-bold mb-1 text-[#5d4037]">Date</label>
@@ -3165,10 +3567,20 @@ export default function Dashboard() {
               </div>
               <div>
                 <label className="block text-sm font-bold mb-1 text-[#5d4037]">Chocolate Name</label>
-                <select required value={invForm.chocolate} onChange={(e) => setInvForm({ ...invForm, chocolate: e.target.value })} className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner cursor-pointer">
-                  {dynamicInventory.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-
+                <input
+                  required
+                  list="inv-chocolates-list"
+                  type="text"
+                  value={invForm.chocolate}
+                  onChange={(e) => setInvForm({ ...invForm, chocolate: e.target.value })}
+                  className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner"
+                  placeholder="Select or type chocolate name"
+                />
+                <datalist id="inv-chocolates-list">
+                  {dynamicInventory.map((c, i) => (
+                    <option key={i} value={c} />
+                  ))}
+                </datalist>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -3189,7 +3601,7 @@ export default function Dashboard() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsInvModalOpen(false)} className="flex-1 px-4 py-3 rounded-xl font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="button" onClick={() => { setIsInvModalOpen(false); setEditInvId(null); }} className="flex-1 px-4 py-3 rounded-xl font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all">Save Entry</button>
               </div>
             </form>
@@ -3259,7 +3671,7 @@ export default function Dashboard() {
                       <tr key={idx} className="border-b border-amber-100 text-sm print:border-gray-400">
                         <td className="p-3 font-bold text-amber-950 border-r border-amber-100 print:border-gray-400 print:text-black">{order.name}</td>
                         <td className="p-3 text-amber-800 border-r border-amber-100 print:border-gray-400 print:text-black">{order.phone}</td>
-                        <td className="p-3 font-medium text-amber-900 border-r border-amber-100 print:border-gray-400 print:text-black">{order.deliveryDate}</td>
+                        <td className="p-3 font-medium text-amber-900 border-r border-amber-100 print:border-gray-400 print:text-black">{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
                         <td className="p-3 text-amber-800 border-r border-amber-100 print:border-gray-400 print:text-black max-w-[200px] truncate">{order.chocolate}</td>
 
                         <td className="p-3 text-center font-bold text-amber-950 border-r border-amber-100 print:border-gray-400 print:text-black">
@@ -3348,15 +3760,12 @@ export default function Dashboard() {
                   <div className="flex justify-between items-end mb-1">
                     <label className={`block text-sm font-bold text-[#5d4037]`}>{formData.category === 'product' ? 'Product Name' : 'Chocolate Name'}</label>
                   </div>
-                  {/* 🟢 EXACTLY SHOWS 'Select products...' FOR DASHBOARD 2 */}
-                  <ChocolateMultiSelect
+                  <ChocolateSingleSelect
                     value={formData.chocolate}
                     onChange={(val) => setFormData({ ...formData, chocolate: val })}
                     suggestions={formData.category === 'product' ? customProducts.map(p => p.name) : uniqueChocolates}
                     pricesMap={formData.category === 'product' ? customPricesMap : managedChocPricesMap}
-
-                    placeholderText={formData.category === 'product' ? "Select products..." : "Select chocolates..."}
-
+                    placeholderText={formData.category === 'product' ? "Select product..." : "Select chocolate..."}
                   />
                 </div>
 
@@ -3392,29 +3801,61 @@ export default function Dashboard() {
                   <input type="number" list="discount-suggestions" name="discount" value={formData.discount || ''} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Eg. 50" />
                 </div>
 
-                {/* 🟢 Dashboards Manual Delivery Fee Field */}
-                {formData.category === 'product' && (
-                  <div className="col-span-2">
-                    <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Manual Delivery Fee (₹)</label>
-                    <input type="number" name="manualDeliveryFee" value={formData.manualDeliveryFee} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} placeholder="Eg. 100" />
-                  </div>
-                )}
+                {/* 🟢 Delivery Fee Field - visible for all categories */}
+                <div>
+                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>
+                    Delivery Charge (₹)
+                    {formData.category !== 'product' && (
+                      <span className="text-xs font-medium text-amber-600 ml-1">(Default)</span>
+                    )}
+                  </label>
+                  <input type="number" name="manualDeliveryFee" value={formData.manualDeliveryFee} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} placeholder={formData.category === 'product' ? 'Eg. 100' : `${Number(formData.count) > 99 ? '200' : '150'}`} />
+                </div>
 
-                {formData.category !== 'product' && (
-                  <div className="col-span-2">
-                    <label className={`block text-sm font-bold mb-2 text-[#5d4037]`}>Pricing Type</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-4 py-2 rounded-xl focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm">
-                        <input type="radio" name="pricingType" value="retail" checked={formData.pricingType === "retail"} onChange={handleInputChange} className="w-4 h-4 accent-[#8d6e63]" />
-                        Retail
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-4 py-2 rounded-xl focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm">
-                        <input type="radio" name="pricingType" value="wholesale" checked={formData.pricingType === "wholesale"} onChange={handleInputChange} className="w-4 h-4 accent-[#8d6e63]" />
-                        Wholesale
-                      </label>
-                    </div>
+                <div>
+                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>
+                    Chennai
+                  </label>
+                  <div className="flex items-center h-[46px] bg-white border-2 border-[#d7ccc8] rounded-xl px-3.5 focus-within:border-[#8d6e63] shadow-inner">
+                    <label className="flex items-center gap-2 cursor-pointer w-full font-bold text-[#5d4037]">
+                      <input
+                        type="checkbox"
+                        checked={formData.isChennai || false}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const newFormData = { ...formData, isChennai: checked };
+                          const priceData = calculatePriceInfo(
+                            newFormData.chocolate,
+                            newFormData.count,
+                            newFormData.discount,
+                            newFormData.isDeliveryFree || checked,
+                            newFormData.paymentStatus,
+                            newFormData.category,
+                            customPricesMap,
+                            newFormData.manualDeliveryFee,
+                            newFormData.orderStatus,
+                            managedChocPricesMap,
+                            newFormData.pricingType,
+                            newFormData.manualProductPrice
+                          );
+                          const currentAdvance = Number(newFormData.advanceAmount);
+                          if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+                            newFormData.paymentStatus = 'Full Paid';
+                          } else if (currentAdvance > 0) {
+                            newFormData.paymentStatus = 'Partially Paid';
+                          } else {
+                            newFormData.paymentStatus = 'Pending';
+                          }
+                          setFormData(newFormData);
+                        }}
+                        className="w-4 h-4 accent-[#8d6e63] cursor-pointer"
+                      />
+                      Chennai
+                    </label>
                   </div>
-                )}
+                </div>
+
+                {/* Pricing Type hidden from UI per requirement */}
 
                 {formData.category !== 'product' && (
                   <>
@@ -3436,17 +3877,16 @@ export default function Dashboard() {
                     </div>
 
                     <div className="col-span-2">
-                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Detailed Order Status</label>
+                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Order Status</label>
                       <select
                         name="orderStatus"
                         value={formData.orderStatus}
                         onChange={handleInputChange}
                         className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}
                       >
-                        <option value="image edit (pending)">Image Edit (Pending)</option>
-                        <option value="image edit (completed)">Image Edit (Completed)</option>
-                        <option value="forward to print (paid)">Forward to Print (Paid)</option>
-                        <option value="delivered">Delivered</option>
+                        <option value="image edited (not paid)">I E (Not Paid)</option>
+                        <option value="forward to print (paid)">F 2 P (Paid)</option>
+                        <option value="order complete">Order Complete</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </div>
@@ -3469,13 +3909,39 @@ export default function Dashboard() {
 
                 <div className="flex justify-between items-center text-sm font-bold text-[#5d4037] border-b border-[#ffe082] pb-2">
                   <span>Delivery Charge:</span>
-                  <span>{formData.isDeliveryFree ? <span className="text-green-600">Free</span> : `₹${(liveFormPrice.fullDeliveryCharge || 0).toLocaleString()}`}</span>
+                  <span>{(formData.isDeliveryFree || formData.isChennai) ? <span className="text-green-600">Free</span> : `₹${(liveFormPrice.fullDeliveryCharge || 0).toLocaleString()}`}</span>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-[#5d4037]">
                   <input
                     type="checkbox"
                     checked={formData.isDeliveryFree || false}
-                    onChange={(e) => setFormData({ ...formData, isDeliveryFree: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      const newFormData = { ...formData, isDeliveryFree: checked };
+                      const priceData = calculatePriceInfo(
+                        newFormData.chocolate,
+                        newFormData.count,
+                        newFormData.discount,
+                        checked || newFormData.isChennai,
+                        newFormData.paymentStatus,
+                        newFormData.category,
+                        customPricesMap,
+                        newFormData.manualDeliveryFee,
+                        newFormData.orderStatus,
+                        managedChocPricesMap,
+                        newFormData.pricingType,
+                        newFormData.manualProductPrice
+                      );
+                      const currentAdvance = Number(newFormData.advanceAmount);
+                      if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+                        newFormData.paymentStatus = 'Full Paid';
+                      } else if (currentAdvance > 0) {
+                        newFormData.paymentStatus = 'Partially Paid';
+                      } else {
+                        newFormData.paymentStatus = 'Pending';
+                      }
+                      setFormData(newFormData);
+                    }}
                     className="accent-[#8d6e63] w-4 h-4 cursor-pointer"
                   />
                   Delivery Free
@@ -3645,7 +4111,7 @@ export default function Dashboard() {
                       {/* Row 7: Dispatch Date & Status Value */}
                       <tr>
                         <td colSpan={2} className="border-r border-[#f0e6db] pb-2">
-                          <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate}</p>
+                          <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate || previewData.functionDate || previewData.orderDate || "-"}</p>
                         </td>
                         <td colSpan={2} className="pl-4 pb-2 text-right pr-4">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
@@ -3740,7 +4206,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-center py-3 border-t-2 border-b-2 border-black">
                   <div>
                     <p className="text-[14px] font-extrabold mb-1 text-black">Invoice #: {getSerial(shippingOrder.id)}</p>
-                    <p className="text-[14px] font-extrabold text-black">Invoice Date: {shippingOrder.deliveryDate}</p>
+                    <p className="text-[14px] font-extrabold text-black">Invoice Date: {shippingOrder.deliveryDate || shippingOrder.functionDate || shippingOrder.orderDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
                   </div>
                   <div className="flex flex-col items-center">
                     <img src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${getSerial(shippingOrder.id)}&scale=2&height=10`} alt="Barcode" className="h-12 w-auto mix-blend-multiply" crossOrigin="anonymous" />
@@ -3941,11 +4407,11 @@ export default function Dashboard() {
 
       {/* 🟢 MANAGED CHOCOLATES MODAL (ANALYTICS AREA) */}
       {isAnalyticsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", price: "" }); }}>
+        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" }); }}>
           <div className="rounded-[2.5rem] shadow-2xl w-full max-w-4xl p-8 bg-[#fffcf9] border-4 border-amber-100 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-amber-200 pb-4 shrink-0">
               <h2 className="text-2xl font-black text-[#5d4037] flex items-center gap-2 uppercase tracking-widest"><TrendingUp size={24} /> Chocolate Master Analytics</h2>
-              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", price: "" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
+              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-hidden">
@@ -3957,7 +4423,7 @@ export default function Dashboard() {
                   const data = {
                     name: newChocForm.name,
                     retailPrice: Number(newChocForm.retailPrice),
-                    wholesalePrice: Number(newChocForm.wholesalePrice),
+                    wholesalePrice: parseFloat(newChocForm.wholesalePrice) || 0,
                     costPrice: 0
                   };
                   if (editChocId) {
@@ -3975,7 +4441,7 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-black text-amber-800 uppercase mb-1">Wholesale Price</label>
-                      <input required type="number" value={newChocForm.wholesalePrice} onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 18" />
+                      <input required type="number" step="any" value={newChocForm.wholesalePrice} onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 18.50" />
                     </div>
                     <div>
                       <label className="block text-xs font-black text-amber-800 uppercase mb-1">Retail Price</label>
@@ -3987,7 +4453,7 @@ export default function Dashboard() {
                   </button>
 
                   {editChocId && (
-                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", price: "" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
+                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
                   )}
                 </form>
               </div>
@@ -4031,9 +4497,8 @@ export default function Dashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <OrderInvoiceView
-              order={{
-                ...selectedOrderForInvoice,
-                totalPrice: calculatePriceInfo(
+              order={(() => {
+                const invoicePriceData = calculatePriceInfo(
                   selectedOrderForInvoice.chocolate,
                   selectedOrderForInvoice.count,
                   selectedOrderForInvoice.discount,
@@ -4043,9 +4508,18 @@ export default function Dashboard() {
                   customPricesMap,
                   selectedOrderForInvoice.manualDeliveryFee,
                   selectedOrderForInvoice.orderStatus,
-                  managedChocPricesMap
-                ).totalPrice
-              }}
+                  managedChocPricesMap,
+                  selectedOrderForInvoice.pricingType,
+                  selectedOrderForInvoice.manualProductPrice
+                );
+                return {
+                  ...selectedOrderForInvoice,
+                  totalPrice: invoicePriceData.fullTotalPrice,
+                  totalOrderPrice: invoicePriceData.fullTotalPrice,
+                  itemSubtotal: invoicePriceData.fullChocolatePrice,
+                  calculatedDeliveryFee: invoicePriceData.fullDeliveryCharge
+                };
+              })()}
               onClose={() => setIsInvoiceOpen(false)}
             />
           </div>
@@ -4084,14 +4558,14 @@ export default function Dashboard() {
                       const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
                       const qty = Number(order.count || 0);
                       chocs.forEach(c => {
-                        totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length;
+                        totalCost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1);
                       });
                     } else {
                       // For products, assume 70% of price is cost if not defined
                       totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
                     }
 
-                    const profit = priceInfo.revenue - totalCost;
+                    const profit = priceInfo.fullTotalPrice - totalCost;
 
                     return (
                       <tr key={order.fireId} className="border-b border-emerald-50 hover:bg-emerald-50/30 transition-colors">
@@ -4099,7 +4573,7 @@ export default function Dashboard() {
                         <td className="p-4 text-xs font-black text-emerald-800">{getSerial(order.id)}</td>
                         <td className="p-4 text-sm font-bold text-gray-800">{order.name}</td>
                         <td className="p-4 text-sm font-black text-center text-emerald-700">{order.count}</td>
-                        <td className="p-4 text-sm font-black text-right text-green-700">₹{priceInfo.revenue.toLocaleString()}</td>
+                        <td className="p-4 text-sm font-black text-right text-green-700">₹{priceInfo.fullTotalPrice.toLocaleString()}</td>
                         <td className="p-4 text-sm font-bold text-right text-red-600">₹{Math.round(totalCost).toLocaleString()}</td>
                         <td className={`p-4 text-sm font-black text-right ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>₹{Math.round(profit).toLocaleString()}</td>
                       </tr>
@@ -4121,7 +4595,7 @@ export default function Dashboard() {
                   if (order.category !== 'product') {
                     const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
                     const qty = Number(order.count || 0);
-                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length; });
+                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1); });
                   } else {
                     totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
                   }
@@ -4135,7 +4609,7 @@ export default function Dashboard() {
                   if (order.category !== 'product') {
                     const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
                     const qty = Number(order.count || 0);
-                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / chocs.length; });
+                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1); });
                   } else {
                     totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
                   }
@@ -4164,7 +4638,7 @@ export default function Dashboard() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-xs font-black text-gray-500 uppercase tracking-wider">Message Content</label>
-                  <button 
+                  <button
                     onClick={() => {
                       if (whatsAppOrder) {
                         setWhatsAppMessage(generateWhatsAppMessage(whatsAppOrder));

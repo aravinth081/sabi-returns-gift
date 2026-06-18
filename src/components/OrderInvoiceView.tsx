@@ -12,6 +12,8 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
   // Pricing Logic matching Dashboard
   const discountAmount = Number(order.discount) || 0;
+  const deliveryCharge = Number(order.calculatedDeliveryFee) || 0;
+  const itemSubtotal = Number(order.itemSubtotal) || 0;
   const finalTotal = Number(order.totalOrderPrice || order.totalPrice) || 0;
   const totalQty = Number(order.count) || 1;
   const advancePaid = Number(order.advanceAmount) || 0;
@@ -21,12 +23,9 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
   const items = String(order.chocolate || 'Gift Item').split(',').map(item => item.trim()).filter(Boolean);
   const itemCount = items.length;
 
-  // Calculate subtotal and unit prices
-  // In Dashboard, totalPrice = (unitPrice * qty) + delivery - discount
-  // We'll assume delivery is 0 for simplicity in the item list, or included in the first item
-  const subTotal = finalTotal + discountAmount;
-  const avgRateAfterDiscount = finalTotal / totalQty;
-  const avgRateBeforeDiscount = subTotal / totalQty;
+  // Calculate unit price from item subtotal
+  const unitPrice = totalQty > 0 ? itemSubtotal / totalQty : 0;
+
 
   const numberToWords = (num: number) => {
     if (num === 0) return 'INR Zero Only';
@@ -212,15 +211,11 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
           </thead>
           <tbody>
             {items.map((item, index) => {
-              // Logic to distribute prices:
-              // For now, we assume the first item takes the total and the others are part of the set
-              // OR we split the total equally. Equal split is safer for "Kitkat" style lists.
-              const itemRate = avgRateAfterDiscount;
-              const itemRateBefore = avgRateBeforeDiscount;
-              const itemQty = index === 0 ? totalQty : 0; // The total qty is usually for the whole "order line"
+              const itemRate = unitPrice;
+              const itemQty = index === 0 ? totalQty : 0;
               const itemAmount = itemRate * (index === 0 ? totalQty : 0);
 
-              if (index > 0 && !order.chocolate.includes(',')) return null; // Safety check
+              if (index > 0 && !order.chocolate.includes(',')) return null;
 
               return (
                 <tr key={index} className={index === items.length - 1 ? 'border-b-2 border-black' : 'border-b border-gray-100'}>
@@ -230,11 +225,6 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
                   </td>
                   <td className="py-5 px-1 align-top text-right">
                     <p className="font-black text-[14px]">{itemRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    {discountAmount > 0 && index === 0 && (
-                      <p className="text-gray-500 text-[11px] font-bold mt-1">
-                        {itemRateBefore.toFixed(2)} (-{((discountAmount / subTotal) * 100).toFixed(2)}%)
-                      </p>
-                    )}
                   </td>
                   <td className="py-5 px-1 align-top text-center font-black text-[14px]">{index === 0 ? totalQty : '-'}</td>
                   <td className="py-5 px-1 align-top text-right font-black text-[14px]">
@@ -252,13 +242,25 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
             Total Items / Qty : {itemCount} / {totalQty}
           </div>
           <div className="w-[55%] text-right">
-            <div className="flex justify-between py-1 border-t-2 border-black items-center">
+            <div className="flex justify-between py-1 font-black text-[13px]">
+              <span>Item Subtotal</span>
+              <span>₹{itemSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            {deliveryCharge > 0 && (
+              <div className="flex justify-between py-1 font-black text-[13px] text-gray-700">
+                <span>Delivery Charge</span>
+                <span>₹{deliveryCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {discountAmount > 0 && (
+              <div className="flex justify-between py-1 font-black text-[13px] text-red-600">
+                <span>Discount</span>
+                <span>-₹{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            <div className="flex justify-between py-1 border-t-2 border-black items-center mt-1">
               <span className="font-black text-[20px]">Total</span>
               <span className="font-black text-[24px]">₹{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between py-1 font-black text-[14px]">
-              <span>Total Discount</span>
-              <span>₹{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
             {advancePaid > 0 && (
               <div className="flex justify-between py-1 font-black text-[14px] text-green-700">
