@@ -17,9 +17,6 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign
-
-
-
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -254,7 +251,7 @@ const ChocolateSingleSelect = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner flex justify-between items-center text-left cursor-pointer"
+        className="w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner flex justify-between items-center text-left text-sm cursor-pointer"
       >
         <span className="truncate pr-2">
           {value ? `${value}${priceSuffix}` : placeholderText}
@@ -308,6 +305,7 @@ const ChocolateSingleSelect = ({
 
 export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -426,7 +424,26 @@ export default function Dashboard() {
       }
     });
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); };
+    const unsubTrash = onSnapshot(collection(db, "trash_orders"), (snapshot) => {
+      const trashList = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      trashList.sort((a: any, b: any) => (b.deletedAt || 0) - (a.deletedAt || 0));
+      setTrashOrders(trashList);
+
+      // Auto-cleanup items older than 30 days
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+      const cutoffTime = Date.now() - thirtyDaysInMs;
+      trashList.forEach(async (item: any) => {
+        if (item.deletedAt && item.deletedAt < cutoffTime) {
+          try {
+            await deleteDoc(doc(db, "trash_orders", item.fireId));
+          } catch (e) {
+            console.error("Failed to auto-cleanup old trash item:", e);
+          }
+        }
+      });
+    });
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -444,6 +461,26 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
+
+  const [showSidebarHighlight, setShowSidebarHighlight] = useState(true);
+
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const sidebar = document.querySelector('aside');
+      const toggleBtn = document.querySelector('[title="Toggle Menu"]');
+      if (
+        sidebar &&
+        !sidebar.contains(e.target as Node) &&
+        (!toggleBtn || !toggleBtn.contains(e.target as Node))
+      ) {
+        setShowSidebarHighlight(false);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, []);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -555,8 +592,11 @@ export default function Dashboard() {
 
 
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
+  const [showCheckboxes, setShowCheckboxes] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [trashOrders, setTrashOrders] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isExportPreviewOpen, setIsExportPreviewOpen] = useState(false);
   const [isReportPreviewOpen, setIsReportPreviewOpen] = useState(false);
@@ -1103,6 +1143,17 @@ export default function Dashboard() {
       try {
         const selectedFireOrders = orders.filter(o => selectedOrders.includes(o.id));
         for (const order of selectedFireOrders) {
+          try {
+            const trashOrder = {
+              ...order,
+              deletedAt: Date.now(),
+              deletedBy: loggedInName
+            };
+            delete (trashOrder as any).fireId;
+            await addDoc(collection(db, "trash_orders"), trashOrder);
+          } catch (err) {
+            console.error("Failed to copy bulk order to trash:", err);
+          }
           await deleteDoc(doc(db, "orders", order.fireId));
         }
         setSelectedOrders([]);
@@ -1265,8 +1316,44 @@ export default function Dashboard() {
     if (window.confirm("Are you sure you want to delete this record?")) {
       const order = orders.find(o => o.id === id);
       if (order) {
+        try {
+          const trashOrder = {
+            ...order,
+            deletedAt: Date.now(),
+            deletedBy: loggedInName
+          };
+          delete (trashOrder as any).fireId;
+          await addDoc(collection(db, "trash_orders"), trashOrder);
+        } catch (err) {
+          console.error("Failed to copy order to trash:", err);
+        }
         await deleteDoc(doc(db, "orders", order.fireId));
         setSelectedOrders(selectedOrders.filter(selectedId => selectedId !== id));
+      }
+    }
+  };
+
+  const handleRestoreTrashOrder = async (order: any) => {
+    try {
+      const restoredOrder = { ...order };
+      const trashFireId = restoredOrder.fireId;
+      delete restoredOrder.deletedAt;
+      delete restoredOrder.deletedBy;
+      delete restoredOrder.fireId;
+
+      await addDoc(collection(db, "orders"), restoredOrder);
+      await deleteDoc(doc(db, "trash_orders", trashFireId));
+    } catch (err) {
+      console.error("Restore failed:", err);
+    }
+  };
+
+  const handleDeleteTrashOrderPermanently = async (fireId: string) => {
+    if (window.confirm("Are you sure you want to permanently delete this record from Trash? This cannot be undone.")) {
+      try {
+        await deleteDoc(doc(db, "trash_orders", fireId));
+      } catch (err) {
+        console.error("Permanent deletion failed:", err);
       }
     }
   };
@@ -1693,22 +1780,26 @@ export default function Dashboard() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoggingIn) return;
 
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
 
     // 🛠️ FIX: "Subash G" ku bathila "subash g" nu mathunga
     if (inputUser === "subash g" && inputPass === "561997") {
-      setRole('Admin');
-      setLoggedInName('Subash');
-      setIsLoggedIn(true);
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('loggedInName', 'Subash');
-      localStorage.setItem('role', 'Admin');
-      setLoginError("");
+      setIsLoggingIn(true);
+      setTimeout(() => {
+        setRole('Admin');
+        setLoggedInName('Subash');
+        setIsLoggedIn(true);
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('loggedInName', 'Subash');
+        localStorage.setItem('role', 'Admin');
+        setLoginError("");
+        setIsLoggingIn(false);
+      }, 2000);
       return;
     }
-    // ... bakki code ...
 
     const emp = employees.find(
       (emp) => emp.username.toLowerCase() === inputUser && emp.password === inputPass
@@ -1716,13 +1807,17 @@ export default function Dashboard() {
 
     if (emp) {
       if (emp.status === 'Approved') {
-        setRole('Employee');
-        setLoggedInName(emp.name);
-        setIsLoggedIn(true);
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('loggedInName', emp.name);
-        localStorage.setItem('role', 'Employee');
-        setLoginError("");
+        setIsLoggingIn(true);
+        setTimeout(() => {
+          setRole('Employee');
+          setLoggedInName(emp.name);
+          setIsLoggedIn(true);
+          localStorage.setItem('isLoggedIn', 'true');
+          localStorage.setItem('loggedInName', emp.name);
+          localStorage.setItem('role', 'Employee');
+          setLoginError("");
+          setIsLoggingIn(false);
+        }, 2000);
       } else {
         setLoginError("Your account is still pending approval or declined.");
       }
@@ -1740,6 +1835,62 @@ export default function Dashboard() {
     localStorage.removeItem('loggedInName');
     localStorage.removeItem('role');
   };
+
+  if (isLoggingIn) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#2d1b14] relative overflow-hidden">
+        {/* Decorative background radial gradient */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#5e3827] via-[#2d1b14] to-[#1a0f0b] opacity-80 animate-pulse" style={{ animationDuration: '6s' }}></div>
+        
+        {/* Animated ambient light spots */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#8b5a3e] rounded-full blur-[120px] opacity-20 animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#7c4d36] rounded-full blur-[120px] opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
+
+        <div className="relative z-10 w-full max-w-sm flex flex-col items-center p-8 text-center">
+          {/* Logo container with animated glow and pulse border */}
+          <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
+            {/* Spinning/glowing gradient border */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#8b5a3e] via-[#e8dccb] to-[#4a2c1d] animate-spin" style={{ animationDuration: '3s' }}></div>
+            {/* Outer pulse */}
+            <div className="absolute -inset-2 rounded-full border border-amber-500/20 animate-ping" style={{ animationDuration: '2s' }}></div>
+            {/* Inner mask to keep image circular */}
+            <div className="absolute inset-[4px] rounded-full overflow-hidden bg-[#2d1b14] border-4 border-[#2d1b14]">
+              <img 
+                src="/logo.jpeg" 
+                alt="Logo" 
+                className="w-full h-full object-cover select-none"
+                onError={(e) => {
+                  // Fallback icon if logo fails to load
+                  e.currentTarget.style.display = 'none';
+                  const fb = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                  if (fb) fb.classList.remove('hidden');
+                }}
+              />
+              <div className="fallback-icon hidden w-full h-full flex items-center justify-center bg-[#4a2c1d] text-amber-100">
+                <span className="text-3xl font-black">RC</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SaaS-style loading text and dynamic progress */}
+          <div className="space-y-4 w-full">
+            <h3 className="text-xl font-bold text-amber-100 tracking-wider animate-pulse">
+              Authenticating...
+            </h3>
+            
+            {/* Continuous loading bar */}
+            <div className="w-48 h-1.5 bg-[#4a2c1d]/50 rounded-full overflow-hidden mx-auto border border-[#8b5a3e]/20 relative">
+              <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-[#8b5a3e] to-[#e8dccb] rounded-full animate-loading-bar"></div>
+            </div>
+            
+            <p className="text-sm font-semibold text-[#a8826d] tracking-widest uppercase animate-pulse">
+              loading
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -1848,66 +1999,73 @@ export default function Dashboard() {
 
       <aside className={`bg-slate-50 border-r border-blue-100 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0 border-none'}`}>
         <div className="w-56 h-full flex flex-col justify-between">
-          <div>
-            <div className={`p-8 flex flex-col items-center border-b border-blue-200 relative`}>
+          <div className="overflow-y-auto flex-1 select-none">
+            <div className={`p-6 flex flex-col items-center border-b border-blue-200 relative`}>
               <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 md:hidden p-1 text-blue-600 hover:bg-blue-50 rounded-lg">
                 <X size={20} />
               </button>
-              <div className="relative w-28 h-28 mb-4 rounded-full p-1.5 bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900 shadow-[0_8px_20px_rgba(30,58,138,0.4)] flex items-center justify-center">
+              <div className="relative w-20 h-20 mb-3 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900 shadow-[0_6px_12px_rgba(30,58,138,0.35)] flex items-center justify-center">
                 <div className="w-full h-full rounded-full border-[3px] border-white overflow-hidden bg-blue-50 shadow-inner">
                   <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
 
-              <h2 className={`font-black text-3xl text-blue-900 tracking-wide`} style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,1)" }}>
+              <h2 className={`font-black text-2xl text-blue-900 tracking-wide`} style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" }}>
                 {loggedInName}
               </h2>
 
               {role === 'Admin' && (
-                <span className={`text-xs text-white font-black px-5 py-1.5 rounded-full mt-2 border border-blue-400 bg-gradient-to-r from-blue-500 to-blue-700 shadow-[0_4px_6px_rgba(0,0,0,0.2),inset_0_2px_4px_rgba(255,255,255,0.3)]`} style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.6)" }}>
+                <span className={`text-xs text-white font-black px-4 py-1.5 rounded-full mt-2 border border-blue-400 bg-gradient-to-r from-blue-500 to-blue-700 shadow-[0_3px_6px_rgba(0,0,0,0.2)]`}>
                   Admin
                 </span>
               )}
             </div>
 
-            <nav className="p-4 space-y-3 mt-4">
+            <nav className="p-4 space-y-2.5 mt-3">
               <button
-                onClick={() => { setActiveTab('dashboard1'); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-300 ${activeTab === 'dashboard1' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Home size={20} className={activeTab === 'dashboard1' ? 'drop-shadow-md' : ''} />
-                <span style={activeTab === 'dashboard1' ? { textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" } : {}}>Dashboard 1</span>
+                onClick={() => { setActiveTab('dashboard1'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard1' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <Home size={18} className={showSidebarHighlight && activeTab === 'dashboard1' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'dashboard1' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Dashboard 1</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('dashboard2'); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-300 ${activeTab === 'dashboard2' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Package size={20} className={activeTab === 'dashboard2' ? 'drop-shadow-md' : ''} />
-                <span style={activeTab === 'dashboard2' ? { textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" } : {}}>Dashboard 2</span>
+                onClick={() => { setActiveTab('dashboard2'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard2' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <Package size={18} className={showSidebarHighlight && activeTab === 'dashboard2' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'dashboard2' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Dashboard 2</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('inventories'); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-300 ${activeTab === 'inventories' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Archive size={20} className={activeTab === 'inventories' ? 'drop-shadow-md' : ''} />
-                <span style={activeTab === 'inventories' ? { textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" } : {}}>Inventories</span>
+                onClick={() => { setActiveTab('inventories'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'inventories' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <Archive size={18} className={showSidebarHighlight && activeTab === 'inventories' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'inventories' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Inventories</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('tracking'); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-300 ${activeTab === 'tracking' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <MapPin size={20} className={activeTab === 'tracking' ? 'drop-shadow-md' : ''} />
-                <span style={activeTab === 'tracking' ? { textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" } : {}}>Orders Tracking</span>
+                onClick={() => { setActiveTab('tracking'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'tracking' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <MapPin size={18} className={showSidebarHighlight && activeTab === 'tracking' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'tracking' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Orders Tracking</span>
               </button>
+
               <button
-                onClick={() => { setActiveTab('reports'); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-300 ${activeTab === 'reports' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <TrendingUp size={20} className={activeTab === 'reports' ? 'drop-shadow-md' : ''} />
-                <span style={activeTab === 'reports' ? { textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" } : {}}>Reports</span>
+                onClick={() => { setActiveTab('reports'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'reports' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'reports' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Reports</span>
               </button>
             </nav>
           </div>
 
-          <div className="p-4 border-t border-blue-100">
+          <div className="p-4 border-t border-blue-100 space-y-2">
+            <button
+              onClick={() => setIsTrashOpen(true)}
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
+            >
+              <Trash2 size={18} /> Trash Bin
+            </button>
             <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-rose-600 bg-gradient-to-r from-rose-50/70 to-blue-50/40 border border-rose-100/70 hover:from-rose-500 hover:to-rose-600 hover:text-white hover:border-rose-600 hover:shadow-[0_8px_16px_rgba(244,63,94,0.2)] active:scale-95 font-black transition-all duration-300 shadow-sm cursor-pointer"
@@ -2325,6 +2483,22 @@ export default function Dashboard() {
                         Search
                       </label>
 
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-black tracking-wider uppercase text-amber-600 hover:text-amber-800 transition-colors print:hidden bg-white border border-amber-200 px-2.5 h-8 rounded-xl shadow-sm hover:bg-amber-50">
+                        <input
+                          type="checkbox"
+                          checked={showCheckboxes}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setShowCheckboxes(checked);
+                            if (!checked) {
+                              setSelectedOrders([]);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                        />
+                        Checkbox
+                      </label>
+
                       {showSearch && (
                         <div className="relative animate-in fade-in slide-in-from-left-2 duration-300 w-40 sm:w-48 md:w-56">
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
@@ -2341,19 +2515,19 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto print:hidden">
-                    {selectedOrders.length > 0 && (
-                      <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 animate-in fade-in zoom-in duration-200">
-                        <span className="text-sm font-bold text-amber-800 hidden sm:inline">{selectedOrders.length} Selected:</span>
-                        <select onChange={(e) => { if (e.target.value) handleBulkAction(e.target.value); e.target.value = ''; }} className="text-sm font-bold p-1.5 rounded border border-amber-300 bg-white text-amber-900 outline-none cursor-pointer">
-                          <option value="">Change Status...</option>
-                          <optgroup label="Delivery"><option value="Delivered">Mark Delivered</option><option value="In Process">Mark In Process</option></optgroup>
-                          <optgroup label="Payment"><option value="Full Paid">Mark Full Paid</option><option value="Partially Paid">Mark Partially Paid</option><option value="Pending">Mark Pending</option></optgroup>
-                        </select>
-                        <button onClick={handleBulkDelete} className="text-red-500 hover:bg-red-100 p-1.5 rounded transition-colors" title="Delete Selected"><Trash2 size={18} /></button>
-                      </div>
-                    )}
+                  {selectedOrders.length > 0 && (
+                    <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 animate-in fade-in zoom-in duration-200 shadow-sm shrink-0">
+                      <span className="text-sm font-bold text-amber-800 hidden sm:inline">{selectedOrders.length} Selected:</span>
+                      <select onChange={(e) => { if (e.target.value) handleBulkAction(e.target.value); e.target.value = ''; }} className="text-sm font-bold p-1.5 rounded border border-amber-300 bg-white text-amber-900 outline-none cursor-pointer">
+                        <option value="">Change Status...</option>
+                        <optgroup label="Delivery"><option value="Delivered">Mark Delivered</option><option value="In Process">Mark In Process</option></optgroup>
+                        <optgroup label="Payment"><option value="Full Paid">Mark Full Paid</option><option value="Partially Paid">Mark Partially Paid</option><option value="Pending">Mark Pending</option></optgroup>
+                      </select>
+                      <button onClick={handleBulkDelete} className="text-red-500 hover:bg-red-100 p-1.5 rounded transition-colors" title="Delete Selected"><Trash2 size={18} /></button>
+                    </div>
+                  )}
 
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto print:hidden">
                     <input
                       type="file"
                       accept=".xlsx, .xls"
@@ -2406,7 +2580,7 @@ export default function Dashboard() {
                   <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-0' : 'min-w-[1450px]'}`}>
                     <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
                       <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
-                        {!isScreenshotMode && (
+                        {!isScreenshotMode && showCheckboxes && (
                           <th className="py-3 px-4 w-12 text-center print:hidden align-top">
                             <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                           </th>
@@ -2683,14 +2857,19 @@ export default function Dashboard() {
 
                           return (
                             <tr key={order.fireId || order.id} className={`border-b transition-colors border-amber-50 hover:bg-orange-50/50 print:border-gray-200 ${isSelected ? 'bg-amber-50/80 print:bg-transparent' : ''}`}>
-                              {!isScreenshotMode && (
+                              {!isScreenshotMode && showCheckboxes && (
                                 <td className="py-2.5 px-4 text-center print:hidden align-middle">
                                   <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                                 </td>
                               )}
                               {!isScreenshotMode && (
                                 <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
-                                  {!hiddenCols.serialNo && getSerial(order.id)}
+                                  {!hiddenCols.serialNo && (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 shrink-0 print:hidden" />
+                                      <span>{getSerial(order.id)}</span>
+                                    </div>
+                                  )}
                                 </td>
                               )}
                               {!isScreenshotMode && (
@@ -3714,121 +3893,226 @@ export default function Dashboard() {
           onClick={() => setIsModalOpen(false)}
         >
           <div
-            className={`rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#fffcf9] overflow-y-auto max-h-[90vh] border border-amber-100`}
+            className={`rounded-2xl shadow-2xl w-full max-w-[800px] p-5 bg-[#fffcf9] overflow-y-auto max-h-[95vh] border border-[#f0e6db]`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className={`text-3xl font-extrabold mb-8 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4`}>
+            <h2 className={`text-xl font-bold mb-3 text-[#5d4037] text-center tracking-wide border-b border-dashed border-[#d7ccc8] pb-2`}>
               {formData.id ? "Edit Order Details" : "Add New Order"}
             </h2>
 
             <datalist id="names-list">{uniqueNames.map((name, i) => <option key={i} value={name} />)}</datalist>
             <datalist id="phones-list">{uniquePhones.map((phone, i) => <option key={i} value={phone} />)}</datalist>
 
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Order Confirm Date</label>
-                  <input required type="date" name="orderDate" value={formData.orderDate} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
-                </div>
-
-                <div className="col-span-2">
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Customer Name</label>
-                  <input required list="names-list" type="text" name="name" value={formData.name} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter Name" />
-                </div>
-                <div className="col-span-2">
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Contact Number</label>
-                  <input required list="phones-list" type="text" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Phone Number" />
-                </div>
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Function Date</label>
-                  <input required type="date" name="functionDate" value={formData.functionDate} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
-                </div>
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Dispatch Date</label>
-                  <input required type="date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
-                </div>
-
-                {formData.category === 'product' && (
-                  <div className="col-span-2">
-                    <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Product Unit Price (₹)</label>
-                    <input type="number" name="manualProductPrice" value={formData.manualProductPrice || ''} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter price per unit" />
+            <form onSubmit={handleSave} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                {/* Column 1: Customer & Dates */}
+                <div className="space-y-3">
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Customer Name</label>
+                    <input required list="names-list" type="text" name="name" value={formData.name} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter Name" />
                   </div>
-                )}
 
-
-                <div className="col-span-2">
-                  <div className="flex justify-between items-end mb-1">
-                    <label className={`block text-sm font-bold text-[#5d4037]`}>{formData.category === 'product' ? 'Product Name' : 'Chocolate Name'}</label>
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Contact Number</label>
+                    <input required list="phones-list" type="text" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Phone Number" />
                   </div>
-                  <ChocolateSingleSelect
-                    value={formData.chocolate}
-                    onChange={(val) => setFormData({ ...formData, chocolate: val })}
-                    suggestions={formData.category === 'product' ? customProducts.map(p => p.name) : uniqueChocolates}
-                    pricesMap={formData.category === 'product' ? customPricesMap : managedChocPricesMap}
-                    placeholderText={formData.category === 'product' ? "Select product..." : "Select chocolate..."}
-                  />
-                </div>
 
-                <div className="col-span-2">
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Address (Optional)</label>
-                  <textarea name="address" value={formData.address} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner resize-none`} placeholder="Enter delivery address..." rows={2} />
-                </div>
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Order Confirm Date</label>
+                    <input required type="date" name="orderDate" value={formData.orderDate} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
+                  </div>
 
-                {/* 🟢 CONDITIONALLY HIDE ORDER TYPE FOR DASHBOARD 2 */}
-                {formData.category !== 'product' && (
-                  <div className="col-span-2">
-                    <label className={`block text-sm font-bold mb-2 text-[#5d4037]`}>Order Type</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-4 py-2 rounded-xl focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm">
-                        <input type="radio" name="orderType" value="Self" checked={formData.orderType === "Self"} onChange={handleInputChange} className="w-4 h-4 accent-[#8d6e63]" />
-                        Self
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-4 py-2 rounded-xl focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm">
-                        <input type="radio" name="orderType" value="Others" checked={formData.orderType === "Others"} onChange={handleInputChange} className="w-4 h-4 accent-[#8d6e63]" />
-                        Others
-                      </label>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Function Date</label>
+                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Dispatch Date</label>
+                    <div>
+                      <input required type="date" name="functionDate" value={formData.functionDate} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
+                    </div>
+                    <div>
+                      <input required type="date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
                     </div>
                   </div>
-                )}
 
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Count (Quantity)</label>
-                  <input required type="number" name="count" value={formData.count} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Quantity" />
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Address (Optional)</label>
+                    <textarea name="address" value={formData.address} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner resize-none`} placeholder="Enter delivery address..." rows={2} />
+                  </div>
                 </div>
 
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Discount Amount</label>
-                  <input type="number" list="discount-suggestions" name="discount" value={formData.discount || ''} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Eg. 50" />
+                {/* Column 2: Order Details */}
+                <div className="space-y-3">
+                  {formData.category === 'product' && (
+                    <div>
+                      <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Product Unit Price (₹)</label>
+                      <input type="number" name="manualProductPrice" value={formData.manualProductPrice || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter price per unit" />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>{formData.category === 'product' ? 'Product Name' : 'Chocolate Name'}</label>
+                    <ChocolateSingleSelect
+                      value={formData.chocolate}
+                      onChange={(val) => setFormData({ ...formData, chocolate: val })}
+                      suggestions={formData.category === 'product' ? customProducts.map(p => p.name) : uniqueChocolates}
+                      pricesMap={formData.category === 'product' ? customPricesMap : managedChocPricesMap}
+                      placeholderText={formData.category === 'product' ? "Select product..." : "Select chocolate..."}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Count (Quantity)</label>
+                    <input required type="number" name="count" value={formData.count} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Quantity" />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Discount Amount</label>
+                    <input type="number" list="discount-suggestions" name="discount" value={formData.discount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Eg. 50" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>
+                      Delivery Charge (₹)
+                    </label>
+                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>
+                      Chennai
+                    </label>
+                    <div>
+                      <input type="number" name="manualDeliveryFee" value={formData.manualDeliveryFee} onChange={handleInputChange} className={`w-full font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-sm`} placeholder={formData.category === 'product' ? 'Eg. 100' : `${Number(formData.count) > 99 ? '200' : '150'}`} />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center h-[40px] bg-white border-2 border-[#d7ccc8] rounded-lg px-2 focus-within:border-[#8d6e63] shadow-inner">
+                        <label className="flex items-center gap-1.5 cursor-pointer w-full font-bold text-[#5d4037] text-[10px] uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={formData.isChennai || false}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const newFormData = { ...formData, isChennai: checked };
+                              const priceData = calculatePriceInfo(
+                                newFormData.chocolate,
+                                newFormData.count,
+                                newFormData.discount,
+                                newFormData.isDeliveryFree || checked,
+                                newFormData.paymentStatus,
+                                newFormData.category,
+                                customPricesMap,
+                                newFormData.manualDeliveryFee,
+                                newFormData.orderStatus,
+                                managedChocPricesMap,
+                                newFormData.pricingType,
+                                newFormData.manualProductPrice
+                              );
+                              const currentAdvance = Number(newFormData.advanceAmount);
+                              if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+                                newFormData.paymentStatus = 'Full Paid';
+                              } else if (currentAdvance > 0) {
+                                newFormData.paymentStatus = 'Partially Paid';
+                              } else {
+                                newFormData.paymentStatus = 'Pending';
+                              }
+                              setFormData(newFormData);
+                            }}
+                            className="w-4 h-4 accent-[#8d6e63] cursor-pointer"
+                          />
+                          Chennai
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {formData.category !== 'product' && (
+                    <div>
+                      <label className={`block text-[11px] font-black uppercase tracking-wider mb-1.5 text-[#5d4037]`}>Order Type</label>
+                      <div className="flex gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
+                          <input type="radio" name="orderType" value="Self" checked={formData.orderType === "Self"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
+                          Self
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
+                          <input type="radio" name="orderType" value="Others" checked={formData.orderType === "Others"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
+                          Others
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* 🟢 Delivery Fee Field - visible for all categories */}
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>
-                    Delivery Charge (₹)
-                    {formData.category !== 'product' && (
-                      <span className="text-xs font-medium text-amber-600 ml-1">(Default)</span>
+                {/* Column 3: Payment & Summary */}
+                <div className="space-y-3">
+                  {formData.category !== 'product' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider mb-1 text-[#5d4037]`}>Payment Status</label>
+                        <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleInputChange} className={`w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-xs`}>
+                          <option value="Pending">Pending</option>
+                          <option value="Partially Paid">Part. Paid</option>
+                          <option value="Full Paid">Full Paid</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider mb-1 text-[#5d4037]`}>Delivery Status</label>
+                        <select required name="status" value={formData.status} onChange={handleInputChange} className={`w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-xs`}>
+                          <option value="In Process">In Process</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {formData.category !== 'product' ? (
+                      <>
+                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Order Status</label>
+                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Advance Paid (₹)</label>
+                        <div>
+                          <select
+                            name="orderStatus"
+                            value={formData.orderStatus}
+                            onChange={handleInputChange}
+                            className={`w-full text-xs font-semibold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}
+                          >
+                            <option value="image edited (not paid)">I E (Not Paid)</option>
+                            <option value="forward to print (paid)">F 2 P (Paid)</option>
+                            <option value="order complete">Order Complete</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                        <div>
+                          <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Advance amount" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="col-span-2">
+                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Advance Amount Paid (₹)</label>
+                        <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter advance amount paid" />
+                      </div>
                     )}
-                  </label>
-                  <input type="number" name="manualDeliveryFee" value={formData.manualDeliveryFee} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} placeholder={formData.category === 'product' ? 'Eg. 100' : `${Number(formData.count) > 99 ? '200' : '150'}`} />
-                </div>
+                  </div>
 
-                <div>
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>
-                    Chennai
-                  </label>
-                  <div className="flex items-center h-[46px] bg-white border-2 border-[#d7ccc8] rounded-xl px-3.5 focus-within:border-[#8d6e63] shadow-inner">
-                    <label className="flex items-center gap-2 cursor-pointer w-full font-bold text-[#5d4037]">
+                  <div className="bg-[#fff8e1] border-2 border-[#ffecb3] rounded-lg p-3 flex flex-col gap-1.5 shadow-sm text-xs">
+                    <div className="flex justify-between items-center font-bold text-[#5d4037]">
+                      <span>{formData.category === 'product' ? 'Products Price:' : 'Chocolates Price:'}</span>
+                      <span>₹{(liveFormPrice.fullChocolatePrice || 0).toLocaleString()}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center font-bold text-[#5d4037] border-b border-[#ffe082] pb-1">
+                      <span>Delivery Charge:</span>
+                      <span>{(formData.isDeliveryFree || formData.isChennai) ? <span className="text-green-600">Free</span> : `₹${(liveFormPrice.fullDeliveryCharge || 0).toLocaleString()}`}</span>
+                    </div>
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold text-[#5d4037]">
                       <input
                         type="checkbox"
-                        checked={formData.isChennai || false}
+                        checked={formData.isDeliveryFree || false}
                         onChange={(e) => {
                           const checked = e.target.checked;
-                          const newFormData = { ...formData, isChennai: checked };
+                          const newFormData = { ...formData, isDeliveryFree: checked };
                           const priceData = calculatePriceInfo(
                             newFormData.chocolate,
                             newFormData.count,
                             newFormData.discount,
-                            newFormData.isDeliveryFree || checked,
+                            checked || newFormData.isChennai,
                             newFormData.paymentStatus,
                             newFormData.category,
                             customPricesMap,
@@ -3848,127 +4132,35 @@ export default function Dashboard() {
                           }
                           setFormData(newFormData);
                         }}
-                        className="w-4 h-4 accent-[#8d6e63] cursor-pointer"
+                        className="accent-[#8d6e63] w-3.5 h-3.5 cursor-pointer"
                       />
-                      Chennai
+                      Delivery Free
                     </label>
+
+                    {(Number(formData.discount) || 0) > 0 && (
+                      <div className="flex justify-between items-center font-bold text-red-600 border-b border-[#ffe082] pb-1 mt-0.5">
+                        <span>Discount Applied:</span>
+                        <span>-₹{(Number(formData.discount) || 0).toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-1 mt-0.5">
+                      <span className="font-extrabold text-[#3e2723]">Total Order Price:</span>
+                      <span className="text-base font-black text-green-700">₹{(liveFormPrice.fullTotalPrice || 0).toLocaleString()}</span>
+                    </div>
+                    {Number(formData.advanceAmount) > 0 && (
+                      <div className="flex justify-between items-center font-bold text-blue-700 border-t border-[#ffe082] pt-1 mt-0.5">
+                        <span>Advance Paid:</span>
+                        <span>₹{Number(formData.advanceAmount).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1.5">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className={`flex-1 px-3 py-2 rounded-lg font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors text-xs`} fire-id="cancel-btn">Cancel</button>
+                    <button type="submit" className={`flex-1 px-3 py-2 rounded-lg font-bold text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 text-xs`}>Save Order</button>
                   </div>
                 </div>
-
-                {/* Pricing Type hidden from UI per requirement */}
-
-                {formData.category !== 'product' && (
-                  <>
-                    <div>
-                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Payment Status</label>
-                      <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
-                        <option value="Pending">Pending</option>
-                        <option value="Partially Paid">Partially Paid</option>
-                        <option value="Full Paid">Full Paid</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Delivery Status</label>
-                      <select required name="status" value={formData.status} onChange={handleInputChange} className={`w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}>
-                        <option value="In Process">In Process</option>
-                        <option value="Delivered">Delivered</option>
-                      </select>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Order Status</label>
-                      <select
-                        name="orderStatus"
-                        value={formData.orderStatus}
-                        onChange={handleInputChange}
-                        className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}
-                      >
-                        <option value="image edited (not paid)">I E (Not Paid)</option>
-                        <option value="forward to print (paid)">F 2 P (Paid)</option>
-                        <option value="order complete">Order Complete</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-
-
-                <div className="col-span-2">
-                  <label className={`block text-sm font-bold mb-1 text-[#5d4037]`}>Advance Amount Paid (₹)</label>
-                  <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter advance amount paid" />
-                </div>
-              </div>
-
-              <div className="bg-[#fff8e1] border-2 border-[#ffecb3] rounded-xl p-4 mt-4 flex flex-col gap-2">
-                <div className="flex justify-between items-center text-sm font-bold text-[#5d4037]">
-                  <span>{formData.category === 'product' ? 'Products Price:' : 'Chocolates Price:'}</span>
-                  <span>₹{(liveFormPrice.fullChocolatePrice || 0).toLocaleString()}</span>
-                </div>
-
-                <div className="flex justify-between items-center text-sm font-bold text-[#5d4037] border-b border-[#ffe082] pb-2">
-                  <span>Delivery Charge:</span>
-                  <span>{(formData.isDeliveryFree || formData.isChennai) ? <span className="text-green-600">Free</span> : `₹${(liveFormPrice.fullDeliveryCharge || 0).toLocaleString()}`}</span>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-[#5d4037]">
-                  <input
-                    type="checkbox"
-                    checked={formData.isDeliveryFree || false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      const newFormData = { ...formData, isDeliveryFree: checked };
-                      const priceData = calculatePriceInfo(
-                        newFormData.chocolate,
-                        newFormData.count,
-                        newFormData.discount,
-                        checked || newFormData.isChennai,
-                        newFormData.paymentStatus,
-                        newFormData.category,
-                        customPricesMap,
-                        newFormData.manualDeliveryFee,
-                        newFormData.orderStatus,
-                        managedChocPricesMap,
-                        newFormData.pricingType,
-                        newFormData.manualProductPrice
-                      );
-                      const currentAdvance = Number(newFormData.advanceAmount);
-                      if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
-                        newFormData.paymentStatus = 'Full Paid';
-                      } else if (currentAdvance > 0) {
-                        newFormData.paymentStatus = 'Partially Paid';
-                      } else {
-                        newFormData.paymentStatus = 'Pending';
-                      }
-                      setFormData(newFormData);
-                    }}
-                    className="accent-[#8d6e63] w-4 h-4 cursor-pointer"
-                  />
-                  Delivery Free
-                </label>
-
-                {(Number(formData.discount) || 0) > 0 && (
-                  <div className="flex justify-between items-center text-sm font-bold text-red-600 border-b border-[#ffe082] pb-2 mt-1">
-                    <span>Discount Applied:</span>
-                    <span>-₹{(Number(formData.discount) || 0).toLocaleString()}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center pt-2 mt-1">
-                  <span className="font-extrabold text-[#3e2723]">Total Order Price:</span>
-                  <span className="text-2xl font-black text-green-700">₹{(liveFormPrice.fullTotalPrice || 0).toLocaleString()}</span>
-                </div>
-                {Number(formData.advanceAmount) > 0 && (
-                  <div className="flex justify-between items-center text-sm font-bold text-blue-700 border-t border-[#ffe082] pt-2">
-                    <span>Advance Paid:</span>
-                    <span>₹{Number(formData.advanceAmount).toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className={`flex-1 px-4 py-3 rounded-xl font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors`}>Cancel</button>
-                <button type="submit" className={`flex-1 px-4 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-lg hover:shadow-xl transition-all hover:-translate-y-1`}>Save Order</button>
               </div>
             </form>
           </div>
@@ -4233,6 +4425,135 @@ export default function Dashboard() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 TRASH MODAL */}
+      {isTrashOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
+          onClick={() => setIsTrashOpen(false)}
+        >
+          <div
+            className="rounded-2xl shadow-2xl w-full max-w-4xl p-6 bg-[#fffcf9] overflow-y-auto max-h-[90vh] border border-[#f0e6db] relative flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsTrashOpen(false)}
+              className="absolute top-4 right-4 p-2 text-[#8d6e63] hover:bg-amber-50 hover:text-[#5d4037] rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-2 pb-3 border-b border-[#d7ccc8]">
+              <Trash2 size={24} className="text-red-600" />
+              <h2 className="text-xl font-bold text-[#5d4037]">Trash Bin</h2>
+            </div>
+
+            {/* Banner/Info message */}
+            <div className="bg-[#fff8e1] border border-[#ffe082] rounded-xl p-3 flex items-start gap-2.5 shadow-sm text-[#5d4037] text-xs">
+              <span className="shrink-0 text-amber-600 font-bold">ℹ️</span>
+              <div>
+                <p className="font-extrabold">Auto-Cleanup Policy</p>
+                <p className="font-medium text-amber-900 mt-0.5">
+                  All deleted orders are temporarily moved here. Items in the trash are automatically deleted forever after <strong>30 days</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Trash Orders Table */}
+            <div className="overflow-x-auto rounded-xl border-2 border-[#d7ccc8] bg-white">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-amber-50 border-b-2 border-[#d7ccc8] text-[#5d4037] uppercase tracking-wider font-extrabold text-[10px]">
+                    <th className="p-3">Customer</th>
+                    <th className="p-3">Order Details</th>
+                    <th className="p-3">Deleted By</th>
+                    <th className="p-3 text-center">Time Left</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e8dccb] font-medium text-black">
+                  {trashOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-gray-500 font-bold italic">
+                        Trash is empty
+                      </td>
+                    </tr>
+                  ) : (
+                    trashOrders.map((order, idx) => {
+                      const daysLeft = 30 - Math.ceil((Date.now() - (order.deletedAt || Date.now())) / (24 * 60 * 60 * 1000));
+                      const isUrgent = daysLeft <= 5;
+                      const daysLabel = daysLeft <= 0 ? "Expired" : `${daysLeft} days remaining`;
+
+                      return (
+                        <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
+                          <td className="p-3">
+                            <div className="font-bold text-[#5d4037] text-sm">{order.name}</div>
+                            <div className="text-gray-500 font-semibold">{order.phone}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-semibold text-gray-800">{order.chocolate || order.productName || "Product"}</div>
+                            <div className="text-gray-500">
+                              Qty: <strong className="text-[#5d4037]">{order.count}</strong> | Total: <strong className="text-green-700">₹{(order.totalOrderPrice || 0).toLocaleString()}</strong>
+                            </div>
+                          </td>
+                           <td className="p-3">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                              order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
+                                ? "bg-blue-50 text-blue-700 border-blue-200" 
+                                : "bg-purple-50 text-purple-700 border-purple-200"
+                            }`}>
+                              <User size={10} />
+                              {order.deletedBy ? (
+                                order.deletedBy.match(/^(?:Admin|Employee)\s*\(([^)]+)\)$/i)?.[1] || order.deletedBy
+                              ) : "Unknown"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                              isUrgent 
+                                ? "bg-red-50 text-red-700 border-red-200 animate-pulse" 
+                                : "bg-green-50 text-green-700 border-green-200"
+                            }`}>
+                              {daysLabel}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleRestoreTrashOrder(order)}
+                                className="px-2.5 py-1.5 rounded-lg border border-green-200 text-green-700 bg-green-50 hover:bg-green-600 hover:text-white transition-all font-bold tracking-wide active:scale-95 shadow-sm uppercase text-[9px] cursor-pointer"
+                                title="Restore Order"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTrashOrderPermanently(order.fireId)}
+                                className="px-2.5 py-1.5 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-600 hover:text-white transition-all font-bold tracking-wide active:scale-95 shadow-sm uppercase text-[9px] cursor-pointer"
+                                title="Delete Permanently"
+                              >
+                                Delete Forever
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-[#d7ccc8]">
+              <button
+                onClick={() => setIsTrashOpen(false)}
+                className="px-5 py-2.5 rounded-lg font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors text-xs cursor-pointer"
+              >
+                Close Trash
+              </button>
+            </div>
           </div>
         </div>
       )}
