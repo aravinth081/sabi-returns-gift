@@ -603,7 +603,7 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Thaaru", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Self", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
 
   const [previewData, setPreviewData] = useState<any>(null);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -1278,7 +1278,7 @@ export default function Dashboard() {
 
   const handleAddClick = () => {
     const today = new Date().toISOString().split('T')[0];
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Thaaru", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Self", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setIsModalOpen(true);
   };
 
@@ -1417,7 +1417,7 @@ export default function Dashboard() {
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Thaaru", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Self", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
 
 
     } catch (err) {
@@ -2312,7 +2312,7 @@ export default function Dashboard() {
                             <option value="All">All Types</option>
                             <option value="Sabi">Sabi</option>
                             <option value="Thaaru">Thaaru</option>
-                            <option value="Self">Self</option>
+                            <option value="Self">Others</option>
                           </select>
                         </div>
                       </div>
@@ -2321,7 +2321,7 @@ export default function Dashboard() {
 
                     {tableTypeFilter !== 'All' && (
                       <p className="text-[9px] font-extrabold text-purple-600 uppercase tracking-wider -mt-2 mb-1 z-10 relative">
-                        Type: {tableTypeFilter}
+                        Type: {tableTypeFilter === 'Self' ? 'Others' : tableTypeFilter}
                       </p>
                     )}
 
@@ -2730,7 +2730,7 @@ export default function Dashboard() {
                           <th className="py-3 px-4 font-bold align-top min-w-[150px]">
                             <div className="flex items-center gap-1 group">
                               <span>Order Status</span>
-                              <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Self/Others)">
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Sabi/Thaaru/Others)">
                                 <ChevronDown size={14} className={tableTypeFilter !== 'All' ? 'text-amber-800' : 'text-amber-800/30 group-hover:text-amber-800 transition-opacity'} />
                                 <select
                                   value={tableTypeFilter}
@@ -2740,7 +2740,7 @@ export default function Dashboard() {
                                   <option value="All">All Types</option>
                                   <option value="Sabi">Sabi</option>
                                   <option value="Thaaru">Thaaru</option>
-                                  <option value="Self">Self</option>
+                                  <option value="Self">Others</option>
                                 </select>
                               </div>
                             </div>
@@ -4037,7 +4037,7 @@ export default function Dashboard() {
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
                           <input type="radio" name="orderType" value="Self" checked={formData.orderType === "Self"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
-                          Self
+                          Others
                         </label>
                       </div>
                     </div>
