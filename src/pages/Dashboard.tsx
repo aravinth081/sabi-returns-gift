@@ -1,4 +1,4 @@
-// ==========================================
+ // ==========================================
 // 5 STEPS INTEGRATION
 // Step 1: Ensure dependencies are installed -> `npm install firebase lucide-react recharts xlsx html2canvas`
 // Step 2: Verify Firebase config credentials match your Firebase Console.
@@ -486,6 +486,25 @@ export default function Dashboard() {
         isLive: false
       }).catch(err => console.error("Error setting offline on logout:", err));
     };
+  }, [role, isLoggedIn, employeeId]);
+
+  useEffect(() => {
+    if (role !== 'Employee' || !isLoggedIn || !employeeId) return;
+
+    const unsubSelf = onSnapshot(doc(db, "employees", employeeId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.status === 'Declined') {
+          alert("Your access has been revoked by the administrator.");
+          handleLogout();
+        }
+      } else {
+        alert("Your account no longer exists.");
+        handleLogout();
+      }
+    });
+
+    return () => unsubSelf();
   }, [role, isLoggedIn, employeeId]);
 
   const [showSidebarHighlight, setShowSidebarHighlight] = useState(true);
@@ -4780,7 +4799,7 @@ export default function Dashboard() {
                       <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center">
                         <div>
                           <p className="font-bold text-amber-950 text-base">{emp.name}</p>
-                          <p className="text-xs font-medium text-amber-700">Username: <span className="font-bold">{emp.username}</span></p>
+                          <p className="text-xs font-medium text-amber-700">Username: <span className="font-bold">{emp.username}</span> | Password: <span className="font-bold">{emp.password}</span></p>
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' })} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 font-bold rounded-lg hover:bg-green-200 transition-colors border border-green-300">Accept</button>
@@ -4803,32 +4822,34 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {employees.filter(e => e.status === 'Approved').map(emp => (
-                      <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-emerald-950 text-base flex items-center gap-2">
-                            {emp.name}
-                            {(() => {
-                              const isLive = emp.isLive && emp.lastActive && (Date.now() - new Date(emp.lastActive).getTime() < 90000);
-                              return isLive ? (
+                    {employees.filter(e => e.status === 'Approved').map(emp => {
+                      const isLive = emp.isLive && emp.lastActive && (Date.now() - new Date(emp.lastActive).getTime() < 90000);
+                      return (
+                        <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-emerald-950 text-base">{emp.name}</p>
+                            <p className="text-xs font-medium text-emerald-700 flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                              <span>Username: <span className="font-bold">{emp.username}</span></span>
+                              <span className="text-emerald-300">|</span>
+                              <span>Password: <span className="font-bold">{emp.password}</span></span>
+                              {isLive && (
                                 <span className="inline-flex items-center gap-1 text-[9px] bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
                                   <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live
                                 </span>
-                              ) : null;
-                            })()}
-                          </p>
-                          <p className="text-xs font-medium text-emerald-700">Username: <span className="font-bold">{emp.username}</span></p>
-                          {emp.lastLoginAt && (
-                            <p className="text-[10px] font-bold text-emerald-600 mt-1">
-                              Last login: {new Date(emp.lastLoginAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                              )}
                             </p>
-                          )}
+                            {emp.lastLoginAt && (
+                              <p className="text-[10px] font-bold text-emerald-600 mt-1">
+                                Last login: {new Date(emp.lastLoginAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined', isLive: false })} className="px-3 py-1.5 text-xs bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">Revoke Access</button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined', isLive: false })} className="px-3 py-1.5 text-xs bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">Revoke Access</button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
