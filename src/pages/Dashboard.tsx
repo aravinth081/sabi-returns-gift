@@ -463,6 +463,31 @@ export default function Dashboard() {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (role !== 'Employee' || !isLoggedIn || !employeeId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await updateDoc(doc(db, "employees", employeeId), {
+          isLive: true,
+          lastActive: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Error sending heartbeat:", err);
+      }
+    };
+
+    sendHeartbeat();
+    const intervalId = setInterval(sendHeartbeat, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+      updateDoc(doc(db, "employees", employeeId), {
+        isLive: false
+      }).catch(err => console.error("Error setting offline on logout:", err));
+    };
+  }, [role, isLoggedIn, employeeId]);
+
   const [showSidebarHighlight, setShowSidebarHighlight] = useState(true);
 
   useEffect(() => {
@@ -4783,11 +4808,14 @@ export default function Dashboard() {
                         <div>
                           <p className="font-bold text-emerald-950 text-base flex items-center gap-2">
                             {emp.name}
-                            {emp.isLive && (
-                              <span className="inline-flex items-center gap-1 text-[9px] bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live
-                              </span>
-                            )}
+                            {(() => {
+                              const isLive = emp.isLive && emp.lastActive && (Date.now() - new Date(emp.lastActive).getTime() < 90000);
+                              return isLive ? (
+                                <span className="inline-flex items-center gap-1 text-[9px] bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live
+                                </span>
+                              ) : null;
+                            })()}
                           </p>
                           <p className="text-xs font-medium text-emerald-700">Username: <span className="font-bold">{emp.username}</span></p>
                           {emp.lastLoginAt && (
