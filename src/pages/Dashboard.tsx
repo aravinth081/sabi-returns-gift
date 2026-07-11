@@ -352,7 +352,7 @@ export default function Dashboard() {
 
   const [managedChocolates, setManagedChocolates] = useState<any[]>([]);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
-  const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "" });
+  const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -396,15 +396,15 @@ export default function Dashboard() {
         });
 
         const defaults = [
-          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5 },
-          { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5 },
-          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 9, costPrice: 9.5 },
-          { name: "5 rs Peanut Candy", retailPrice: 17, wholesalePrice: 17, costPrice: 4.5 },
-          { name: "5 rs 5 Star", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5 },
-          { name: "5 rs Dairy Milk", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5 },
-          { name: "2 rs Dairymilk Shots", retailPrice: 10, wholesalePrice: 10, costPrice: 1.5 },
-          { name: "5 rs Milky Bar", retailPrice: 10, wholesalePrice: 10, costPrice: 4.5 },
-          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5 }
+          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5 },
+          { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5, stickerPrice: 1.5 },
+          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5 },
+          { name: "5 rs Peanut Candy", retailPrice: 17, wholesalePrice: 17, costPrice: 4.5, stickerPrice: 1.5 },
+          { name: "5 rs 5 Star", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5 },
+          { name: "5 rs Dairy Milk", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5 },
+          { name: "2 rs Dairymilk Shots", retailPrice: 10, wholesalePrice: 10, costPrice: 1.5, stickerPrice: 1.5 },
+          { name: "5 rs Milky Bar", retailPrice: 10, wholesalePrice: 10, costPrice: 4.5, stickerPrice: 1.5 },
+          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5, stickerPrice: 1.5 }
         ];
 
         defaults.forEach(d => addDoc(collection(db, "managed_chocolates"), d));
@@ -650,6 +650,12 @@ export default function Dashboard() {
   const managedChocCostsMap = useMemo(() => {
     const map: Record<string, number> = {};
     managedChocolates.forEach(c => map[c.name.toLowerCase()] = Number(c.costPrice || 0));
+    return map;
+  }, [managedChocolates]);
+
+  const managedChocStickersMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    managedChocolates.forEach(c => map[c.name.toLowerCase()] = Number(c.stickerPrice !== undefined ? c.stickerPrice : (c.costPrice !== undefined ? c.costPrice : 1.5)));
     return map;
   }, [managedChocolates]);
 
@@ -901,7 +907,14 @@ export default function Dashboard() {
 
       const purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
 
-      const stickerCost = count * 1.5;
+      let sumSticker = 0;
+      chocs.forEach(c => {
+        const key = c.toLowerCase();
+        sumSticker += (managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5);
+      });
+      const stickerPricePerItem = chocs.length > 0 ? sumSticker / chocs.length : 1.5;
+
+      const stickerCost = count * stickerPricePerItem;
       const labourCost = count * 1;
       const totalPurchase = purchasePricePerItem * count;
       const finalCost = stickerCost + labourCost + totalPurchase;
@@ -921,7 +934,7 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, adminDateRange, adminDateType, managedChocCostsMap]);
+  }, [orders, adminDateRange, adminDateType, managedChocCostsMap, managedChocStickersMap]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
@@ -3435,12 +3448,12 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
 
               {/* 🟢 MODIFIED HEADER: ADDED BOOK DROPDOWN AND SMALLER CLOSE BUTTON */}
-              <div className="flex justify-between items-center bg-[#f2eee6] p-4 rounded-2xl shadow-sm border border-[#d7ccc8] shrink-0 z-20 relative">
+              <div className="flex justify-between items-center bg-[#f2eee6] p-4 rounded-2xl shadow-sm border border-[#d7ccc8] shrink-0 z-40 relative">
                 <div>
                   <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
                     <TrendingUp className="text-amber-700" /> {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
                   </h2>
-                  <p className="text-sm font-medium text-amber-700 mt-1">Sticker (₹1.5) | Labour (₹1) | Order wise mapped data.</p>
+                  <p className="text-sm font-medium text-amber-700 mt-1">Sticker (Dynamic) | Labour (₹1) | Order wise mapped data.</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -3523,7 +3536,7 @@ export default function Dashboard() {
                           <th className="p-4 font-black">Chocolate Name</th>
                           <th className="p-4 font-black text-right border-l border-amber-200/50">Purch. Cost <br /><span className="text-[9px] font-bold text-amber-600">(Per Item)</span></th>
                           <th className="p-4 font-black text-center border-l border-amber-200/50">Count</th>
-                          <th className="p-4 font-black text-right border-l border-amber-200/50">Sticker Cost <br /><span className="text-[9px] font-bold text-amber-600">(Count x 1.5)</span></th>
+                          <th className="p-4 font-black text-right border-l border-amber-200/50">Sticker Cost <br /><span className="text-[9px] font-bold text-amber-600">(Count x Sticker Price)</span></th>
                           <th className="p-4 font-black text-right">Labour Cost <br /><span className="text-[9px] font-bold text-amber-600">(Count x 1)</span></th>
                           <th className="p-4 font-black text-right">Total Purchase <br /><span className="text-[9px] font-bold text-amber-600">(Cost x Count)</span></th>
                           <th className="p-4 font-black text-right bg-red-50 text-red-800 border-l border-red-200">Final Cost <br /><span className="text-[9px] font-bold text-red-600">(Sticker+Lab+Purch)</span></th>
@@ -4708,25 +4721,59 @@ export default function Dashboard() {
               <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2"><Lock className="text-amber-700" /> Approvals</h2>
               <button onClick={() => setShowApprovalPanel(false)} className="text-[#7c4d36] hover:text-[#4a2c1d]"><X size={24} /></button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              {employees.filter(e => e.status === 'Pending').length === 0 ? (
-                <p className="text-center text-amber-700 font-bold py-8">No pending requests.</p>
-              ) : (
-                <div className="space-y-4">
-                  {employees.filter(e => e.status === 'Pending').map(emp => (
-                    <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-amber-950 text-lg">{emp.name}</p>
-                        <p className="text-sm font-medium text-amber-700">Username: <span className="font-bold">{emp.username}</span></p>
+            <div className="p-6 overflow-y-auto flex-1 space-y-8 custom-scrollbar">
+              {/* SECTION 1: PENDING REQUESTS */}
+              <div>
+                <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest mb-3 pb-1 border-b border-amber-200 flex items-center justify-between">
+                  <span>Pending Requests ({employees.filter(e => e.status === 'Pending').length})</span>
+                </h3>
+                {employees.filter(e => e.status === 'Pending').length === 0 ? (
+                  <div className="bg-amber-50/40 p-4 rounded-xl border border-dashed border-amber-200 text-center text-amber-800 font-bold">
+                    No pending requests.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {employees.filter(e => e.status === 'Pending').map(emp => (
+                      <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-amber-950 text-base">{emp.name}</p>
+                          <p className="text-xs font-medium text-amber-700">Username: <span className="font-bold">{emp.username}</span></p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' })} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 font-bold rounded-lg hover:bg-green-200 transition-colors border border-green-300">Accept</button>
+                          <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' })} className="px-3 py-1.5 text-xs bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-300">Decline</button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' })} className="px-4 py-1.5 bg-green-100 text-green-700 font-bold rounded-lg hover:bg-green-200 transition-colors border border-green-300">Accept</button>
-                        <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' })} className="px-4 py-1.5 bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-300">Decline</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: APPROVED EMPLOYEES */}
+              <div>
+                <h3 className="text-sm font-black text-emerald-900 uppercase tracking-widest mb-3 pb-1 border-b border-emerald-200 flex items-center justify-between">
+                  <span>Approved Employees ({employees.filter(e => e.status === 'Approved').length})</span>
+                </h3>
+                {employees.filter(e => e.status === 'Approved').length === 0 ? (
+                  <div className="bg-emerald-50/20 p-4 rounded-xl border border-dashed border-emerald-200 text-center text-emerald-800 font-bold">
+                    No approved employees yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {employees.filter(e => e.status === 'Approved').map(emp => (
+                      <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-emerald-950 text-base">{emp.name}</p>
+                          <p className="text-xs font-medium text-emerald-700">Username: <span className="font-bold">{emp.username}</span></p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' })} className="px-3 py-1.5 text-xs bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">Revoke Access</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -4734,11 +4781,11 @@ export default function Dashboard() {
 
       {/* 🟢 MANAGED CHOCOLATES MODAL (ANALYTICS AREA) */}
       {isAnalyticsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" }); }}>
+        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" }); }}>
           <div className="rounded-[2.5rem] shadow-2xl w-full max-w-4xl p-8 bg-[#fffcf9] border-4 border-amber-100 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-amber-200 pb-4 shrink-0">
               <h2 className="text-2xl font-black text-[#5d4037] flex items-center gap-2 uppercase tracking-widest"><TrendingUp size={24} /> Chocolate Master Analytics</h2>
-              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
+              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-hidden">
@@ -4747,11 +4794,13 @@ export default function Dashboard() {
                 <h3 className="text-lg font-black text-[#8d6e63] mb-4 flex items-center gap-2"><Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}</h3>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+                  const existingChoc = editChocId ? managedChocolates.find(c => c.fireId === editChocId) : null;
                   const data = {
                     name: newChocForm.name,
                     retailPrice: Number(newChocForm.retailPrice),
                     wholesalePrice: parseFloat(newChocForm.wholesalePrice) || 0,
-                    costPrice: 0
+                    costPrice: existingChoc ? (existingChoc.costPrice || 0) : 0,
+                    stickerPrice: parseFloat(newChocForm.stickerPrice) !== undefined ? parseFloat(newChocForm.stickerPrice) : 1.5
                   };
                   if (editChocId) {
                     await updateDoc(doc(db, "managed_chocolates", editChocId), data);
@@ -4759,7 +4808,7 @@ export default function Dashboard() {
                   } else {
                     await addDoc(collection(db, "managed_chocolates"), data);
                   }
-                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" });
+                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" });
                 }} className="space-y-4">
                   <div>
                     <label className="block text-xs font-black text-amber-800 uppercase mb-1">Chocolate Name</label>
@@ -4775,12 +4824,16 @@ export default function Dashboard() {
                       <input required type="number" value={newChocForm.retailPrice} onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 20" />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-xs font-black text-amber-800 uppercase mb-1">Sticker Price</label>
+                    <input required type="number" step="any" value={newChocForm.stickerPrice} onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 1.5" />
+                  </div>
                   <button type="submit" className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
                     {editChocId ? 'Update Item' : 'Add to List'}
                   </button>
 
                   {editChocId && (
-                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
+                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
                   )}
                 </form>
               </div>
@@ -4792,13 +4845,22 @@ export default function Dashboard() {
                     <div key={choc.fireId} className="bg-white p-4 rounded-2xl border-2 border-amber-50 shadow-sm flex justify-between items-center group hover:border-amber-200 transition-all">
                       <div>
                         <p className="font-black text-amber-950">{choc.name}</p>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex flex-wrap gap-2 mt-1">
                           <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">W: ₹{choc.wholesalePrice || choc.price}</span>
                           <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold">R: ₹{choc.retailPrice || choc.price}</span>
+                          <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">S: ₹{choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)}</span>
                         </div>
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditChocId(choc.fireId); setNewChocForm({ name: choc.name, retailPrice: (choc.retailPrice || choc.price || "").toString(), wholesalePrice: (choc.wholesalePrice || choc.price || "").toString() }); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
+                        <button onClick={() => {
+                          setEditChocId(choc.fireId);
+                          setNewChocForm({
+                            name: choc.name,
+                            retailPrice: (choc.retailPrice || choc.price || "").toString(),
+                            wholesalePrice: (choc.wholesalePrice || choc.price || "").toString(),
+                            stickerPrice: (choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)).toString()
+                          });
+                        }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
 
 
                         <button onClick={() => deleteDoc(doc(db, "managed_chocolates", choc.fireId))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
