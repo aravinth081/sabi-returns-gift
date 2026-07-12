@@ -16,7 +16,7 @@ import {
 // ------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -444,7 +444,14 @@ export default function Dashboard() {
       });
     });
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); };
+    const unsubActivityLogs = onSnapshot(
+      query(collection(db, "activity_logs"), orderBy("timestamp", "desc")),
+      (snapshot) => {
+        setActivityLogs(snapshot.docs.map(d => ({ fireId: d.id, ...d.data() })));
+      }
+    );
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -659,6 +666,10 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [trashOrders, setTrashOrders] = useState<any[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [historyTab, setHistoryTab] = useState<'users' | 'activity'>('users');
+  const [historyModuleFilter, setHistoryModuleFilter] = useState('All');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isExportPreviewOpen, setIsExportPreviewOpen] = useState(false);
   const [isReportPreviewOpen, setIsReportPreviewOpen] = useState(false);
@@ -1463,6 +1474,19 @@ export default function Dashboard() {
     setIsPreviewOpen(true);
   };
 
+  const logActivity = async (action: string, module: string = '') => {
+    try {
+      await addDoc(collection(db, "activity_logs"), {
+        action,
+        module,
+        performedBy: loggedInName || 'Unknown',
+        username: loggedInName || 'Unknown',
+        role: role || 'Unknown',
+        timestamp: Date.now()
+      });
+    } catch (e) { console.error("logActivity error:", e); }
+  };
+
   const handleDeleteClick = async (id: any) => {
     if (window.confirm("Are you sure you want to delete this record?")) {
       const order = orders.find(o => o.id === id);
@@ -1480,6 +1504,8 @@ export default function Dashboard() {
         }
         await deleteDoc(doc(db, "orders", order.fireId));
         setSelectedOrders(selectedOrders.filter(selectedId => selectedId !== id));
+        logActivity(`Deleted Order: ${order.name} (${order.chocolate || 'Product'} x${order.count})`,
+          order.category === 'product' ? 'Order Management (Products)' : 'Order Management (Chocolates)');
       }
     }
   };
@@ -1494,6 +1520,8 @@ export default function Dashboard() {
 
       await addDoc(collection(db, "orders"), restoredOrder);
       await deleteDoc(doc(db, "trash_orders", trashFireId));
+      logActivity(`Restored Order from Trash: ${order.name} (${order.chocolate || 'Product'})`,
+        order.category === 'product' ? 'Order Management (Products)' : 'Order Management (Chocolates)');
     } catch (err) {
       console.error("Restore failed:", err);
     }
@@ -1503,6 +1531,7 @@ export default function Dashboard() {
     if (window.confirm("Are you sure you want to permanently delete this record from Trash? This cannot be undone.")) {
       try {
         await deleteDoc(doc(db, "trash_orders", fireId));
+        logActivity(`Permanently Deleted Order from Trash`, 'Trash Bin');
       } catch (err) {
         console.error("Permanent deletion failed:", err);
       }
@@ -1547,6 +1576,7 @@ export default function Dashboard() {
     };
 
     try {
+      const moduleName = (formData.category === 'product') ? 'Order Management (Products)' : 'Order Management (Chocolates)';
       if (formData.fireId) {
         const { fireId, ...dataToUpdate } = formattedOrder;
 
@@ -1554,6 +1584,7 @@ export default function Dashboard() {
         Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
 
         await updateDoc(doc(db, "orders", formData.fireId), dataToUpdate);
+        logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
       } else {
         const nextId = orders.length > 0 ? Math.max(...orders.map(o => Number(o.id) || 0)) + 1 : 1;
         formattedOrder.id = nextId;
@@ -1563,6 +1594,7 @@ export default function Dashboard() {
         Object.keys(formattedOrder).forEach(key => formattedOrder[key] === undefined && delete formattedOrder[key]);
 
         await addDoc(collection(db, "orders"), formattedOrder);
+        logActivity(`Added New Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
       }
 
       setIsModalOpen(false);
@@ -1595,6 +1627,7 @@ export default function Dashboard() {
         await updateDoc(doc(db, "inventory", editInvId), entryData);
         setInventoryLogs(prev => prev.map(log => log.fireId === editInvId ? { ...log, ...entryData } : log));
         setEditInvId(null);
+        logActivity(`Edited Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox})`, 'Inventories');
       } else {
         const fireId = Date.now().toString();
         setInventoryLogs(prev => [{ fireId, ...entryData, timestamp: Date.now() }, ...prev]);
@@ -1602,6 +1635,7 @@ export default function Dashboard() {
           ...entryData,
           timestamp: Date.now()
         });
+        logActivity(`Added Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox} = ${Number(invForm.boxCount)*Number(invForm.itemsPerBox)} pcs)`, 'Inventories');
       }
       setInvForm(prev => ({ ...prev, boxCount: "", itemsPerBox: "" }));
       setIsInvModalOpen(false);
@@ -1610,8 +1644,12 @@ export default function Dashboard() {
 
   const handleDeleteInventory = async (fireId: string) => {
     if (window.confirm("Delete this inventory entry?")) {
+      const log = inventoryLogs.find(l => l.fireId === fireId);
       setInventoryLogs(prev => prev.filter(log => log.fireId !== fireId));
-      try { await deleteDoc(doc(db, "inventory", fireId)); } catch (e) { }
+      try {
+        await deleteDoc(doc(db, "inventory", fireId));
+        logActivity(`Deleted Inventory Entry: ${log?.chocolate || 'Unknown'}`, 'Inventories');
+      } catch (e) { }
     }
   };
 
@@ -1624,12 +1662,14 @@ export default function Dashboard() {
           name: newProductForm.name,
           price: Number(newProductForm.price)
         });
+        logActivity(`Edited Product: ${newProductForm.name} (₹${newProductForm.price})`, 'Products');
       } else {
         await addDoc(collection(db, "products"), {
           name: newProductForm.name,
           price: Number(newProductForm.price),
           createdAt: new Date().toISOString()
         });
+        logActivity(`Added New Product: ${newProductForm.name} (₹${newProductForm.price})`, 'Products');
       }
       setIsAddProductModalOpen(false);
       setNewProductForm({ name: "", price: "" });
@@ -1645,7 +1685,11 @@ export default function Dashboard() {
 
   const handleDeleteProductClick = async (fireId: string) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
-      try { await deleteDoc(doc(db, "products", fireId)); } catch (e) { }
+      const prod = customProducts.find(p => p.fireId === fireId);
+      try {
+        await deleteDoc(doc(db, "products", fireId));
+        logActivity(`Deleted Product: ${prod?.name || 'Unknown'}`, 'Products');
+      } catch (e) { }
     }
   };
 
@@ -1923,6 +1967,7 @@ export default function Dashboard() {
         status: 'Pending',
         createdAt: new Date().toISOString()
       });
+      logActivity(`Registered New Employee: ${regData.name} (@${regData.username})`, 'Employees');
       alert("Registration Request Sent! Account must be approved before login.");
       setShowRegisterModal(false);
       setRegData({ name: "", username: "", password: "" });
@@ -2235,6 +2280,12 @@ export default function Dashboard() {
           </div>
 
           <div className="p-4 border-t border-blue-100 space-y-2">
+            <button
+              onClick={() => setIsHistoryOpen(true)}
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
+            >
+              <History size={18} /> History
+            </button>
             <button
               onClick={() => setIsTrashOpen(true)}
               className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
@@ -4798,6 +4849,269 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 🟣 HISTORY MODAL */}
+      {isHistoryOpen && (
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
+          onClick={() => setIsHistoryOpen(false)}
+        >
+          <div
+            className="rounded-2xl shadow-2xl w-full max-w-4xl bg-[#0f172a] overflow-hidden border border-indigo-900/60 relative flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 border-b border-indigo-700/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                  <History size={18} className="text-indigo-300" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-white tracking-tight">Platform History</h2>
+                  <p className="text-xs text-indigo-300 font-medium">Live users & all platform changes</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="p-2 text-indigo-300 hover:bg-indigo-800/60 rounded-xl transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Tab Switcher */}
+            <div className="flex shrink-0 bg-slate-900/80 border-b border-slate-700/60">
+              <button
+                onClick={() => setHistoryTab('users')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${
+                  historyTab === 'users'
+                    ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <User size={15} />
+                Logged In Users
+                <span className="ml-1 px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full text-[10px] font-black">
+                  {1 + employees.filter(e => e.status === 'Approved' && e.isLive && e.lastActive && (Date.now() - new Date(e.lastActive).getTime() < 90000)).length}
+                </span>
+              </button>
+              <button
+                onClick={() => setHistoryTab('activity')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${
+                  historyTab === 'activity'
+                    ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Clock size={15} />
+                Change History
+                <span className="ml-1 px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full text-[10px] font-black">
+                  {activityLogs.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+
+              {/* === TAB 1: LOGGED IN USERS === */}
+              {historyTab === 'users' && (
+                <div className="p-6 space-y-4">
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest">Currently active on this platform</p>
+
+                  {/* Admin Card */}
+                  <div className="flex items-center gap-4 bg-gradient-to-r from-amber-900/30 to-amber-800/10 border border-amber-700/30 rounded-2xl p-4">
+                    <div className="w-11 h-11 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/30 shrink-0">
+                      <User size={20} className="text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-amber-200 text-base">Subash</span>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-black uppercase">Admin</span>
+                        {role === 'Admin' && isLoggedIn && (
+                          <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black px-2 py-0.5 rounded-full uppercase animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">Username: <span className="text-amber-300 font-bold">subash g</span></p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] text-slate-500 font-semibold">Role</p>
+                      <p className="text-xs text-amber-300 font-black">Administrator</p>
+                    </div>
+                  </div>
+
+                  {/* Approved Employees */}
+                  {employees
+                    .filter(e => e.status === 'Approved')
+                    .map(emp => {
+                      const isLive = emp.isLive && emp.lastActive && (Date.now() - new Date(emp.lastActive).getTime() < 90000);
+                      return (
+                        <div
+                          key={emp.fireId}
+                          className={`flex items-center gap-4 rounded-2xl p-4 border transition-all ${
+                            isLive
+                              ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/10 border-emerald-700/30'
+                              : 'bg-slate-800/40 border-slate-700/40'
+                          }`}
+                        >
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 ${
+                            isLive ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-slate-700/50 border-slate-600/40'
+                          }`}>
+                            <User size={20} className={isLive ? 'text-emerald-400' : 'text-slate-500'} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`font-black text-base ${isLive ? 'text-emerald-200' : 'text-slate-400'}`}>{emp.name}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase border ${
+                                isLive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/40'
+                              }`}>Employee</span>
+                              {isLive ? (
+                                <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black px-2 py-0.5 rounded-full uppercase animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[9px] bg-slate-700/50 text-slate-500 border border-slate-600/40 font-black px-2 py-0.5 rounded-full uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Offline
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 font-medium mt-0.5">Username: <span className={`font-bold ${isLive ? 'text-emerald-300' : 'text-slate-400'}`}>{emp.username}</span></p>
+                            {emp.lastLoginAt && (
+                              <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                                Last login: {new Date(emp.lastLoginAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[10px] text-slate-500 font-semibold">Status</p>
+                            <p className={`text-xs font-black ${isLive ? 'text-emerald-400' : 'text-slate-500'}`}>{isLive ? 'Online' : 'Offline'}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  {employees.filter(e => e.status === 'Approved').length === 0 && (
+                    <div className="text-center py-8 text-slate-500 font-bold text-sm">
+                      No approved employees yet.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* === TAB 2: ACTIVITY LOG === */}
+              {historyTab === 'activity' && (
+                <div className="flex flex-col h-full">
+                  {/* Filter Bar */}
+                  <div className="px-6 py-3 bg-slate-900/60 border-b border-slate-700/40 flex items-center gap-2 shrink-0 flex-wrap">
+                    <Filter size={13} className="text-slate-400" />
+                    <span className="text-xs text-slate-400 font-bold mr-1">Module:</span>
+                    {['All', 'Order Management (Chocolates)', 'Order Management (Products)', 'Inventories', 'Products', 'Chocolates', 'Employees', 'Trash Bin'].map(mod => (
+                      <button
+                        key={mod}
+                        onClick={() => setHistoryModuleFilter(mod)}
+                        className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${
+                          historyModuleFilter === mod
+                            ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50'
+                            : 'bg-slate-800/60 text-slate-400 border-slate-700/40 hover:text-slate-200'
+                        }`}
+                      >
+                        {mod === 'All' ? 'All'
+                          : mod === 'Order Management (Chocolates)' ? 'Choc Orders'
+                          : mod === 'Order Management (Products)' ? 'Prod Orders'
+                          : mod}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Log Table */}
+                  <div className="overflow-x-auto flex-1">
+                    {activityLogs.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                        <History size={40} className="mb-3 opacity-30" />
+                        <p className="font-bold text-sm">No activity recorded yet</p>
+                        <p className="text-xs mt-1 opacity-60">Actions on this platform will appear here</p>
+                      </div>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead className="sticky top-0">
+                          <tr className="bg-slate-800/90 text-slate-400 uppercase tracking-widest text-[10px] font-black border-b border-slate-700/60">
+                            <th className="px-4 py-3">#</th>
+                            <th className="px-4 py-3">Action</th>
+                            <th className="px-4 py-3">Module</th>
+                            <th className="px-4 py-3">By</th>
+                            <th className="px-4 py-3 whitespace-nowrap">Date & Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {activityLogs
+                            .filter(log => historyModuleFilter === 'All' || log.module === historyModuleFilter)
+                            .map((log, idx) => {
+                              const actionLower = (log.action || '').toLowerCase();
+                              const isAdd = actionLower.startsWith('added') || actionLower.startsWith('registered');
+                              const isEdit = actionLower.startsWith('edited');
+                              const isDelete = actionLower.startsWith('deleted') || actionLower.startsWith('permanently');
+                              const isRestore = actionLower.startsWith('restored');
+                              const actionColor = isAdd ? 'text-emerald-400' : isEdit ? 'text-amber-400' : isDelete ? 'text-red-400' : isRestore ? 'text-blue-400' : 'text-slate-300';
+                              const actionBg = isAdd ? 'bg-emerald-500/10 border-emerald-500/20' : isEdit ? 'bg-amber-500/10 border-amber-500/20' : isDelete ? 'bg-red-500/10 border-red-500/20' : isRestore ? 'bg-blue-500/10 border-blue-500/20' : 'bg-slate-700/20 border-slate-600/20';
+                              const dot = isAdd ? 'bg-emerald-400' : isEdit ? 'bg-amber-400' : isDelete ? 'bg-red-400' : isRestore ? 'bg-blue-400' : 'bg-slate-400';
+                              return (
+                                <tr key={log.fireId || idx} className="hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-4 py-3 text-slate-600 text-xs font-bold">{idx + 1}</td>
+                                  <td className="px-4 py-3">
+                                    <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border text-xs font-bold ${actionBg}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`}></span>
+                                      <span className={actionColor}>{log.action || '—'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-[10px] text-slate-400 font-semibold">{log.module || '—'}</span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                        log.role === 'Admin' ? 'bg-amber-500/20' : 'bg-indigo-500/20'
+                                      }`}>
+                                        <User size={10} className={log.role === 'Admin' ? 'text-amber-400' : 'text-indigo-400'} />
+                                      </div>
+                                      <div>
+                                        <p className={`text-xs font-black ${log.role === 'Admin' ? 'text-amber-300' : 'text-indigo-300'}`}>{log.username || log.performedBy || '—'}</p>
+                                        <p className="text-[10px] text-slate-500 font-semibold">{log.role || '—'}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <p className="text-xs text-slate-300 font-bold">
+                                      {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                                    </p>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 bg-slate-900/80 border-t border-slate-700/40 flex justify-between items-center shrink-0">
+              <p className="text-xs text-slate-500 font-semibold">
+                {activityLogs.length} total actions logged
+              </p>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="px-5 py-2 rounded-xl font-bold text-xs text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/40 transition-all active:scale-95"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🟢 NEW: REPORT PREVIEW & DOWNLOAD MODAL */}
       {isReportPreviewOpen && (
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
@@ -5013,8 +5327,8 @@ export default function Dashboard() {
                           <p className="text-xs font-medium text-amber-700">Username: <span className="font-bold">{emp.username}</span> | Password: <span className="font-bold">{emp.password}</span></p>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' })} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 font-bold rounded-lg hover:bg-green-200 transition-colors border border-green-300">Accept</button>
-                          <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' })} className="px-3 py-1.5 text-xs bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-300">Decline</button>
+                          <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' }); logActivity(`Approved Employee: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 font-bold rounded-lg hover:bg-green-200 transition-colors border border-green-300">Accept</button>
+                          <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' }); logActivity(`Declined Employee: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3 py-1.5 text-xs bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-300">Decline</button>
                         </div>
                       </div>
                     ))}
@@ -5056,7 +5370,7 @@ export default function Dashboard() {
                             )}
                           </div>
                           <div className="flex gap-2">
-                            <button onClick={() => updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined', isLive: false })} className="px-3 py-1.5 text-xs bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">Revoke Access</button>
+                            <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined', isLive: false }); logActivity(`Revoked Access: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3 py-1.5 text-xs bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">Revoke Access</button>
                           </div>
                         </div>
                       );
@@ -5094,9 +5408,11 @@ export default function Dashboard() {
                   };
                   if (editChocId) {
                     await updateDoc(doc(db, "managed_chocolates", editChocId), data);
+                    logActivity(`Edited Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
                     setEditChocId(null);
                   } else {
                     await addDoc(collection(db, "managed_chocolates"), data);
+                    logActivity(`Added Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
                   }
                   setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" });
                 }} className="space-y-4">
@@ -5153,7 +5469,7 @@ export default function Dashboard() {
                         }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
 
 
-                        <button onClick={() => deleteDoc(doc(db, "managed_chocolates", choc.fireId))} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={async () => { await deleteDoc(doc(db, "managed_chocolates", choc.fireId)); logActivity(`Deleted Chocolate: ${choc.name}`, 'Chocolates'); }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
