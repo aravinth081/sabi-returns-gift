@@ -1,4 +1,4 @@
- // ==========================================
+// ==========================================
 // 5 STEPS INTEGRATION
 // Step 1: Ensure dependencies are installed -> `npm install firebase lucide-react recharts xlsx html2canvas`
 // Step 2: Verify Firebase config credentials match your Firebase Console.
@@ -16,7 +16,7 @@ import {
 // ------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -543,7 +543,7 @@ export default function Dashboard() {
   const [d1DeliveryDates, setD1DeliveryDates] = useState<string[]>([]);
   const [d1ChocFilter, setD1ChocFilter] = useState<string>('');
   const [d1ChennaiFilter, setD1ChennaiFilter] = useState<boolean>(false);
-  const [d1ShowSearch, setD1ShowSearch] = useState<boolean>(false);
+  const [d1RoleFilter, setD1RoleFilter] = useState<string>('All');
 
   // Dashboard 2 filters
   const [d2PaymentFilter, setD2PaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
@@ -558,7 +558,7 @@ export default function Dashboard() {
   const [d2DeliveryDates, setD2DeliveryDates] = useState<string[]>([]);
   const [d2ChocFilter, setD2ChocFilter] = useState<string>('');
   const [d2ChennaiFilter, setD2ChennaiFilter] = useState<boolean>(false);
-  const [d2ShowSearch, setD2ShowSearch] = useState<boolean>(false);
+  const [d2RoleFilter, setD2RoleFilter] = useState<string>('All');
 
   // Order Tracking filters
   const [trkPaymentFilter, setTrkPaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
@@ -591,8 +591,8 @@ export default function Dashboard() {
   const setChocFilter = activeTab === 'dashboard2' ? setD2ChocFilter : setD1ChocFilter;
   const chennaiFilter = activeTab === 'dashboard2' ? d2ChennaiFilter : d1ChennaiFilter;
   const setChennaiFilter = activeTab === 'dashboard2' ? setD2ChennaiFilter : setD1ChennaiFilter;
-  const showSearch = activeTab === 'dashboard2' ? d2ShowSearch : d1ShowSearch;
-  const setShowSearch = activeTab === 'dashboard2' ? setD2ShowSearch : setD1ShowSearch;
+  const roleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
+  const setRoleFilter = activeTab === 'dashboard2' ? setD2RoleFilter : setD1RoleFilter;
   const trackingSearch = trkSearch;
   const setTrackingSearch = setTrkSearch;
 
@@ -604,10 +604,14 @@ export default function Dashboard() {
   const [authError, setAuthError] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const [isReportsAuthModalOpen, setIsReportsAuthModalOpen] = useState(false);
+  const [reportsPassword, setReportsPassword] = useState("");
+  const [reportsAuthError, setReportsAuthError] = useState("");
+
   const [isInvModalOpen, setIsInvModalOpen] = useState(false);
   const [invForm, setInvForm] = useState({
     date: new Date().toISOString().split('T')[0],
-    chocolate: "Kitkat",
+    chocolate: "10 rs 5 Star",
     boxCount: "",
     itemsPerBox: ""
   });
@@ -635,6 +639,19 @@ export default function Dashboard() {
     }
   };
 
+  const handleReportsAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (reportsPassword === "963" || reportsPassword === "561997" || reportsPassword === "8520") {
+      setActiveTab('reports');
+      setShowSidebarHighlight(true);
+      setIsReportsAuthModalOpen(false);
+      setReportsPassword("");
+      setReportsAuthError("");
+    } else {
+      setReportsAuthError("Wrong Password! Access Denied.");
+    }
+  };
+
 
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [showCheckboxes, setShowCheckboxes] = useState(false);
@@ -648,7 +665,19 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Self", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+
+  const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      if (formData.orderType === 'Self') {
+        setOrderTypeOthersToggle(false);
+      } else {
+        setOrderTypeOthersToggle(true);
+      }
+    }
+  }, [isModalOpen, formData.orderType]);
 
   const [previewData, setPreviewData] = useState<any>(null);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -694,7 +723,9 @@ export default function Dashboard() {
 
   const managedChocCostsMap = useMemo(() => {
     const map: Record<string, number> = {};
-    managedChocolates.forEach(c => map[c.name.toLowerCase()] = Number(c.costPrice || 0));
+    managedChocolates.forEach(c => {
+      map[c.name.toLowerCase()] = Number(c.stickerPrice !== undefined ? c.stickerPrice : (c.costPrice !== undefined ? c.costPrice : 0));
+    });
     return map;
   }, [managedChocolates]);
 
@@ -817,6 +848,7 @@ export default function Dashboard() {
     const curTableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
     const curChocFilter = activeTab === 'dashboard2' ? d2ChocFilter : d1ChocFilter;
     const curChennaiFilter = activeTab === 'dashboard2' ? d2ChennaiFilter : d1ChennaiFilter;
+    const curRoleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
 
     return orders.filter(order => {
       const pMatch = curPaymentFilter === 'All' || order.paymentStatus === curPaymentFilter;
@@ -856,7 +888,13 @@ export default function Dashboard() {
       let searchMatch = true;
       if (curDashboardSearch.trim()) {
         const query = curDashboardSearch.toLowerCase().trim();
-        searchMatch = order.name.toLowerCase().includes(query) || order.phone.includes(query);
+        const serialNo = getSerial(order.id).toLowerCase();
+        const chocName = String(order.chocolate || order.productName || "").toLowerCase();
+        searchMatch = 
+          String(order.name || "").toLowerCase().includes(query) || 
+          String(order.phone || "").includes(query) ||
+          serialNo.includes(query) ||
+          chocName.includes(query);
       }
 
       const countMatch = curCountFilter === 'All' || order.count.toString() === curCountFilter;
@@ -874,9 +912,18 @@ export default function Dashboard() {
       const isProduct = order.category === 'product';
       const categoryMatch = activeTab === 'dashboard2' ? isProduct : !isProduct;
 
-      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && chennaiMatch;
+      let roleMatch = true;
+      if (curRoleFilter !== 'All') {
+        if (curRoleFilter === 'Green') {
+          roleMatch = order.orderType === 'Others';
+        } else if (curRoleFilter === 'Red') {
+          roleMatch = order.orderType === 'Self';
+        }
+      }
+
+      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && chennaiMatch && roleMatch;
     });
-  }, [activeTab, orders, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1ChennaiFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2ChennaiFilter]);
+  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1ChennaiFilter, d1RoleFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2ChennaiFilter, d2RoleFilter]);
 
   const { totalOrders, deliveredCount, inProcessCount, totalItems, topChocolates, totalRevenue, totalDeliveryCharge } = useMemo(() => {
     const total = filteredDashboardOrders.length;
@@ -1050,11 +1097,20 @@ export default function Dashboard() {
 
     if (trkSearch.trim()) {
       const lowerSearch = trkSearch.toLowerCase().trim();
-      result = result.filter(o => o.name.toLowerCase().includes(lowerSearch) || o.phone.includes(lowerSearch));
+      result = result.filter(o => {
+        const serialNo = getSerial(o.id).toLowerCase();
+        const chocName = String(o.chocolate || o.productName || "").toLowerCase();
+        return (
+          String(o.name || "").toLowerCase().includes(lowerSearch) ||
+          String(o.phone || "").includes(lowerSearch) ||
+          serialNo.includes(lowerSearch) ||
+          chocName.includes(lowerSearch)
+        );
+      });
     }
 
     return result;
-  }, [orders, trkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter]);
+  }, [orders, orderSerialMap, trkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter]);
 
   const sortedDashboardOrders = useMemo(() => {
     let sortable = [...filteredDashboardOrders];
@@ -1115,6 +1171,7 @@ export default function Dashboard() {
     let totalRev = 0;
     let totalItems = 0;
     let totalDelivery = 0;
+    let totalCost = 0;
 
     filtered.forEach(order => {
       if (order.status === "Delivered" || order.status === "In Process") {
@@ -1123,6 +1180,17 @@ export default function Dashboard() {
         totalItems += Number(order.count || 0);
         totalDelivery += priceInfo.deliveryCharge;
 
+        let cost = 0;
+        if (order.category !== 'product') {
+          const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
+          const qty = Number(order.count || 0);
+          chocs.forEach(c => {
+            cost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1);
+          });
+        } else {
+          cost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
+        }
+        totalCost += cost;
 
         if (order.chocolate) {
           String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
@@ -1135,8 +1203,17 @@ export default function Dashboard() {
     const topChocs = Object.entries(chocolateCounts).sort((a, b) => b[1] - a[1]);
     const chartData = topChocs.slice(0, 8).map(([name, count]) => ({ name, count }));
 
-    return { filteredOrders: filtered, topChocs, chartData, totalRev, totalItems, totalDeliveryCharge: totalDelivery };
-  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter]);
+    return { 
+      filteredOrders: filtered, 
+      topChocs, 
+      chartData, 
+      totalRev, 
+      totalItems, 
+      totalDeliveryCharge: totalDelivery,
+      totalCost,
+      totalProfit: totalRev - totalCost
+    };
+  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, managedChocCostsMap, managedChocPricesMap]);
 
   const displayRevenue = useMemo(() => {
     return filteredDashboardOrders.reduce((sum, o) => {
@@ -1205,7 +1282,7 @@ export default function Dashboard() {
             const trashOrder = {
               ...order,
               deletedAt: Date.now(),
-              deletedBy: loggedInName
+              deletedBy: role ? `${role} (${loggedInName})` : loggedInName
             };
             delete (trashOrder as any).fireId;
             await addDoc(collection(db, "trash_orders"), trashOrder);
@@ -1336,7 +1413,7 @@ export default function Dashboard() {
 
   const handleAddClick = () => {
     const today = new Date().toISOString().split('T')[0];
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Self", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setIsModalOpen(true);
   };
 
@@ -1378,7 +1455,7 @@ export default function Dashboard() {
           const trashOrder = {
             ...order,
             deletedAt: Date.now(),
-            deletedBy: loggedInName
+            deletedBy: role ? `${role} (${loggedInName})` : loggedInName
           };
           delete (trashOrder as any).fireId;
           await addDoc(collection(db, "trash_orders"), trashOrder);
@@ -1850,6 +1927,7 @@ export default function Dashboard() {
         setRole('Admin');
         setLoggedInName('Subash');
         setIsLoggedIn(true);
+        setActiveTab('dashboard1');
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('loggedInName', 'Subash');
         localStorage.setItem('role', 'Admin');
@@ -1876,6 +1954,7 @@ export default function Dashboard() {
           setLoggedInName(emp.name);
           setEmployeeId(emp.fireId);
           setIsLoggedIn(true);
+          setActiveTab('dashboard1');
           localStorage.setItem('isLoggedIn', 'true');
           localStorage.setItem('loggedInName', emp.name);
           localStorage.setItem('role', 'Employee');
@@ -2126,7 +2205,12 @@ export default function Dashboard() {
               </button>
 
               <button
-                onClick={() => { setActiveTab('reports'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { 
+                  setIsReportsAuthModalOpen(true); 
+                  setReportsPassword(""); 
+                  setReportsAuthError(""); 
+                  if (window.innerWidth < 768) setIsSidebarOpen(false); 
+                }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'reports' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
                 <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'drop-shadow-md' : ''} />
                 <span style={showSidebarHighlight && activeTab === 'reports' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Reports</span>
@@ -2180,14 +2264,13 @@ export default function Dashboard() {
               <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
               <p className="text-sm font-bold text-amber-600 tracking-widest uppercase">return Gifts</p>
             </div>
-            <button
-              onClick={() => setIsAdminAuthModalOpen(true)}
-              className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-[#d4a373] to-[#3e2723] shadow-md flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+            <div
+              className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-[#d4a373] to-[#3e2723] shadow-md flex items-center justify-center select-none"
             >
               <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-amber-50 shadow-inner">
                 <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
               </div>
-            </button>
+            </div>
           </div>
         </header>
 
@@ -2276,7 +2359,7 @@ export default function Dashboard() {
                     <button onClick={() => {
                       setInvForm({
                         date: new Date().toISOString().split('T')[0],
-                        chocolate: "Kitkat",
+                        chocolate: "10 rs 5 Star",
                         boxCount: "",
                         itemsPerBox: ""
                       });
@@ -2313,7 +2396,7 @@ export default function Dashboard() {
                                 <button onClick={() => {
                                   setInvForm({
                                     date: log.date || new Date().toISOString().split('T')[0],
-                                    chocolate: log.chocolate || "Kitkat",
+                                    chocolate: log.chocolate || "10 rs 5 Star",
                                     boxCount: String(log.boxCount || ""),
                                     itemsPerBox: String(log.itemsPerBox || "")
                                   });
@@ -2542,23 +2625,6 @@ export default function Dashboard() {
                         <MapPin size={12} strokeWidth={3} />
                         Chennai
                       </button>
-
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-black tracking-wider uppercase text-amber-600 hover:text-amber-800 transition-colors print:hidden bg-white border border-amber-200 px-2.5 h-8 rounded-xl shadow-sm hover:bg-amber-50">
-                        <input
-                          type="checkbox"
-                          checked={showSearch}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setShowSearch(checked);
-                            if (!checked) {
-                              setDashboardSearch("");
-                            }
-                          }}
-                          className="w-3.5 h-3.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
-                        />
-                        Search
-                      </label>
-
                       <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-black tracking-wider uppercase text-amber-600 hover:text-amber-800 transition-colors print:hidden bg-white border border-amber-200 px-2.5 h-8 rounded-xl shadow-sm hover:bg-amber-50">
                         <input
                           type="checkbox"
@@ -2575,19 +2641,16 @@ export default function Dashboard() {
                         Checkbox
                       </label>
 
-                      {showSearch && (
-                        <div className="relative animate-in fade-in slide-in-from-left-2 duration-300 w-40 sm:w-48 md:w-56">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
-                          <input
-                            type="text"
-                            placeholder="Search..."
-                            value={dashboardSearch}
-                            onChange={(e) => setDashboardSearch(e.target.value)}
-                            className="pl-8 pr-3 py-1 bg-white border border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs w-full shadow-sm h-8"
-                            autoFocus
-                          />
-                        </div>
-                      )}
+                      <div className="relative w-40 sm:w-48 md:w-56">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Search..."
+                          value={dashboardSearch}
+                          onChange={(e) => setDashboardSearch(e.target.value)}
+                          className="pl-8 pr-3 py-1 bg-white border border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs w-full shadow-sm h-8"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -2688,6 +2751,25 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                               )}
+                            </div>
+                          </th>
+                        )}
+                        {!isScreenshotMode && (
+                          <th className="py-3 px-4 font-bold align-top transition-all duration-300">
+                            <div className="flex items-center gap-1 group">
+                              <span className="whitespace-nowrap">Role</span>
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
+                                <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
+                                <select
+                                  value={roleFilter}
+                                  onChange={(e) => setRoleFilter(e.target.value)}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                >
+                                  <option value="All">All</option>
+                                  <option value="Green">Green</option>
+                                  <option value="Red">Red</option>
+                                </select>
+                              </div>
                             </div>
                           </th>
                         )}
@@ -2947,6 +3029,19 @@ export default function Dashboard() {
                                       <span>{getSerial(order.id)}</span>
                                     </div>
                                   )}
+                                </td>
+                              )}
+                              {!isScreenshotMode && (
+                                <td className="py-2.5 px-4 align-middle">
+                                  <div className="flex items-center justify-start">
+                                    {order.orderType === 'Others' ? (
+                                      <span className="inline-block w-4 h-4 rounded-full bg-green-500 shadow-sm border border-white" title="Others" />
+                                    ) : order.orderType === 'Self' ? (
+                                      <span className="inline-block w-4 h-4 rounded-full bg-rose-500 shadow-sm border border-white" title="Self" />
+                                    ) : (
+                                      <span className="inline-block w-4 h-4 rounded-full bg-gray-300 shadow-sm border border-white" title={order.orderType || "N/A"} />
+                                    )}
+                                  </div>
                                 </td>
                               )}
                               {!isScreenshotMode && (
@@ -3327,17 +3422,35 @@ export default function Dashboard() {
                     <Calendar className="text-amber-700" /> Report Analytics
                   </h2>
 
-                  <div className="relative">
-                    <select
-                      value={reportDashboardFilter}
-                      onChange={(e) => setReportDashboardFilter(e.target.value)}
-                      className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <select
+                        value={reportDashboardFilter}
+                        onChange={(e) => setReportDashboardFilter(e.target.value)}
+                        className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
+                      >
+                        <option value="All">All Dashboards</option>
+                        <option value="Dashboard 1">Dashboard 1 (Choc)</option>
+                        <option value="Dashboard 2">Dashboard 2 (Prod)</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
+                    </div>
+
+                    <button
+                      onClick={() => setActiveTab('admin_panel' as any)}
+                      className="p-1.5 bg-white border border-[#d7ccc8] hover:border-amber-500 hover:text-amber-700 rounded-xl text-[#5d4037] shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px]"
+                      title="Open Admin Cost Analytics"
                     >
-                      <option value="All">All Dashboards</option>
-                      <option value="Dashboard 1">Dashboard 1 (Choc)</option>
-                      <option value="Dashboard 2">Dashboard 2 (Prod)</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
+                      <Settings size={16} strokeWidth={2.5} />
+                    </button>
+
+                    <button
+                      onClick={() => setIsAnalyticsModalOpen(true)}
+                      className="p-1.5 bg-white border border-[#d7ccc8] hover:border-amber-500 hover:text-amber-700 rounded-xl text-[#5d4037] shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px]"
+                      title="Open Profit Analytics Table"
+                    >
+                      <Eye size={16} strokeWidth={2.5} />
+                    </button>
                   </div>
                 </div>
 
@@ -3823,20 +3936,23 @@ export default function Dashboard() {
               </div>
               <div>
                 <label className="block text-sm font-bold mb-1 text-[#5d4037]">Chocolate Name</label>
-                <input
+                <select
                   required
-                  list="inv-chocolates-list"
-                  type="text"
                   value={invForm.chocolate}
                   onChange={(e) => setInvForm({ ...invForm, chocolate: e.target.value })}
-                  className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner"
-                  placeholder="Select or type chocolate name"
-                />
-                <datalist id="inv-chocolates-list">
-                  {dynamicInventory.map((c, i) => (
-                    <option key={i} value={c} />
-                  ))}
-                </datalist>
+                  className="w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-amber-950 shadow-inner cursor-pointer"
+                >
+                  <option value="" disabled>Select chocolate...</option>
+                  <option value="10 rs 5 Star">10 rs 5 Star</option>
+                  <option value="10 rs Kitkat">10 rs Kitkat</option>
+                  <option value="10 rs Dairy Milk">10 rs Dairy Milk</option>
+                  <option value="5 rs Peanut Candy">5 rs Peanut Candy</option>
+                  <option value="5 rs 5 Star">5 rs 5 Star</option>
+                  <option value="5 rs Dairy Milk">5 rs Dairy Milk</option>
+                  <option value="2 rs Dairymilk Shots">2 rs Dairymilk Shots</option>
+                  <option value="5 rs Milky Bar">5 rs Milky Bar</option>
+                  <option value="1 rs Chocolate">1 rs Chocolate</option>
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -3973,9 +4089,38 @@ export default function Dashboard() {
             className={`rounded-2xl shadow-2xl w-full max-w-[800px] p-5 bg-[#fffcf9] overflow-y-auto max-h-[95vh] border border-[#f0e6db]`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className={`text-xl font-bold mb-3 text-[#5d4037] text-center tracking-wide border-b border-dashed border-[#d7ccc8] pb-2`}>
-              {formData.id ? "Edit Order Details" : "Add New Order"}
-            </h2>
+            <div className="relative border-b border-dashed border-[#d7ccc8] pb-2 mb-3 flex items-center justify-between">
+              {/* Invisible spacer to center the title */}
+              <div className="w-[100px] hidden sm:block"></div> 
+              
+              <h2 className="text-xl font-bold text-[#5d4037] text-center tracking-wide flex-1 sm:text-center text-left">
+                {formData.id ? "Edit Order Details" : "Add New Order"}
+              </h2>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-[10px] font-black uppercase tracking-wider ${orderTypeOthersToggle ? 'text-green-600' : 'text-rose-600'}`}>
+                  {orderTypeOthersToggle ? 'Others' : 'Self'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVal = !orderTypeOthersToggle;
+                    setOrderTypeOthersToggle(nextVal);
+                    // Sync with formData.orderType
+                    if (formData.orderType === 'Others' && !nextVal) {
+                      setFormData(prev => ({ ...prev, orderType: 'Self' }));
+                    } else if (formData.orderType === 'Self' && nextVal) {
+                      setFormData(prev => ({ ...prev, orderType: 'Others' }));
+                    }
+                  }}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${orderTypeOthersToggle ? 'bg-green-500' : 'bg-rose-500'}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${orderTypeOthersToggle ? 'translate-x-4' : 'translate-x-0'}`}
+                  />
+                </button>
+              </div>
+            </div>
 
             <datalist id="names-list">{uniqueNames.map((name, i) => <option key={i} value={name} />)}</datalist>
             <datalist id="phones-list">{uniquePhones.map((phone, i) => <option key={i} value={phone} />)}</datalist>
@@ -4111,8 +4256,15 @@ export default function Dashboard() {
                           Thaaru
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
-                          <input type="radio" name="orderType" value="Self" checked={formData.orderType === "Self"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
-                          Others
+                          <input
+                            type="radio"
+                            name="orderType"
+                            value={orderTypeOthersToggle ? "Others" : "Self"}
+                            checked={formData.orderType === (orderTypeOthersToggle ? "Others" : "Self")}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 accent-[#8d6e63]"
+                          />
+                          {orderTypeOthersToggle ? "Others" : "Self"}
                         </label>
                       </div>
                     </div>
@@ -4457,7 +4609,7 @@ export default function Dashboard() {
             <div className="p-6 overflow-y-auto flex-1 flex justify-center bg-gray-100">
 
               <div id="shipping-label-content" className="bg-white p-8 w-full max-w-xl text-black font-sans shadow-lg border border-gray-200 h-max shrink-0">
-                <div className="flex justify-between items-start mb-1 pb-4 border-b-2 border-black">
+                <div className="flex justify-between items-start pb-4 border-b-2 border-black">
                   <div className="flex-1 pt-2">
                     <h3 className="text-base font-extrabold text-black tracking-wide mb-3">Shipping Label</h3>
                     <p className="font-extrabold text-[15px] mb-1 text-black">Shipping To:</p>
@@ -4469,17 +4621,12 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="my-4 p-3 bg-amber-50/50 border-l-4 border-amber-600 rounded-r-lg">
-                  <p className="text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-1">Instructions:</p>
-                  <p className="text-[12px] leading-snug font-medium text-gray-800">
-                    Thank you for choosing <span className="font-bold text-black">SABI Return Gifts</span>. To ensure timely delivery, please settle the outstanding amount via GPay to <span className="font-bold text-[#3e2723]">8220638753 (Subash G.)</span>. Please share the payment screenshot with your Invoice Number for verification.
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center py-3 border-t-2 border-b-2 border-black">
+                <div className="flex justify-between items-center py-3 border-b-2 border-black">
                   <div>
-                    <p className="text-[14px] font-extrabold mb-1 text-black">Invoice #: {getSerial(shippingOrder.id)}</p>
-                    <p className="text-[14px] font-extrabold text-black">Invoice Date: {shippingOrder.deliveryDate || shippingOrder.functionDate || shippingOrder.orderDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
+                    <p className="text-[14px] font-extrabold mb-1 text-black">Invoice No: {getSerial(shippingOrder.id)}</p>
+                    <p className="text-[14px] font-extrabold mb-1 text-black">Invoice Date: {shippingOrder.deliveryDate || shippingOrder.functionDate || shippingOrder.orderDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
+                    <p className="text-[14px] font-extrabold mb-1 text-black">Item: {shippingOrder.chocolate}</p>
+                    <p className="text-[14px] font-extrabold text-black">Qty: {shippingOrder.count}</p>
                   </div>
                   <div className="flex flex-col items-center">
                     <img src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${getSerial(shippingOrder.id)}&scale=2&height=10`} alt="Barcode" className="h-12 w-auto mix-blend-multiply" crossOrigin="anonymous" />
@@ -4581,16 +4728,21 @@ export default function Dashboard() {
                             </div>
                           </td>
                            <td className="p-3">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
-                              order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
-                                ? "bg-blue-50 text-blue-700 border-blue-200" 
-                                : "bg-purple-50 text-purple-700 border-purple-200"
-                            }`}>
-                              <User size={10} />
-                              {order.deletedBy ? (
-                                order.deletedBy.match(/^(?:Admin|Employee)\s*\(([^)]+)\)$/i)?.[1] || order.deletedBy
-                              ) : "Unknown"}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
+                                  ? "bg-blue-50 text-blue-700 border-blue-200" 
+                                  : "bg-purple-50 text-purple-700 border-purple-200"
+                              }`}>
+                                <User size={10} />
+                                {order.deletedBy || "Unknown"}
+                              </span>
+                              {order.deletedAt && (
+                                <div className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                                  {new Date(order.deletedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3 text-center">
                             <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${
@@ -4666,7 +4818,7 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-4 gap-4 mb-8">
                 <div className="border border-gray-200 p-4 rounded-xl bg-gray-50 text-center shadow-sm">
                   <p className="text-xs font-bold text-gray-500 uppercase">Total Orders</p>
                   <p className="text-2xl font-black text-gray-800">{reportData.filteredOrders.length}</p>
@@ -4678,6 +4830,10 @@ export default function Dashboard() {
                 <div className="border border-green-200 p-4 rounded-xl bg-green-50 text-center shadow-sm">
                   <p className="text-xs font-bold text-green-700 uppercase">Total Revenue Generated</p>
                   <p className="text-2xl font-black text-green-700">₹{reportData.totalRev.toLocaleString()}</p>
+                </div>
+                <div className="border border-emerald-200 p-4 rounded-xl bg-emerald-50 text-center shadow-sm">
+                  <p className="text-xs font-bold text-emerald-700 uppercase">Total Profit</p>
+                  <p className="text-2xl font-black text-emerald-700">₹{Math.round(reportData.totalProfit || 0).toLocaleString()}</p>
                 </div>
               </div>
 
@@ -4725,6 +4881,54 @@ export default function Dashboard() {
                 <Download size={18} /> Download Report
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 NEW: REPORTS AUTHENTICATION MODAL */}
+      {isReportsAuthModalOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsReportsAuthModalOpen(false)}>
+          <div
+            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-sm border-2 border-blue-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-6 text-center relative border-b-4 border-indigo-950">
+              <button type="button" onClick={() => setIsReportsAuthModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"><X size={20} /></button>
+              <div className="w-16 h-16 bg-[#fffcf9] rounded-full mx-auto flex items-center justify-center shadow-inner mb-3">
+                <Lock size={28} className="text-indigo-800" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-wide">Enter Password</h2>
+              <p className="text-blue-200/80 text-xs font-bold mt-1 tracking-widest uppercase">Restricted Reports Area</p>
+            </div>
+
+            <form onSubmit={handleReportsAuthSubmit} className="p-7 space-y-5">
+              {reportsAuthError && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 text-sm font-bold rounded shadow-sm text-center animate-in zoom-in duration-200">
+                  {reportsAuthError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-blue-900 uppercase tracking-wider mb-1.5">Reports Password</label>
+                  <input
+                    type="password"
+                    value={reportsPassword}
+                    onChange={(e) => setReportsPassword(e.target.value)}
+                    className="w-full font-bold text-center text-lg rounded-xl p-3 border-2 border-blue-200 focus:border-indigo-600 bg-white text-black outline-none shadow-inner"
+                    placeholder="••••"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-indigo-700 text-white font-black rounded-xl border-b-4 border-indigo-900 active:border-b-0 hover:-translate-y-0.5 active:translate-y-1 transition-all shadow-md uppercase tracking-wider text-xs"
+              >
+                Access Reports
+              </button>
+            </form>
           </div>
         </div>
       )}
