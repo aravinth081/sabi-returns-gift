@@ -691,6 +691,7 @@ export default function Dashboard() {
 
   const [hiddenCols, setHiddenCols] = useState<Record<string, boolean>>({
     serialNo: false,
+    role: false,
     orderDate: false,
     deliveryCharge: false,
     discount: false
@@ -894,7 +895,8 @@ export default function Dashboard() {
           String(order.name || "").toLowerCase().includes(query) || 
           String(order.phone || "").includes(query) ||
           serialNo.includes(query) ||
-          chocName.includes(query);
+          chocName.includes(query) ||
+          String(order.orderType || "").toLowerCase().includes(query);
       }
 
       const countMatch = curCountFilter === 'All' || order.count.toString() === curCountFilter;
@@ -914,10 +916,10 @@ export default function Dashboard() {
 
       let roleMatch = true;
       if (curRoleFilter !== 'All') {
-        if (curRoleFilter === 'Green') {
-          roleMatch = order.orderType === 'Others';
-        } else if (curRoleFilter === 'Red') {
-          roleMatch = order.orderType === 'Self';
+        if (curRoleFilter === 'Others') {
+          roleMatch = order.orderType === 'Others' || order.orderType === 'Thaaru';
+        } else if (curRoleFilter === 'Self') {
+          roleMatch = order.orderType === 'Self' || order.orderType === 'Sabi';
         }
       }
 
@@ -1371,6 +1373,20 @@ export default function Dashboard() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
       try { await updateDoc(doc(db, "orders", fireId), { orderStatus: newOrderStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
+    }
+  };
+
+  const handleOrderTypeUpdate = async (id: any, fireId: string, newOrderType: string) => {
+    const orderToUpdate = orders.find(o => o.id === id);
+    if (!orderToUpdate) return;
+
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, orderType: newOrderType } : o));
+    if (fireId) {
+      try {
+        await updateDoc(doc(db, "orders", fireId), { orderType: newOrderType });
+      } catch (e) {
+        console.error("Failed to update orderType:", e);
+      }
     }
   };
 
@@ -2586,22 +2602,23 @@ export default function Dashboard() {
                       <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
                       <button
                         onClick={() => {
-                          const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
+                          const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.role || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
                           setHiddenCols({
                             ...hiddenCols,
                             serialNo: isAnyVisible,
+                            role: isAnyVisible,
                             orderDate: isAnyVisible,
                             deliveryCharge: isAnyVisible,
                             discount: isAnyVisible
                           });
                         }}
-                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
+                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
                             ? 'bg-amber-600 text-white border-amber-700'
                             : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
                           }`}
-                        title={(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
+                        title={(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
                       >
-                        {(hiddenCols.serialNo && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+                        {(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
                       </button>
                       <button
                         onClick={handleScreenshotCapture}
@@ -2755,21 +2772,23 @@ export default function Dashboard() {
                           </th>
                         )}
                         {!isScreenshotMode && (
-                          <th className="py-3 px-4 font-bold align-top transition-all duration-300">
-                            <div className="flex items-center gap-1 group">
-                              <span className="whitespace-nowrap">Role</span>
-                              <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
-                                <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
-                                <select
-                                  value={roleFilter}
-                                  onChange={(e) => setRoleFilter(e.target.value)}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                >
-                                  <option value="All">All</option>
-                                  <option value="Green">Green</option>
-                                  <option value="Red">Red</option>
-                                </select>
-                              </div>
+                          <th className={`py-3 ${hiddenCols.role ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
+                            <div className={`flex items-center ${hiddenCols.role ? 'justify-center' : 'gap-1'} group`}>
+                              {!hiddenCols.role && <span className="whitespace-nowrap">Role</span>}
+                              {!hiddenCols.role && (
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
+                                  <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
+                                  <select
+                                    value={roleFilter}
+                                    onChange={(e) => setRoleFilter(e.target.value)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  >
+                                    <option value="All">All</option>
+                                    <option value="Others">Others</option>
+                                    <option value="Self">Self</option>
+                                  </select>
+                                </div>
+                              )}
                             </div>
                           </th>
                         )}
@@ -3032,16 +3051,25 @@ export default function Dashboard() {
                                 </td>
                               )}
                               {!isScreenshotMode && (
-                                <td className="py-2.5 px-4 align-middle">
-                                  <div className="flex items-center justify-start">
-                                    {order.orderType === 'Others' ? (
-                                      <span className="inline-block w-4 h-4 rounded-full bg-green-500 shadow-sm border border-white" title="Others" />
-                                    ) : order.orderType === 'Self' ? (
-                                      <span className="inline-block w-4 h-4 rounded-full bg-rose-500 shadow-sm border border-white" title="Self" />
-                                    ) : (
-                                      <span className="inline-block w-4 h-4 rounded-full bg-gray-300 shadow-sm border border-white" title={order.orderType || "N/A"} />
-                                    )}
-                                  </div>
+                                <td className={`py-2.5 ${hiddenCols.role ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} align-middle transition-all duration-300`}>
+                                  {!hiddenCols.role && (
+                                    <div className="flex items-center justify-start">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const isOthers = order.orderType === 'Others' || order.orderType === 'Thaaru';
+                                          const nextType = isOthers ? 'Self' : 'Others';
+                                          handleOrderTypeUpdate(order.id, order.fireId, nextType);
+                                        }}
+                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'bg-green-500' : 'bg-rose-500'}`}
+                                        title={`Click to change to ${order.orderType === 'Others' || order.orderType === 'Thaaru' ? 'Self' : 'Others'}`}
+                                      >
+                                        <span
+                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'translate-x-3' : 'translate-x-0'}`}
+                                        />
+                                      </button>
+                                    </div>
+                                  )}
                                 </td>
                               )}
                               {!isScreenshotMode && (
@@ -4098,20 +4126,12 @@ export default function Dashboard() {
               </h2>
 
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-[10px] font-black uppercase tracking-wider ${orderTypeOthersToggle ? 'text-green-600' : 'text-rose-600'}`}>
-                  {orderTypeOthersToggle ? 'Others' : 'Self'}
-                </span>
                 <button
                   type="button"
                   onClick={() => {
                     const nextVal = !orderTypeOthersToggle;
                     setOrderTypeOthersToggle(nextVal);
-                    // Sync with formData.orderType
-                    if (formData.orderType === 'Others' && !nextVal) {
-                      setFormData(prev => ({ ...prev, orderType: 'Self' }));
-                    } else if (formData.orderType === 'Self' && nextVal) {
-                      setFormData(prev => ({ ...prev, orderType: 'Others' }));
-                    }
+                    setFormData(prev => ({ ...prev, orderType: nextVal ? 'Others' : 'Self' }));
                   }}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${orderTypeOthersToggle ? 'bg-green-500' : 'bg-rose-500'}`}
                 >
@@ -4139,10 +4159,7 @@ export default function Dashboard() {
                     <input required list="phones-list" type="text" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Phone Number" />
                   </div>
 
-                  <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Order Confirm Date</label>
-                    <input required type="date" name="orderDate" value={formData.orderDate} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
-                  </div>
+
 
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                     <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Function Date</label>
@@ -4255,17 +4272,7 @@ export default function Dashboard() {
                           <input type="radio" name="orderType" value="Thaaru" checked={formData.orderType === "Thaaru"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
                           Thaaru
                         </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
-                          <input
-                            type="radio"
-                            name="orderType"
-                            value={orderTypeOthersToggle ? "Others" : "Self"}
-                            checked={formData.orderType === (orderTypeOthersToggle ? "Others" : "Self")}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 accent-[#8d6e63]"
-                          />
-                          {orderTypeOthersToggle ? "Others" : "Self"}
-                        </label>
+
                       </div>
                     </div>
                   )}
