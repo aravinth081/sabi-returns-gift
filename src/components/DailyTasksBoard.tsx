@@ -6,6 +6,9 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical
 } from 'lucide-react';
 import { toast } from 'sonner';
+// --- FIREBASE IMPORTS ---
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 export interface DailyTaskCard {
   id: string;
@@ -95,14 +98,17 @@ export default function DailyTasksBoard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load from localStorage
+  // Firestore document reference for the entire board
+  const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
+  const isFirestoreUpdate = useRef(false); // Flag to avoid save loops
+
+  // Load from localStorage first (instant), then sync with Firestore (real-time)
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setLists(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to parse board data, resetting to default', e);
+    // 1. Instant load from localStorage cache
+    const savedLists = localStorage.getItem(STORAGE_KEY);
+    if (savedLists) {
+      try { setLists(JSON.parse(savedLists)); } catch (e) {
+        console.error('Failed to parse cached board data', e);
         setLists(DEFAULT_LISTS);
       }
     } else {
@@ -111,24 +117,73 @@ export default function DailyTasksBoard() {
 
     const savedSort = localStorage.getItem(SORT_STORAGE_KEY);
     if (savedSort) {
-      try {
-        setSortPreferences(JSON.parse(savedSort));
-      } catch (e) {
-        console.error('Failed to parse sort preferences', e);
+      try { setSortPreferences(JSON.parse(savedSort)); } catch (e) {
+        console.error('Failed to parse cached sort preferences', e);
       }
     }
-  }, []);
 
-  // Save to localStorage helper
+    // 2. Real-time Firestore listener
+    const unsubscribe = onSnapshot(boardDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        isFirestoreUpdate.current = true;
+        if (data.lists) {
+          setLists(data.lists);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.lists));
+        }
+        if (data.sortPreferences) {
+          setSortPreferences(data.sortPreferences);
+          localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(data.sortPreferences));
+        }
+        setTimeout(() => { isFirestoreUpdate.current = false; }, 100);
+      } else {
+        // First time: save default data to Firestore
+        setDoc(boardDocRef, {
+          lists: DEFAULT_LISTS,
+          sortPreferences: {},
+          updatedAt: new Date().toISOString()
+        }).catch(err => console.error('Failed to init Firestore board:', err));
+      }
+    }, (error) => {
+      console.error('Firestore listener error:', error);
+      toast.error('Database connection error. Using local data.');
+    });
+
+    return () => unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Save to both Firestore and localStorage
   const saveLists = useCallback((updatedLists: DailyTaskList[]) => {
     setLists(updatedLists);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLists));
-  }, []);
+    // Save to Firestore
+    if (!isFirestoreUpdate.current) {
+      setDoc(boardDocRef, {
+        lists: updatedLists,
+        sortPreferences,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => {
+        console.error('Failed to save lists to Firestore:', err);
+        toast.error('Failed to sync to database');
+      });
+    }
+  }, [sortPreferences]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveSortPreferences = useCallback((prefs: Record<string, SortMode>) => {
     setSortPreferences(prefs);
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(prefs));
-  }, []);
+    // Save to Firestore
+    if (!isFirestoreUpdate.current) {
+      setDoc(boardDocRef, {
+        lists,
+        sortPreferences: prefs,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => {
+        console.error('Failed to save sort prefs to Firestore:', err);
+        toast.error('Failed to sync to database');
+      });
+    }
+  }, [lists]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sort cards by birthday
   const getSortedCards = useCallback((cards: DailyTaskCard[], sortMode: SortMode): DailyTaskCard[] => {
