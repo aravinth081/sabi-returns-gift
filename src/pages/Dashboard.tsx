@@ -16,11 +16,12 @@ import {
 // ------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
 import OrderInvoiceView from "@/components/OrderInvoiceView";
+import DailyTasksBoard from "@/components/DailyTasksBoard";
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
   apiKey: "AIzaSyA2zPg2iKK5oTYqctmqQt3N5wUNOoZ8Kp8",
@@ -462,7 +463,7 @@ export default function Dashboard() {
   const [showApprovalPanel, setShowApprovalPanel] = useState(false);
   const [openActionId, setOpenActionId] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories'>(
+  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks'>(
     (localStorage.getItem('activeTab') as any) || 'dashboard1'
   );
 
@@ -2245,6 +2246,13 @@ export default function Dashboard() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('daily_tasks'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'daily_tasks' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <ClipboardList size={18} className={showSidebarHighlight && activeTab === 'daily_tasks' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'daily_tasks' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Daily Tasks</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('dashboard2'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard2' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
                 <Package size={18} className={showSidebarHighlight && activeTab === 'dashboard2' ? 'drop-shadow-md' : ''} />
@@ -2316,12 +2324,14 @@ export default function Dashboard() {
                 {activeTab === 'tracking' && 'Orders Tracking Center'}
                 {activeTab === 'reports' && 'Analytics & Reports'}
                 {activeTab === 'inventories' && 'Inventory Management'}
+                {activeTab === 'daily_tasks' && 'Daily Task Management Board'}
               </h1>
               <p className={`hidden md:block text-sm text-amber-700`}>
                 {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
                 {activeTab === 'tracking' && 'Search and trace live order statuses.'}
                 {activeTab === 'reports' && 'View your sales and item statistics.'}
                 {activeTab === 'inventories' && 'Track live chocolate stock & manual entries.'}
+                {activeTab === 'daily_tasks' && 'Track your daily operations, follow-ups, and customer pipeline.'}
               </p>
             </div>
           </div>
@@ -2342,6 +2352,12 @@ export default function Dashboard() {
         </header>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible">
+
+          {activeTab === 'daily_tasks' && (
+            <div className="w-full h-full animate-in fade-in duration-300">
+              <DailyTasksBoard />
+            </div>
+          )}
 
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
