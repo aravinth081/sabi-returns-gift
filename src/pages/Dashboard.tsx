@@ -2310,7 +2310,7 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible bg-gradient-to-br from-[#3e2723] via-[#2d1b14] to-[#1a0f0b] shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)]">
+      <main className={`flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] ${activeTab === 'daily_tasks' ? 'bg-gradient-to-br from-[#0f172a] via-[#1e3a5f] to-[#60a5fa]/30' : 'bg-gradient-to-br from-[#3e2723] via-[#2d1b14] to-[#1a0f0b]'}`}>
 
         <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm z-10 print:hidden border-amber-100`}>
           <div className="flex items-center gap-3 md:gap-5">
