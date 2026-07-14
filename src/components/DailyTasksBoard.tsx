@@ -3,11 +3,12 @@ import * as XLSX from 'xlsx';
 import { 
   Plus, X, Upload, Pencil, Trash2, Phone, Calendar, 
   MessageSquare, ClipboardList, ShoppingBag, Trash,
-  ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical
+  ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical,
+  Heart, Camera
 } from 'lucide-react';
 import { toast } from 'sonner';
 // --- FIREBASE IMPORTS ---
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 export interface DailyTaskCard {
@@ -18,6 +19,7 @@ export interface DailyTaskCard {
   chocolateCount: string;
   birthdayDate: string;
   comments: string;
+  favorite?: boolean;
 }
 
 export interface DailyTaskList {
@@ -34,6 +36,26 @@ const normalizePhone = (phone: string): string => {
     return digits.slice(-10);
   }
   return digits;
+};
+
+const triggerForwardToPrintNotification = async (card: DailyTaskCard) => {
+  try {
+    const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+    const newNotification = {
+      id: `notify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      cardId: card.id,
+      cardTitle: card.title,
+      phoneNumber: card.phoneNumber,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    await setDoc(notifyDocRef, {
+      items: arrayUnion(newNotification)
+    }, { merge: true });
+    console.log('Notification triggered for', card.phoneNumber);
+  } catch (err) {
+    console.error('Failed to trigger notification:', err);
+  }
 };
 
 const DEFAULT_LISTS: DailyTaskList[] = [
@@ -54,6 +76,7 @@ export default function DailyTasksBoard() {
   const [selectedCardListId, setSelectedCardListId] = useState<string | null>(null);
   const [isAddingCardListId, setIsAddingCardListId] = useState<string | null>(null);
   const [newCardTitle, setNewCardTitle] = useState('');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   
   // List title editing state
   const [editingListId, setEditingListId] = useState<string | null>(null);
@@ -81,6 +104,10 @@ export default function DailyTasksBoard() {
   const [dragOverListIndex, setDragOverListIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wallpaperInputRef = useRef<HTMLInputElement>(null);
+  const [wallpaper, setWallpaper] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
@@ -98,12 +125,69 @@ export default function DailyTasksBoard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleWallpaperClick = () => {
+    wallpaperInputRef.current?.click();
+  };
+
+  const handleWallpaperChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setWallpaper(result);
+      localStorage.setItem('sabi_daily_tasks_wallpaper', result);
+      toast.success('Wallpaper updated!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetWallpaper = () => {
+    setWallpaper(null);
+    localStorage.removeItem('sabi_daily_tasks_wallpaper');
+    toast.success('Wallpaper reset to default');
+  };
+
+  const handleDragOverFile = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingFile(true);
+    }
+  };
+
+  const handleDragLeaveFile = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDropFile = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        processExcelFile(file);
+      } else {
+        toast.error('Please drop a valid Excel file (.xlsx or .xls)');
+      }
+    }
+  };
+
   // Firestore document reference for the entire board
   const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
   const isFirestoreUpdate = useRef(false); // Flag to avoid save loops
 
   // Load from localStorage first (instant), then sync with Firestore (real-time)
   useEffect(() => {
+    const savedWallpaper = localStorage.getItem('sabi_daily_tasks_wallpaper');
+    if (savedWallpaper) {
+      setWallpaper(savedWallpaper);
+    }
     // 1. Instant load from localStorage cache
     const savedLists = localStorage.getItem(STORAGE_KEY);
     if (savedLists) {
@@ -160,14 +244,13 @@ export default function DailyTasksBoard() {
     if (!isFirestoreUpdate.current) {
       setDoc(boardDocRef, {
         lists: updatedLists,
-        sortPreferences,
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => {
         console.error('Failed to save lists to Firestore:', err);
         toast.error('Failed to sync to database');
       });
     }
-  }, [sortPreferences]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveSortPreferences = useCallback((prefs: Record<string, SortMode>) => {
     setSortPreferences(prefs);
@@ -175,7 +258,6 @@ export default function DailyTasksBoard() {
     // Save to Firestore
     if (!isFirestoreUpdate.current) {
       setDoc(boardDocRef, {
-        lists,
         sortPreferences: prefs,
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => {
@@ -183,7 +265,7 @@ export default function DailyTasksBoard() {
         toast.error('Failed to sync to database');
       });
     }
-  }, [lists]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sort cards by birthday
   const getSortedCards = useCallback((cards: DailyTaskCard[], sortMode: SortMode): DailyTaskCard[] => {
@@ -332,6 +414,41 @@ export default function DailyTasksBoard() {
     }
   };
 
+  const handleCancelCard = (sourceListId: string, cardId: string) => {
+    const sourceList = lists.find(l => l.id === sourceListId);
+    const card = sourceList?.cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    let targetList = lists.find(l => l.title.toLowerCase().trim() === 'cancelled');
+    let updatedLists = [...lists];
+
+    if (!targetList) {
+      const newListId = `list-cancelled`;
+      targetList = {
+        id: newListId,
+        title: 'Cancelled',
+        cards: []
+      };
+      updatedLists.push(targetList);
+    }
+
+    const updatedCard = { ...card, status: 'Cancelled' as const };
+
+    updatedLists = updatedLists.map(list => {
+      if (list.id === sourceListId) {
+        return { ...list, cards: list.cards.filter(c => c.id !== cardId) };
+      }
+      if (list.id === targetList!.id) {
+        const filtered = list.cards.filter(c => c.id !== cardId);
+        return { ...list, cards: [...filtered, updatedCard] };
+      }
+      return list;
+    });
+
+    saveLists(updatedLists);
+    toast.success('Card cancelled and moved to "Cancelled" list');
+  };
+
   const handleCardStatusChange = (listId: string, cardId: string, newStatus: DailyTaskCard['status']) => {
     const updated = lists.map(list => {
       if (list.id === listId) {
@@ -346,6 +463,50 @@ export default function DailyTasksBoard() {
     });
     saveLists(updated);
     toast.success('Card status updated');
+  };
+
+  const handleCardFieldChange = (listId: string, cardId: string, field: keyof DailyTaskCard, value: any) => {
+    const updated = lists.map(list => {
+      if (list.id === listId) {
+        return {
+          ...list,
+          cards: list.cards.map(card => 
+            card.id === cardId ? { ...card, [field]: value } : card
+          )
+        };
+      }
+      return list;
+    });
+    saveLists(updated);
+  };
+
+  const handlePhoneBlur = (listId: string, card: DailyTaskCard, originalPhone: string) => {
+    const val = card.phoneNumber.trim();
+    if (!val) {
+      toast.error("Phone number cannot be empty.");
+      handleCardFieldChange(listId, card.id, 'phoneNumber', originalPhone);
+      return;
+    }
+    
+    const norm = normalizePhone(val);
+    let isDuplicate = false;
+    if (norm && val !== originalPhone) {
+      for (const list of lists) {
+        for (const c of list.cards) {
+          if (c.id === card.id) continue;
+          if (normalizePhone(c.phoneNumber) === norm) {
+            isDuplicate = true;
+            break;
+          }
+        }
+        if (isDuplicate) break;
+      }
+    }
+    
+    if (isDuplicate) {
+      toast.error(`Phone number ${val} already exists!`);
+      handleCardFieldChange(listId, card.id, 'phoneNumber', originalPhone);
+    }
   };
 
   // ==================== CARD DRAG & DROP ====================
@@ -421,6 +582,11 @@ export default function DailyTasksBoard() {
         l.id === targetListId ? { ...l, cards: filteredCards } : l
       );
     } else {
+      const targetList = updatedLists.find(l => l.id === targetListId);
+      if (targetList && targetList.title.toLowerCase().trim() === 'forward to print') {
+        triggerForwardToPrintNotification(cardToMove);
+      }
+
       updatedLists = updatedLists.map(list => {
         if (list.id === sourceListId) {
           return { ...list, cards: list.cards.filter(c => c.id !== sourceCardId) };
@@ -553,8 +719,10 @@ export default function DailyTasksBoard() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) processExcelFile(file);
+  };
 
+  const processExcelFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -595,6 +763,12 @@ export default function DailyTasksBoard() {
           return undefined;
         };
 
+        const cleanLabelText = (label: string): string => {
+          if (!label) return '';
+          const noEmojis = label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "");
+          return noEmojis.replace(/[^\w\s\(\)\-]/g, '').replace(/\s+/g, ' ').trim();
+        };
+
         let importCount = 0;
         let skipDuplicateCount = 0;
         let skipMissingCount = 0;
@@ -611,25 +785,30 @@ export default function DailyTasksBoard() {
           if (!phoneStr) { skipMissingCount++; return; }
 
           const normImported = normalizePhone(phoneStr);
-          let isDup = false;
+
+          // Find if duplicate exists on the board
+          let existingCard: DailyTaskCard | null = null;
+          let existingListIndex = -1;
+          let existingCardIndex = -1;
+
           if (normImported) {
-            for (const list of updatedLists) {
-              for (const card of list.cards) {
+            for (let li = 0; li < updatedLists.length; li++) {
+              const list = updatedLists[li];
+              for (let ci = 0; ci < list.cards.length; ci++) {
+                const card = list.cards[ci];
                 const normExisting = normalizePhone(card.phoneNumber);
-                if (card.phoneNumber.trim() === phoneStr || normExisting === normImported) { isDup = true; break; }
+                if (card.phoneNumber.trim() === phoneStr || normExisting === normImported) {
+                  existingCard = card;
+                  existingListIndex = li;
+                  existingCardIndex = ci;
+                  break;
+                }
               }
-              if (isDup) break;
+              if (existingCard) break;
             }
           }
 
-          if (isDup) { skipDuplicateCount++; return; }
-
-          const cleanLabelText = (label: string): string => {
-            if (!label) return '';
-            const noEmojis = label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "");
-            return noEmojis.replace(/[^\w\s\(\)\-]/g, '').replace(/\s+/g, ' ').trim();
-          };
-
+          // Determine target list for this row
           const labelVal = String(rawLabel || '').trim();
           const cleanedLabel = cleanLabelText(labelVal);
 
@@ -660,6 +839,42 @@ export default function DailyTasksBoard() {
             if (match) targetListIndex = match.index;
           }
 
+          if (existingCard) {
+            // It's a duplicate. Check if target list is different
+            if (existingListIndex !== targetListIndex) {
+              // Move existing card to target list
+              // Determine status update based on target list title
+              let newStatus = existingCard.status;
+              const targetTitle = updatedLists[targetListIndex].title.toLowerCase().trim();
+              if (targetTitle.includes('pending')) {
+                newStatus = 'Image Edit Pending';
+              } else if (targetTitle.includes('completed')) {
+                newStatus = 'Order Completed';
+              } else if (targetTitle.includes('cancelled')) {
+                newStatus = 'Cancelled';
+              } else if (targetTitle.includes('july') || targetTitle.includes('aug')) {
+                newStatus = 'Waiting for Image';
+              }
+
+              // Remove from old list
+              updatedLists[existingListIndex].cards.splice(existingCardIndex, 1);
+              
+              // Update status and move card
+              const movedCard = { ...existingCard, status: newStatus };
+              updatedLists[targetListIndex].cards.push(movedCard);
+              importCount++;
+
+              // Trigger notification if target list is "Forward to Print"
+              if (targetTitle === 'forward to print') {
+                triggerForwardToPrintNotification(movedCard);
+              }
+            } else {
+              skipDuplicateCount++;
+            }
+            return;
+          }
+
+          // Create new card
           const newCard: DailyTaskCard = {
             id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             title: phoneStr,
@@ -670,12 +885,26 @@ export default function DailyTasksBoard() {
             comments: ''
           };
 
+          const targetTitle = updatedLists[targetListIndex].title.toLowerCase().trim();
+          if (targetTitle.includes('pending')) {
+            newCard.status = 'Image Edit Pending';
+          } else if (targetTitle.includes('completed')) {
+            newCard.status = 'Order Completed';
+          } else if (targetTitle.includes('cancelled')) {
+            newCard.status = 'Cancelled';
+          }
+
           updatedLists[targetListIndex].cards.push(newCard);
           importCount++;
+
+          // Trigger notification if target list is "Forward to Print"
+          if (targetTitle === 'forward to print') {
+            triggerForwardToPrintNotification(newCard);
+          }
         });
 
         saveLists(updatedLists);
-        toast.success(`Import complete: Added ${importCount} new cards! (Skipped ${skipDuplicateCount} duplicates, ${skipMissingCount} invalid numbers)`);
+        toast.success(`Import complete: Added/Moved ${importCount} cards! (Skipped ${skipDuplicateCount} duplicates in same lists, ${skipMissingCount} invalid numbers)`);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (err) {
         console.error('Error importing Excel:', err);
@@ -716,80 +945,149 @@ export default function DailyTasksBoard() {
   // ==================== RENDER ====================
 
   return (
-    <div className="flex flex-col h-full w-full select-none" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
-      {/* Board Controls */}
-      <div className="flex justify-between items-center mb-5 shrink-0 print:hidden flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2.5 tracking-wide">
-            <div className="p-1.5 bg-blue-500/20 rounded-lg backdrop-blur-sm">
-              <ClipboardList className="text-blue-300" size={22} />
-            </div>
-            Daily Tasks Board
-          </h2>
-          <p className="text-xs text-blue-200/50 font-medium mt-1 ml-10">Manage tasks and import leads dynamically.</p>
-        </div>
+    <div 
+      className="flex flex-col h-full w-full select-none relative p-6 rounded-3xl overflow-hidden min-h-[80vh]" 
+      style={{ 
+        backgroundImage: wallpaper ? `url(${wallpaper})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif"
+      }}
+      onDragOver={handleDragOverFile}
+      onDragLeave={handleDragLeaveFile}
+      onDrop={handleDropFile}
+    >
+      {/* Semi-transparent dark overlay for wallpaper readability */}
+      {wallpaper && (
+        <div className="absolute inset-0 bg-slate-950/50 z-0 pointer-events-none" />
+      )}
 
-        <div className="flex items-center gap-2.5">
-          {/* Add List Button */}
-          {isAddingList ? (
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-xl p-1.5 border border-white/20">
-              <input
-                ref={newListInputRef}
-                type="text"
-                value={newListTitle}
-                onChange={(e) => setNewListTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAddList();
-                  if (e.key === 'Escape') { setIsAddingList(false); setNewListTitle(''); }
-                }}
-                placeholder="List name..."
-                className="bg-white/90 border-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 w-40 placeholder:text-slate-400"
-                autoFocus
-              />
+      {/* File Drag and Drop Overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 bg-blue-950/85 z-[150] rounded-3xl flex flex-col items-center justify-center border-4 border-dashed border-blue-400 m-2 backdrop-blur-sm pointer-events-none">
+          <Upload size={48} className="text-blue-300 animate-bounce mb-3" />
+          <p className="text-xl font-black text-white">Drop Excel file here to Import</p>
+          <p className="text-xs text-blue-200 mt-1">Supports .xlsx and .xls formats</p>
+        </div>
+      )}
+
+      <div className="relative z-10 flex flex-col h-full w-full">
+        {/* Board Controls */}
+        <div className="flex justify-between items-center mb-5 shrink-0 print:hidden flex-wrap gap-3">
+          <div>
+            <h2 className="text-xl font-extrabold text-white flex items-center gap-2.5 tracking-wide">
+              <div className="p-1.5 bg-blue-500/20 rounded-lg backdrop-blur-sm">
+                <ClipboardList className="text-blue-300" size={22} />
+              </div>
+              Daily Tasks Board
+            </h2>
+            <p className="text-xs text-blue-200/50 font-medium mt-1 ml-10">Manage tasks and import leads dynamically.</p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Add List Button */}
+            {isAddingList ? (
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-xl p-1.5 border border-white/20">
+                <input
+                  ref={newListInputRef}
+                  type="text"
+                  value={newListTitle}
+                  onChange={(e) => setNewListTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddList();
+                    if (e.key === 'Escape') { setIsAddingList(false); setNewListTitle(''); }
+                  }}
+                  placeholder="List name..."
+                  className="bg-white/90 border-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 w-40 placeholder:text-slate-400"
+                  autoFocus
+                />
+                <button
+                  onClick={handleAddList}
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors shadow-sm"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => { setIsAddingList(false); setNewListTitle(''); }}
+                  className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={handleAddList}
-                className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors shadow-sm"
+                onClick={() => { setIsAddingList(true); setNewListTitle(''); setTimeout(() => newListInputRef.current?.focus(), 50); }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl border border-white/20 hover:border-white/40 font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
               >
-                Add
+                <Plus size={16} className="stroke-[2.5]" /> Add List
               </button>
-              <button
-                onClick={() => { setIsAddingList(false); setNewListTitle(''); }}
-                className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setIsAddingList(true); setNewListTitle(''); setTimeout(() => newListInputRef.current?.focus(), 50); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl border border-white/20 hover:border-white/40 font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
+            )}
+
+            {/* Import Excel */}
+            <button 
+              onClick={handleImportClick}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 border border-blue-500/50"
             >
-              <Plus size={16} className="stroke-[2.5]" /> Add List
+              <Upload size={16} /> Import Excel
             </button>
-          )}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              accept=".xlsx,.xls" 
+              className="hidden" 
+            />
 
-          {/* Import Excel */}
-          <button 
-            onClick={handleImportClick}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 border border-blue-500/50"
-          >
-            <Upload size={16} /> Import Excel
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept=".xlsx,.xls" 
-            className="hidden" 
-          />
+            {/* Wallpaper Controls */}
+            <button 
+              onClick={handleWallpaperClick}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl border border-white/20 hover:border-white/40 font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
+              title="Upload Daily Tasks Wallpaper"
+            >
+              <Camera size={16} /> Wallpaper
+            </button>
+            {wallpaper && (
+              <button 
+                onClick={handleResetWallpaper}
+                className="flex items-center gap-1.5 px-3 py-2.5 bg-rose-600/30 hover:bg-rose-600/55 text-white rounded-xl border border-rose-500/35 hover:border-rose-400 font-bold text-xs transition-all shadow-md"
+                title="Reset to default background"
+              >
+                Reset
+              </button>
+            )}
+            <input 
+              type="file" 
+              ref={wallpaperInputRef} 
+              onChange={handleWallpaperChange} 
+              accept="image/*" 
+              className="hidden" 
+            />
+
+            {/* Global Favorites Filter */}
+            <button 
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg ${
+                showFavoritesOnly 
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 hover:border-rose-600' 
+                  : 'bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border-white/20 hover:border-white/40'
+              }`}
+              title={showFavoritesOnly ? "Show All Cards" : "Filter Favorites"}
+            >
+              <Heart size={16} className={showFavoritesOnly ? "fill-white stroke-white" : "text-white"} />
+              <span>Favorites</span>
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Trello Columns Horizontal Scroll */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 flex gap-4 items-start custom-scrollbar h-full min-h-[500px]">
         {lists.map((list, listIndex) => {
           const sortMode = sortPreferences[list.id] || 'default';
-          const displayCards = getSortedCards(list.cards, sortMode);
+          let displayCards = getSortedCards(list.cards, sortMode);
+          if (showFavoritesOnly) {
+            displayCards = displayCards.filter(c => c.favorite);
+          }
 
           return (
             <div
@@ -924,6 +1222,7 @@ export default function DailyTasksBoard() {
                     )}
                   </div>
 
+
                   {/* More Menu (Delete List) */}
                   <div className="relative shrink-0">
                     <button
@@ -996,43 +1295,94 @@ export default function DailyTasksBoard() {
                       onClick={() => handleOpenDetailsModal(card, list.id)}
                     >
                       <div className="flex flex-col gap-2">
+                        {/* Header Row: Title input, Favorite button, Actions stack */}
                         <div className="flex justify-between items-start gap-2">
-                          <p className="text-xs font-bold text-slate-800 tracking-wide truncate flex-1">{card.title}</p>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteCard(list.id, card.id); }}
-                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded-lg transition-colors shrink-0 opacity-0 group-hover/card:opacity-100"
-                            title="Delete card"
-                          >
-                            <Trash size={11} />
-                          </button>
-                        </div>
+                          <input
+                            type="text"
+                            value={card.title}
+                            onChange={(e) => handleCardFieldChange(list.id, card.id, 'title', e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs font-bold text-slate-800 tracking-wide bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
+                            title="Click to edit title"
+                          />
+                          
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* Favorite Button (Heart) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCardFieldChange(list.id, card.id, 'favorite', !card.favorite);
+                              }}
+                              className={`p-1 rounded transition-colors ${
+                                card.favorite ? 'text-rose-600 hover:text-rose-700' : 'text-slate-300 hover:text-slate-500'
+                              }`}
+                              title={card.favorite ? "Unmark Favorite" : "Mark Favorite"}
+                            >
+                              <Heart size={13} className={card.favorite ? "fill-rose-600 stroke-rose-600" : ""} />
+                            </button>
 
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold select-all">
-                          <Phone size={10} className="text-blue-400" />
-                          <span>{card.phoneNumber}</span>
-                        </div>
-
-                        {card.birthdayDate && (
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
-                            <Calendar size={10} className="text-emerald-400" />
-                            <span>{new Date(card.birthdayDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            {/* Action Buttons Stack (Delete & Cancel) */}
+                            <div className="flex flex-col gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteCard(list.id, card.id); }}
+                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-0.5 rounded transition-colors"
+                                title="Delete card"
+                              >
+                                <Trash size={12} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleCancelCard(list.id, card.id); }}
+                                className="text-slate-400 hover:text-amber-500 hover:bg-amber-50 p-0.5 rounded transition-colors"
+                                title="Cancel card"
+                              >
+                                <X size={12} className="stroke-[3]" />
+                              </button>
+                            </div>
                           </div>
-                        )}
+                        </div>
 
-                        <div className="flex items-center gap-1 justify-between shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                        {/* Phone Number Input */}
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold" onClick={(e) => e.stopPropagation()}>
+                          <Phone size={10} className="text-blue-400 shrink-0" />
+                          <input
+                            type="text"
+                            value={card.phoneNumber}
+                            onChange={(e) => handleCardFieldChange(list.id, card.id, 'phoneNumber', e.target.value)}
+                            onBlur={() => handlePhoneBlur(list.id, card, card.phoneNumber)}
+                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-semibold text-slate-700 focus:outline-none transition-all w-full select-all"
+                            placeholder="Phone number"
+                          />
+                        </div>
+
+                        {/* Birthday Date Input */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium" onClick={(e) => e.stopPropagation()}>
+                          <Calendar size={10} className="text-emerald-400 shrink-0" />
+                          <input
+                            type="date"
+                            value={card.birthdayDate || ''}
+                            onChange={(e) => handleCardFieldChange(list.id, card.id, 'birthdayDate', e.target.value)}
+                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[10px] text-slate-600 focus:outline-none transition-all w-full cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Count Input (Inline, editable) */}
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600" onClick={(e) => e.stopPropagation()}>
+                          <ShoppingBag size={10} className="text-purple-400 shrink-0" />
+                          <span className="text-slate-500">Count:</span>
+                          <input
+                            type="number"
+                            value={card.chocolateCount || ''}
+                            onChange={(e) => handleCardFieldChange(list.id, card.id, 'chocolateCount', e.target.value)}
+                            className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 focus:outline-none transition-all"
+                            placeholder="0"
+                          />
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex items-center shrink-0 mt-0.5">
                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusStyle(card.status)}`}>
                             {card.status}
                           </span>
-                          <select
-                            value={card.status}
-                            onChange={(e) => handleCardStatusChange(list.id, card.id, e.target.value as any)}
-                            className="text-[9px] bg-white border border-slate-200 rounded-lg p-1 font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer shadow-sm hover:bg-slate-50"
-                          >
-                            <option value="Waiting for Image">Waiting</option>
-                            <option value="Image Edit Pending">Pending</option>
-                            <option value="Order Completed">Completed</option>
-                            <option value="Cancelled">Cancelled</option>
-                          </select>
                         </div>
                       </div>
                     </div>
@@ -1084,6 +1434,7 @@ export default function DailyTasksBoard() {
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Card Details Modal popup */}

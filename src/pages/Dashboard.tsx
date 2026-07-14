@@ -11,17 +11,19 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 // --- FIREBASE IMPORTS ADDED ---
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc
 } from "firebase/firestore";
 // ------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
+  Bell
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
 import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
+import { toast } from 'sonner';
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
   apiKey: "AIzaSyA2zPg2iKK5oTYqctmqQt3N5wUNOoZ8Kp8",
@@ -470,6 +472,46 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
+
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+
+  useEffect(() => {
+    const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+    const unsubscribe = onSnapshot(notifyDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.items) {
+          const sorted = [...data.items].sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          setNotifications(sorted);
+        }
+      }
+    }, (err) => {
+      console.error("Firestore notifications listener error:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+      const updated = notifications.map(n => ({ ...n, read: true }));
+      await setDoc(notifyDocRef, { items: updated }, { merge: true });
+      toast.success("All notifications marked as read");
+    } catch (err) {
+      console.error('Failed to mark notifications as read:', err);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    try {
+      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+      await setDoc(notifyDocRef, { items: [] }, { merge: true });
+      toast.success("Notifications cleared");
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+    }
+  };
 
   useEffect(() => {
     if (role !== 'Employee' || !isLoggedIn || !employeeId) return;
@@ -2312,7 +2354,7 @@ export default function Dashboard() {
 
       <main className={`flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] ${activeTab === 'daily_tasks' ? 'bg-gradient-to-br from-[#0f172a] via-[#1e3a5f] to-[#60a5fa]/30' : 'bg-gradient-to-br from-[#3e2723] via-[#2d1b14] to-[#1a0f0b]'}`}>
 
-        <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm z-10 print:hidden border-amber-100`}>
+        <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm relative z-50 print:hidden border-amber-100`}>
           <div className="flex items-center gap-3 md:gap-5">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200" title="Toggle Menu">
               <Menu size={24} />
@@ -2337,6 +2379,81 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {activeTab === 'dashboard1' && (
+              <div className="relative print:hidden">
+                <button
+                  onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+                  className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200 relative cursor-pointer flex items-center justify-center"
+                  title="Notifications"
+                >
+                  <Bell size={20} />
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md animate-pulse">
+                      {notifications.filter(n => !n.read).length}
+                    </span>
+                  )}
+                </button>
+                
+                {showNotificationDropdown && (
+                  <div 
+                    className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-amber-100 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.98)',
+                      backdropFilter: 'blur(20px)',
+                    }}
+                  >
+                    <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
+                      <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                        <Bell size={14} className="text-amber-800" /> Notifications
+                      </span>
+                      <div className="flex gap-2 text-[11px]">
+                        {notifications.length > 0 && (
+                          <>
+                            <button 
+                              onClick={markAllNotificationsAsRead}
+                              className="text-amber-800 hover:text-amber-950 font-bold hover:underline"
+                            >
+                              Mark read
+                            </button>
+                            <span className="text-amber-200">|</span>
+                            <button 
+                              onClick={clearAllNotifications}
+                              className="text-rose-600 hover:text-rose-700 font-bold hover:underline"
+                            >
+                              Clear
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar divide-y divide-amber-50">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-amber-900/40 italic font-medium">
+                          No notifications yet
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div 
+                            key={n.id} 
+                            className={`p-3 text-xs transition-colors hover:bg-amber-50/30 ${
+                              !n.read ? 'bg-amber-50/20 font-semibold' : 'text-slate-500'
+                            }`}
+                          >
+                            <p className="text-slate-800 leading-tight">
+                              Card <span className="font-bold text-amber-950 select-all">{n.phoneNumber}</span> ({n.cardTitle}) was moved to <span className="text-blue-600 font-bold">Forward to Print</span>
+                            </p>
+                            <span className="text-[10px] text-slate-400 mt-1 block font-medium">
+                              {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className="hidden sm:block text-right">
               <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
               <p className="text-sm font-bold text-amber-600 tracking-widest uppercase">return Gifts</p>
