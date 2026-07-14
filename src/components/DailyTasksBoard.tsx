@@ -1064,19 +1064,19 @@ export default function DailyTasksBoard() {
               className="hidden" 
             />
 
-            {/* Global Favorites Filter */}
-            <button 
-              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg ${
-                showFavoritesOnly 
-                  ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 hover:border-rose-600' 
-                  : 'bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border-white/20 hover:border-white/40'
-              }`}
-              title={showFavoritesOnly ? "Show All Cards" : "Filter Favorites"}
-            >
-              <Heart size={16} className={showFavoritesOnly ? "fill-white stroke-white" : "text-white"} />
-              <span>Favorites</span>
-            </button>
+             {/* Global Favorites Filter */}
+             <button 
+               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg ${
+                 showFavoritesOnly 
+                   ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 hover:border-rose-600' 
+                   : 'bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border-white/20 hover:border-white/40'
+               }`}
+               title={showFavoritesOnly ? "Show All Cards" : "Filter Favorites"}
+             >
+               <Heart size={16} fill={showFavoritesOnly ? "currentColor" : "none"} className={showFavoritesOnly ? "text-white" : "text-white/60"} />
+               <span>Favorites</span>
+             </button>
           </div>
         </div>
 
@@ -1313,12 +1313,12 @@ export default function DailyTasksBoard() {
                                 e.stopPropagation();
                                 handleCardFieldChange(list.id, card.id, 'favorite', !card.favorite);
                               }}
-                              className={`p-1 rounded transition-colors ${
-                                card.favorite ? 'text-rose-600 hover:text-rose-700' : 'text-slate-300 hover:text-slate-500'
+                              className={`p-1.5 rounded transition-all cursor-pointer ${
+                                card.favorite ? 'text-rose-600 bg-rose-50' : 'text-slate-300 hover:text-rose-600 hover:bg-rose-50/50'
                               }`}
                               title={card.favorite ? "Unmark Favorite" : "Mark Favorite"}
                             >
-                              <Heart size={13} className={card.favorite ? "fill-rose-600 stroke-rose-600" : ""} />
+                              <Heart size={13} fill={card.favorite ? "currentColor" : "none"} />
                             </button>
 
                             {/* Action Buttons Stack (Delete & Cancel) */}
