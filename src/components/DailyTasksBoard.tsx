@@ -1316,11 +1316,11 @@ export default function DailyTasksBoard() {
                               }}
                               onMouseDown={(e) => e.stopPropagation()}
                               className={`p-1.5 rounded transition-all cursor-pointer ${
-                                card.favorite ? 'text-red-500 bg-red-50' : 'text-slate-300 hover:text-red-500 hover:bg-red-50/50'
+                                card.favorite ? 'text-red-500 bg-red-50' : 'text-slate-400 hover:text-red-500 hover:bg-red-50/50'
                               }`}
                               title={card.favorite ? "Unmark Favorite" : "Mark Favorite"}
                             >
-                              <Heart size={13} fill={card.favorite ? "currentColor" : "none"} />
+                              <Heart size={16} fill={card.favorite ? "currentColor" : "none"} className="stroke-[2.5]" />
                             </button>
 
                             {/* Action Buttons Stack (Delete & Cancel) */}
