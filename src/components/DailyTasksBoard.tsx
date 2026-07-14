@@ -1302,6 +1302,7 @@ export default function DailyTasksBoard() {
                             value={card.title}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'title', e.target.value)}
                             onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
                             className="text-xs font-bold text-slate-800 tracking-wide bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
                             title="Click to edit title"
                           />
@@ -1313,8 +1314,9 @@ export default function DailyTasksBoard() {
                                 e.stopPropagation();
                                 handleCardFieldChange(list.id, card.id, 'favorite', !card.favorite);
                               }}
+                              onMouseDown={(e) => e.stopPropagation()}
                               className={`p-1.5 rounded transition-all cursor-pointer ${
-                                card.favorite ? 'text-rose-600 bg-rose-50' : 'text-slate-300 hover:text-rose-600 hover:bg-rose-50/50'
+                                card.favorite ? 'text-red-500 bg-red-50' : 'text-slate-300 hover:text-red-500 hover:bg-red-50/50'
                               }`}
                               title={card.favorite ? "Unmark Favorite" : "Mark Favorite"}
                             >
@@ -1325,6 +1327,7 @@ export default function DailyTasksBoard() {
                             <div className="flex flex-col gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDeleteCard(list.id, card.id); }}
+                                onMouseDown={(e) => e.stopPropagation()}
                                 className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-0.5 rounded transition-colors"
                                 title="Delete card"
                               >
@@ -1332,6 +1335,7 @@ export default function DailyTasksBoard() {
                               </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCancelCard(list.id, card.id); }}
+                                onMouseDown={(e) => e.stopPropagation()}
                                 className="text-slate-400 hover:text-amber-500 hover:bg-amber-50 p-0.5 rounded transition-colors"
                                 title="Cancel card"
                               >
@@ -1349,6 +1353,7 @@ export default function DailyTasksBoard() {
                             value={card.phoneNumber}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'phoneNumber', e.target.value)}
                             onBlur={() => handlePhoneBlur(list.id, card, card.phoneNumber)}
+                            onMouseDown={(e) => e.stopPropagation()}
                             className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-semibold text-slate-700 focus:outline-none transition-all w-full select-all"
                             placeholder="Phone number"
                           />
@@ -1361,6 +1366,7 @@ export default function DailyTasksBoard() {
                             type="date"
                             value={card.birthdayDate || ''}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'birthdayDate', e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
                             className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[10px] text-slate-600 focus:outline-none transition-all w-full cursor-pointer"
                           />
                         </div>
@@ -1373,6 +1379,7 @@ export default function DailyTasksBoard() {
                             type="number"
                             value={card.chocolateCount || ''}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'chocolateCount', e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
                             className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 focus:outline-none transition-all"
                             placeholder="0"
                           />
