@@ -1085,9 +1085,6 @@ export default function DailyTasksBoard() {
         {lists.map((list, listIndex) => {
           const sortMode = sortPreferences[list.id] || 'default';
           let displayCards = getSortedCards(list.cards, sortMode);
-          if (showFavoritesOnly) {
-            displayCards = displayCards.filter(c => c.favorite);
-          }
 
           return (
             <div
@@ -1283,6 +1280,10 @@ export default function DailyTasksBoard() {
                       className={`rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:-translate-y-0.5 group/card ${
                         dragOverCardId === card.id && draggedCardId 
                           ? 'border-t-[3px] border-t-blue-400' 
+                          : ''
+                      } ${
+                        showFavoritesOnly && !card.favorite 
+                          ? 'blur-[1.5px] opacity-40 select-none pointer-events-none' 
                           : ''
                       }`}
                       style={{
