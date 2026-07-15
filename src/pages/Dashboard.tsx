@@ -2564,7 +2564,7 @@ export default function Dashboard() {
 
           {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6 print:hidden mt-1">
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
 
                 <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                   <div className="flex justify-between items-start mb-2 relative z-10">
@@ -2599,45 +2599,7 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                {activeTab === 'dashboard1' ? (
-                  <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex justify-between items-start mb-3 relative z-10">
-                      <div className="flex items-center gap-1 group relative">
-                        <p className="text-sm font-black text-[#c2410c] tracking-wide">Order Status</p>
-                        <div className="relative inline-block">
-                          <ChevronDown size={14} className="text-[#c2410c] cursor-pointer hover:scale-125 transition-transform" />
-                          <select
-                            value={tableTypeFilter}
-                            onChange={(e) => setTableTypeFilter(e.target.value)}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            title="Filter by Order Type"
-                          >
-                            <option value="All">All Types</option>
-                            <option value="Sabi">Sabi</option>
-                            <option value="Thaaru">Thaaru</option>
-                            <option value="Self">Others</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><Package size={16} /></div>
-                    </div>
-
-                    {tableTypeFilter !== 'All' && (
-                      <p className="text-[9px] font-extrabold text-purple-600 uppercase tracking-wider -mt-2 mb-1 z-10 relative">
-                        Type: {tableTypeFilter === 'Self' ? 'Others' : tableTypeFilter}
-                      </p>
-                    )}
-
-                    <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider relative z-10">
-                      <option value="All">All Statuses</option>
-                      <option value="image edited (not paid)">I E (Not Paid)</option>
-                      <option value="forward to print (paid)">F 2 P (Paid)</option>
-                      <option value="order complete">Order Complete</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-
-                  </div>
-                ) : (
+                {activeTab === 'dashboard2' && (
                   <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col hover:-translate-y-1 transition-all duration-300">
                     <div className="flex justify-between items-start mb-2 relative z-10 shrink-0">
                       <p className="text-sm font-black text-[#c2410c] tracking-wide">Product Listing</p>

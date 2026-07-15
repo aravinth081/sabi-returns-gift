@@ -188,9 +188,62 @@ export default function DailyTasksBoard() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
-      setWallpaper(result);
-      localStorage.setItem('sabi_daily_tasks_wallpaper', result);
-      toast.success('Wallpaper updated!');
+      
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1200;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.7);
+          setWallpaper(compressed);
+          try {
+            localStorage.setItem('sabi_daily_tasks_wallpaper', compressed);
+            toast.success('Wallpaper updated!');
+          } catch (err) {
+            console.error('Failed to save wallpaper:', err);
+            toast.error('Failed to save wallpaper: storage quota exceeded.');
+          }
+        } else {
+          setWallpaper(result);
+          try {
+            localStorage.setItem('sabi_daily_tasks_wallpaper', result);
+            toast.success('Wallpaper updated!');
+          } catch (err) {
+            console.error('Failed to save wallpaper:', err);
+            toast.error('Failed to save wallpaper: storage quota exceeded.');
+          }
+        }
+      };
+      img.onerror = () => {
+        setWallpaper(result);
+        try {
+          localStorage.setItem('sabi_daily_tasks_wallpaper', result);
+          toast.success('Wallpaper updated!');
+        } catch (err) {
+          console.error('Failed to save wallpaper:', err);
+          toast.error('Failed to save wallpaper: storage quota exceeded.');
+        }
+      };
+      img.src = result;
     };
     reader.readAsDataURL(file);
   };
@@ -1507,30 +1560,33 @@ export default function DailyTasksBoard() {
                           />
                         </div>
 
-                        {/* Birthday Date Input */}
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium" onClick={(e) => e.stopPropagation()}>
-                          <Calendar size={10} className="text-emerald-400 shrink-0" />
-                          <input
-                            type="date"
-                            value={card.birthdayDate || ''}
-                            onChange={(e) => handleCardFieldChange(list.id, card.id, 'birthdayDate', e.target.value)}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[10px] text-slate-600 focus:outline-none transition-all w-full cursor-pointer"
-                          />
-                        </div>
+                        {/* Date & Count Row */}
+                        <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                          {/* Birthday Date Input */}
+                          <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium flex-1 min-w-0">
+                            <Calendar size={10} className="text-emerald-400 shrink-0" />
+                            <input
+                              type="date"
+                              value={card.birthdayDate || ''}
+                              onChange={(e) => handleCardFieldChange(list.id, card.id, 'birthdayDate', e.target.value)}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-0.5 py-0.5 rounded text-[10px] text-slate-600 focus:outline-none transition-all w-full cursor-pointer"
+                            />
+                          </div>
 
-                        {/* Count Input (Inline, editable) */}
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600" onClick={(e) => e.stopPropagation()}>
-                          <ShoppingBag size={10} className="text-purple-400 shrink-0" />
-                          <span className="text-slate-500">Count:</span>
-                          <input
-                            type="number"
-                            value={card.chocolateCount || ''}
-                            onChange={(e) => handleCardFieldChange(list.id, card.id, 'chocolateCount', e.target.value)}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 focus:outline-none transition-all"
-                            placeholder="0"
-                          />
+                          {/* Count Input (Inline, editable) */}
+                          <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-600 shrink-0">
+                            <ShoppingBag size={10} className="text-purple-400 shrink-0" />
+                            <span className="text-slate-500 text-[10px]">Count:</span>
+                            <input
+                              type="number"
+                              value={card.chocolateCount || ''}
+                              onChange={(e) => handleCardFieldChange(list.id, card.id, 'chocolateCount', e.target.value)}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              className="w-10 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-0.5 py-0.5 rounded text-[11px] font-bold text-slate-800 focus:outline-none transition-all"
+                              placeholder="0"
+                            />
+                          </div>
                         </div>
 
                         {/* Status Badge */}
