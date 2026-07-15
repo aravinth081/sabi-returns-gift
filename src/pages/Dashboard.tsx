@@ -17,7 +17,7 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -362,7 +362,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
-      const ordersList = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      const ordersList = snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        const fallbackRole = (data.orderType === 'Self' || data.orderType === 'Sabi') ? 'Self' : 'Others';
+        return {
+          fireId: doc.id,
+          ...data,
+          role: data.role || fallbackRole
+        };
+      });
       ordersList.sort((a: any, b: any) => b.id - a.id);
       setOrders(ordersList);
     });
@@ -477,6 +485,10 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [isWinnerPickerModalOpen, setIsWinnerPickerModalOpen] = useState(false);
+  const [historyDetailOrder, setHistoryDetailOrder] = useState<any>(null);
+  const [d1Wallpaper, setD1Wallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_dashboard1') || "");
+  const [d2Wallpaper, setD2Wallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_dashboard2') || "");
+  const [showWallpaperDropdown, setShowWallpaperDropdown] = useState(false);
 
   useEffect(() => {
     const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
@@ -512,6 +524,107 @@ export default function Dashboard() {
       toast.success("Notifications cleared");
     } catch (err) {
       console.error('Failed to clear notifications:', err);
+    }
+  };
+
+  const handleNotificationClick = async (notification: any) => {
+    const matchedOrder = orders.find(o => o.phone === notification.phoneNumber || o.name === notification.cardTitle);
+    
+    if (matchedOrder) {
+      setHistoryDetailOrder(matchedOrder);
+    } else {
+      const matchedTrash = trashOrders.find(o => o.phone === notification.phoneNumber || o.name === notification.cardTitle);
+      if (matchedTrash) {
+        setHistoryDetailOrder({ ...matchedTrash, isFromTrash: true });
+      } else {
+        setHistoryDetailOrder({
+          name: notification.cardTitle || 'Unknown Customer',
+          phone: notification.phoneNumber || 'N/A',
+          chocolate: 'N/A',
+          count: '0',
+          orderStatus: 'N/A',
+          paymentStatus: 'N/A',
+          totalOrderPrice: 0,
+          isFallback: true
+        });
+      }
+    }
+    
+    try {
+      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+      const updated = notifications.map(n => n.id === notification.id ? { ...n, read: true } : n);
+      await setDoc(notifyDocRef, { items: updated }, { merge: true });
+    } catch (e) {
+      console.error("Failed to mark notification as read:", e);
+    }
+  };
+
+  const PRESET_WALLPAPERS = [
+    { name: "Cream Soft Gradient", value: "linear-gradient(to right, #fdfbf7, #f5e6d3)" },
+    { name: "Sabi Warm Glow", value: "linear-gradient(135deg, #fdf8f5 0%, #faefe8 100%)" },
+    { name: "Golden Chocolate Mesh", value: "radial-gradient(circle at 80% 20%, #fdf5e6 0%, #f7ebd3 100%)" },
+    { name: "Pastel Lavender Mist", value: "linear-gradient(135deg, #fbf7ff 0%, #f3e6ff 100%)" },
+    { name: "Minimal Soft Slate", value: "linear-gradient(to bottom, #f8fafc, #f1f5f9)" }
+  ];
+
+  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'd1' | 'd2') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          
+          if (target === 'd1') {
+            setD1Wallpaper(compressedBase64);
+            localStorage.setItem('sabi_wallpaper_dashboard1', compressedBase64);
+            toast.success("Dashboard 1 background updated!");
+          } else {
+            setD2Wallpaper(compressedBase64);
+            localStorage.setItem('sabi_wallpaper_dashboard2', compressedBase64);
+            toast.success("Dashboard 2 background updated!");
+          }
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearWallpaper = (target: 'd1' | 'd2') => {
+    if (target === 'd1') {
+      setD1Wallpaper("");
+      localStorage.removeItem('sabi_wallpaper_dashboard1');
+      toast.success("Dashboard 1 background cleared.");
+    } else {
+      setD2Wallpaper("");
+      localStorage.removeItem('sabi_wallpaper_dashboard2');
+      toast.success("Dashboard 2 background cleared.");
     }
   };
 
@@ -728,19 +841,19 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Self", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
 
   useEffect(() => {
     if (isModalOpen) {
-      if (formData.orderType === 'Self') {
+      if (formData.role === 'Self') {
         setOrderTypeOthersToggle(false);
       } else {
         setOrderTypeOthersToggle(true);
       }
     }
-  }, [isModalOpen, formData.orderType]);
+  }, [isModalOpen, formData.role]);
 
   const [previewData, setPreviewData] = useState<any>(null);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -770,6 +883,19 @@ export default function Dashboard() {
 
   const uniqueNames = useMemo(() => Array.from(new Set(orders.map(o => o.name))), [orders]);
   const uniquePhones = useMemo(() => Array.from(new Set(orders.map(o => o.phone))), [orders]);
+
+  const relatedLogs = useMemo(() => {
+    if (!historyDetailOrder) return [];
+    const nameQuery = historyDetailOrder.name.toLowerCase().trim();
+    const phoneQuery = historyDetailOrder.phone ? historyDetailOrder.phone.trim() : '';
+    
+    return activityLogs.filter(log => {
+      const actionLower = (log.action || '').toLowerCase();
+      const nameMatch = nameQuery && actionLower.includes(nameQuery);
+      const phoneMatch = phoneQuery && actionLower.includes(phoneQuery);
+      return nameMatch || phoneMatch;
+    });
+  }, [historyDetailOrder, activityLogs]);
 
   // Sequential serial number map: oldest order = SR001, next = SR002, etc.
   const orderSerialMap = useMemo(() => {
@@ -982,11 +1108,7 @@ export default function Dashboard() {
 
       let roleMatch = true;
       if (curRoleFilter !== 'All') {
-        if (curRoleFilter === 'Others') {
-          roleMatch = order.orderType === 'Others' || order.orderType === 'Thaaru';
-        } else if (curRoleFilter === 'Self') {
-          roleMatch = order.orderType === 'Self' || order.orderType === 'Sabi';
-        }
+        roleMatch = order.role === curRoleFilter;
       }
 
       return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && chennaiMatch && roleMatch;
@@ -1456,6 +1578,20 @@ export default function Dashboard() {
     }
   };
 
+  const handleRoleUpdate = async (id: any, fireId: string, newRole: string) => {
+    const orderToUpdate = orders.find(o => o.id === id);
+    if (!orderToUpdate) return;
+
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, role: newRole } : o));
+    if (fireId) {
+      try {
+        await updateDoc(doc(db, "orders", fireId), { role: newRole });
+      } catch (e) {
+        console.error("Failed to update role:", e);
+      }
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let newFormData = { ...formData, [name]: value };
@@ -1493,14 +1629,16 @@ export default function Dashboard() {
 
 
 
-  const handleAddClick = () => {
+  const handleAddClick = (categoryOverride?: 'chocolate' | 'product') => {
     const today = new Date().toISOString().split('T')[0];
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    const category = categoryOverride || (activeTab === 'dashboard2' ? 'product' : 'chocolate');
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Self", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setIsModalOpen(true);
   };
 
 
   const handleEditClick = (order: any) => {
+    const fallbackRole = (order.orderType === 'Self' || order.orderType === 'Sabi') ? 'Self' : 'Others';
     setFormData({
       ...order,
       fireId: order.fireId, // 🟢 IMPORTANT: Ithu thaan edit aaga use aagum
@@ -1513,6 +1651,7 @@ export default function Dashboard() {
       isDeliveryFree: order.isDeliveryFree || false,
       isChennai: order.isChennai || false,
       orderType: order.orderType || "Thaaru",
+      role: order.role || fallbackRole,
       orderStatus: order.orderStatus || "image edited (not paid)",
       category: order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate'),
       manualDeliveryFee: order.manualDeliveryFee || "",
@@ -1552,15 +1691,38 @@ export default function Dashboard() {
             deletedAt: Date.now(),
             deletedBy: role ? `${role} (${loggedInName})` : loggedInName
           };
+          const originalFireId = order.fireId;
+          const originalOrderData = { ...order };
+          delete (originalOrderData as any).fireId;
+
           delete (trashOrder as any).fireId;
-          await addDoc(collection(db, "trash_orders"), trashOrder);
+          const trashRef = await addDoc(collection(db, "trash_orders"), trashOrder);
+          const trashFireId = trashRef.id;
+
+          await deleteDoc(doc(db, "orders", originalFireId));
+          setSelectedOrders(selectedOrders.filter(selectedId => selectedId !== id));
+          logActivity(`Deleted Order: ${order.name} (${order.chocolate || 'Product'} x${order.count})`,
+            order.category === 'product' ? 'Order Management (Products)' : 'Order Management (Chocolates)');
+
+          toast.success("Order moved to trash", {
+            action: {
+              label: "Undo",
+              onClick: async () => {
+                try {
+                  await setDoc(doc(db, "orders", originalFireId), originalOrderData);
+                  await deleteDoc(doc(db, "trash_orders", trashFireId));
+                  toast.success("Order restored successfully!");
+                  logActivity(`Restored Order: ${order.name}`, 'Trash Bin');
+                } catch (err) {
+                  console.error("Undo restore failed:", err);
+                  toast.error("Failed to restore order.");
+                }
+              }
+            }
+          });
         } catch (err) {
           console.error("Failed to copy order to trash:", err);
         }
-        await deleteDoc(doc(db, "orders", order.fireId));
-        setSelectedOrders(selectedOrders.filter(selectedId => selectedId !== id));
-        logActivity(`Deleted Order: ${order.name} (${order.chocolate || 'Product'} x${order.count})`,
-          order.category === 'product' ? 'Order Management (Products)' : 'Order Management (Chocolates)');
       }
     }
   };
@@ -1655,7 +1817,7 @@ export default function Dashboard() {
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Self", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Self", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
 
 
     } catch (err) {
@@ -2563,8 +2725,21 @@ export default function Dashboard() {
           )}
 
           {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
-            <>
-              <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
+            <div 
+              className="relative p-6 rounded-[2.5rem] transition-all duration-500 overflow-hidden shadow-inner border border-amber-100/40"
+              style={{
+                background: activeTab === 'dashboard1' 
+                  ? (d1Wallpaper ? (d1Wallpaper.startsWith('data:image') ? `url(${d1Wallpaper}) center/cover no-repeat` : d1Wallpaper) : '#fffcf9')
+                  : (d2Wallpaper ? (d2Wallpaper.startsWith('data:image') ? `url(${d2Wallpaper}) center/cover no-repeat` : d2Wallpaper) : '#fffcf9'),
+              }}
+            >
+              {/* Overlay for contrast when wallpaper is active */}
+              {((activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper)) && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-0 pointer-events-none" />
+              )}
+              
+              <div className="relative z-10 flex flex-col gap-6">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
 
                 <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                   <div className="flex justify-between items-start mb-2 relative z-10">
@@ -2685,10 +2860,10 @@ export default function Dashboard() {
               </div>
 
               <div ref={screenshotTableRef} className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8`}>
-                <div className={`p-4 md:p-6 border-b flex flex-col md:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
+                <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
 
 
-                  <div className="flex items-center gap-4 w-full md:w-auto">
+                  <div className="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
                     <div className="flex items-center gap-3">
                       <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
                       <button
@@ -2733,21 +2908,23 @@ export default function Dashboard() {
                         <MapPin size={12} strokeWidth={3} />
                         Chennai
                       </button>
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-black tracking-wider uppercase text-amber-600 hover:text-amber-800 transition-colors print:hidden bg-white border border-amber-200 px-2.5 h-8 rounded-xl shadow-sm hover:bg-amber-50">
-                        <input
-                          type="checkbox"
-                          checked={showCheckboxes}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setShowCheckboxes(checked);
-                            if (!checked) {
-                              setSelectedOrders([]);
-                            }
-                          }}
-                          className="w-3.5 h-3.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600"
-                        />
-                        Checkbox
-                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextVal = !showCheckboxes;
+                          setShowCheckboxes(nextVal);
+                          if (!nextVal) {
+                            setSelectedOrders([]);
+                          }
+                        }}
+                        className={`h-8 w-8 rounded-xl transition-all duration-300 print:hidden shadow-sm border flex items-center justify-center shrink-0 ${showCheckboxes
+                            ? 'bg-amber-600 text-white border-amber-700 shadow-md scale-105'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                          }`}
+                        title={showCheckboxes ? "Hide checkboxes" : "Show checkboxes"}
+                      >
+                        {showCheckboxes ? <CheckSquare size={15} strokeWidth={2.5} /> : <Square size={15} strokeWidth={2.5} />}
+                      </button>
 
                       <div className="relative w-40 sm:w-48 md:w-56">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
@@ -2774,7 +2951,7 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto print:hidden">
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto print:hidden shrink-0 justify-center sm:justify-end">
                     {/* Gift Icon Button to open Winner Picker Modal */}
                     <button
                       onClick={() => setIsWinnerPickerModalOpen(true)}
@@ -2784,6 +2961,39 @@ export default function Dashboard() {
                       <Gift size={18} className="text-amber-600 fill-amber-100 group-hover:text-amber-700 animate-bounce" />
                       <span>Winner Picker</span>
                     </button>
+
+                    {/* Wallpaper Customize Button (opens file manager directly) */}
+                    <div className="flex items-center gap-1.5 print:hidden">
+                      <button
+                        onClick={() => {
+                          const fileInput = document.getElementById(activeTab === 'dashboard1' ? 'd1-wallpaper-upload' : 'd2-wallpaper-upload');
+                          fileInput?.click();
+                        }}
+                        className="flex justify-center items-center gap-2 px-4 py-2 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer"
+                        title="Choose Custom Background Image"
+                      >
+                        <ImageIcon size={18} className="text-amber-700" />
+                        <span>Background</span>
+                      </button>
+                      <input
+                        type="file"
+                        id={activeTab === 'dashboard1' ? 'd1-wallpaper-upload' : 'd2-wallpaper-upload'}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          handleWallpaperUpload(e, activeTab === 'dashboard1' ? 'd1' : 'd2');
+                        }}
+                      />
+                      {((activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper)) && (
+                        <button
+                          onClick={() => handleClearWallpaper(activeTab === 'dashboard1' ? 'd1' : 'd2')}
+                          className="p-2 text-rose-600 hover:text-rose-800 hover:bg-rose-55/40 border border-rose-200 rounded-lg cursor-pointer bg-white"
+                          title="Remove Background"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
 
                     {/* Notifications button/dropdown replacing Import/Export */}
                     <div className="relative">
@@ -2795,7 +3005,11 @@ export default function Dashboard() {
                         <Bell size={18} />
                         <span>Notifications</span>
                         {notifications.filter(n => !n.read).length > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md animate-pulse">
+                          <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md ${
+                            orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
+                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border border-indigo-300 animate-pulse'
+                              : 'bg-rose-600'
+                          }`}>
                             {notifications.filter(n => !n.read).length}
                           </span>
                         )}
@@ -2812,26 +3026,26 @@ export default function Dashboard() {
                           <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
                             <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
                               <Bell size={14} className="text-amber-800" /> Notifications
-                            </span>
-                            <div className="flex gap-2 text-[11px]">
-                              {notifications.length > 0 && (
-                                <>
-                                  <button 
-                                    onClick={markAllNotificationsAsRead}
-                                    className="text-amber-800 hover:text-amber-950 font-bold hover:underline"
-                                  >
-                                    Mark read
-                                  </button>
-                                  <span className="text-amber-200">|</span>
-                                  <button 
-                                    onClick={clearAllNotifications}
-                                    className="text-amber-850 hover:text-rose-700 font-bold hover:underline"
-                                  >
-                                    Clear
-                                  </button>
-                                </>
+                              {notifications.filter(n => !n.read).length > 0 && (
+                                <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${
+                                  orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
+                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
+                                    : 'bg-rose-600'
+                                }`}>
+                                  {notifications.filter(n => !n.read).length}
+                                </span>
                               )}
-                            </div>
+                            </span>
+                            <button
+                              onClick={() => {
+                                setShowNotificationDropdown(false);
+                                setActiveTab('dashboard1');
+                                handleAddClick('chocolate');
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer border border-amber-500/20"
+                            >
+                              <Plus size={11} /> Add Order
+                            </button>
                           </div>
                           <div className="max-h-64 overflow-y-auto divide-y divide-amber-100/50">
                             {notifications.length === 0 ? (
@@ -2840,7 +3054,14 @@ export default function Dashboard() {
                               </div>
                             ) : (
                               notifications.map((n) => (
-                                <div key={n.id} className={`p-3 text-xs transition-colors hover:bg-amber-50/30 ${!n.read ? 'bg-amber-50/10 font-semibold' : 'text-slate-500'}`}>
+                                <div
+                                  key={n.id}
+                                  onClick={() => {
+                                    setShowNotificationDropdown(false);
+                                    handleNotificationClick(n);
+                                  }}
+                                  className={`p-3 text-xs transition-colors hover:bg-amber-50/50 cursor-pointer ${!n.read ? 'bg-amber-50/10 font-bold' : 'text-slate-500'}`}
+                                >
                                   <div className="flex justify-between items-start gap-1">
                                     <p className="text-slate-800">{n.cardTitle} moved to Print</p>
                                     <span className="text-[9px] text-amber-600 shrink-0 font-bold">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -3212,19 +3433,18 @@ export default function Dashboard() {
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const isOthers = order.orderType === 'Others' || order.orderType === 'Thaaru';
-                                          const nextType = isOthers ? 'Self' : 'Others';
-                                          handleOrderTypeUpdate(order.id, order.fireId, nextType);
+                                          const nextRole = order.role === 'Others' ? 'Self' : 'Others';
+                                          handleRoleUpdate(order.id, order.fireId, nextRole);
                                         }}
-                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'bg-green-500' : 'bg-rose-500'}`}
-                                        title={`Click to change to ${order.orderType === 'Others' || order.orderType === 'Thaaru' ? 'Self' : 'Others'}`}
+                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.role === 'Others') ? 'bg-green-500' : 'bg-rose-500'}`}
+                                        title={`Click to change to ${order.role === 'Others' ? 'Self' : 'Others'}`}
                                       >
                                         <span
-                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'translate-x-3' : 'translate-x-0'}`}
+                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.role === 'Others') ? 'translate-x-3' : 'translate-x-0'}`}
                                         />
                                       </button>
-                                      <span className={`text-[10px] font-black uppercase tracking-wider ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'text-green-600' : 'text-rose-600'}`}>
-                                        {(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'Others' : 'Self'}
+                                      <span className={`text-[10px] font-black uppercase tracking-wider ${(order.role === 'Others') ? 'text-green-600' : 'text-rose-600'}`}>
+                                        {order.role}
                                       </span>
                                     </div>
                                   )}
@@ -3481,9 +3701,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
-            </>
-          )}
+            </div>
+          </div>
+        )}
 
           {activeTab === 'tracking' && (
             <div className="w-full px-2 print:hidden">
@@ -4292,7 +4512,7 @@ export default function Dashboard() {
                   onClick={() => {
                     const nextVal = !orderTypeOthersToggle;
                     setOrderTypeOthersToggle(nextVal);
-                    setFormData(prev => ({ ...prev, orderType: nextVal ? 'Others' : 'Self' }));
+                    setFormData(prev => ({ ...prev, role: nextVal ? 'Others' : 'Self' }));
                   }}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${orderTypeOthersToggle ? 'bg-green-500' : 'bg-rose-500'}`}
                 >
@@ -5135,6 +5355,7 @@ export default function Dashboard() {
                             <th className="px-4 py-3">Module</th>
                             <th className="px-4 py-3">By</th>
                             <th className="px-4 py-3 whitespace-nowrap">Date & Time</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60">
@@ -5178,6 +5399,33 @@ export default function Dashboard() {
                                     <p className="text-xs text-slate-300 font-bold">
                                       {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                                     </p>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-right">
+                                    <button
+                                      onClick={async () => {
+                                        const logToDelete = { ...log };
+                                        const logFireId = log.fireId;
+                                        delete (logToDelete as any).fireId;
+                                        try {
+                                          await deleteDoc(doc(db, "activity_logs", logFireId));
+                                          toast.success("History log deleted", {
+                                            action: {
+                                              label: "Undo",
+                                              onClick: async () => {
+                                                await setDoc(doc(db, "activity_logs", logFireId), logToDelete);
+                                                toast.success("History log restored!");
+                                              }
+                                            }
+                                          });
+                                        } catch (e) {
+                                          toast.error("Failed to delete log entry");
+                                        }
+                                      }}
+                                      className="p-1.5 text-slate-450 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                      title="Delete Log"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -5774,6 +6022,197 @@ export default function Dashboard() {
             className="relative bg-transparent max-w-sm w-full animate-in fade-in zoom-in-95 slide-in-from-bottom-8 ease-out duration-300 cursor-default"
           >
             <MonthlyWinnerPicker orders={orders} onClose={() => setIsWinnerPickerModalOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* 🟣 ORDER DETAILS & ACTIVITY TIMELINE MODAL */}
+      {historyDetailOrder && (
+        <div
+          className="fixed inset-0 bg-black/70 z-[210] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => setHistoryDetailOrder(null)}
+        >
+          <div
+            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden border border-amber-100 flex flex-col transform transition-all animate-in zoom-in-95 ease-out duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-950 to-amber-900 p-6 text-white flex justify-between items-center border-b-4 border-amber-800 shrink-0">
+              <div>
+                <h2 className="text-xl font-black tracking-wide flex items-center gap-2">
+                  <History size={20} className="text-amber-400" />
+                  Order Detail & History
+                </h2>
+                <p className="text-amber-200/80 text-xs font-bold mt-1 tracking-widest uppercase">
+                  {historyDetailOrder.isFallback ? 'Fallback Record' : `Invoice: ${getSerial(historyDetailOrder.id)}`} 
+                  {historyDetailOrder.isFromTrash && <span className="ml-2 text-red-300 bg-red-950/40 border border-red-500/35 px-2 py-0.5 rounded text-[10px]">In Trash Bin</span>}
+                </p>
+              </div>
+              <button 
+                onClick={() => setHistoryDetailOrder(null)} 
+                className="text-amber-100 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 custom-scrollbar">
+              
+              {/* Left Column: Order details Card */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-100 pb-2">Customer & Item Information</h3>
+                
+                <div className="bg-white border-2 border-amber-50 rounded-2xl p-5 space-y-3.5 shadow-sm">
+                  <div>
+                    <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Customer Name</span>
+                    <span className="text-base font-black text-amber-950">{historyDetailOrder.name}</span>
+                  </div>
+                  
+                  <div>
+                    <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Contact Number</span>
+                    <span className="text-sm font-black text-amber-900">{historyDetailOrder.phone || 'N/A'}</span>
+                  </div>
+
+                  {historyDetailOrder.address && (
+                    <div>
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Delivery Address</span>
+                      <span className="text-xs font-bold text-slate-700">{historyDetailOrder.address}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-amber-50">
+                    <div>
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Category</span>
+                      <span className="text-xs font-black uppercase text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50 w-max block mt-0.5">
+                        {historyDetailOrder.category || 'chocolate'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Order Type</span>
+                      <span className="text-xs font-black uppercase text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50 w-max block mt-0.5">
+                        {historyDetailOrder.orderType || 'Sabi'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-amber-50">
+                    <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">{historyDetailOrder.category === 'product' ? 'Product Name' : 'Chocolate Name'}</span>
+                    <span className="text-sm font-black text-amber-950 block mt-0.5">{historyDetailOrder.chocolate || historyDetailOrder.productName || 'N/A'}</span>
+                    <span className="text-xs text-slate-500 font-semibold mt-1 block">Quantity: <strong className="text-amber-950">{historyDetailOrder.count}</strong> units</span>
+                  </div>
+                </div>
+
+                <div className="bg-white border-2 border-amber-50 rounded-2xl p-5 space-y-3 shadow-sm">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Subtotal</span>
+                      <span className="text-xs font-extrabold text-slate-700">₹{(historyDetailOrder.itemSubtotal || 0).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Discount</span>
+                      <span className="text-xs font-extrabold text-red-600">-₹{(historyDetailOrder.discount || 0).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Delivery Fee</span>
+                      <span className="text-xs font-extrabold text-slate-700">
+                        {historyDetailOrder.isDeliveryFree ? 'Free' : `₹${(historyDetailOrder.calculatedDeliveryFee || 0).toLocaleString()}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-amber-50">
+                    <div>
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Total Price</span>
+                      <span className="text-base font-black text-green-700">₹{(historyDetailOrder.totalOrderPrice || 0).toLocaleString()}</span>
+                    </div>
+                    {Number(historyDetailOrder.advanceAmount) > 0 && (
+                      <div className="text-right">
+                        <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Advance Paid</span>
+                        <span className="text-xs font-black text-blue-600">₹{Number(historyDetailOrder.advanceAmount).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-amber-50">
+                    <div>
+                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Payment Status</span>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${
+                        historyDetailOrder.paymentStatus === 'Full Paid' ? 'bg-green-50 text-green-700 border-green-200' :
+                        historyDetailOrder.paymentStatus === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {historyDetailOrder.paymentStatus || 'Pending'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Dispatch Status</span>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${
+                        historyDetailOrder.status === 'Delivered' ? 'bg-green-50 text-green-700 border-green-200' :
+                        'bg-yellow-50 text-yellow-700 border-yellow-200'
+                      }`}>
+                        {historyDetailOrder.status || 'In Process'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Timeline stepper */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-100 pb-2">Activity History Timeline</h3>
+                
+                <div className="max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                  {relatedLogs.length === 0 ? (
+                    <div className="text-center py-16 text-slate-400 font-bold text-xs bg-white rounded-2xl border-2 border-amber-50/50 p-6">
+                      <History size={36} className="mx-auto mb-2 opacity-35 text-slate-400" />
+                      No log history found for this order.
+                    </div>
+                  ) : (
+                    <div className="relative pl-6 border-l border-amber-200/70 space-y-5 py-2">
+                      {relatedLogs.map((log: any, idx: number) => {
+                        const actionLower = (log.action || '').toLowerCase();
+                        const isAdd = actionLower.startsWith('added') || actionLower.startsWith('registered');
+                        const isEdit = actionLower.startsWith('edited');
+                        const isDelete = actionLower.startsWith('deleted') || actionLower.startsWith('permanently');
+                        const isRestore = actionLower.startsWith('restored');
+                        const dotColor = isAdd ? 'bg-emerald-500 ring-emerald-100' : isEdit ? 'bg-amber-500 ring-amber-100' : isDelete ? 'bg-red-500 ring-red-100' : isRestore ? 'bg-blue-500 ring-blue-100' : 'bg-slate-400 ring-slate-100';
+                        
+                        return (
+                          <div key={log.fireId || idx} className="relative group/timeline">
+                            {/* Dot */}
+                            <span className={`absolute -left-[30px] top-1 w-3 h-3 rounded-full ring-4 ${dotColor} border border-white`} />
+                            
+                            <div className="bg-white border border-amber-100/50 rounded-xl p-3 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow">
+                              <p className="text-xs font-bold text-slate-800 leading-normal">{log.action}</p>
+                              <div className="flex justify-between items-center text-[9px] text-slate-400 font-semibold mt-2 border-t border-slate-50 pt-1.5">
+                                <span className="flex items-center gap-1">
+                                  <User size={8} /> By: {log.performedBy || 'System'} ({log.role || 'Admin'})
+                                </span>
+                                <span>
+                                  {new Date(log.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-amber-50/50 border-t border-amber-100 flex justify-end shrink-0">
+              <button
+                onClick={() => setHistoryDetailOrder(null)}
+                className="px-6 py-2 rounded-xl font-bold text-xs text-amber-900 bg-white border-2 border-amber-200 hover:bg-amber-50 shadow-sm transition-all active:scale-95 cursor-pointer"
+              >
+                Close details
+              </button>
+            </div>
           </div>
         </div>
       )}

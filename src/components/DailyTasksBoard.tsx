@@ -1076,11 +1076,11 @@ export default function DailyTasksBoard() {
 
   const getStatusStyle = (status: DailyTaskCard['status']) => {
     switch (status) {
-      case 'Waiting for Image': return 'bg-amber-100 text-amber-800 border-amber-300';
-      case 'Image Edit Pending': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'Order Completed': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-      case 'Cancelled': return 'bg-rose-100 text-rose-800 border-rose-300';
-      default: return 'bg-slate-100 text-slate-800 border-slate-300';
+      case 'Waiting for Image': return 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 border-amber-200';
+      case 'Image Edit Pending': return 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200';
+      case 'Order Completed': return 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border-emerald-200';
+      case 'Cancelled': return 'bg-gradient-to-r from-rose-50 to-red-50 text-rose-700 border-rose-200';
+      default: return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 border-slate-200';
     }
   };
 
@@ -1466,9 +1466,9 @@ export default function DailyTasksBoard() {
                       onDragStart={(e) => handleCardDragStart(e, card.id, list.id)}
                       onDragEnd={handleCardDragEnd}
                       onDragOver={(e) => handleDragOverCard(e, card.id)}
-                      className={`rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:-translate-y-0.5 group/card ${
+                      className={`rounded-2xl p-4 cursor-grab active:cursor-grabbing transition-all duration-300 hover:-translate-y-1 hover:shadow-lg group/card relative ${
                         dragOverCardId === card.id && draggedCardId 
-                          ? 'border-t-[3px] border-t-blue-400' 
+                          ? 'ring-2 ring-blue-400' 
                           : ''
                       } ${
                         showFavoritesOnly && !card.favorite 
@@ -1476,35 +1476,27 @@ export default function DailyTasksBoard() {
                           : ''
                       }`}
                       style={{
-                        background: 'rgba(255,255,255,0.92)',
-                        border: dragOverCardId === card.id && draggedCardId 
-                          ? '1px solid rgba(96,165,250,0.5)' 
-                          : '1px solid rgba(255,255,255,0.3)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
+                        borderLeft: `4px solid ${
+                          card.status === 'Waiting for Image' ? '#f59e0b' :
+                          card.status === 'Image Edit Pending' ? '#3b82f6' :
+                          card.status === 'Cancelled' ? '#ef4444' :
+                          card.status === 'Order Completed' ? '#10b981' : '#64748b'
+                        }`,
+                        background: '#ffffff',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
                       }}
                       onClick={() => handleOpenDetailsModal(card, list.id)}
                     >
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2.5">
                         {/* Header Row: Title input, Favorite button, Actions stack */}
                         <div className="flex justify-between items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={isCardSelected(list.id, card.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleCardSelection(list.id, card.id);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="w-4 h-4 rounded border-slate-350 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all accent-blue-600 mt-1 shrink-0"
-                          />
                           <input
                             type="text"
                             value={card.title}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'title', e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="text-xs font-bold text-slate-800 tracking-wide bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
+                            className="text-xs font-black text-slate-800 tracking-wide bg-transparent border-b border-transparent hover:border-slate-350 focus:border-blue-500 focus:bg-slate-50 px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
                             title="Click to edit title"
                           />
                           
@@ -1590,7 +1582,7 @@ export default function DailyTasksBoard() {
                         </div>
 
                         {/* Status Badge */}
-                        {card.status !== 'Waiting for Image' && (
+                        {card.status !== 'Waiting for Image' && card.status !== 'Order Completed' && (
                           <div className="flex items-center shrink-0 mt-0.5">
                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusStyle(card.status)}`}>
                               {card.status}
