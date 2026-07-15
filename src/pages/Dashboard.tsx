@@ -17,12 +17,13 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell
+  Bell, Gift
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
 import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
+import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
 import { toast } from 'sonner';
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
@@ -465,7 +466,7 @@ export default function Dashboard() {
   const [showApprovalPanel, setShowApprovalPanel] = useState(false);
   const [openActionId, setOpenActionId] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks'>(
+  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker'>(
     (localStorage.getItem('activeTab') as any) || 'dashboard1'
   );
 
@@ -475,6 +476,7 @@ export default function Dashboard() {
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [isWinnerPickerModalOpen, setIsWinnerPickerModalOpen] = useState(false);
 
   useEffect(() => {
     const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
@@ -569,6 +571,13 @@ export default function Dashboard() {
         (!toggleBtn || !toggleBtn.contains(e.target as Node))
       ) {
         setShowSidebarHighlight(false);
+      }
+
+      // Close notification dropdown when clicking outside
+      const target = e.target as HTMLElement;
+      const isNotificationClick = target.closest('.notification-container-ref') || target.closest('[title="Notifications"]');
+      if (!isNotificationClick) {
+        setShowNotificationDropdown(false);
       }
     };
     document.addEventListener('click', handleDocumentClick);
@@ -825,6 +834,9 @@ export default function Dashboard() {
 
     orders.forEach(order => {
       if (order.orderStatus === 'cancelled') return;
+      // Exclude 'Self' and 'Sabi' orders from inventory calculations (only 'Others' affect inventory)
+      const isSelf = order.orderType === 'Self' || order.orderType === 'Sabi';
+      if (isSelf) return;
       if (!order.chocolate) return;
 
       const orderChocs = String(order.chocolate).split(',');
@@ -2326,6 +2338,8 @@ export default function Dashboard() {
                 <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'drop-shadow-md' : ''} />
                 <span style={showSidebarHighlight && activeTab === 'reports' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Reports</span>
               </button>
+
+
             </nav>
           </div>
 
@@ -2367,6 +2381,7 @@ export default function Dashboard() {
                 {activeTab === 'reports' && 'Analytics & Reports'}
                 {activeTab === 'inventories' && 'Inventory Management'}
                 {activeTab === 'daily_tasks' && 'Daily Task Management Board'}
+                {activeTab === 'random_picker' && 'Monthly Winner Picker'}
               </h1>
               <p className={`hidden md:block text-sm text-amber-700`}>
                 {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
@@ -2374,85 +2389,13 @@ export default function Dashboard() {
                 {activeTab === 'reports' && 'View your sales and item statistics.'}
                 {activeTab === 'inventories' && 'Track live chocolate stock & manual entries.'}
                 {activeTab === 'daily_tasks' && 'Track your daily operations, follow-ups, and customer pipeline.'}
+                {activeTab === 'random_picker' && 'Draw monthly random winners for cashback rewards (Instagram Reels ready).'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {activeTab === 'dashboard1' && (
-              <div className="relative print:hidden">
-                <button
-                  onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
-                  className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200 relative cursor-pointer flex items-center justify-center"
-                  title="Notifications"
-                >
-                  <Bell size={20} />
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md animate-pulse">
-                      {notifications.filter(n => !n.read).length}
-                    </span>
-                  )}
-                </button>
-                
-                {showNotificationDropdown && (
-                  <div 
-                    className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-amber-100 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.98)',
-                      backdropFilter: 'blur(20px)',
-                    }}
-                  >
-                    <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
-                      <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
-                        <Bell size={14} className="text-amber-800" /> Notifications
-                      </span>
-                      <div className="flex gap-2 text-[11px]">
-                        {notifications.length > 0 && (
-                          <>
-                            <button 
-                              onClick={markAllNotificationsAsRead}
-                              className="text-amber-800 hover:text-amber-950 font-bold hover:underline"
-                            >
-                              Mark read
-                            </button>
-                            <span className="text-amber-200">|</span>
-                            <button 
-                              onClick={clearAllNotifications}
-                              className="text-rose-600 hover:text-rose-700 font-bold hover:underline"
-                            >
-                              Clear
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto custom-scrollbar divide-y divide-amber-50">
-                      {notifications.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-amber-900/40 italic font-medium">
-                          No notifications yet
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div 
-                            key={n.id} 
-                            className={`p-3 text-xs transition-colors hover:bg-amber-50/30 ${
-                              !n.read ? 'bg-amber-50/20 font-semibold' : 'text-slate-500'
-                            }`}
-                          >
-                            <p className="text-slate-800 leading-tight">
-                              Card <span className="font-bold text-amber-950 select-all">{n.phoneNumber}</span> ({n.cardTitle}) was moved to <span className="text-blue-600 font-bold">Forward to Print</span>
-                            </p>
-                            <span className="text-[10px] text-slate-400 mt-1 block font-medium">
-                              {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+
             
             <div className="hidden sm:block text-right">
               <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
@@ -2475,6 +2418,8 @@ export default function Dashboard() {
               <DailyTasksBoard />
             </div>
           )}
+
+
 
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
@@ -2868,20 +2813,84 @@ export default function Dashboard() {
                   )}
 
                   <div className="flex flex-wrap items-center gap-3 w-full md:w-auto print:hidden">
-                    <input
-                      type="file"
-                      accept=".xlsx, .xls"
-                      ref={fileInputRef}
-                      onChange={handleFileImport}
-                      className="hidden"
-                    />
-                    <button onClick={handleImportClick} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50`}>
-                      <Upload size={18} /> <span className="hidden sm:inline">Import</span> Excel
+                    {/* Gift Icon Button to open Winner Picker Modal */}
+                    <button
+                      onClick={() => setIsWinnerPickerModalOpen(true)}
+                      className="flex justify-center items-center gap-2 px-4 py-2 font-bold rounded-lg transition-all border bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:scale-105 active:scale-95 cursor-pointer shadow-sm relative group"
+                      title="Monthly Winner Picker"
+                    >
+                      <Gift size={18} className="text-amber-600 fill-amber-100 group-hover:text-amber-700 animate-bounce" />
+                      <span>Winner Picker</span>
                     </button>
 
-                    <button onClick={() => setIsExportPreviewOpen(true)} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50`}>
-                      <Download size={18} /> <span className="hidden sm:inline">Export</span> Excel
-                    </button>
+                    {/* Notifications button/dropdown replacing Import/Export */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+                        className="flex justify-center items-center gap-2 px-4 py-2 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer relative"
+                        title="Notifications"
+                      >
+                        <Bell size={18} />
+                        <span>Notifications</span>
+                        {notifications.filter(n => !n.read).length > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md animate-pulse">
+                            {notifications.filter(n => !n.read).length}
+                          </span>
+                        )}
+                      </button>
+
+                      {showNotificationDropdown && (
+                        <div 
+                          className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-amber-100 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.98)',
+                            backdropFilter: 'blur(20px)',
+                          }}
+                        >
+                          <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
+                            <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                              <Bell size={14} className="text-amber-800" /> Notifications
+                            </span>
+                            <div className="flex gap-2 text-[11px]">
+                              {notifications.length > 0 && (
+                                <>
+                                  <button 
+                                    onClick={markAllNotificationsAsRead}
+                                    className="text-amber-800 hover:text-amber-950 font-bold hover:underline"
+                                  >
+                                    Mark read
+                                  </button>
+                                  <span className="text-amber-200">|</span>
+                                  <button 
+                                    onClick={clearAllNotifications}
+                                    className="text-amber-850 hover:text-rose-700 font-bold hover:underline"
+                                  >
+                                    Clear
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto divide-y divide-amber-100/50">
+                            {notifications.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-amber-600 font-medium italic">
+                                No notifications yet
+                              </div>
+                            ) : (
+                              notifications.map((n) => (
+                                <div key={n.id} className={`p-3 text-xs transition-colors hover:bg-amber-50/30 ${!n.read ? 'bg-amber-50/10 font-semibold' : 'text-slate-500'}`}>
+                                  <div className="flex justify-between items-start gap-1">
+                                    <p className="text-slate-800">{n.cardTitle} moved to Print</p>
+                                    <span className="text-[9px] text-amber-600 shrink-0 font-bold">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">{n.phoneNumber}</p>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {activeTab === 'dashboard2' && (
                       <button onClick={() => setIsAddProductModalOpen(true)} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700`}>
@@ -3085,8 +3094,8 @@ export default function Dashboard() {
                           </div>
                         </th>
 
-                        {/* 🟢 ORDER STATUS VISIBLE FOR BOTH DASHBOARDS */}
-                        {!isScreenshotMode && (activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
+                         {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
+                        {!isScreenshotMode && activeTab === 'dashboard2' && (
                           <th className="py-3 px-4 font-bold align-top min-w-[150px]">
                             <div className="flex items-center gap-1 group">
                               <span>Order Status</span>
@@ -3237,7 +3246,7 @@ export default function Dashboard() {
                               {!isScreenshotMode && (
                                 <td className={`py-2.5 ${hiddenCols.role ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} align-middle transition-all duration-300`}>
                                   {!hiddenCols.role && (
-                                    <div className="flex items-center justify-start">
+                                    <div className="flex items-center justify-start gap-1.5">
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -3252,6 +3261,9 @@ export default function Dashboard() {
                                           className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'translate-x-3' : 'translate-x-0'}`}
                                         />
                                       </button>
+                                      <span className={`text-[10px] font-black uppercase tracking-wider ${(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'text-green-600' : 'text-rose-600'}`}>
+                                        {(order.orderType === 'Others' || order.orderType === 'Thaaru') ? 'Others' : 'Self'}
+                                      </span>
                                     </div>
                                   )}
                                 </td>
@@ -3267,8 +3279,8 @@ export default function Dashboard() {
                               {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
                               <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
 
-                              {/* 🟢 ORDER STATUS VISIBLE FOR BOTH DASHBOARDS */}
-                              {!isScreenshotMode && (activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
+                               {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
+                              {!isScreenshotMode && activeTab === 'dashboard2' && (
                                 <td className="py-2.5 px-4 text-center align-middle">
                                   <div className="print:hidden">
                                     <select
@@ -4310,6 +4322,9 @@ export default function Dashboard() {
               </h2>
 
               <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-[10px] font-black uppercase tracking-wider ${orderTypeOthersToggle ? 'text-green-600' : 'text-rose-600'}`}>
+                  {orderTypeOthersToggle ? 'Others' : 'Self'}
+                </span>
                 <button
                   type="button"
                   onClick={() => {
@@ -4487,26 +4502,10 @@ export default function Dashboard() {
 
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                     {formData.category !== 'product' ? (
-                      <>
-                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Order Status</label>
-                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Advance Paid (₹)</label>
-                        <div>
-                          <select
-                            name="orderStatus"
-                            value={formData.orderStatus}
-                            onChange={handleInputChange}
-                            className={`w-full text-xs font-semibold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`}
-                          >
-                            <option value="image edited (not paid)">I E (Not Paid)</option>
-                            <option value="forward to print (paid)">F 2 P (Paid)</option>
-                            <option value="order complete">Order Complete</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-                        <div>
-                          <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Advance amount" />
-                        </div>
-                      </>
+                      <div className="col-span-2">
+                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Advance Paid (₹)</label>
+                        <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Advance amount" />
+                      </div>
                     ) : (
                       <div className="col-span-2">
                         <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Advance Amount Paid (₹)</label>
@@ -5798,6 +5797,21 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Winner Picker Modal */}
+      {isWinnerPickerModalOpen && (
+        <div 
+          onClick={() => setIsWinnerPickerModalOpen(false)}
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-transparent max-w-sm w-full animate-in fade-in zoom-in-95 slide-in-from-bottom-8 ease-out duration-300 cursor-default"
+          >
+            <MonthlyWinnerPicker orders={orders} onClose={() => setIsWinnerPickerModalOpen(false)} />
           </div>
         </div>
       )}

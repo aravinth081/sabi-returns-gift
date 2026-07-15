@@ -28,7 +28,7 @@ export interface DailyTaskList {
   cards: DailyTaskCard[];
 }
 
-type SortMode = 'default' | 'asc' | 'desc';
+type SortMode = 'default' | 'asc' | 'desc' | 'favorites';
 
 const normalizePhone = (phone: string): string => {
   const digits = phone.replace(/\D/g, '');
@@ -78,6 +78,13 @@ export default function DailyTasksBoard() {
   const [newCardTitle, setNewCardTitle] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   
+  // Card Selection State
+  const [selectedCardIds, setSelectedCardIds] = useState<Record<string, string[]>>({});
+  
+  // Last Deleted List State
+  const [lastDeletedList, setLastDeletedList] = useState<{ list: DailyTaskList; index: number } | null>(null);
+  const lastDeletedListRef = useRef<{ list: DailyTaskList; index: number } | null>(null);
+
   // List title editing state
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editingListTitle, setEditingListTitle] = useState('');
@@ -102,6 +109,51 @@ export default function DailyTasksBoard() {
   // List Drag states
   const [draggedListId, setDraggedListId] = useState<string | null>(null);
   const [dragOverListIndex, setDragOverListIndex] = useState<number | null>(null);
+
+  const isCardSelected = (listId: string, cardId: string) => {
+    return selectedCardIds[listId]?.includes(cardId) || false;
+  };
+
+  const toggleCardSelection = (listId: string, cardId: string) => {
+    setSelectedCardIds(prev => {
+      const listSelected = prev[listId] || [];
+      const newListSelected = listSelected.includes(cardId)
+        ? listSelected.filter(id => id !== cardId)
+        : [...listSelected, cardId];
+      return { ...prev, [listId]: newListSelected };
+    });
+  };
+
+  const toggleSelectAll = (listId: string, cards: DailyTaskCard[]) => {
+    setSelectedCardIds(prev => {
+      const listSelected = prev[listId] || [];
+      const allCardIds = cards.map(c => c.id);
+      const isAllSelected = allCardIds.length > 0 && allCardIds.every(id => listSelected.includes(id));
+      return {
+        ...prev,
+        [listId]: isAllSelected ? [] : allCardIds
+      };
+    });
+  };
+
+  const handleBulkDelete = (listId: string, listTitle: string) => {
+    const idsToDelete = selectedCardIds[listId] || [];
+    if (idsToDelete.length === 0) return;
+    if (confirm(`Are you sure you want to delete the ${idsToDelete.length} selected card(s) from "${listTitle}"?`)) {
+      const updated = lists.map(list => {
+        if (list.id === listId) {
+          return {
+            ...list,
+            cards: list.cards.filter(card => !idsToDelete.includes(card.id))
+          };
+        }
+        return list;
+      });
+      saveLists(updated);
+      setSelectedCardIds(prev => ({ ...prev, [listId]: [] }));
+      toast.success(`${idsToDelete.length} cards deleted`);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
@@ -267,8 +319,13 @@ export default function DailyTasksBoard() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sort cards by birthday
+  // Sort cards by birthday or favorites
   const getSortedCards = useCallback((cards: DailyTaskCard[], sortMode: SortMode): DailyTaskCard[] => {
+    if (sortMode === 'favorites') {
+      const favorites = cards.filter(c => c.favorite);
+      const nonFavorites = cards.filter(c => !c.favorite);
+      return [...favorites, ...nonFavorites];
+    }
     if (sortMode === 'default') return cards;
     
     return [...cards].sort((a, b) => {
@@ -326,19 +383,46 @@ export default function DailyTasksBoard() {
 
   const handleDeleteList = (listId: string, listTitle: string) => {
     const list = lists.find(l => l.id === listId);
+    const index = lists.findIndex(l => l.id === listId);
     const cardCount = list?.cards.length || 0;
     const msg = cardCount > 0 
-      ? `Delete "${listTitle}" and its ${cardCount} card(s)? This cannot be undone.`
+      ? `Delete "${listTitle}" and its ${cardCount} card(s)?`
       : `Delete the empty list "${listTitle}"?`;
     
     if (confirm(msg)) {
+      if (list) {
+        const deletedInfo = { list, index };
+        setLastDeletedList(deletedInfo);
+        lastDeletedListRef.current = deletedInfo;
+      }
+      
       const updated = lists.filter(l => l.id !== listId);
       saveLists(updated);
       const newPrefs = { ...sortPreferences };
       delete newPrefs[listId];
       saveSortPreferences(newPrefs);
       setOpenMoreMenuListId(null);
-      toast.success(`List "${listTitle}" deleted`);
+      
+      toast.success(`List "${listTitle}" deleted successfully`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            const info = lastDeletedListRef.current;
+            if (info) {
+              setLists(prev => {
+                const restored = [...prev];
+                restored.splice(info.index, 0, info.list);
+                saveLists(restored);
+                return restored;
+              });
+              setLastDeletedList(null);
+              lastDeletedListRef.current = null;
+              toast.success(`List "${info.list.title}" restored`);
+            }
+          }
+        },
+        duration: 30000
+      });
     }
   };
 
@@ -410,6 +494,10 @@ export default function DailyTasksBoard() {
       });
       saveLists(updated);
       setSelectedCard(null);
+      setSelectedCardIds(prev => ({
+        ...prev,
+        [listId]: (prev[listId] || []).filter(id => id !== cardId)
+      }));
       toast.success('Card deleted');
     }
   };
@@ -446,6 +534,10 @@ export default function DailyTasksBoard() {
     });
 
     saveLists(updatedLists);
+    setSelectedCardIds(prev => ({
+      ...prev,
+      [sourceListId]: (prev[sourceListId] || []).filter(id => id !== cardId)
+    }));
     toast.success('Card cancelled and moved to "Cancelled" list');
   };
 
@@ -602,6 +694,19 @@ export default function DailyTasksBoard() {
           return { ...list, cards: filteredCards };
         }
         return list;
+      });
+
+      // Update card selection state: transfer selection from source list to target list if selected
+      setSelectedCardIds(prev => {
+        const sourceSelected = prev[sourceListId] || [];
+        if (sourceSelected.includes(sourceCardId)) {
+          return {
+            ...prev,
+            [sourceListId]: sourceSelected.filter(id => id !== sourceCardId),
+            [targetListId]: [...(prev[targetListId] || []), sourceCardId]
+          };
+        }
+        return prev;
       });
     }
 
@@ -930,6 +1035,7 @@ export default function DailyTasksBoard() {
     switch (mode) {
       case 'asc': return <ArrowUp size={13} />;
       case 'desc': return <ArrowDown size={13} />;
+      case 'favorites': return <Heart size={13} className="fill-rose-500 text-rose-500" />;
       default: return <ArrowUpDown size={13} />;
     }
   };
@@ -938,6 +1044,7 @@ export default function DailyTasksBoard() {
     switch (mode) {
       case 'asc': return 'Birthday \u2191';
       case 'desc': return 'Birthday \u2193';
+      case 'favorites': return 'Favorites';
       default: return 'Default';
     }
   };
@@ -1189,8 +1296,9 @@ export default function DailyTasksBoard() {
                         }}
                       >
                         <div className="p-1">
-                          <div className="px-3 py-2 text-[10px] font-bold text-blue-300/60 uppercase tracking-widest">Sort by Birthday</div>
+                          <div className="px-3 py-2 text-[10px] font-bold text-blue-300/60 uppercase tracking-widest">Sort Options</div>
                           {([
+                            ['favorites', 'Sort Favorites'],
                             ['asc', 'Birthday (Ascending)'],
                             ['desc', 'Birthday (Descending)'],
                             ['default', 'Default (Manual Order)']
@@ -1209,7 +1317,7 @@ export default function DailyTasksBoard() {
                                   : 'text-white/70 hover:bg-white/10 hover:text-white'
                               }`}
                             >
-                              {mode === 'asc' ? <ArrowUp size={13} /> : mode === 'desc' ? <ArrowDown size={13} /> : <ArrowUpDown size={13} />}
+                              {mode === 'asc' ? <ArrowUp size={13} /> : mode === 'desc' ? <ArrowDown size={13} /> : mode === 'favorites' ? <Heart size={13} className="fill-rose-500 text-rose-500" /> : <ArrowUpDown size={13} />}
                               {label}
                               {sortMode === mode && <span className="ml-auto text-blue-400">{'\u2713'}</span>}
                             </button>
@@ -1263,6 +1371,34 @@ export default function DailyTasksBoard() {
                 </div>
               </div>
 
+              {/* Bulk Actions Panel */}
+              {list.cards.length > 0 && (
+                <div className="px-4 py-2 flex items-center justify-between bg-white/5 border-b border-white/5 text-[11px] font-semibold select-none shrink-0">
+                  <label className="flex items-center gap-1.5 text-white/70 hover:text-white cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={(selectedCardIds[list.id] || []).length === list.cards.length}
+                      onChange={() => toggleSelectAll(list.id, list.cards)}
+                      className="w-3.5 h-3.5 rounded border-white/20 bg-slate-900 text-blue-500 focus:ring-blue-400 cursor-pointer accent-blue-500"
+                    />
+                    <span>Select All</span>
+                  </label>
+                  
+                  {(selectedCardIds[list.id] || []).length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-300 font-bold">{(selectedCardIds[list.id] || []).length} selected</span>
+                      <button
+                        onClick={() => handleBulkDelete(list.id, list.title)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 hover:text-rose-200 transition-all font-bold cursor-pointer"
+                      >
+                        <Trash size={11} />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* List Cards Content */}
               <div className="flex-1 overflow-y-auto space-y-2.5 px-3 py-3 custom-scrollbar min-h-[100px]">
                 {displayCards.length === 0 ? (
@@ -1298,6 +1434,17 @@ export default function DailyTasksBoard() {
                       <div className="flex flex-col gap-2">
                         {/* Header Row: Title input, Favorite button, Actions stack */}
                         <div className="flex justify-between items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isCardSelected(list.id, card.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleCardSelection(list.id, card.id);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded border-slate-350 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all accent-blue-600 mt-1 shrink-0"
+                          />
                           <input
                             type="text"
                             value={card.title}
@@ -1387,11 +1534,13 @@ export default function DailyTasksBoard() {
                         </div>
 
                         {/* Status Badge */}
-                        <div className="flex items-center shrink-0 mt-0.5">
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusStyle(card.status)}`}>
-                            {card.status}
-                          </span>
-                        </div>
+                        {card.status !== 'Waiting for Image' && (
+                          <div className="flex items-center shrink-0 mt-0.5">
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusStyle(card.status)}`}>
+                              {card.status}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))
