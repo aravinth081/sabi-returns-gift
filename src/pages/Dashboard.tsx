@@ -463,7 +463,20 @@ export default function Dashboard() {
       }
     );
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); };
+    const unsubPasscodes = onSnapshot(doc(db, 'daily_tasks_board', 'passcodes'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.reports) setReportsPasscode(data.reports);
+        if (data.history) setHistoryPasscode(data.history);
+      } else {
+        setDoc(doc(db, 'daily_tasks_board', 'passcodes'), {
+          reports: '963',
+          history: '852'
+        }).catch(err => console.error("Failed to init Firestore passcodes:", err));
+      }
+    });
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -489,6 +502,7 @@ export default function Dashboard() {
   const [d1Wallpaper, setD1Wallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_dashboard1') || "");
   const [d2Wallpaper, setD2Wallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_dashboard2') || "");
   const [showWallpaperDropdown, setShowWallpaperDropdown] = useState(false);
+  const isWallpaperActive = (activeTab === 'dashboard1' && !!d1Wallpaper) || (activeTab === 'dashboard2' && !!d2Wallpaper);
 
   useEffect(() => {
     const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
@@ -529,7 +543,7 @@ export default function Dashboard() {
 
   const handleNotificationClick = async (notification: any) => {
     const matchedOrder = orders.find(o => o.phone === notification.phoneNumber || o.name === notification.cardTitle);
-    
+
     if (matchedOrder) {
       setHistoryDetailOrder(matchedOrder);
     } else {
@@ -549,7 +563,7 @@ export default function Dashboard() {
         });
       }
     }
-    
+
     try {
       const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
       const updated = notifications.map(n => n.id === notification.id ? { ...n, read: true } : n);
@@ -599,7 +613,7 @@ export default function Dashboard() {
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          
+
           if (target === 'd1') {
             setD1Wallpaper(compressedBase64);
             localStorage.setItem('sabi_wallpaper_dashboard1', compressedBase64);
@@ -780,6 +794,15 @@ export default function Dashboard() {
   const [reportsPassword, setReportsPassword] = useState("");
   const [reportsAuthError, setReportsAuthError] = useState("");
 
+  const [reportsPasscode, setReportsPasscode] = useState('963');
+  const [historyPasscode, setHistoryPasscode] = useState('852');
+  const [isHistoryAuthModalOpen, setIsHistoryAuthModalOpen] = useState(false);
+  const [historyPassword, setHistoryPassword] = useState("");
+  const [historyAuthError, setHistoryAuthError] = useState("");
+  const [isPasscodeSettingsOpen, setIsPasscodeSettingsOpen] = useState(false);
+  const [tempReportsPasscode, setTempReportsPasscode] = useState('963');
+  const [tempHistoryPasscode, setTempHistoryPasscode] = useState('852');
+
   const [isInvModalOpen, setIsInvModalOpen] = useState(false);
   const [invForm, setInvForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -813,7 +836,7 @@ export default function Dashboard() {
 
   const handleReportsAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (reportsPassword === "963" || reportsPassword === "561997" || reportsPassword === "8520") {
+    if (reportsPassword === reportsPasscode || reportsPassword === "561997" || reportsPassword === "8520") {
       setActiveTab('reports');
       setShowSidebarHighlight(true);
       setIsReportsAuthModalOpen(false);
@@ -821,6 +844,18 @@ export default function Dashboard() {
       setReportsAuthError("");
     } else {
       setReportsAuthError("Wrong Password! Access Denied.");
+    }
+  };
+
+  const handleHistoryAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (historyPassword === historyPasscode || historyPassword === "8520") {
+      setIsHistoryOpen(true);
+      setIsHistoryAuthModalOpen(false);
+      setHistoryPassword("");
+      setHistoryAuthError("");
+    } else {
+      setHistoryAuthError("Wrong Password! Access Denied.");
     }
   };
 
@@ -888,7 +923,7 @@ export default function Dashboard() {
     if (!historyDetailOrder) return [];
     const nameQuery = historyDetailOrder.name.toLowerCase().trim();
     const phoneQuery = historyDetailOrder.phone ? historyDetailOrder.phone.trim() : '';
-    
+
     return activityLogs.filter(log => {
       const actionLower = (log.action || '').toLowerCase();
       const nameMatch = nameQuery && actionLower.includes(nameQuery);
@@ -1083,8 +1118,8 @@ export default function Dashboard() {
         const query = curDashboardSearch.toLowerCase().trim();
         const serialNo = getSerial(order.id).toLowerCase();
         const chocName = String(order.chocolate || order.productName || "").toLowerCase();
-        searchMatch = 
-          String(order.name || "").toLowerCase().includes(query) || 
+        searchMatch =
+          String(order.name || "").toLowerCase().includes(query) ||
           String(order.phone || "").includes(query) ||
           serialNo.includes(query) ||
           chocName.includes(query) ||
@@ -1393,12 +1428,12 @@ export default function Dashboard() {
     const topChocs = Object.entries(chocolateCounts).sort((a, b) => b[1] - a[1]);
     const chartData = topChocs.slice(0, 8).map(([name, count]) => ({ name, count }));
 
-    return { 
-      filteredOrders: filtered, 
-      topChocs, 
-      chartData, 
-      totalRev, 
-      totalItems, 
+    return {
+      filteredOrders: filtered,
+      topChocs,
+      chartData,
+      totalRev,
+      totalItems,
       totalDeliveryCharge: totalDelivery,
       totalCost,
       totalProfit: totalRev - totalCost
@@ -1636,6 +1671,38 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
+  const handleAddOrderFromNotification = (n: any) => {
+    const today = new Date().toISOString().split('T')[0];
+    const category = activeTab === 'dashboard2' ? 'product' : 'chocolate';
+    const birthdayVal = n.birthdayDate ? parseDateToYYYYMMDD(n.birthdayDate) : today;
+    setFormData({
+      id: null,
+      fireId: null,
+      name: n.cardTitle || "",
+      phone: n.phoneNumber || "",
+      orderDate: today,
+      functionDate: birthdayVal || today,
+      deliveryDate: birthdayVal || today,
+      chocolate: "",
+      count: n.chocolateCount || "",
+      address: n.comments || "",
+      status: "In Process",
+      paymentStatus: "Pending",
+      discount: 0,
+      isDeliveryFree: false,
+      isChennai: false,
+      orderType: "Sabi",
+      role: "Self",
+      orderStatus: "image edited (not paid)",
+      category,
+      manualDeliveryFee: "",
+      advanceAmount: "",
+      manualProductPrice: "",
+      pricingType: 'retail'
+    });
+    setIsModalOpen(true);
+  };
+
 
   const handleEditClick = (order: any) => {
     const fallbackRole = (order.orderType === 'Self' || order.orderType === 'Sabi') ? 'Self' : 'Others';
@@ -1852,7 +1919,7 @@ export default function Dashboard() {
           ...entryData,
           timestamp: Date.now()
         });
-        logActivity(`Added Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox} = ${Number(invForm.boxCount)*Number(invForm.itemsPerBox)} pcs)`, 'Inventories');
+        logActivity(`Added Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox} = ${Number(invForm.boxCount) * Number(invForm.itemsPerBox)} pcs)`, 'Inventories');
       }
       setInvForm(prev => ({ ...prev, boxCount: "", itemsPerBox: "" }));
       setIsInvModalOpen(false);
@@ -2273,7 +2340,7 @@ export default function Dashboard() {
       <div className="flex h-screen items-center justify-center bg-[#2d1b14] relative overflow-hidden">
         {/* Decorative background radial gradient */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#5e3827] via-[#2d1b14] to-[#1a0f0b] opacity-80 animate-pulse" style={{ animationDuration: '6s' }}></div>
-        
+
         {/* Animated ambient light spots */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#8b5a3e] rounded-full blur-[120px] opacity-20 animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#7c4d36] rounded-full blur-[120px] opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -2287,9 +2354,9 @@ export default function Dashboard() {
             <div className="absolute -inset-2 rounded-full border border-amber-500/20 animate-ping" style={{ animationDuration: '2s' }}></div>
             {/* Inner mask to keep image circular */}
             <div className="absolute inset-[4px] rounded-full overflow-hidden bg-[#2d1b14] border-4 border-[#2d1b14]">
-              <img 
-                src="/logo.jpeg" 
-                alt="Logo" 
+              <img
+                src="/logo.jpeg"
+                alt="Logo"
                 className="w-full h-full object-cover select-none"
                 onError={(e) => {
                   // Fallback icon if logo fails to load
@@ -2309,12 +2376,12 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold text-amber-100 tracking-wider animate-pulse">
               Authenticating...
             </h3>
-            
+
             {/* Continuous loading bar */}
             <div className="w-48 h-1.5 bg-[#4a2c1d]/50 rounded-full overflow-hidden mx-auto border border-[#8b5a3e]/20 relative">
               <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-[#8b5a3e] to-[#e8dccb] rounded-full animate-loading-bar"></div>
             </div>
-            
+
             <p className="text-sm font-semibold text-[#a8826d] tracking-widest uppercase animate-pulse">
               loading
             </p>
@@ -2429,7 +2496,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/20 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`bg-slate-50 border-r border-blue-100 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0 border-none'}`}>
+      <aside className={`bg-slate-50 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0'}`}>
         <div className="w-56 h-full flex flex-col justify-between">
           <div className="overflow-y-auto flex-1 select-none">
             <div className={`p-6 flex flex-col items-center border-b border-blue-200 relative`}>
@@ -2490,11 +2557,11 @@ export default function Dashboard() {
               </button>
 
               <button
-                onClick={() => { 
-                  setIsReportsAuthModalOpen(true); 
-                  setReportsPassword(""); 
-                  setReportsAuthError(""); 
-                  if (window.innerWidth < 768) setIsSidebarOpen(false); 
+                onClick={() => {
+                  setIsReportsAuthModalOpen(true);
+                  setReportsPassword("");
+                  setReportsAuthError("");
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'reports' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
                 <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'drop-shadow-md' : ''} />
@@ -2507,13 +2574,21 @@ export default function Dashboard() {
 
           <div className="p-4 border-t border-blue-100 space-y-2">
             <button
-              onClick={() => setIsHistoryOpen(true)}
+              onClick={() => {
+                setIsHistoryAuthModalOpen(true);
+                setHistoryPassword("");
+                setHistoryAuthError("");
+                if (window.innerWidth < 768) setIsSidebarOpen(false);
+              }}
               className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
             >
               <History size={18} /> History
             </button>
             <button
-              onClick={() => setIsTrashOpen(true)}
+              onClick={() => {
+                setIsTrashOpen(true);
+                if (window.innerWidth < 768) setIsSidebarOpen(false);
+              }}
               className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
             >
               <Trash2 size={18} /> Trash Bin
@@ -2528,7 +2603,18 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      <main className={`flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] ${activeTab === 'daily_tasks' ? 'bg-gradient-to-br from-[#0f172a] via-[#1e3a5f] to-[#60a5fa]/30' : 'bg-gradient-to-br from-[#3e2723] via-[#2d1b14] to-[#1a0f0b]'}`}>
+      <main
+        className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500"
+        style={{
+          background: activeTab === 'daily_tasks'
+            ? 'linear-gradient(to bottom right, #0f172a, #1e3a5f, rgba(96, 165, 250, 0.3))'
+            : activeTab === 'dashboard1' && d1Wallpaper
+              ? (d1Wallpaper.startsWith('data:image') ? `url(${d1Wallpaper}) center/cover no-repeat` : d1Wallpaper)
+              : activeTab === 'dashboard2' && d2Wallpaper
+                ? (d2Wallpaper.startsWith('data:image') ? `url(${d2Wallpaper}) center/cover no-repeat` : d2Wallpaper)
+                : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)'
+        }}
+      >
 
         <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm relative z-50 print:hidden border-amber-100`}>
           <div className="flex items-center gap-3 md:gap-5">
@@ -2558,7 +2644,7 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-4">
 
-            
+
             <div className="hidden sm:block text-right">
               <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
               <p className="text-sm font-bold text-amber-600 tracking-widest uppercase">return Gifts</p>
@@ -2725,985 +2811,1008 @@ export default function Dashboard() {
           )}
 
           {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
-            <div 
-              className="relative p-6 rounded-[2.5rem] transition-all duration-500 overflow-hidden shadow-inner border border-amber-100/40"
+            <div
+              className={`relative p-6 rounded-[2.5rem] transition-all duration-500 overflow-hidden ${isWallpaperActive ? 'wallpaper-active' : ''}`}
               style={{
-                background: activeTab === 'dashboard1' 
-                  ? (d1Wallpaper ? (d1Wallpaper.startsWith('data:image') ? `url(${d1Wallpaper}) center/cover no-repeat` : d1Wallpaper) : '#fffcf9')
-                  : (d2Wallpaper ? (d2Wallpaper.startsWith('data:image') ? `url(${d2Wallpaper}) center/cover no-repeat` : d2Wallpaper) : '#fffcf9'),
+                background: activeTab === 'dashboard1'
+                  ? (d1Wallpaper ? 'transparent' : '#fffcf9')
+                  : (d2Wallpaper ? 'transparent' : '#fffcf9'),
+                border: (activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper) ? 'none' : '1px solid rgba(251, 191, 36, 0.1)',
+                boxShadow: (activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper) ? 'none' : 'inset 0 2px 4px rgba(0, 0, 0, 0.06)'
               }}
             >
-              {/* Overlay for contrast when wallpaper is active */}
-              {((activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper)) && (
-                <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] z-0 pointer-events-none" />
-              )}
-              
+
               <div className="relative z-10 flex flex-col gap-6">
                 <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
 
-                <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex justify-between items-start mb-2 relative z-10">
-                    <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={18} /></div>
-                  </div>
-                  <h3 className="text-4xl font-black text-[#3e2723] relative z-10">{filteredDashboardOrders.length}</h3>
-                </div>
-
-                <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex justify-between items-start mb-3 relative z-10">
-                    <p className="text-sm font-black text-[#c2410c] tracking-wide">Payment Filter</p>
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 shadow-inner"><IndianRupee size={16} /></div>
-                  </div>
-                  <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
-                    <option value="All">All Payments</option>
-                    <option value="Full Paid">Full Paid</option>
-                    <option value="Partially Paid">Partially Paid</option>
-                    <option value="Pending">Pending</option>
-                  </select>
-                </div>
-
-                <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex justify-between items-start mb-3 relative z-10">
-                    <p className="text-sm font-black text-[#c2410c] tracking-wide">Delivery Filter</p>
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner"><Package size={16} /></div>
-                  </div>
-                  <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
-                    <option value="All">All Deliveries</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="In Process">In Process</option>
-                  </select>
-                </div>
-
-                {activeTab === 'dashboard2' && (
-                  <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex justify-between items-start mb-2 relative z-10 shrink-0">
-                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Product Listing</p>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><Package size={16} /></div>
+                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex justify-between items-start mb-2 relative z-10">
+                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={18} /></div>
                     </div>
+                    <h3 className="text-4xl font-black text-[#3e2723] relative z-10">{filteredDashboardOrders.length}</h3>
+                  </div>
 
-                    <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 relative z-10 text-xs font-bold max-h-[75px]">
-                      {customProducts.length === 0 ? (
-                        <p className="text-amber-700/60 text-center mt-2 italic">No products added.</p>
-                      ) : (
-                        customProducts.map(prod => (
-                          <div key={prod.fireId} className="flex justify-between items-center bg-white/60 px-2 py-1.5 rounded-lg border border-white shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] hover:bg-white transition-colors">
-                            <span className="text-amber-950 truncate flex-1 pr-2" title={prod.name}>{prod.name} - ₹{prod.price}</span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={() => handleEditProductClick(prod)} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Edit"><Pencil size={12} /></button>
-                              <button onClick={() => handleDeleteProductClick(prod.fireId)} className="text-red-500 hover:bg-red-100 p-1 rounded transition-colors" title="Delete"><Trash2 size={12} /></button>
+                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex justify-between items-start mb-3 relative z-10">
+                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Payment Filter</p>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 shadow-inner"><IndianRupee size={16} /></div>
+                    </div>
+                    <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
+                      <option value="All">All Payments</option>
+                      <option value="Full Paid">Full Paid</option>
+                      <option value="Partially Paid">Partially Paid</option>
+                      <option value="Pending">Pending</option>
+                    </select>
+                  </div>
+
+                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex justify-between items-start mb-3 relative z-10">
+                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Delivery Filter</p>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner"><Package size={16} /></div>
+                    </div>
+                    <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
+                      <option value="All">All Deliveries</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="In Process">In Process</option>
+                    </select>
+                  </div>
+
+                  {activeTab === 'dashboard2' && (
+                    <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col hover:-translate-y-1 transition-all duration-300">
+                      <div className="flex justify-between items-start mb-2 relative z-10 shrink-0">
+                        <p className="text-sm font-black text-[#c2410c] tracking-wide">Product Listing</p>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><Package size={16} /></div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 relative z-10 text-xs font-bold max-h-[75px]">
+                        {customProducts.length === 0 ? (
+                          <p className="text-amber-700/60 text-center mt-2 italic">No products added.</p>
+                        ) : (
+                          customProducts.map(prod => (
+                            <div key={prod.fireId} className="flex justify-between items-center bg-white/60 px-2 py-1.5 rounded-lg border border-white shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] hover:bg-white transition-colors">
+                              <span className="text-amber-950 truncate flex-1 pr-2" title={prod.name}>{prod.name} - ₹{prod.price}</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button onClick={() => handleEditProductClick(prod)} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Edit"><Pencil size={12} /></button>
+                                <button onClick={() => handleDeleteProductClick(prod.fireId)} className="text-red-500 hover:bg-red-100 p-1 rounded transition-colors" title="Delete"><Trash2 size={12} /></button>
+                              </div>
                             </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex justify-between items-start w-full mb-1 relative z-10">
-                    <div className="flex items-center gap-1 group relative">
-                      <p className="text-[11px] font-black text-[#c2410c] tracking-wide leading-tight">Revenue <br />Filter</p>
-
-                      <div className="relative inline-block">
-                        <ChevronDown size={14} className="text-[#c2410c] cursor-pointer hover:scale-125 transition-transform" />
-                        <select
-                          value={revenueDateType}
-                          onChange={(e) => setRevenueDateType(e.target.value)}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          title="Select Filter Basis"
-                        >
-                          <option value="Serial No">Serial No</option>
-                          <option value="Order Date">Order Date</option>
-                          <option value="Function Date">Function Date</option>
-                          <option value="Dispatch Date">Dispatch Date</option>
-                        </select>
+                          ))
+                        )}
                       </div>
-                    </div>
-                    <h3 className="text-xl font-black text-green-700 mt-1">₹{displayRevenue.toLocaleString()}</h3>
-                  </div>
-
-                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter -mt-1 mb-1 z-10 relative">
-                    Based on: {revenueDateType}
-                  </p>
-
-                  <div className="flex items-center gap-1 mt-auto relative z-10 w-full">
-                    <input
-                      type="date"
-                      value={dateFilter.from}
-                      onChange={e => setDateFilter({ ...dateFilter, from: e.target.value })}
-                      className="flex-1 w-full min-w-0 px-1 py-1.5 border-2 border-white rounded-md text-[9px] font-bold text-purple-950 outline-none focus:ring-1 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] tracking-tighter"
-                      title="From Date"
-                    />
-
-                    <span className="text-[10px] font-black text-purple-700 shrink-0">To</span>
-
-                    <input
-                      type="date"
-                      value={dateFilter.to}
-                      onChange={e => setDateFilter({ ...dateFilter, to: e.target.value })}
-                      className="flex-1 w-full min-w-0 px-1 py-1.5 border-2 border-white rounded-md text-[9px] font-bold text-purple-950 outline-none focus:ring-1 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] tracking-tighter"
-                      title="To Date"
-                    />
-
-                    {(dateFilter.from || dateFilter.to) && (
-                      <button
-                        onClick={() => setDateFilter({ from: "", to: "" })}
-                        className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors"
-                        title="Clear Date Filter"
-                      >
-                        <X size={12} strokeWidth={3} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              <div ref={screenshotTableRef} className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8`}>
-                <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
-
-
-                  <div className="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
-                    <div className="flex items-center gap-3">
-                      <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
-                      <button
-                        onClick={() => {
-                          const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.role || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
-                          setHiddenCols({
-                            ...hiddenCols,
-                            serialNo: isAnyVisible,
-                            role: isAnyVisible,
-                            orderDate: isAnyVisible,
-                            deliveryCharge: isAnyVisible,
-                            discount: isAnyVisible
-                          });
-                        }}
-                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
-                            ? 'bg-amber-600 text-white border-amber-700'
-                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
-                          }`}
-                        title={(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
-                      >
-                        {(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
-                      </button>
-                      <button
-                        onClick={handleScreenshotCapture}
-                        disabled={isScreenshotMode}
-                        className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${isScreenshotMode
-                            ? 'bg-green-500 text-white border-green-600 animate-pulse'
-                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
-                          }`}
-                        title={isScreenshotMode ? "Capturing..." : "Screenshot Table (Name, Dispatch, Chocolate, Count, Total Price, Payment)"}
-                      >
-                        <Camera size={18} strokeWidth={2.5} />
-                      </button>
-                      <button
-                        onClick={() => setChennaiFilter(!chennaiFilter)}
-                        className={`h-8 px-2.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border flex items-center gap-1 text-[10px] font-black tracking-wider uppercase ${chennaiFilter
-                            ? 'bg-amber-600 text-white border-amber-700 shadow-md scale-105'
-                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
-                          }`}
-                        title={chennaiFilter ? "Clear Chennai Filter" : "Filter Chennai Orders Only"}
-                      >
-                        <MapPin size={12} strokeWidth={3} />
-                        Chennai
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextVal = !showCheckboxes;
-                          setShowCheckboxes(nextVal);
-                          if (!nextVal) {
-                            setSelectedOrders([]);
-                          }
-                        }}
-                        className={`h-8 w-8 rounded-xl transition-all duration-300 print:hidden shadow-sm border flex items-center justify-center shrink-0 ${showCheckboxes
-                            ? 'bg-amber-600 text-white border-amber-700 shadow-md scale-105'
-                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
-                          }`}
-                        title={showCheckboxes ? "Hide checkboxes" : "Show checkboxes"}
-                      >
-                        {showCheckboxes ? <CheckSquare size={15} strokeWidth={2.5} /> : <Square size={15} strokeWidth={2.5} />}
-                      </button>
-
-                      <div className="relative w-40 sm:w-48 md:w-56">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
-                        <input
-                          type="text"
-                          placeholder="Search..."
-                          value={dashboardSearch}
-                          onChange={(e) => setDashboardSearch(e.target.value)}
-                          className="pl-8 pr-3 py-1 bg-white border border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs w-full shadow-sm h-8"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {selectedOrders.length > 0 && (
-                    <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 animate-in fade-in zoom-in duration-200 shadow-sm shrink-0">
-                      <span className="text-sm font-bold text-amber-800 hidden sm:inline">{selectedOrders.length} Selected:</span>
-                      <select onChange={(e) => { if (e.target.value) handleBulkAction(e.target.value); e.target.value = ''; }} className="text-sm font-bold p-1.5 rounded border border-amber-300 bg-white text-amber-900 outline-none cursor-pointer">
-                        <option value="">Change Status...</option>
-                        <optgroup label="Delivery"><option value="Delivered">Mark Delivered</option><option value="In Process">Mark In Process</option></optgroup>
-                        <optgroup label="Payment"><option value="Full Paid">Mark Full Paid</option><option value="Partially Paid">Mark Partially Paid</option><option value="Pending">Mark Pending</option></optgroup>
-                      </select>
-                      <button onClick={handleBulkDelete} className="text-red-500 hover:bg-red-100 p-1.5 rounded transition-colors" title="Delete Selected"><Trash2 size={18} /></button>
                     </div>
                   )}
 
-                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto print:hidden shrink-0 justify-center sm:justify-end">
-                    {/* Gift Icon Button to open Winner Picker Modal */}
-                    <button
-                      onClick={() => setIsWinnerPickerModalOpen(true)}
-                      className="flex justify-center items-center gap-2 px-4 py-2 font-bold rounded-lg transition-all border bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:scale-105 active:scale-95 cursor-pointer shadow-sm relative group"
-                      title="Monthly Winner Picker"
-                    >
-                      <Gift size={18} className="text-amber-600 fill-amber-100 group-hover:text-amber-700 animate-bounce" />
-                      <span>Winner Picker</span>
-                    </button>
+                  <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex justify-between items-start w-full mb-1 relative z-10">
+                      <div className="flex items-center gap-1 group relative">
+                        <p className="text-[11px] font-black text-[#c2410c] tracking-wide leading-tight">Revenue <br />Filter</p>
 
-                    {/* Wallpaper Customize Button (opens file manager directly) */}
-                    <div className="flex items-center gap-1.5 print:hidden">
-                      <button
-                        onClick={() => {
-                          const fileInput = document.getElementById(activeTab === 'dashboard1' ? 'd1-wallpaper-upload' : 'd2-wallpaper-upload');
-                          fileInput?.click();
-                        }}
-                        className="flex justify-center items-center gap-2 px-4 py-2 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer"
-                        title="Choose Custom Background Image"
-                      >
-                        <ImageIcon size={18} className="text-amber-700" />
-                        <span>Background</span>
-                      </button>
+                        <div className="relative inline-block">
+                          <ChevronDown size={14} className="text-[#c2410c] cursor-pointer hover:scale-125 transition-transform" />
+                          <select
+                            value={revenueDateType}
+                            onChange={(e) => setRevenueDateType(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            title="Select Filter Basis"
+                          >
+                            <option value="Serial No">Serial No</option>
+                            <option value="Order Date">Order Date</option>
+                            <option value="Function Date">Function Date</option>
+                            <option value="Dispatch Date">Dispatch Date</option>
+                          </select>
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-black text-green-700 mt-1">₹{displayRevenue.toLocaleString()}</h3>
+                    </div>
+
+                    <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter -mt-1 mb-1 z-10 relative">
+                      Based on: {revenueDateType}
+                    </p>
+
+                    <div className="flex items-center gap-1 mt-auto relative z-10 w-full">
                       <input
-                        type="file"
-                        id={activeTab === 'dashboard1' ? 'd1-wallpaper-upload' : 'd2-wallpaper-upload'}
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          handleWallpaperUpload(e, activeTab === 'dashboard1' ? 'd1' : 'd2');
-                        }}
+                        type="date"
+                        value={dateFilter.from}
+                        onChange={e => setDateFilter({ ...dateFilter, from: e.target.value })}
+                        className="flex-1 w-full min-w-0 px-1 py-1.5 border-2 border-white rounded-md text-[9px] font-bold text-purple-950 outline-none focus:ring-1 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] tracking-tighter"
+                        title="From Date"
                       />
-                      {((activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper)) && (
+
+                      <span className="text-[10px] font-black text-purple-700 shrink-0">To</span>
+
+                      <input
+                        type="date"
+                        value={dateFilter.to}
+                        onChange={e => setDateFilter({ ...dateFilter, to: e.target.value })}
+                        className="flex-1 w-full min-w-0 px-1 py-1.5 border-2 border-white rounded-md text-[9px] font-bold text-purple-950 outline-none focus:ring-1 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] tracking-tighter"
+                        title="To Date"
+                      />
+
+                      {(dateFilter.from || dateFilter.to) && (
                         <button
-                          onClick={() => handleClearWallpaper(activeTab === 'dashboard1' ? 'd1' : 'd2')}
-                          className="p-2 text-rose-600 hover:text-rose-800 hover:bg-rose-55/40 border border-rose-200 rounded-lg cursor-pointer bg-white"
-                          title="Remove Background"
+                          onClick={() => setDateFilter({ from: "", to: "" })}
+                          className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors"
+                          title="Clear Date Filter"
                         >
-                          <X size={16} />
+                          <X size={12} strokeWidth={3} />
                         </button>
                       )}
                     </div>
-
-                    {/* Notifications button/dropdown replacing Import/Export */}
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
-                        className="flex justify-center items-center gap-2 px-4 py-2 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer relative"
-                        title="Notifications"
-                      >
-                        <Bell size={18} />
-                        <span>Notifications</span>
-                        {notifications.filter(n => !n.read).length > 0 && (
-                          <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md ${
-                            orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border border-indigo-300 animate-pulse'
-                              : 'bg-rose-600'
-                          }`}>
-                            {notifications.filter(n => !n.read).length}
-                          </span>
-                        )}
-                      </button>
-
-                      {showNotificationDropdown && (
-                        <div 
-                          className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-amber-100 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.98)',
-                            backdropFilter: 'blur(20px)',
-                          }}
-                        >
-                          <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
-                            <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
-                              <Bell size={14} className="text-amber-800" /> Notifications
-                              {notifications.filter(n => !n.read).length > 0 && (
-                                <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${
-                                  orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
-                                    : 'bg-rose-600'
-                                }`}>
-                                  {notifications.filter(n => !n.read).length}
-                                </span>
-                              )}
-                            </span>
-                            <button
-                              onClick={() => {
-                                setShowNotificationDropdown(false);
-                                setActiveTab('dashboard1');
-                                handleAddClick('chocolate');
-                              }}
-                              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer border border-amber-500/20"
-                            >
-                              <Plus size={11} /> Add Order
-                            </button>
-                          </div>
-                          <div className="max-h-64 overflow-y-auto divide-y divide-amber-100/50">
-                            {notifications.length === 0 ? (
-                              <div className="p-4 text-center text-xs text-amber-600 font-medium italic">
-                                No notifications yet
-                              </div>
-                            ) : (
-                              notifications.map((n) => (
-                                <div
-                                  key={n.id}
-                                  onClick={() => {
-                                    setShowNotificationDropdown(false);
-                                    handleNotificationClick(n);
-                                  }}
-                                  className={`p-3 text-xs transition-colors hover:bg-amber-50/50 cursor-pointer ${!n.read ? 'bg-amber-50/10 font-bold' : 'text-slate-500'}`}
-                                >
-                                  <div className="flex justify-between items-start gap-1">
-                                    <p className="text-slate-800">{n.cardTitle} moved to Print</p>
-                                    <span className="text-[9px] text-amber-600 shrink-0 font-bold">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                  </div>
-                                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">{n.phoneNumber}</p>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {activeTab === 'dashboard2' && (
-                      <button onClick={() => setIsAddProductModalOpen(true)} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700`}>
-                        <Plus size={18} /> Add Product
-                      </button>
-                    )}
-
-                    <button onClick={handleAddClick} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-amber-600 text-white hover:bg-amber-700`}>
-                      <Plus size={18} /> Add Order
-                    </button>
                   </div>
+
                 </div>
 
-                <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-auto max-h-[75vh]'}`}>
+                <div ref={screenshotTableRef} className="bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8">
+                  <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
 
-                  {/* 📸 Screenshot Header - Only visible during screenshot capture */}
-                  {isScreenshotMode && (
-                    <div className="bg-gradient-to-r from-amber-100 via-orange-50 to-amber-100 px-6 py-4 border-b-2 border-amber-300">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h1 className="text-2xl font-black text-amber-950 tracking-tight">SABI Return Gifts</h1>
-                          <p className="text-sm font-bold text-amber-700 mt-0.5">Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-bold text-amber-600">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                          <div className="flex gap-4 mt-1">
-                            <span className="text-xs font-black text-amber-900">Orders: {filteredDashboardOrders.length}</span>
-                            <span className="text-xs font-black text-amber-900">Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}</span>
-                            <span className="text-xs font-black text-green-700">Revenue: ₹{displayRevenue.toLocaleString()}</span>
-                          </div>
+
+                    <div className="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-3">
+                        <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
+                        <button
+                          onClick={() => {
+                            const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.role || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
+                            setHiddenCols({
+                              ...hiddenCols,
+                              serialNo: isAnyVisible,
+                              role: isAnyVisible,
+                              orderDate: isAnyVisible,
+                              deliveryCharge: isAnyVisible,
+                              discount: isAnyVisible
+                            });
+                          }}
+                          className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount)
+                            ? 'bg-amber-600 text-white border-amber-700'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
+                            }`}
+                          title={(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
+                        >
+                          {(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+                        </button>
+                        <button
+                          onClick={handleScreenshotCapture}
+                          disabled={isScreenshotMode}
+                          className={`p-1.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border ${isScreenshotMode
+                            ? 'bg-green-500 text-white border-green-600 animate-pulse'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                            }`}
+                          title={isScreenshotMode ? "Capturing..." : "Screenshot Table (Name, Dispatch, Chocolate, Count, Total Price, Payment)"}
+                        >
+                          <Camera size={18} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          onClick={() => setChennaiFilter(!chennaiFilter)}
+                          className={`h-8 px-2.5 rounded-xl transition-all duration-300 print:hidden shadow-sm border flex items-center gap-1 text-[10px] font-black tracking-wider uppercase ${chennaiFilter
+                            ? 'bg-amber-600 text-white border-amber-700 shadow-md scale-105'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                            }`}
+                          title={chennaiFilter ? "Clear Chennai Filter" : "Filter Chennai Orders Only"}
+                        >
+                          <MapPin size={12} strokeWidth={3} />
+                          Chennai
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextVal = !showCheckboxes;
+                            setShowCheckboxes(nextVal);
+                            if (!nextVal) {
+                              setSelectedOrders([]);
+                            }
+                          }}
+                          className={`h-8 w-8 rounded-xl transition-all duration-300 print:hidden shadow-sm border flex items-center justify-center shrink-0 ${showCheckboxes
+                            ? 'bg-amber-600 text-white border-amber-700 shadow-md scale-105'
+                            : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                            }`}
+                          title={showCheckboxes ? "Hide checkboxes" : "Show checkboxes"}
+                        >
+                          {showCheckboxes ? <CheckSquare size={15} strokeWidth={2.5} /> : <Square size={15} strokeWidth={2.5} />}
+                        </button>
+
+                        <div className="relative w-40 sm:w-48 md:w-56">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
+                          <input
+                            type="text"
+                            placeholder="Search..."
+                            value={dashboardSearch}
+                            onChange={(e) => setDashboardSearch(e.target.value)}
+                            className="pl-8 pr-3 py-1 bg-white border border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs w-full shadow-sm h-8"
+                          />
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-0' : 'min-w-[1450px]'}`}>
-                    <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
-                      <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
-                        {!isScreenshotMode && showCheckboxes && (
-                          <th className="py-3 px-4 w-12 text-center print:hidden align-top">
-                            <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
-                          </th>
+                    {selectedOrders.length > 0 && (
+                      <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 animate-in fade-in zoom-in duration-200 shadow-sm shrink-0">
+                        <span className="text-sm font-bold text-amber-800 hidden sm:inline">{selectedOrders.length} Selected:</span>
+                        <select onChange={(e) => { if (e.target.value) handleBulkAction(e.target.value); e.target.value = ''; }} className="text-sm font-bold p-1.5 rounded border border-amber-300 bg-white text-amber-900 outline-none cursor-pointer">
+                          <option value="">Change Status...</option>
+                          <optgroup label="Delivery"><option value="Delivered">Mark Delivered</option><option value="In Process">Mark In Process</option></optgroup>
+                          <optgroup label="Payment"><option value="Full Paid">Mark Full Paid</option><option value="Partially Paid">Mark Partially Paid</option><option value="Pending">Mark Pending</option></optgroup>
+                        </select>
+                        <button onClick={handleBulkDelete} className="text-red-500 hover:bg-red-100 p-1.5 rounded transition-colors" title="Delete Selected"><Trash2 size={18} /></button>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto print:hidden shrink-0 justify-center sm:justify-end">
+                      {/* Gift Icon Button to open Winner Picker Modal */}
+                      <button
+                        onClick={() => setIsWinnerPickerModalOpen(true)}
+                        className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-all border bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:scale-105 active:scale-95 cursor-pointer shadow-sm relative group"
+                        title="Winner Picker"
+                      >
+                        <Gift size={18} className="text-amber-600 fill-amber-100 group-hover:text-amber-700 animate-bounce" />
+                      </button>
+
+                      {/* Wallpaper Customize Button (opens file manager directly) */}
+                      <div className="flex items-center gap-1.5 print:hidden">
+                        <button
+                          onClick={() => {
+                            const fileInput = document.getElementById(activeTab === 'dashboard1' ? 'd1-wallpaper-upload' : 'd2-wallpaper-upload');
+                            fileInput?.click();
+                          }}
+                          className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer"
+                          title="Background"
+                        >
+                          <ImageIcon size={18} className="text-amber-700" />
+                        </button>
+                        <input
+                          type="file"
+                          id={activeTab === 'dashboard1' ? 'd1-wallpaper-upload' : 'd2-wallpaper-upload'}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            handleWallpaperUpload(e, activeTab === 'dashboard1' ? 'd1' : 'd2');
+                          }}
+                        />
+                        {((activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper)) && (
+                          <button
+                            onClick={() => handleClearWallpaper(activeTab === 'dashboard1' ? 'd1' : 'd2')}
+                            className="w-10 h-10 flex justify-center items-center text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-lg cursor-pointer bg-white"
+                            title="Remove Background"
+                          >
+                            <X size={16} />
+                          </button>
                         )}
-                        {!isScreenshotMode && (
-                          <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
-                            <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
+                      </div>
+
+                      {/* Notifications button/dropdown replacing Import/Export */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+                          className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer relative"
+                          title="Notifications"
+                        >
+                          <Bell size={18} />
+                          {notifications.filter(n => !n.read).length > 0 && (
+                            <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border border-indigo-300 animate-pulse'
+                                : 'bg-rose-600'
+                              }`}>
+                              {notifications.filter(n => !n.read).length}
+                            </span>
+                          )}
+                        </button>
+
+                        {showNotificationDropdown && (
+                          <div
+                            className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-amber-100 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.98)',
+                              backdropFilter: 'blur(20px)',
+                            }}
+                          >
+                            <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
+                              <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                                <Bell size={14} className="text-amber-800" /> Notifications
+                                {notifications.filter(n => !n.read).length > 0 && (
+                                  <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
+                                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
+                                      : 'bg-rose-600'
+                                    }`}>
+                                    {notifications.filter(n => !n.read).length}
+                                  </span>
+                                )}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setShowNotificationDropdown(false);
+                                  setActiveTab('dashboard1');
+                                  handleAddClick('chocolate');
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer border border-amber-500/20"
+                              >
+                                <Plus size={11} /> Add Order
+                              </button>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto divide-y divide-amber-100/50">
+                              {notifications.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-amber-600 font-medium italic">
+                                  No notifications yet
+                                </div>
+                              ) : (
+                                notifications.map((n) => (
+                                  <div
+                                    key={n.id}
+                                    onClick={() => {
+                                      setShowNotificationDropdown(false);
+                                      handleNotificationClick(n);
+                                    }}
+                                    className={`p-3 text-xs transition-colors hover:bg-amber-50/50 cursor-pointer ${!n.read ? 'bg-amber-50/10 font-bold' : 'text-slate-500'}`}
+                                  >
+                                    <div className="flex justify-between items-start gap-1">
+                                      <p className="text-slate-800">{n.cardTitle} moved to Print</p>
+                                      <span className="text-[9px] text-amber-600 shrink-0 font-bold">
+                                        {new Date(n.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-1">
+                                      <p className="text-[10px] text-slate-500 font-medium">{n.phoneNumber}</p>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowNotificationDropdown(false);
+                                          handleAddOrderFromNotification(n);
+                                        }}
+                                        className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[9px] font-bold shadow-sm transition-all cursor-pointer border border-amber-500/20"
+                                      >
+                                        + Add Order
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            {notifications.length > 0 && (
+                              <div className="px-4 py-2 border-t border-amber-100 bg-amber-50/20 flex justify-between items-center shrink-0">
+                                <button
+                                  onClick={markAllNotificationsAsRead}
+                                  className="text-[11px] font-bold text-amber-800 hover:text-amber-950 transition-colors cursor-pointer"
+                                >
+                                  Mark all read
+                                </button>
+                                <button
+                                  onClick={clearAllNotifications}
+                                  className="text-[11px] font-bold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"
+                                >
+                                  Clear all
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {activeTab === 'dashboard2' && (
+                        <button onClick={() => setIsAddProductModalOpen(true)} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700`}>
+                          <Plus size={18} /> Add Product
+                        </button>
+                      )}
+
+                      <button onClick={handleAddClick} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-amber-600 text-white hover:bg-amber-700`}>
+                        <Plus size={18} /> Add Order
+                      </button>
+                    </div>
+                  </div>
+
+                  <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-auto max-h-[75vh]'}`}>
+
+                    {/* 📸 Screenshot Header - Only visible during screenshot capture */}
+                    {isScreenshotMode && (
+                      <div className="bg-gradient-to-r from-amber-100 via-orange-50 to-amber-100 px-6 py-4 border-b-2 border-amber-300">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h1 className="text-2xl font-black text-amber-950 tracking-tight">SABI Return Gifts</h1>
+                            <p className="text-sm font-bold text-amber-700 mt-0.5">Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs font-bold text-amber-600">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                            <div className="flex gap-4 mt-1">
+                              <span className="text-xs font-black text-amber-900">Orders: {filteredDashboardOrders.length}</span>
+                              <span className="text-xs font-black text-amber-900">Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}</span>
+                              <span className="text-xs font-black text-green-700">Revenue: ₹{displayRevenue.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-0' : 'min-w-[1450px]'}`}>
+                      <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
+                        <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
+                          {!isScreenshotMode && showCheckboxes && (
+                            <th className="py-3 px-4 w-12 text-center print:hidden align-top">
+                              <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
+                            </th>
+                          )}
+                          {!isScreenshotMode && (
+                            <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
+                              <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
                                 <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
                                   <ChevronRight size={14} strokeWidth={3} />
                                 </button>
-                              {!hiddenCols.serialNo && (
-                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                  <span className="whitespace-nowrap">Serial No</span>
+                                {!hiddenCols.serialNo && (
+                                  <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <span className="whitespace-nowrap">Serial No</span>
 
-                                  <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
-                                    <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                    <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
+                                      <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                      <select
+                                        value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
+                                        onChange={(e) => {
+                                          if (!e.target.value) setSortConfig(null);
+                                          else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
+                                        }}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                      >
+                                        <option value="">Sort...</option>
+                                        <option value="asc">new  to old</option>
+                                        <option value="desc">old to new </option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </th>
+                          )}
+                          {!isScreenshotMode && (
+                            <th className={`py-3 ${hiddenCols.role ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
+                              <div className={`flex items-center ${hiddenCols.role ? 'justify-center' : 'gap-1'} group`}>
+                                {!hiddenCols.role && <span className="whitespace-nowrap">Role</span>}
+                                {!hiddenCols.role && (
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
+                                    <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
                                     <select
-                                      value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
-                                      onChange={(e) => {
-                                        if (!e.target.value) setSortConfig(null);
-                                        else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
-                                      }}
+                                      value={roleFilter}
+                                      onChange={(e) => setRoleFilter(e.target.value)}
                                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     >
-                                      <option value="">Sort...</option>
-                                      <option value="asc">new  to old</option>
-                                      <option value="desc">old to new </option>
+                                      <option value="All">All</option>
+                                      <option value="Others">Others</option>
+                                      <option value="Self">Self</option>
                                     </select>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          </th>
-                        )}
-                        {!isScreenshotMode && (
-                          <th className={`py-3 ${hiddenCols.role ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
-                            <div className={`flex items-center ${hiddenCols.role ? 'justify-center' : 'gap-1'} group`}>
-                              {!hiddenCols.role && <span className="whitespace-nowrap">Role</span>}
-                              {!hiddenCols.role && (
-                                <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
-                                  <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
-                                  <select
-                                    value={roleFilter}
-                                    onChange={(e) => setRoleFilter(e.target.value)}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  >
-                                    <option value="All">All</option>
-                                    <option value="Others">Others</option>
-                                    <option value="Self">Self</option>
-                                  </select>
-                                </div>
-                              )}
-                            </div>
-                          </th>
-                        )}
-                        {!isScreenshotMode && (
-                          <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
-                            <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
+                                )}
+                              </div>
+                            </th>
+                          )}
+                          {!isScreenshotMode && (
+                            <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
+                              <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
 
-                              {!hiddenCols.orderDate && (
-                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                                  <span className="whitespace-nowrap">Order Date</span>
-                                  <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
-                                    <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                                    <select
-                                      value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
+                                {!hiddenCols.orderDate && (
+                                  <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <span className="whitespace-nowrap">Order Date</span>
+                                    <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
+                                      <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                      <select
+                                        value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
+                                        onChange={(e) => {
+                                          if (!e.target.value) setSortConfig(null);
+                                          else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
+                                        }}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                      >
+                                        <option value="">Sort...</option>
+                                        <option value="desc">new to old</option>
+                                        <option value="asc">old to new</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </th>
+                          )}
+                          <th className="py-3 px-4 font-bold align-top">Name</th>
+                          {!isScreenshotMode && <th className="py-3 px-4 font-bold align-top">Contact Number</th>}
+
+                          {!isScreenshotMode && (
+                            <th className="py-3 px-4 font-bold align-top min-w-[140px]">
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span>Function Date</span>
+                                  <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
+                                    <Calendar size={16} className="text-amber-700 pointer-events-none" />
+                                    <input
+                                      type="date"
+                                      value=""
                                       onChange={(e) => {
-                                        if (!e.target.value) setSortConfig(null);
-                                        else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
+                                        if (e.target.value && !functionDates.includes(e.target.value)) {
+                                          setFunctionDates([...functionDates, e.target.value]);
+                                        }
                                       }}
                                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    >
-                                      <option value="">Sort...</option>
-                                      <option value="desc">new to old</option>
-                                      <option value="asc">old to new</option>
-                                    </select>
+                                    />
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          </th>
-                        )}
-                        <th className="py-3 px-4 font-bold align-top">Name</th>
-                        {!isScreenshotMode && <th className="py-3 px-4 font-bold align-top">Contact Number</th>}
+                                {functionDates.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {functionDates.map(d => (
+                                      <span key={d} className="flex items-center gap-1 bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                        {formatToDisplayDate(d)}
+                                        <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setFunctionDates(functionDates.filter(fd => fd !== d))} />
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </th>
+                          )}
 
-                        {!isScreenshotMode && (
-                          <th className="py-3 px-4 font-bold align-top min-w-[140px]">
+                          <th className="py-3 px-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
                             <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-2">
-                                <span>Function Date</span>
-                                <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
-                                  <Calendar size={16} className="text-amber-700 pointer-events-none" />
+                                <span>Dispatch Date</span>
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Dispatch Date">
+                                  <ChevronDown size={14} className="text-orange-700/30 group-hover:text-orange-700 transition-opacity" />
+                                  <select
+                                    value={sortConfig?.key === 'deliveryDate' ? sortConfig.direction : ""}
+                                    onChange={(e) => {
+                                      if (!e.target.value) setSortConfig(null);
+                                      else setSortConfig({ key: 'deliveryDate', direction: e.target.value as 'asc' | 'desc' });
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  >
+                                    <option value="">Sort...</option>
+                                    <option value="desc">new to old</option>
+                                    <option value="asc">old to new</option>
+                                  </select>
+                                </div>
+                                <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-orange-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
+                                  <Calendar size={16} className="text-orange-700 pointer-events-none" />
                                   <input
                                     type="date"
                                     value=""
                                     onChange={(e) => {
-                                      if (e.target.value && !functionDates.includes(e.target.value)) {
-                                        setFunctionDates([...functionDates, e.target.value]);
+                                      if (e.target.value && !deliveryDates.includes(e.target.value)) {
+                                        setDeliveryDates([...deliveryDates, e.target.value]);
                                       }
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                   />
                                 </div>
                               </div>
-                              {functionDates.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {functionDates.map(d => (
-                                    <span key={d} className="flex items-center gap-1 bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                              {deliveryDates.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {deliveryDates.map(d => (
+                                    <span key={d} className="flex items-center gap-1 bg-white text-orange-800 border border-orange-300 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">
                                       {formatToDisplayDate(d)}
-                                      <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setFunctionDates(functionDates.filter(fd => fd !== d))} />
+                                      <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setDeliveryDates(deliveryDates.filter(dd => dd !== d))} />
                                     </span>
                                   ))}
                                 </div>
                               )}
                             </div>
                           </th>
-                        )}
 
-                        <th className="py-3 px-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              <span>Dispatch Date</span>
-                              <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Dispatch Date">
-                                <ChevronDown size={14} className="text-orange-700/30 group-hover:text-orange-700 transition-opacity" />
-                                <select
-                                  value={sortConfig?.key === 'deliveryDate' ? sortConfig.direction : ""}
-                                  onChange={(e) => {
-                                    if (!e.target.value) setSortConfig(null);
-                                    else setSortConfig({ key: 'deliveryDate', direction: e.target.value as 'asc' | 'desc' });
-                                  }}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                >
-                                  <option value="">Sort...</option>
-                                  <option value="desc">new to old</option>
-                                  <option value="asc">old to new</option>
-                                </select>
+                          {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
+                          {!isScreenshotMode && activeTab === 'dashboard2' && (
+                            <th className="py-3 px-4 font-bold align-top min-w-[150px]">
+                              <div className="flex items-center gap-1 group">
+                                <span>Order Status</span>
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Sabi/Thaaru/Others)">
+                                  <ChevronDown size={14} className={tableTypeFilter !== 'All' ? 'text-amber-800' : 'text-amber-800/30 group-hover:text-amber-800 transition-opacity'} />
+                                  <select
+                                    value={tableTypeFilter}
+                                    onChange={(e) => setTableTypeFilter(e.target.value)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  >
+                                    <option value="All">All Types</option>
+                                    <option value="Sabi">Sabi</option>
+                                    <option value="Thaaru">Thaaru</option>
+                                    <option value="Self">Others</option>
+                                  </select>
+                                </div>
                               </div>
-                              <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-orange-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
-                                <Calendar size={16} className="text-orange-700 pointer-events-none" />
-                                <input
-                                  type="date"
-                                  value=""
-                                  onChange={(e) => {
-                                    if (e.target.value && !deliveryDates.includes(e.target.value)) {
-                                      setDeliveryDates([...deliveryDates, e.target.value]);
-                                    }
-                                  }}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                              </div>
-                            </div>
-                            {deliveryDates.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {deliveryDates.map(d => (
-                                  <span key={d} className="flex items-center gap-1 bg-white text-orange-800 border border-orange-300 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">
-                                    {formatToDisplayDate(d)}
-                                    <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setDeliveryDates(deliveryDates.filter(dd => dd !== d))} />
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </th>
+                            </th>
+                          )}
 
-                         {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
-                        {!isScreenshotMode && activeTab === 'dashboard2' && (
                           <th className="py-3 px-4 font-bold align-top min-w-[150px]">
-                            <div className="flex items-center gap-1 group">
-                              <span>Order Status</span>
-                              <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Sabi/Thaaru/Others)">
-                                <ChevronDown size={14} className={tableTypeFilter !== 'All' ? 'text-amber-800' : 'text-amber-800/30 group-hover:text-amber-800 transition-opacity'} />
+                            <div className="flex items-center gap-1.5 group">
+                              <span>{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</span>
+
+                              {/* Dropdown Filter for Chocolates or Products */}
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title={activeTab === 'dashboard2' ? "Filter by Product Name" : "Filter by Chocolate Name"}>
+                                <ChevronDown size={14} className={chocFilter ? 'text-amber-800' : 'text-amber-400'} />
                                 <select
-                                  value={tableTypeFilter}
-                                  onChange={(e) => setTableTypeFilter(e.target.value)}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  value={chocFilter}
+                                  onChange={(e) => setChocFilter(e.target.value)}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 >
-                                  <option value="All">All Types</option>
-                                  <option value="Sabi">Sabi</option>
-                                  <option value="Thaaru">Thaaru</option>
-                                  <option value="Self">Others</option>
-                                </select>
-                              </div>
-                            </div>
-                          </th>
-                        )}
-
-                        <th className="py-3 px-4 font-bold align-top min-w-[150px]">
-                          <div className="flex items-center gap-1.5 group">
-                            <span>{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</span>
-                            
-                            {/* Dropdown Filter for Chocolates or Products */}
-                            <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title={activeTab === 'dashboard2' ? "Filter by Product Name" : "Filter by Chocolate Name"}>
-                              <ChevronDown size={14} className={chocFilter ? 'text-amber-800' : 'text-amber-400'} />
-                              <select
-                                value={chocFilter}
-                                onChange={(e) => setChocFilter(e.target.value)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                              >
-                                {activeTab === 'dashboard2' ? (
-                                  <>
-                                    <option value="">All Products</option>
-                                    {customProducts.map(p => (
-                                      <option key={p.fireId || p.id} value={p.name}>{p.name}</option>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <>
-                                    <option value="">All Chocolates</option>
-                                    <option value="10 rs 5 Star">10 rs 5 Star</option>
-                                    <option value="10 rs Kitkat">10 rs Kitkat</option>
-                                    <option value="10 rs Dairy Milk">10 rs Dairy Milk</option>
-                                    <option value="5 rs Peanut Candy">5 rs Peanut Candy</option>
-                                    <option value="5 rs 5 Star">5 rs 5 Star</option>
-                                    <option value="5 rs Dairy Milk">5 rs Dairy Milk</option>
-                                    <option value="2 rs Dairymilk Shots">2 rs Dairymilk Shots</option>
-                                    <option value="5 rs Milky Bar">5 rs Milky Bar</option>
-                                    <option value="1 rs Chocolate">1 rs Chocolate</option>
-                                  </>
-                                )}
-                              </select>
-                            </div>
-
-                            {/* Clear indicator if active */}
-                            {chocFilter && (
-                              <button
-                                onClick={() => setChocFilter('')}
-                                className="text-red-500 hover:scale-110 transition-transform ml-0.5"
-                                title="Clear filter"
-                              >
-                                <X size={12} strokeWidth={3} />
-                              </button>
-                            )}
-                          </div>
-                        </th>
-                        <th className="py-3 px-4 font-bold text-center align-top min-w-[100px]">
-                          <div className="flex items-center justify-center gap-1">
-                            <span>Count</span>
-                            <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Count">
-                              <Filter size={14} className={countFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
-                              <select
-                                value={countFilter}
-                                onChange={(e) => setCountFilter(e.target.value)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              >
-                                <option value="All">All</option>
-                                {uniqueCounts.map(c => (
-                                  <option key={c} value={c.toString()}>{c}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        </th>
-
-                        {!isScreenshotMode && <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>}
-                        {!isScreenshotMode && (
-                          <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
-                            <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
-                              {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
-                            </div>
-                          </th>
-                        )}
-                        {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Advance</th>}
-                        {!isScreenshotMode && (
-                          <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
-                            <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
-                              {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
-                            </div>
-                          </th>
-                        )}
-
-
-                        <th className="py-3 px-4 font-bold text-right align-top">Total Price</th>
-                        <th className="py-3 px-4 font-bold text-center align-top">Payment</th>
-                        {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Delivery Status</th>}
-
-                        {!isScreenshotMode && (
-                          <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
-                            <div className="flex items-center justify-center gap-2">
-                              <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
-                                <ChevronLeft size={14} strokeWidth={3} />
-                              </button>
-                              <span>Actions</span>
-                            </div>
-                          </th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(isScreenshotMode ? sortedDashboardOrders : paginatedOrders).length === 0 ? (
-                        <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
-                      ) : (
-                        (isScreenshotMode ? sortedDashboardOrders : paginatedOrders).map((order) => {
-                          const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
-                          const isSelected = selectedOrders.includes(order.id);
-
-
-                          return (
-                            <tr key={order.fireId || order.id} className={`border-b transition-colors border-amber-50 hover:bg-orange-50/50 print:border-gray-200 ${isSelected ? 'bg-amber-50/80 print:bg-transparent' : ''}`}>
-                              {!isScreenshotMode && showCheckboxes && (
-                                <td className="py-2.5 px-4 text-center print:hidden align-middle">
-                                  <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
-                                </td>
-                              )}
-                              {!isScreenshotMode && (
-                                <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
-                                  {!hiddenCols.serialNo && (
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 shrink-0 print:hidden" />
-                                      <span>{getSerial(order.id)}</span>
-                                    </div>
-                                  )}
-                                </td>
-                              )}
-                              {!isScreenshotMode && (
-                                <td className={`py-2.5 ${hiddenCols.role ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} align-middle transition-all duration-300`}>
-                                  {!hiddenCols.role && (
-                                    <div className="flex items-center justify-start gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const nextRole = order.role === 'Others' ? 'Self' : 'Others';
-                                          handleRoleUpdate(order.id, order.fireId, nextRole);
-                                        }}
-                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.role === 'Others') ? 'bg-green-500' : 'bg-rose-500'}`}
-                                        title={`Click to change to ${order.role === 'Others' ? 'Self' : 'Others'}`}
-                                      >
-                                        <span
-                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.role === 'Others') ? 'translate-x-3' : 'translate-x-0'}`}
-                                        />
-                                      </button>
-                                      <span className={`text-[10px] font-black uppercase tracking-wider ${(order.role === 'Others') ? 'text-green-600' : 'text-rose-600'}`}>
-                                        {order.role}
-                                      </span>
-                                    </div>
-                                  )}
-                                </td>
-                              )}
-                              {!isScreenshotMode && (
-                                <td className={`py-2.5 ${hiddenCols.orderDate ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-medium text-[#5d4037] align-middle transition-all duration-300`}>
-                                  {!hiddenCols.orderDate && order.orderDate}
-                                </td>
-                              )}
-
-                              <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
-                              {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>}
-                              {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
-                              <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
-
-                               {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
-                              {!isScreenshotMode && activeTab === 'dashboard2' && (
-                                <td className="py-2.5 px-4 text-center align-middle">
-                                  <div className="print:hidden">
-                                    <select
-                                      value={order.orderStatus || "image edited (not paid)"}
-                                      onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
-                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${order.orderStatus === 'image edited (not paid)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' :
-                                        order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
-                                          order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
-                                            order.orderStatus === 'order complete' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
-                                              'bg-[#f3e8ff] text-[#7e22ce] border-[#e9d5ff]'
-                                        }`}
-                                    >
-                                      <option value="image edited (not paid)">I E (Not Paid)</option>
-                                      <option value="forward to print (paid)">F 2 P (Paid)</option>
-                                      <option value="order complete">Order Complete</option>
-                                      <option value="cancelled">Cancelled</option>
-                                    </select>
-
-                                  </div>
-                                  <span className="hidden print:inline text-[10px] font-bold text-black uppercase">
-                                     {(order.orderStatus || "image edited (not paid)") === 'image edited (not paid)' ? 'I E (Not Paid)' : (order.orderStatus === 'forward to print (paid)' ? 'F 2 P (Paid)' : order.orderStatus)}
-                                  </span>
-                                </td>
-                              )}
-
-                              <td className={`py-2.5 px-4 print:text-gray-800 align-middle`}>
-                                {renderChocolateBadges(order.chocolate)}
-                              </td>
-
-                              <td className={`py-2.5 px-4 text-center font-bold text-amber-950 print:text-black align-middle`}>
-                                {order.count}
-                              </td>
-
-                              {!isScreenshotMode && (
-                                <td className="py-2.5 px-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
-                                  <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
-                                </td>
-                              )}
-
-                              {!isScreenshotMode && (
-                                <td className={`py-2.5 ${hiddenCols.deliveryCharge ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-right font-medium text-amber-900 align-middle transition-all duration-300`}>
-                                  {!hiddenCols.deliveryCharge && (
-                                    order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`
-                                  )}
-                                </td>
-                              )}
-
-                              {!isScreenshotMode && (
-                                <td className="py-2.5 px-4 text-center align-middle">
-                                  <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={order.advanceAmount || ''}
-                                    onChange={(e) => handleAdvanceUpdate(order.id, order.fireId, e.target.value)}
-                                    className="w-20 p-1.5 border border-emerald-300 rounded text-center text-sm font-bold text-emerald-950 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
-                                  />
-                                </td>
-                              )}
-
-                              {!isScreenshotMode && (
-                                <td className={`py-2.5 ${hiddenCols.discount ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-center print:hidden align-middle transition-all duration-300`}>
-                                  {!hiddenCols.discount && (
-                                    <input
-                                      type="number"
-                                      list="discount-suggestions"
-                                      placeholder="0"
-                                      value={order.discount || ''}
-                                      onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
-                                      className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                                    />
-                                  )}
-                                </td>
-                              )}
-
-
-                              {isScreenshotMode ? (
-                                <td className="py-2.5 px-4 text-right align-middle font-bold text-amber-950 text-base">
-                                  ₹{priceData.fullTotalPrice.toLocaleString()}
-                                </td>
-                              ) : (
-                                <td className={`py-2.5 px-4 text-right align-middle`}>
-                                  <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
-                                  {order.paymentStatus === 'Pending' && (
-                                    <div className="text-[11px] font-bold text-red-600 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
-                                  )}
-                                  {order.paymentStatus === 'Partially Paid' && (
+                                  {activeTab === 'dashboard2' ? (
                                     <>
-                                      <div className="text-[11px] font-bold text-green-700 leading-tight mt-0.5">Paid: ₹{Number(order.advanceAmount || 0).toLocaleString()}</div>
-                                      <div className="text-[11px] font-bold text-red-600 leading-tight">Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}</div>
+                                      <option value="">All Products</option>
+                                      {customProducts.map(p => (
+                                        <option key={p.fireId || p.id} value={p.name}>{p.name}</option>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <option value="">All Chocolates</option>
+                                      <option value="10 rs 5 Star">10 rs 5 Star</option>
+                                      <option value="10 rs Kitkat">10 rs Kitkat</option>
+                                      <option value="10 rs Dairy Milk">10 rs Dairy Milk</option>
+                                      <option value="5 rs Peanut Candy">5 rs Peanut Candy</option>
+                                      <option value="5 rs 5 Star">5 rs 5 Star</option>
+                                      <option value="5 rs Dairy Milk">5 rs Dairy Milk</option>
+                                      <option value="2 rs Dairymilk Shots">2 rs Dairymilk Shots</option>
+                                      <option value="5 rs Milky Bar">5 rs Milky Bar</option>
+                                      <option value="1 rs Chocolate">1 rs Chocolate</option>
                                     </>
                                   )}
-                                </td>
-                              )}
+                                </select>
+                              </div>
 
-                              <td className="py-2.5 px-4 text-center align-middle">
-                                {isScreenshotMode ? (
-                                  <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                    ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]'
-                                    : order.paymentStatus === 'Partially Paid'
-                                      ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]'
-                                      : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
-                                    }`}
-                                  >
-                                    {order.paymentStatus || 'Pending'}
-                                  </span>
-                                ) : (
-                                  <>
+                              {/* Clear indicator if active */}
+                              {chocFilter && (
+                                <button
+                                  onClick={() => setChocFilter('')}
+                                  className="text-red-500 hover:scale-110 transition-transform ml-0.5"
+                                  title="Clear filter"
+                                >
+                                  <X size={12} strokeWidth={3} />
+                                </button>
+                              )}
+                            </div>
+                          </th>
+                          <th className="py-3 px-4 font-bold text-center align-top min-w-[100px]">
+                            <div className="flex items-center justify-center gap-1">
+                              <span>Count</span>
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Count">
+                                <Filter size={14} className={countFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
+                                <select
+                                  value={countFilter}
+                                  onChange={(e) => setCountFilter(e.target.value)}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                >
+                                  <option value="All">All</option>
+                                  {uniqueCounts.map(c => (
+                                    <option key={c} value={c.toString()}>{c}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </th>
+
+                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>}
+                          {!isScreenshotMode && (
+                            <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
+                              <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
+                                {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
+                              </div>
+                            </th>
+                          )}
+                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Advance</th>}
+                          {!isScreenshotMode && (
+                            <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
+                              <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
+                                {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
+                              </div>
+                            </th>
+                          )}
+
+
+                          <th className="py-3 px-4 font-bold text-right align-top">Total Price</th>
+                          <th className="py-3 px-4 font-bold text-center align-top">Payment</th>
+                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Delivery Status</th>}
+
+                          {!isScreenshotMode && (
+                            <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
+                              <div className="flex items-center justify-center gap-2">
+                                <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
+                                  <ChevronLeft size={14} strokeWidth={3} />
+                                </button>
+                                <span>Actions</span>
+                              </div>
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(isScreenshotMode ? sortedDashboardOrders : paginatedOrders).length === 0 ? (
+                          <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
+                        ) : (
+                          (isScreenshotMode ? sortedDashboardOrders : paginatedOrders).map((order) => {
+                            const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
+                            const isSelected = selectedOrders.includes(order.id);
+
+
+                            return (
+                              <tr key={order.fireId || order.id} className={`border-b transition-colors border-amber-50 hover:bg-orange-50/50 print:border-gray-200 ${isSelected ? 'bg-amber-50/80 print:bg-transparent' : ''}`}>
+                                {!isScreenshotMode && showCheckboxes && (
+                                  <td className="py-2.5 px-4 text-center print:hidden align-middle">
+                                    <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
+                                  </td>
+                                )}
+                                {!isScreenshotMode && (
+                                  <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
+                                    {!hiddenCols.serialNo && (
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 shrink-0 print:hidden" />
+                                        <span>{getSerial(order.id)}</span>
+                                      </div>
+                                    )}
+                                  </td>
+                                )}
+                                {!isScreenshotMode && (
+                                  <td className={`py-2.5 ${hiddenCols.role ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} align-middle transition-all duration-300`}>
+                                    {!hiddenCols.role && (
+                                      <div className="flex items-center justify-start gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const nextRole = order.role === 'Others' ? 'Self' : 'Others';
+                                            handleRoleUpdate(order.id, order.fireId, nextRole);
+                                          }}
+                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.role === 'Others') ? 'bg-green-500' : 'bg-rose-500'}`}
+                                          title={`Click to change to ${order.role === 'Others' ? 'Self' : 'Others'}`}
+                                        >
+                                          <span
+                                            className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.role === 'Others') ? 'translate-x-3' : 'translate-x-0'}`}
+                                          />
+                                        </button>
+                                        <span className={`text-[10px] font-black uppercase tracking-wider ${(order.role === 'Others') ? 'text-green-600' : 'text-rose-600'}`}>
+                                          {order.role}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
+                                )}
+                                {!isScreenshotMode && (
+                                  <td className={`py-2.5 ${hiddenCols.orderDate ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-medium text-[#5d4037] align-middle transition-all duration-300`}>
+                                    {!hiddenCols.orderDate && order.orderDate}
+                                  </td>
+                                )}
+
+                                <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
+                                {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>}
+                                {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
+                                <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
+
+                                {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
+                                {!isScreenshotMode && activeTab === 'dashboard2' && (
+                                  <td className="py-2.5 px-4 text-center align-middle">
                                     <div className="print:hidden">
                                       <select
-                                        value={order.paymentStatus || "Pending"}
-                                        onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                          ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
-                                          : order.paymentStatus === 'Partially Paid'
-                                            ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
-                                            : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
+                                        value={order.orderStatus || "image edited (not paid)"}
+                                        onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${order.orderStatus === 'image edited (not paid)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' :
+                                          order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
+                                            order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
+                                              order.orderStatus === 'order complete' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
+                                                'bg-[#f3e8ff] text-[#7e22ce] border-[#e9d5ff]'
                                           }`}
                                       >
-                                        <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
-                                        <option value="Partially Paid" className="font-bold text-[#d35400] bg-white">Partially Paid</option>
-                                        <option value="Pending" className="font-bold text-[#b91c1c] bg-white">Pending</option>
+                                        <option value="image edited (not paid)">I E (Not Paid)</option>
+                                        <option value="forward to print (paid)">F 2 P (Paid)</option>
+                                        <option value="order complete">Order Complete</option>
+                                        <option value="cancelled">Cancelled</option>
                                       </select>
+
                                     </div>
-                                    <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
-                                  </>
+                                    <span className="hidden print:inline text-[10px] font-bold text-black uppercase">
+                                      {(order.orderStatus || "image edited (not paid)") === 'image edited (not paid)' ? 'I E (Not Paid)' : (order.orderStatus === 'forward to print (paid)' ? 'F 2 P (Paid)' : order.orderStatus)}
+                                    </span>
+                                  </td>
                                 )}
-                              </td>
 
-                              {!isScreenshotMode && (
-                                <td className="py-2.5 px-4 text-center align-middle">
-                                  <div className="print:hidden">
-                                    <select
-                                      value={order.status}
-                                      onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
-                                        ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
-                                        : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
-                                        }`}
-                                    >
-                                      <option value="Delivered" className="font-bold text-green-700">Delivered</option>
-                                      <option value="In Process" className="font-bold text-amber-700">In Process</option>
-                                    </select>
-                                  </div>
-                                  <span className="hidden print:inline text-sm font-bold text-black">{order.status}</span>
+                                <td className={`py-2.5 px-4 print:text-gray-800 align-middle`}>
+                                  {renderChocolateBadges(order.chocolate)}
                                 </td>
-                              )}
 
-                              {!isScreenshotMode && (
-                                <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
-                                  <button
-                                    onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
-                                    className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
-                                    title="Actions Menu"
-                                  >
-                                    <MoreVertical size={20} />
-                                  </button>
+                                <td className={`py-2.5 px-4 text-center font-bold text-amber-950 print:text-black align-middle`}>
+                                  {order.count}
+                                </td>
 
-                                  {openActionId === order.id && (
+                                {!isScreenshotMode && (
+                                  <td className="py-2.5 px-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
+                                    <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
+                                  </td>
+                                )}
+
+                                {!isScreenshotMode && (
+                                  <td className={`py-2.5 ${hiddenCols.deliveryCharge ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-right font-medium text-amber-900 align-middle transition-all duration-300`}>
+                                    {!hiddenCols.deliveryCharge && (
+                                      order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`
+                                    )}
+                                  </td>
+                                )}
+
+                                {!isScreenshotMode && (
+                                  <td className="py-2.5 px-4 text-center align-middle">
+                                    <input
+                                      type="number"
+                                      placeholder="0"
+                                      value={order.advanceAmount || ''}
+                                      onChange={(e) => handleAdvanceUpdate(order.id, order.fireId, e.target.value)}
+                                      className="w-20 p-1.5 border border-emerald-300 rounded text-center text-sm font-bold text-emerald-950 bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                  </td>
+                                )}
+
+                                {!isScreenshotMode && (
+                                  <td className={`py-2.5 ${hiddenCols.discount ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-center print:hidden align-middle transition-all duration-300`}>
+                                    {!hiddenCols.discount && (
+                                      <input
+                                        type="number"
+                                        list="discount-suggestions"
+                                        placeholder="0"
+                                        value={order.discount || ''}
+                                        onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
+                                        className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                                      />
+                                    )}
+                                  </td>
+                                )}
+
+
+                                {isScreenshotMode ? (
+                                  <td className="py-2.5 px-4 text-right align-middle font-bold text-amber-950 text-base">
+                                    ₹{priceData.fullTotalPrice.toLocaleString()}
+                                  </td>
+                                ) : (
+                                  <td className={`py-2.5 px-4 text-right align-middle`}>
+                                    <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
+                                    {order.paymentStatus === 'Pending' && (
+                                      <div className="text-[11px] font-bold text-red-600 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
+                                    )}
+                                    {order.paymentStatus === 'Partially Paid' && (
+                                      <>
+                                        <div className="text-[11px] font-bold text-green-700 leading-tight mt-0.5">Paid: ₹{Number(order.advanceAmount || 0).toLocaleString()}</div>
+                                        <div className="text-[11px] font-bold text-red-600 leading-tight">Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}</div>
+                                      </>
+                                    )}
+                                  </td>
+                                )}
+
+                                <td className="py-2.5 px-4 text-center align-middle">
+                                  {isScreenshotMode ? (
+                                    <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
+                                      ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]'
+                                      : order.paymentStatus === 'Partially Paid'
+                                        ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]'
+                                        : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
+                                      }`}
+                                    >
+                                      {order.paymentStatus || 'Pending'}
+                                    </span>
+                                  ) : (
                                     <>
-                                      <div className="fixed inset-0 z-40" onClick={() => setOpenActionId(null)}></div>
-
-                                      <div className="absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
-                                        <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Send SMS Bill"><MessageSquare size={20} /></button>
-                                        <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Shipping"><Truck size={20} /></button>
-                                        <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
-                                        <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
-                                        {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
-                                        <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
-                                        <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Share on WhatsApp"><MessageCircle size={20} /></button>
-
+                                      <div className="print:hidden">
+                                        <select
+                                          value={order.paymentStatus || "Pending"}
+                                          onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
+                                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
+                                            ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
+                                            : order.paymentStatus === 'Partially Paid'
+                                              ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
+                                              : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
+                                            }`}
+                                        >
+                                          <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
+                                          <option value="Partially Paid" className="font-bold text-[#d35400] bg-white">Partially Paid</option>
+                                          <option value="Pending" className="font-bold text-[#b91c1c] bg-white">Pending</option>
+                                        </select>
                                       </div>
+                                      <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
                                     </>
                                   )}
                                 </td>
-                              )}
 
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                                {!isScreenshotMode && (
+                                  <td className="py-2.5 px-4 text-center align-middle">
+                                    <div className="print:hidden">
+                                      <select
+                                        value={order.status}
+                                        onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
+                                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
+                                          : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
+                                          }`}
+                                      >
+                                        <option value="Delivered" className="font-bold text-green-700">Delivered</option>
+                                        <option value="In Process" className="font-bold text-amber-700">In Process</option>
+                                      </select>
+                                    </div>
+                                    <span className="hidden print:inline text-sm font-bold text-black">{order.status}</span>
+                                  </td>
+                                )}
 
-                {/* 🟢 STICKY PAGINATION FOOTER */}
-                <div className={`${isScreenshotMode ? 'hidden' : 'sticky bottom-0 z-30 bg-[#ebe6df]/95 backdrop-blur-md border-t border-amber-200 p-4 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)]'} print:hidden`}>
-                  <div className="text-sm font-bold text-amber-800">
-                    Showing <span className="font-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black">{sortedDashboardOrders.length}</span> orders
+                                {!isScreenshotMode && (
+                                  <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
+                                    <button
+                                      onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
+                                      className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
+                                      title="Actions Menu"
+                                    >
+                                      <MoreVertical size={20} />
+                                    </button>
+
+                                    {openActionId === order.id && (
+                                      <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setOpenActionId(null)}></div>
+
+                                        <div className="absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
+                                          <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Send SMS Bill"><MessageSquare size={20} /></button>
+                                          <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Shipping"><Truck size={20} /></button>
+                                          <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
+                                          <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
+                                          {/* 👇 PUDHU RECEIPT BUTTON INGA ADD PANNIRUKKEN 👇 */}
+                                          <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
+                                          <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Share on WhatsApp"><MessageCircle size={20} /></button>
+
+                                        </div>
+                                      </>
+                                    )}
+                                  </td>
+                                )}
+
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={currentPage === 1}
-                      onClick={() => {
-                        setCurrentPage(prev => prev - 1);
-                        tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className={`p-2 rounded-xl border-2 transition-all ${currentPage === 1 ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 shadow-sm'}`}
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-
-                    <div className="flex items-center gap-1 bg-white/50 p-1 rounded-xl border border-amber-100">
-                      {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }).map((_, i) => {
-                        const pageNum = i + 1;
-                        // Logic to show limited page numbers
-                        if (pageNum === 1 || pageNum === Math.ceil(sortedDashboardOrders.length / itemsPerPage) || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => {
-                                setCurrentPage(pageNum);
-                                tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-white text-amber-800 hover:bg-amber-50'}`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        }
-                        if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="px-1 text-amber-400 font-black">...</span>;
-                        return null;
-                      })}
+                  {/* 🟢 STICKY PAGINATION FOOTER */}
+                  <div className={`${isScreenshotMode ? 'hidden' : 'sticky bottom-0 z-30 bg-[#ebe6df]/95 backdrop-blur-md border-t border-amber-200 p-4 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)]'} print:hidden`}>
+                    <div className="text-sm font-bold text-amber-800">
+                      Showing <span className="font-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black">{sortedDashboardOrders.length}</span> orders
                     </div>
 
-                    <button
-                      disabled={currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
-                      onClick={() => {
-                        setCurrentPage(prev => prev + 1);
-                        tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className={`p-2 rounded-xl border-2 transition-all ${currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 shadow-sm'}`}
-                    >
-                      <ChevronRight size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => {
+                          setCurrentPage(prev => prev - 1);
+                          tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className={`p-2 rounded-xl border-2 transition-all ${currentPage === 1 ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 shadow-sm'}`}
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+
+                      <div className="flex items-center gap-1 bg-white/50 p-1 rounded-xl border border-amber-100">
+                        {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }).map((_, i) => {
+                          const pageNum = i + 1;
+                          // Logic to show limited page numbers
+                          if (pageNum === 1 || pageNum === Math.ceil(sortedDashboardOrders.length / itemsPerPage) || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => {
+                                  setCurrentPage(pageNum);
+                                  tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-white text-amber-800 hover:bg-amber-50'}`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          }
+                          if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="px-1 text-amber-400 font-black">...</span>;
+                          return null;
+                        })}
+                      </div>
+
+                      <button
+                        disabled={currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
+                        onClick={() => {
+                          setCurrentPage(prev => prev + 1);
+                          tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className={`p-2 rounded-xl border-2 transition-all ${currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 shadow-sm'}`}
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
           {activeTab === 'tracking' && (
             <div className="w-full px-2 print:hidden">
@@ -3856,6 +3965,18 @@ export default function Dashboard() {
                       title="Open Profit Analytics Table"
                     >
                       <Eye size={16} strokeWidth={2.5} />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setTempReportsPasscode(reportsPasscode);
+                        setTempHistoryPasscode(historyPasscode);
+                        setIsPasscodeSettingsOpen(true);
+                      }}
+                      className="p-1.5 bg-white border border-[#d7ccc8] hover:border-amber-500 hover:text-amber-700 rounded-xl text-[#5d4037] shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px]"
+                      title="Passcode Settings"
+                    >
+                      <Lock size={16} strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>
@@ -4497,8 +4618,8 @@ export default function Dashboard() {
           >
             <div className="relative border-b border-dashed border-[#d7ccc8] pb-2 mb-3 flex items-center justify-between">
               {/* Invisible spacer to center the title */}
-              <div className="w-[100px] hidden sm:block"></div> 
-              
+              <div className="w-[100px] hidden sm:block"></div>
+
               <h2 className="text-xl font-bold text-[#5d4037] text-center tracking-wide flex-1 sm:text-center text-left">
                 {formData.id ? "Edit Order Details" : "Add New Order"}
               </h2>
@@ -5099,13 +5220,12 @@ export default function Dashboard() {
                               Qty: <strong className="text-[#5d4037]">{order.count}</strong> | Total: <strong className="text-green-700">₹{(order.totalOrderPrice || 0).toLocaleString()}</strong>
                             </div>
                           </td>
-                           <td className="p-3">
+                          <td className="p-3">
                             <div className="flex flex-col gap-1 items-start">
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
-                                order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
-                                  ? "bg-blue-50 text-blue-700 border-blue-200" 
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
                                   : "bg-purple-50 text-purple-700 border-purple-200"
-                              }`}>
+                                }`}>
                                 <User size={10} />
                                 {order.deletedBy || "Unknown"}
                               </span>
@@ -5117,11 +5237,10 @@ export default function Dashboard() {
                             </div>
                           </td>
                           <td className="p-3 text-center">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                              isUrgent 
-                                ? "bg-red-50 text-red-700 border-red-200 animate-pulse" 
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${isUrgent
+                                ? "bg-red-50 text-red-700 border-red-200 animate-pulse"
                                 : "bg-green-50 text-green-700 border-green-200"
-                            }`}>
+                              }`}>
                               {daysLabel}
                             </span>
                           </td>
@@ -5196,11 +5315,10 @@ export default function Dashboard() {
             <div className="flex shrink-0 bg-slate-900/80 border-b border-slate-700/60">
               <button
                 onClick={() => setHistoryTab('users')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${
-                  historyTab === 'users'
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${historyTab === 'users'
                     ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <User size={15} />
                 Logged In Users
@@ -5210,11 +5328,10 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => setHistoryTab('activity')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${
-                  historyTab === 'activity'
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${historyTab === 'activity'
                     ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <Clock size={15} />
                 Change History
@@ -5263,23 +5380,20 @@ export default function Dashboard() {
                       return (
                         <div
                           key={emp.fireId}
-                          className={`flex items-center gap-4 rounded-2xl p-4 border transition-all ${
-                            isLive
+                          className={`flex items-center gap-4 rounded-2xl p-4 border transition-all ${isLive
                               ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/10 border-emerald-700/30'
                               : 'bg-slate-800/40 border-slate-700/40'
-                          }`}
+                            }`}
                         >
-                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 ${
-                            isLive ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-slate-700/50 border-slate-600/40'
-                          }`}>
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 ${isLive ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-slate-700/50 border-slate-600/40'
+                            }`}>
                             <User size={20} className={isLive ? 'text-emerald-400' : 'text-slate-500'} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`font-black text-base ${isLive ? 'text-emerald-200' : 'text-slate-400'}`}>{emp.name}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase border ${
-                                isLive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/40'
-                              }`}>Employee</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase border ${isLive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/40'
+                                }`}>Employee</span>
                               {isLive ? (
                                 <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black px-2 py-0.5 rounded-full uppercase animate-pulse">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
@@ -5320,20 +5434,19 @@ export default function Dashboard() {
                   <div className="px-6 py-3 bg-slate-900/60 border-b border-slate-700/40 flex items-center gap-2 shrink-0 flex-wrap">
                     <Filter size={13} className="text-slate-400" />
                     <span className="text-xs text-slate-400 font-bold mr-1">Module:</span>
-                    {['All', 'Order Management (Chocolates)', 'Order Management (Products)', 'Inventories', 'Products', 'Chocolates', 'Employees', 'Trash Bin'].map(mod => (
+                    {['All', 'Order Management (Chocolates)', 'Order Management (Products)', 'Inventories', 'Products', 'Chocolates', 'Employees', 'Daily Tasks', 'Trash Bin'].map(mod => (
                       <button
                         key={mod}
                         onClick={() => setHistoryModuleFilter(mod)}
-                        className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${
-                          historyModuleFilter === mod
+                        className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${historyModuleFilter === mod
                             ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50'
                             : 'bg-slate-800/60 text-slate-400 border-slate-700/40 hover:text-slate-200'
-                        }`}
+                          }`}
                       >
                         {mod === 'All' ? 'All'
                           : mod === 'Order Management (Chocolates)' ? 'Choc Orders'
-                          : mod === 'Order Management (Products)' ? 'Prod Orders'
-                          : mod}
+                            : mod === 'Order Management (Products)' ? 'Prod Orders'
+                              : mod}
                       </button>
                     ))}
                   </div>
@@ -5384,9 +5497,8 @@ export default function Dashboard() {
                                   </td>
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                                        log.role === 'Admin' ? 'bg-amber-500/20' : 'bg-indigo-500/20'
-                                      }`}>
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${log.role === 'Admin' ? 'bg-amber-500/20' : 'bg-indigo-500/20'
+                                        }`}>
                                         <User size={10} className={log.role === 'Admin' ? 'text-amber-400' : 'text-indigo-400'} />
                                       </div>
                                       <div>
@@ -5592,6 +5704,137 @@ export default function Dashboard() {
                 Access Reports
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 NEW: HISTORY AUTHENTICATION MODAL */}
+      {isHistoryAuthModalOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsHistoryAuthModalOpen(false)}>
+          <div
+            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-sm border-2 border-indigo-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 p-6 text-center relative border-b-4 border-indigo-950">
+              <button type="button" onClick={() => setIsHistoryAuthModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"><X size={20} /></button>
+              <div className="w-16 h-16 bg-[#fffcf9] rounded-full mx-auto flex items-center justify-center shadow-inner mb-3">
+                <Lock size={28} className="text-indigo-800" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-wide">Enter Password</h2>
+              <p className="text-indigo-200/80 text-xs font-bold mt-1 tracking-widest uppercase">Restricted History Area</p>
+            </div>
+
+            <form onSubmit={handleHistoryAuthSubmit} className="p-7 space-y-5">
+              {historyAuthError && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 text-sm font-bold rounded shadow-sm text-center animate-in zoom-in duration-200">
+                  {historyAuthError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-indigo-900 uppercase tracking-wider mb-1.5">History Password</label>
+                  <input
+                    type="password"
+                    value={historyPassword}
+                    onChange={(e) => setHistoryPassword(e.target.value)}
+                    className="w-full font-bold text-center text-lg rounded-xl p-3 border-2 border-indigo-200 focus:border-indigo-600 bg-white text-black outline-none shadow-inner"
+                    placeholder="••••"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl border-b-4 border-indigo-900 active:border-b-0 hover:-translate-y-0.5 active:translate-y-1 transition-all shadow-md uppercase tracking-wider text-xs"
+              >
+                Access History
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 NEW: PASSCODE SETTINGS MODAL */}
+      {isPasscodeSettingsOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsPasscodeSettingsOpen(false)}>
+          <div
+            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-sm border-2 border-indigo-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 p-6 text-center relative border-b-4 border-indigo-950">
+              <button type="button" onClick={() => setIsPasscodeSettingsOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"><X size={20} /></button>
+              <div className="w-16 h-16 bg-[#fffcf9] rounded-full mx-auto flex items-center justify-center shadow-inner mb-3">
+                <Lock size={28} className="text-indigo-800" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-wide">Passcode Settings</h2>
+              <p className="text-indigo-200/80 text-xs font-bold mt-1 tracking-widest uppercase">Security Controls</p>
+            </div>
+
+            <div className="p-7 space-y-6">
+              {/* Reports Passcode Input */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-indigo-900 uppercase tracking-wider mb-1">Reports Passcode</label>
+                <input
+                  type="text"
+                  value={tempReportsPasscode}
+                  onChange={(e) => setTempReportsPasscode(e.target.value.trim())}
+                  className="w-full font-bold text-center text-lg rounded-xl p-2.5 border-2 border-indigo-100 focus:border-indigo-600 bg-white text-black outline-none shadow-inner"
+                  placeholder="e.g. 963"
+                  required
+                />
+                <p className="text-[10px] text-slate-500 font-semibold mt-1">Current Passcode: <span className="font-bold text-indigo-700">{reportsPasscode}</span></p>
+              </div>
+
+              {/* History Passcode Input */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-indigo-900 uppercase tracking-wider mb-1">History Passcode</label>
+                <input
+                  type="text"
+                  value={tempHistoryPasscode}
+                  onChange={(e) => setTempHistoryPasscode(e.target.value.trim())}
+                  className="w-full font-bold text-center text-lg rounded-xl p-2.5 border-2 border-indigo-100 focus:border-indigo-600 bg-white text-black outline-none shadow-inner"
+                  placeholder="e.g. 852"
+                  required
+                />
+                <p className="text-[10px] text-slate-500 font-semibold mt-1">Current Passcode: <span className="font-bold text-indigo-700">{historyPasscode}</span></p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPasscodeSettingsOpen(false)}
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition-all border border-slate-200 shadow-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!tempReportsPasscode || !tempHistoryPasscode) {
+                      toast.error("Passcodes cannot be empty!");
+                      return;
+                    }
+                    try {
+                      const passcodeRef = doc(db, 'daily_tasks_board', 'passcodes');
+                      await setDoc(passcodeRef, {
+                        reports: tempReportsPasscode,
+                        history: tempHistoryPasscode
+                      });
+                      toast.success("Passcodes updated successfully!");
+                      setIsPasscodeSettingsOpen(false);
+                    } catch (err) {
+                      console.error("Failed to save passcodes:", err);
+                      toast.error("Failed to update passcodes");
+                    }
+                  }}
+                  className="flex-1 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-xl transition-all shadow-md border-b-4 border-indigo-900 active:border-b-0"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -6013,11 +6256,11 @@ export default function Dashboard() {
 
       {/* Monthly Winner Picker Modal */}
       {isWinnerPickerModalOpen && (
-        <div 
+        <div
           onClick={() => setIsWinnerPickerModalOpen(false)}
           className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300 cursor-pointer"
         >
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             className="relative bg-transparent max-w-sm w-full animate-in fade-in zoom-in-95 slide-in-from-bottom-8 ease-out duration-300 cursor-default"
           >
@@ -6044,12 +6287,12 @@ export default function Dashboard() {
                   Order Detail & History
                 </h2>
                 <p className="text-amber-200/80 text-xs font-bold mt-1 tracking-widest uppercase">
-                  {historyDetailOrder.isFallback ? 'Fallback Record' : `Invoice: ${getSerial(historyDetailOrder.id)}`} 
+                  {historyDetailOrder.isFallback ? 'Fallback Record' : `Invoice: ${getSerial(historyDetailOrder.id)}`}
                   {historyDetailOrder.isFromTrash && <span className="ml-2 text-red-300 bg-red-950/40 border border-red-500/35 px-2 py-0.5 rounded text-[10px]">In Trash Bin</span>}
                 </p>
               </div>
-              <button 
-                onClick={() => setHistoryDetailOrder(null)} 
+              <button
+                onClick={() => setHistoryDetailOrder(null)}
                 className="text-amber-100 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors"
               >
                 <X size={20} />
@@ -6058,17 +6301,17 @@ export default function Dashboard() {
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 custom-scrollbar">
-              
+
               {/* Left Column: Order details Card */}
               <div className="space-y-4">
                 <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-100 pb-2">Customer & Item Information</h3>
-                
+
                 <div className="bg-white border-2 border-amber-50 rounded-2xl p-5 space-y-3.5 shadow-sm">
                   <div>
                     <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Customer Name</span>
                     <span className="text-base font-black text-amber-950">{historyDetailOrder.name}</span>
                   </div>
-                  
+
                   <div>
                     <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Contact Number</span>
                     <span className="text-sm font-black text-amber-900">{historyDetailOrder.phone || 'N/A'}</span>
@@ -6137,20 +6380,18 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-amber-50">
                     <div>
                       <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Payment Status</span>
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${
-                        historyDetailOrder.paymentStatus === 'Full Paid' ? 'bg-green-50 text-green-700 border-green-200' :
-                        historyDetailOrder.paymentStatus === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                        'bg-red-50 text-red-700 border-red-200'
-                      }`}>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${historyDetailOrder.paymentStatus === 'Full Paid' ? 'bg-green-50 text-green-700 border-green-200' :
+                          historyDetailOrder.paymentStatus === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            'bg-red-50 text-red-700 border-red-200'
+                        }`}>
                         {historyDetailOrder.paymentStatus || 'Pending'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Dispatch Status</span>
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${
-                        historyDetailOrder.status === 'Delivered' ? 'bg-green-50 text-green-700 border-green-200' :
-                        'bg-yellow-50 text-yellow-700 border-yellow-200'
-                      }`}>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${historyDetailOrder.status === 'Delivered' ? 'bg-green-50 text-green-700 border-green-200' :
+                          'bg-yellow-50 text-yellow-700 border-yellow-200'
+                        }`}>
                         {historyDetailOrder.status || 'In Process'}
                       </span>
                     </div>
@@ -6161,7 +6402,7 @@ export default function Dashboard() {
               {/* Right Column: Timeline stepper */}
               <div className="space-y-4">
                 <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest border-b border-amber-100 pb-2">Activity History Timeline</h3>
-                
+
                 <div className="max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                   {relatedLogs.length === 0 ? (
                     <div className="text-center py-16 text-slate-400 font-bold text-xs bg-white rounded-2xl border-2 border-amber-50/50 p-6">
@@ -6177,12 +6418,12 @@ export default function Dashboard() {
                         const isDelete = actionLower.startsWith('deleted') || actionLower.startsWith('permanently');
                         const isRestore = actionLower.startsWith('restored');
                         const dotColor = isAdd ? 'bg-emerald-500 ring-emerald-100' : isEdit ? 'bg-amber-500 ring-amber-100' : isDelete ? 'bg-red-500 ring-red-100' : isRestore ? 'bg-blue-500 ring-blue-100' : 'bg-slate-400 ring-slate-100';
-                        
+
                         return (
                           <div key={log.fireId || idx} className="relative group/timeline">
                             {/* Dot */}
                             <span className={`absolute -left-[30px] top-1 w-3 h-3 rounded-full ring-4 ${dotColor} border border-white`} />
-                            
+
                             <div className="bg-white border border-amber-100/50 rounded-xl p-3 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow">
                               <p className="text-xs font-bold text-slate-800 leading-normal">{log.action}</p>
                               <div className="flex justify-between items-center text-[9px] text-slate-400 font-semibold mt-2 border-t border-slate-50 pt-1.5">

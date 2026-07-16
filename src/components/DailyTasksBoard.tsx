@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 // --- FIREBASE IMPORTS ---
-import { doc, setDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, arrayUnion, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 export interface DailyTaskCard {
@@ -41,17 +41,39 @@ const normalizePhone = (phone: string): string => {
 const triggerForwardToPrintNotification = async (card: DailyTaskCard) => {
   try {
     const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+    
+    // Fetch current notifications to prevent duplicate fires within 5 seconds
+    const docSnap = await getDoc(notifyDocRef);
+    let items = [];
+    if (docSnap.exists()) {
+      items = docSnap.data().items || [];
+    }
+
+    const now = Date.now();
+    const isDuplicate = items.some((item: any) => 
+      item.cardId === card.id && 
+      (now - new Date(item.timestamp).getTime()) < 5000
+    );
+
+    if (isDuplicate) {
+      console.log('Duplicate notification blocked for card:', card.id);
+      return;
+    }
+
     const newNotification = {
       id: `notify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       cardId: card.id,
       cardTitle: card.title,
       phoneNumber: card.phoneNumber,
+      chocolateCount: card.chocolateCount || '',
+      birthdayDate: card.birthdayDate || '',
+      comments: card.comments || '',
       timestamp: new Date().toISOString(),
       read: false
     };
-    await setDoc(notifyDocRef, {
-      items: arrayUnion(newNotification)
-    }, { merge: true });
+
+    items.push(newNotification);
+    await setDoc(notifyDocRef, { items }, { merge: true });
     console.log('Notification triggered for', card.phoneNumber);
   } catch (err) {
     console.error('Failed to trigger notification:', err);
@@ -99,6 +121,7 @@ export default function DailyTasksBoard() {
   const [isAddingList, setIsAddingList] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
   const newListInputRef = useRef<HTMLInputElement>(null);
+  const originalFocusValue = useRef<{ cardId: string; field: string; value: any } | null>(null);
 
   // Card Drag states
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
@@ -179,6 +202,23 @@ export default function DailyTasksBoard() {
 
   const handleWallpaperClick = () => {
     wallpaperInputRef.current?.click();
+  };
+
+  const logActivity = async (action: string) => {
+    try {
+      const loggedInName = localStorage.getItem('loggedInName') || 'Unknown';
+      const role = localStorage.getItem('role') || 'Unknown';
+      await addDoc(collection(db, "activity_logs"), {
+        action,
+        module: 'Daily Tasks',
+        performedBy: loggedInName,
+        username: loggedInName,
+        role: role,
+        timestamp: Date.now()
+      });
+    } catch (e) {
+      console.error("logActivity error:", e);
+    }
   };
 
   const handleWallpaperChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,10 +451,16 @@ export default function DailyTasksBoard() {
       setEditingListId(null);
       return;
     }
+    const oldList = lists.find(list => list.id === listId);
+    const oldTitle = oldList ? oldList.title : '';
+    const newTitle = editingListTitle.trim();
     const updated = lists.map(list => 
-      list.id === listId ? { ...list, title: editingListTitle.trim() } : list
+      list.id === listId ? { ...list, title: newTitle } : list
     );
     saveLists(updated);
+    if (oldTitle && oldTitle !== newTitle) {
+      logActivity(`Renamed Daily Task list from '${oldTitle}' to '${newTitle}'`);
+    }
     setEditingListId(null);
   };
 
@@ -429,6 +475,7 @@ export default function DailyTasksBoard() {
       cards: []
     };
     saveLists([...lists, newList]);
+    logActivity(`Created new Daily Task list '${newList.title}'`);
     setNewListTitle('');
     setIsAddingList(false);
     toast.success(`List "${newList.title}" created!`);
@@ -451,6 +498,7 @@ export default function DailyTasksBoard() {
       
       const updated = lists.filter(l => l.id !== listId);
       saveLists(updated);
+      logActivity(`Deleted Daily Task list '${listTitle}'`);
       const newPrefs = { ...sortPreferences };
       delete newPrefs[listId];
       saveSortPreferences(newPrefs);
@@ -466,6 +514,7 @@ export default function DailyTasksBoard() {
                 const restored = [...prev];
                 restored.splice(info.index, 0, info.list);
                 saveLists(restored);
+                logActivity(`Restored Daily Task list '${info.list.title}'`);
                 return restored;
               });
               setLastDeletedList(null);
@@ -531,7 +580,11 @@ export default function DailyTasksBoard() {
       return list;
     });
 
+    const targetList = lists.find(l => l.id === listId);
+    const listTitle = targetList ? targetList.title : '';
+
     saveLists(updated);
+    logActivity(`Added lead card for '${phone}' to list '${listTitle}'`);
     setIsAddingCardListId(null);
     setNewCardTitle('');
     toast.success('Card added successfully!');
@@ -539,6 +592,11 @@ export default function DailyTasksBoard() {
 
   const handleDeleteCard = (listId: string, cardId: string) => {
     if (confirm('Are you sure you want to delete this card?')) {
+      const targetList = lists.find(l => l.id === listId);
+      const listTitle = targetList ? targetList.title : '';
+      const card = targetList?.cards.find(c => c.id === cardId);
+      const cardTitle = card ? (card.title || card.phoneNumber) : '';
+
       const updated = lists.map(list => {
         if (list.id === listId) {
           return { ...list, cards: list.cards.filter(c => c.id !== cardId) };
@@ -546,6 +604,7 @@ export default function DailyTasksBoard() {
         return list;
       });
       saveLists(updated);
+      logActivity(`Deleted Daily Task card '${cardTitle}' from list '${listTitle}'`);
       setSelectedCard(null);
       setSelectedCardIds(prev => ({
         ...prev,
@@ -586,7 +645,10 @@ export default function DailyTasksBoard() {
       return list;
     });
 
+    const cardTitle = card.title || card.phoneNumber;
+
     saveLists(updatedLists);
+    logActivity(`Cancelled Daily Task card '${cardTitle}'`);
     setSelectedCardIds(prev => ({
       ...prev,
       [sourceListId]: (prev[sourceListId] || []).filter(id => id !== cardId)
@@ -595,6 +657,10 @@ export default function DailyTasksBoard() {
   };
 
   const handleCardStatusChange = (listId: string, cardId: string, newStatus: DailyTaskCard['status']) => {
+    const targetList = lists.find(l => l.id === listId);
+    const card = targetList?.cards.find(c => c.id === cardId);
+    const cardTitle = card ? (card.title || card.phoneNumber) : '';
+
     const updated = lists.map(list => {
       if (list.id === listId) {
         return {
@@ -607,10 +673,32 @@ export default function DailyTasksBoard() {
       return list;
     });
     saveLists(updated);
+    logActivity(`Changed status of lead '${cardTitle}' to '${newStatus}'`);
     toast.success('Card status updated');
   };
 
+  const handleInputFocus = (cardId: string, field: keyof DailyTaskCard, value: any) => {
+    originalFocusValue.current = { cardId, field, value };
+  };
+
+  const handleInputBlur = (listId: string, cardId: string, field: keyof DailyTaskCard, currentValue: any) => {
+    const orig = originalFocusValue.current;
+    if (orig && orig.cardId === cardId && orig.field === field) {
+      if (orig.value !== currentValue) {
+        const targetList = lists.find(l => l.id === listId);
+        const card = targetList?.cards.find(c => c.id === cardId);
+        const cardTitle = card ? (card.title || card.phoneNumber) : '';
+        logActivity(`Updated ${field} of lead '${cardTitle}' to '${currentValue}'`);
+      }
+    }
+    originalFocusValue.current = null;
+  };
+
   const handleCardFieldChange = (listId: string, cardId: string, field: keyof DailyTaskCard, value: any) => {
+    const targetList = lists.find(l => l.id === listId);
+    const card = targetList?.cards.find(c => c.id === cardId);
+    const cardTitle = card ? (card.title || card.phoneNumber) : '';
+
     const updated = lists.map(list => {
       if (list.id === listId) {
         return {
@@ -623,6 +711,11 @@ export default function DailyTasksBoard() {
       return list;
     });
     saveLists(updated);
+    if (field === 'favorite') {
+      logActivity(`${value ? 'Marked' : 'Unmarked'} lead '${cardTitle}' as favorite`);
+    } else if (field === 'status') {
+      logActivity(`Changed status of lead '${cardTitle}' to '${value}'`);
+    }
   };
 
   const handlePhoneBlur = (listId: string, card: DailyTaskCard, originalPhone: string) => {
@@ -651,6 +744,8 @@ export default function DailyTasksBoard() {
     if (isDuplicate) {
       toast.error(`Phone number ${val} already exists!`);
       handleCardFieldChange(listId, card.id, 'phoneNumber', originalPhone);
+    } else if (val !== originalPhone) {
+      logActivity(`Updated phoneNumber of lead '${card.title || val}' to '${val}'`);
     }
   };
 
@@ -726,6 +821,8 @@ export default function DailyTasksBoard() {
       updatedLists = updatedLists.map(l => 
         l.id === targetListId ? { ...l, cards: filteredCards } : l
       );
+      saveLists(updatedLists);
+      logActivity(`Reordered card '${cardToMove.title || cardToMove.phoneNumber}' inside list '${sourceList?.title}'`);
     } else {
       const targetList = updatedLists.find(l => l.id === targetListId);
       if (targetList && targetList.title.toLowerCase().trim() === 'forward to print') {
@@ -761,9 +858,9 @@ export default function DailyTasksBoard() {
         }
         return prev;
       });
+      saveLists(updatedLists);
+      logActivity(`Moved lead card '${cardToMove.title || cardToMove.phoneNumber}' from list '${sourceList?.title}' to '${targetList?.title}'`);
     }
-
-    saveLists(updatedLists);
   };
 
   // ==================== LIST DRAG & DROP ====================
@@ -810,6 +907,7 @@ export default function DailyTasksBoard() {
     updatedLists.splice(targetIndex, 0, movedList);
 
     saveLists(updatedLists);
+    logActivity(`Reordered list '${movedList.title}' on the board`);
     setDraggedListId(null);
     setDragOverListIndex(null);
     toast.success('List reordered!');
@@ -866,6 +964,7 @@ export default function DailyTasksBoard() {
     });
 
     saveLists(updated);
+    logActivity(`Updated details of lead '${selectedCard.title || selectedCard.phoneNumber}'`);
     setSelectedCard(null);
     setSelectedCardListId(null);
     toast.success('Card details updated!');
@@ -968,7 +1067,10 @@ export default function DailyTasksBoard() {
 
           // Determine target list for this row
           const labelVal = String(rawLabel || '').trim();
-          const cleanedLabel = cleanLabelText(labelVal);
+          
+          // Split labels by commas, lowercase and clean them
+          const labelsList = labelVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+          const isImportant = labelsList.some(l => l.includes('important')) || labelVal.toLowerCase().includes('important');
 
           const defaultListMappings = [
             { key: 'july', index: 0 },
@@ -979,22 +1081,39 @@ export default function DailyTasksBoard() {
             { key: 'ordercompleted', index: 5 }
           ];
 
-          let targetListIndex = 0;
+          let targetListIndex = -1;
           let foundMatch = false;
 
-          const cleanedLabelLower = cleanedLabel.toLowerCase().replace(/\s+/g, '');
-          for (let i = 0; i < updatedLists.length; i++) {
-            const listTitleCleaned = updatedLists[i].title.toLowerCase().replace(/[^\w\s\(\)\-]/g, '').replace(/\s+/g, '');
-            if (listTitleCleaned && listTitleCleaned === cleanedLabelLower) {
-              targetListIndex = i;
-              foundMatch = true;
-              break;
+          // 1. Try to match any of the comma-separated labels with the existing lists' titles
+          for (const label of labelsList) {
+            const cleanedLabelLower = cleanLabelText(label).toLowerCase().replace(/\s+/g, '');
+            for (let i = 0; i < updatedLists.length; i++) {
+              const listTitleCleaned = updatedLists[i].title.toLowerCase().replace(/[^\w\s\(\)\-]/g, '').replace(/\s+/g, '');
+              if (listTitleCleaned && listTitleCleaned === cleanedLabelLower) {
+                targetListIndex = i;
+                foundMatch = true;
+                break;
+              }
+            }
+            if (foundMatch) break;
+          }
+
+          // 2. Try to match any of the comma-separated labels with the default list mappings
+          if (!foundMatch) {
+            for (const label of labelsList) {
+              const cleanedLabelLower = cleanLabelText(label).toLowerCase().replace(/\s+/g, '');
+              const match = defaultListMappings.find(m => cleanedLabelLower === m.key);
+              if (match) {
+                targetListIndex = match.index;
+                foundMatch = true;
+                break;
+              }
             }
           }
 
-          if (!foundMatch) {
-            const match = defaultListMappings.find(m => cleanedLabelLower === m.key);
-            if (match) targetListIndex = match.index;
+          // 3. Fallback to default (first list, usually July) if no matching list was found
+          if (targetListIndex === -1) {
+            targetListIndex = 0;
           }
 
           if (existingCard) {
@@ -1017,8 +1136,12 @@ export default function DailyTasksBoard() {
               // Remove from old list
               updatedLists[existingListIndex].cards.splice(existingCardIndex, 1);
               
-              // Update status and move card
-              const movedCard = { ...existingCard, status: newStatus };
+              // Update status, move card, and apply favorite flag if 'Important'
+              const movedCard = { 
+                ...existingCard, 
+                status: newStatus,
+                favorite: isImportant ? true : existingCard.favorite
+              };
               updatedLists[targetListIndex].cards.push(movedCard);
               importCount++;
 
@@ -1027,7 +1150,13 @@ export default function DailyTasksBoard() {
                 triggerForwardToPrintNotification(movedCard);
               }
             } else {
-              skipDuplicateCount++;
+              // Same list, update favorite if needed
+              if (isImportant && !existingCard.favorite) {
+                updatedLists[existingListIndex].cards[existingCardIndex].favorite = true;
+                importCount++;
+              } else {
+                skipDuplicateCount++;
+              }
             }
             return;
           }
@@ -1040,7 +1169,8 @@ export default function DailyTasksBoard() {
             status: 'Waiting for Image',
             chocolateCount: '',
             birthdayDate: '',
-            comments: ''
+            comments: '',
+            favorite: isImportant ? true : undefined
           };
 
           const targetTitle = updatedLists[targetListIndex].title.toLowerCase().trim();
@@ -1062,6 +1192,7 @@ export default function DailyTasksBoard() {
         });
 
         saveLists(updatedLists);
+        logActivity(`Uploaded Excel file to Daily Tasks board, added/moved ${importCount} cards`);
         toast.success(`Import complete: Added/Moved ${importCount} cards! (Skipped ${skipDuplicateCount} duplicates in same lists, ${skipMissingCount} invalid numbers)`);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (err) {
@@ -1127,7 +1258,7 @@ export default function DailyTasksBoard() {
       {isDraggingFile && (
         <div className="absolute inset-0 bg-blue-950/85 z-[150] rounded-3xl flex flex-col items-center justify-center border-4 border-dashed border-blue-400 m-2 backdrop-blur-sm pointer-events-none">
           <Upload size={48} className="text-blue-300 animate-bounce mb-3" />
-          <p className="text-xl font-black text-white">Drop Excel file here to Import</p>
+          <p className="text-xl font-black text-white">Drop Excel file here to Upload</p>
           <p className="text-xs text-blue-200 mt-1">Supports .xlsx and .xls formats</p>
         </div>
       )}
@@ -1189,7 +1320,7 @@ export default function DailyTasksBoard() {
               onClick={handleImportClick}
               className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 border border-blue-500/50"
             >
-              <Upload size={16} /> Import Excel
+              <Upload size={16} /> Upload File
             </button>
             <input 
               type="file" 
@@ -1494,6 +1625,8 @@ export default function DailyTasksBoard() {
                             type="text"
                             value={card.title}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'title', e.target.value)}
+                            onFocus={() => handleInputFocus(card.id, 'title', card.title)}
+                            onBlur={() => handleInputBlur(list.id, card.id, 'title', card.title)}
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                             className="text-xs font-black text-slate-800 tracking-wide bg-transparent border-b border-transparent hover:border-slate-350 focus:border-blue-500 focus:bg-slate-50 px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
@@ -1545,7 +1678,8 @@ export default function DailyTasksBoard() {
                             type="text"
                             value={card.phoneNumber}
                             onChange={(e) => handleCardFieldChange(list.id, card.id, 'phoneNumber', e.target.value)}
-                            onBlur={() => handlePhoneBlur(list.id, card, card.phoneNumber)}
+                            onFocus={() => handleInputFocus(card.id, 'phoneNumber', card.phoneNumber)}
+                            onBlur={() => handlePhoneBlur(list.id, card, originalFocusValue.current?.value || card.phoneNumber)}
                             onMouseDown={(e) => e.stopPropagation()}
                             className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-semibold text-slate-700 focus:outline-none transition-all w-full select-all"
                             placeholder="Phone number"
@@ -1561,6 +1695,8 @@ export default function DailyTasksBoard() {
                               type="date"
                               value={card.birthdayDate || ''}
                               onChange={(e) => handleCardFieldChange(list.id, card.id, 'birthdayDate', e.target.value)}
+                              onFocus={() => handleInputFocus(card.id, 'birthdayDate', card.birthdayDate)}
+                              onBlur={() => handleInputBlur(list.id, card.id, 'birthdayDate', card.birthdayDate)}
                               onMouseDown={(e) => e.stopPropagation()}
                               className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-0.5 py-0.5 rounded text-[10px] text-slate-600 focus:outline-none transition-all w-full cursor-pointer"
                             />
@@ -1574,6 +1710,8 @@ export default function DailyTasksBoard() {
                               type="number"
                               value={card.chocolateCount || ''}
                               onChange={(e) => handleCardFieldChange(list.id, card.id, 'chocolateCount', e.target.value)}
+                              onFocus={() => handleInputFocus(card.id, 'chocolateCount', card.chocolateCount)}
+                              onBlur={() => handleInputBlur(list.id, card.id, 'chocolateCount', card.chocolateCount)}
                               onMouseDown={(e) => e.stopPropagation()}
                               className="w-10 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-0.5 py-0.5 rounded text-[11px] font-bold text-slate-800 focus:outline-none transition-all"
                               placeholder="0"

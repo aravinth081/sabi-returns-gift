@@ -146,3 +146,71 @@ All colors MUST be HSL.
   animation: loading-bar 2s ease-in-out infinite;
 }
 
+/* ==================== WALLPAPER ACTIVE GLASS THEME ==================== */
+/* Overrides for Dashboard 1 & 2 elements to look like premium high-contrast light frosted glass */
+.wallpaper-active .bg-\[\#ebe6df\] {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Ensure table container has no bright border/glow shadow */
+.wallpaper-active div[ref="screenshotTableRef"],
+.wallpaper-active .rounded-2xl {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Ensure inputs and dropdowns are perfectly readable in the light glass */
+.wallpaper-active select,
+.wallpaper-active input[type="date"],
+.wallpaper-active input[type="text"],
+.wallpaper-active input[type="number"] {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #1e293b !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Style option elements inside select dropdowns */
+.wallpaper-active select option {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+}
+
+/* Table header wrapper rendering */
+.wallpaper-active .bg-\[\#ebe6df\]\/95 {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Table head style */
+.wallpaper-active thead,
+.wallpaper-active thead tr {
+  background: rgba(254, 243, 199, 0.9) !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}
+
+.wallpaper-active th,
+.wallpaper-active th span {
+  color: #92400e !important;
+}
+
+.wallpaper-active tr {
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.wallpaper-active tr:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Selected row background override */
+.wallpaper-active tr.bg-amber-50\/80 {
+  background-color: rgba(251, 191, 36, 0.15) !important;
+}
+
+.wallpaper-active td select {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
