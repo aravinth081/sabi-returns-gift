@@ -92,7 +92,7 @@ const DEFAULT_LISTS: DailyTaskList[] = [
 const STORAGE_KEY = 'sabi_daily_tasks_board';
 const SORT_STORAGE_KEY = 'sabi_daily_tasks_sort';
 
-export default function DailyTasksBoard() {
+export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChange?: () => void } = {}) {
   const [lists, setLists] = useState<DailyTaskList[]>([]);
   const [selectedCard, setSelectedCard] = useState<DailyTaskCard | null>(null);
   const [selectedCardListId, setSelectedCardListId] = useState<string | null>(null);
@@ -258,6 +258,7 @@ export default function DailyTasksBoard() {
           try {
             localStorage.setItem('sabi_daily_tasks_wallpaper', compressed);
             toast.success('Wallpaper updated!');
+            onWallpaperChange?.();
           } catch (err) {
             console.error('Failed to save wallpaper:', err);
             toast.error('Failed to save wallpaper: storage quota exceeded.');
@@ -267,6 +268,7 @@ export default function DailyTasksBoard() {
           try {
             localStorage.setItem('sabi_daily_tasks_wallpaper', result);
             toast.success('Wallpaper updated!');
+            onWallpaperChange?.();
           } catch (err) {
             console.error('Failed to save wallpaper:', err);
             toast.error('Failed to save wallpaper: storage quota exceeded.');
@@ -278,6 +280,7 @@ export default function DailyTasksBoard() {
         try {
           localStorage.setItem('sabi_daily_tasks_wallpaper', result);
           toast.success('Wallpaper updated!');
+          onWallpaperChange?.();
         } catch (err) {
           console.error('Failed to save wallpaper:', err);
           toast.error('Failed to save wallpaper: storage quota exceeded.');
@@ -292,6 +295,7 @@ export default function DailyTasksBoard() {
     setWallpaper(null);
     localStorage.removeItem('sabi_daily_tasks_wallpaper');
     toast.success('Wallpaper reset to default');
+    onWallpaperChange?.();
   };
 
   const handleDragOverFile = (e: React.DragEvent) => {
@@ -584,6 +588,9 @@ export default function DailyTasksBoard() {
     const listTitle = targetList ? targetList.title : '';
 
     saveLists(updated);
+    if (listTitle.toLowerCase().includes('print')) {
+      triggerForwardToPrintNotification(newCard);
+    }
     logActivity(`Added lead card for '${phone}' to list '${listTitle}'`);
     setIsAddingCardListId(null);
     setNewCardTitle('');
@@ -825,7 +832,7 @@ export default function DailyTasksBoard() {
       logActivity(`Reordered card '${cardToMove.title || cardToMove.phoneNumber}' inside list '${sourceList?.title}'`);
     } else {
       const targetList = updatedLists.find(l => l.id === targetListId);
-      if (targetList && targetList.title.toLowerCase().trim() === 'forward to print') {
+      if (targetList && targetList.title.toLowerCase().includes('print')) {
         triggerForwardToPrintNotification(cardToMove);
       }
 

@@ -147,70 +147,376 @@ All colors MUST be HSL.
 }
 
 /* ==================== WALLPAPER ACTIVE GLASS THEME ==================== */
-/* Overrides for Dashboard 1 & 2 elements to look like premium high-contrast light frosted glass */
-.wallpaper-active .bg-\[\#ebe6df\] {
-  background: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border-color: rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+/* Premium dark glassmorphism styling when a background wallpaper is active */
+
+/* Root main logged in container background overrides */
+.wallpaper-active {
+  color: #f8fafc !important;
 }
 
-/* Ensure table container has no bright border/glow shadow */
+/* Sidebar styling under wallpaper active */
+.wallpaper-active aside {
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.wallpaper-active aside .overflow-y-auto * {
+  color: #cbd5e1 !important;
+}
+
+.wallpaper-active aside h2,
+.wallpaper-active aside h2 span {
+  color: #ffffff !important;
+}
+
+.wallpaper-active aside .border-b,
+.wallpaper-active aside .border-blue-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Glowing profile ring in sidebar matching the design reference */
+.wallpaper-active aside div[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, #60a5fa, #1d4ed8) !important;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.85) !important;
+}
+
+/* Sidebar active navigation items override */
+.wallpaper-active aside button[class*="bg-gradient-to-br"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-left: 4px solid #ffffff !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
+  transform: scale(1.02);
+}
+
+/* 1. Dashboard 1 - Violet/Indigo Theme */
+.wallpaper-active aside nav button:nth-child(1)[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(99, 102, 241, 0.22)) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  border-left: 4px solid #8b5cf6 !important;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2) !important;
+}
+
+/* 2. Daily Tasks - Blue/Cyan Theme */
+.wallpaper-active aside nav button:nth-child(2)[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(6, 182, 212, 0.22)) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  border-left: 4px solid #3b82f6 !important;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* 3. Dashboard 2 - Fuchsia/Pink Theme */
+.wallpaper-active aside nav button:nth-child(3)[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, rgba(217, 70, 239, 0.22), rgba(168, 85, 247, 0.22)) !important;
+  border-color: rgba(217, 70, 239, 0.3) !important;
+  border-left: 4px solid #d946ef !important;
+  box-shadow: 0 4px 15px rgba(217, 70, 239, 0.2) !important;
+}
+
+/* 4. Inventories - Emerald/Teal Theme */
+.wallpaper-active aside nav button:nth-child(4)[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(20, 184, 166, 0.22)) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  border-left: 4px solid #10b981 !important;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* 5. Orders Tracking - Orange/Amber Theme */
+.wallpaper-active aside nav button:nth-child(5)[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.22), rgba(245, 158, 11, 0.22)) !important;
+  border-color: rgba(249, 115, 22, 0.3) !important;
+  border-left: 4px solid #f97316 !important;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.2) !important;
+}
+
+/* 6. Reports - Rose/Red Theme */
+.wallpaper-active aside nav button:nth-child(6)[class*="bg-gradient-to-br"] {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.22), rgba(236, 72, 153, 0.22)) !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+  border-left: 4px solid #f43f5e !important;
+  box-shadow: 0 4px 15px rgba(244, 63, 94, 0.2) !important;
+}
+
+.wallpaper-active aside button[class*="bg-gradient-to-br"] * {
+  color: #ffffff !important;
+}
+
+.wallpaper-active aside nav button:hover:not([class*="bg-gradient-to-br"]) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-0.5px) scale(1.01) !important;
+}
+
+.wallpaper-active aside nav button:hover:not([class*="bg-gradient-to-br"]) * {
+  color: #ffffff !important;
+}
+
+/* Premium styled buttons for History, Trash, and Logout when wallpaper is active */
+.wallpaper-active aside button[class*="text-indigo-700"] {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.18)) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.1) !important;
+  transition: all 0.3s ease !important;
+}
+
+.wallpaper-active aside button[class*="text-indigo-700"]:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(168, 85, 247, 0.45)) !important;
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.25) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+}
+
+.wallpaper-active aside button[class*="text-indigo-700"] * {
+  color: #ffffff !important;
+}
+
+.wallpaper-active aside button[class*="text-amber-800"] {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.18)) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.1) !important;
+  transition: all 0.3s ease !important;
+}
+
+.wallpaper-active aside button[class*="text-amber-800"]:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(217, 119, 6, 0.4)) !important;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+}
+
+.wallpaper-active aside button[class*="text-amber-800"] * {
+  color: #ffffff !important;
+}
+
+.wallpaper-active aside button[class*="text-rose-600"] {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(225, 29, 72, 0.15)) !important;
+  border: 1px solid rgba(244, 63, 94, 0.35) !important;
+  color: #fca5a5 !important;
+  box-shadow: 0 4px 15px rgba(244, 63, 94, 0.08) !important;
+  transition: all 0.3s ease !important;
+}
+
+.wallpaper-active aside button[class*="text-rose-600"]:hover {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.85), rgba(225, 29, 72, 0.95)) !important;
+  border-color: rgba(244, 63, 94, 0.9) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 20px rgba(244, 63, 94, 0.45) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+}
+
+.wallpaper-active aside button[class*="text-rose-600"] * {
+  color: #fca5a5 !important;
+}
+
+.wallpaper-active aside button[class*="text-rose-600"]:hover * {
+  color: #ffffff !important;
+}
+
+/* Card container background - dark translucent glass */
+.wallpaper-active .bg-\[\#ebe6df\] {
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Ensure table container has correct borders and shadows */
 .wallpaper-active div[ref="screenshotTableRef"],
 .wallpaper-active .rounded-2xl {
-  border-color: rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* Ensure inputs and dropdowns are perfectly readable in the light glass */
+/* Modals (bg-[#fffcf9]) glassmorphic conversion */
+.wallpaper-active .bg-\[\#fffcf9\],
+.wallpaper-active div[class*="bg-[#fffcf9]"] {
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f8fafc !important;
+}
+
+/* History Modal overrides */
+.wallpaper-active div.bg-\[\#0f172a\] {
+  background: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.wallpaper-active .bg-gradient-to-r[class*="from-indigo-900"] {
+  background: rgba(88, 80, 236, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.wallpaper-active .bg-slate-900\/80 {
+  background: rgba(15, 23, 42, 0.3) !important;
+}
+
+/* Header navbar styling */
+.wallpaper-active header.bg-white {
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
+}
+
+.wallpaper-active header h1 {
+  color: #f8fafc !important;
+}
+
+.wallpaper-active header p {
+  color: #cbd5e1 !important;
+}
+
+/* Ensure inputs and dropdowns are perfectly readable in the dark glass */
 .wallpaper-active select,
 .wallpaper-active input[type="date"],
 .wallpaper-active input[type="text"],
-.wallpaper-active input[type="number"] {
-  background: rgba(255, 255, 255, 0.85) !important;
-  color: #1e293b !important;
-  border-color: rgba(0, 0, 0, 0.12) !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+.wallpaper-active input[type="number"],
+.wallpaper-active input[type="password"] {
+  background: rgba(15, 23, 42, 0.6) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 0.75rem !important;
 }
 
 /* Style option elements inside select dropdowns */
 .wallpaper-active select option {
-  background-color: #ffffff !important;
-  color: #1e293b !important;
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Buttons with white backgrounds converted to glassmorphic */
+.wallpaper-active button[class*="bg-white"],
+.wallpaper-active div[class*="bg-white"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f8fafc !important;
+}
+
+.wallpaper-active button[class*="bg-white"]:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Text overrides inside dark cards */
+.wallpaper-active .text-amber-950,
+.wallpaper-active .text-amber-900,
+.wallpaper-active .text-slate-800,
+.wallpaper-active .text-gray-800,
+.wallpaper-active .text-\[\#3e2723\],
+.wallpaper-active .text-\[\#c2410c\],
+.wallpaper-active .text-\[\#5d4037\],
+.wallpaper-active h1,
+.wallpaper-active h2,
+.wallpaper-active h3,
+.wallpaper-active h4 {
+  color: #f8fafc !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+.wallpaper-active .text-amber-700,
+.wallpaper-active .text-slate-600,
+.wallpaper-active .text-gray-600,
+.wallpaper-active .text-slate-500,
+.wallpaper-active .text-gray-500,
+.wallpaper-active .text-\[\#a46c3b\] {
+  color: #cbd5e1 !important;
+}
+
+.wallpaper-active td,
+.wallpaper-active label,
+.wallpaper-active span:not([class*="text-green"]):not([class*="text-rose"]):not([class*="text-red"]):not([class*="text-blue"]):not([class*="text-orange"]):not([class*="text-purple"]) {
+  color: #e2e8f0 !important;
 }
 
 /* Table header wrapper rendering */
 .wallpaper-active .bg-\[\#ebe6df\]\/95 {
-  background: rgba(255, 255, 255, 0.92) !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+  background: rgba(15, 23, 42, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Table head style */
+/* Table head style - Purple Translucent */
 .wallpaper-active thead,
 .wallpaper-active thead tr {
-  background: rgba(254, 243, 199, 0.9) !important;
-  border-color: rgba(251, 191, 36, 0.3) !important;
+  background: rgba(88, 80, 236, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .wallpaper-active th,
 .wallpaper-active th span {
-  color: #92400e !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
 }
 
 .wallpaper-active tr {
-  border-color: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 .wallpaper-active tr:hover {
-  background-color: rgba(0, 0, 0, 0.03) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 /* Selected row background override */
 .wallpaper-active tr.bg-amber-50\/80 {
-  background-color: rgba(251, 191, 36, 0.15) !important;
+  background-color: rgba(88, 80, 236, 0.2) !important;
 }
 
 .wallpaper-active td select {
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Status badge dropdowns overrides */
+.wallpaper-active select[class*="text-\[\#b45309\]"],
+.wallpaper-active select[class*="text-amber-700"] {
+  background-color: rgba(217, 119, 6, 0.2) !important;
+  color: #fcd34d !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+.wallpaper-active select[class*="text-rose-600"],
+.wallpaper-active select[class*="text-rose-700"],
+.wallpaper-active select[class*="text-red-600"] {
+  background-color: rgba(220, 38, 38, 0.2) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(220, 38, 38, 0.4) !important;
+}
+.wallpaper-active select[class*="text-green-600"],
+.wallpaper-active select[class*="text-green-700"] {
+  background-color: rgba(5, 150, 105, 0.2) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(5, 150, 105, 0.4) !important;
+}
+.wallpaper-active select[class*="text-blue-600"],
+.wallpaper-active select[class*="text-blue-700"] {
+  background-color: rgba(37, 99, 235, 0.2) !important;
+  color: #93c5fd !important;
+  border-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+/* ==================== GLOBAL SCROLLBAR REMOVAL ==================== */
+/* Hide scrollbars globally across all components, sidebars, tables, and views */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html, body, *,
+.custom-scrollbar,
+div,
+aside,
+main {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+/* Make "Total Added" manual inventory table column transparent in wallpaper mode */
+.wallpaper-active td[class*="bg-amber-50"] {
+  background-color: transparent !important;
 }

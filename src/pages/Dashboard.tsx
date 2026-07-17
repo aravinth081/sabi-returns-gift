@@ -17,7 +17,7 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -501,8 +501,18 @@ export default function Dashboard() {
   const [historyDetailOrder, setHistoryDetailOrder] = useState<any>(null);
   const [d1Wallpaper, setD1Wallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_dashboard1') || "");
   const [d2Wallpaper, setD2Wallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_dashboard2') || "");
+  const [invWallpaper, setInvWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_inventories') || "");
+  const [trackWallpaper, setTrackWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_tracking') || "");
+  const [reportsWallpaper, setReportsWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_reports') || "");
+  const [dailyTasksWallpaper, setDailyTasksWallpaper] = useState(() => localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
   const [showWallpaperDropdown, setShowWallpaperDropdown] = useState(false);
-  const isWallpaperActive = (activeTab === 'dashboard1' && !!d1Wallpaper) || (activeTab === 'dashboard2' && !!d2Wallpaper);
+  const isWallpaperActive = 
+    (activeTab === 'dashboard1' && !!d1Wallpaper) ||
+    (activeTab === 'dashboard2' && !!d2Wallpaper) ||
+    (activeTab === 'inventories' && !!invWallpaper) ||
+    (activeTab === 'tracking' && !!trackWallpaper) ||
+    (activeTab === 'reports' && !!reportsWallpaper) ||
+    (activeTab === 'daily_tasks' && !!dailyTasksWallpaper);
 
   useEffect(() => {
     const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
@@ -581,7 +591,7 @@ export default function Dashboard() {
     { name: "Minimal Soft Slate", value: "linear-gradient(to bottom, #f8fafc, #f1f5f9)" }
   ];
 
-  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'd1' | 'd2') => {
+  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'd1' | 'd2' | 'inventories' | 'tracking' | 'reports') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -618,10 +628,22 @@ export default function Dashboard() {
             setD1Wallpaper(compressedBase64);
             localStorage.setItem('sabi_wallpaper_dashboard1', compressedBase64);
             toast.success("Dashboard 1 background updated!");
-          } else {
+          } else if (target === 'd2') {
             setD2Wallpaper(compressedBase64);
             localStorage.setItem('sabi_wallpaper_dashboard2', compressedBase64);
             toast.success("Dashboard 2 background updated!");
+          } else if (target === 'inventories') {
+            setInvWallpaper(compressedBase64);
+            localStorage.setItem('sabi_wallpaper_inventories', compressedBase64);
+            toast.success("Inventories background updated!");
+          } else if (target === 'tracking') {
+            setTrackWallpaper(compressedBase64);
+            localStorage.setItem('sabi_wallpaper_tracking', compressedBase64);
+            toast.success("Orders Tracking background updated!");
+          } else if (target === 'reports') {
+            setReportsWallpaper(compressedBase64);
+            localStorage.setItem('sabi_wallpaper_reports', compressedBase64);
+            toast.success("Reports background updated!");
           }
         }
       };
@@ -630,15 +652,27 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   };
 
-  const handleClearWallpaper = (target: 'd1' | 'd2') => {
+  const handleClearWallpaper = (target: 'd1' | 'd2' | 'inventories' | 'tracking' | 'reports') => {
     if (target === 'd1') {
       setD1Wallpaper("");
       localStorage.removeItem('sabi_wallpaper_dashboard1');
       toast.success("Dashboard 1 background cleared.");
-    } else {
+    } else if (target === 'd2') {
       setD2Wallpaper("");
       localStorage.removeItem('sabi_wallpaper_dashboard2');
       toast.success("Dashboard 2 background cleared.");
+    } else if (target === 'inventories') {
+      setInvWallpaper("");
+      localStorage.removeItem('sabi_wallpaper_inventories');
+      toast.success("Inventories background cleared.");
+    } else if (target === 'tracking') {
+      setTrackWallpaper("");
+      localStorage.removeItem('sabi_wallpaper_tracking');
+      toast.success("Orders Tracking background cleared.");
+    } else if (target === 'reports') {
+      setReportsWallpaper("");
+      localStorage.removeItem('sabi_wallpaper_reports');
+      toast.success("Reports background cleared.");
     }
   };
 
@@ -1671,10 +1705,19 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  const handleAddOrderFromNotification = (n: any) => {
+  const handleAddOrderFromNotification = async (n: any) => {
     const today = new Date().toISOString().split('T')[0];
     const category = activeTab === 'dashboard2' ? 'product' : 'chocolate';
     const birthdayVal = n.birthdayDate ? parseDateToYYYYMMDD(n.birthdayDate) : today;
+    
+    try {
+      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
+      const updated = notifications.map(notif => notif.id === n.id ? { ...notif, read: true } : notif);
+      await setDoc(notifyDocRef, { items: updated }, { merge: true });
+    } catch (e) {
+      console.error("Failed to mark notification as read:", e);
+    }
+
     setFormData({
       id: null,
       fireId: null,
@@ -1810,6 +1853,194 @@ export default function Dashboard() {
       console.error("Restore failed:", err);
     }
   };
+
+  const handleUndoActivity = async (log: any) => {
+    const action = (log.action || '').toLowerCase();
+    const actionStr = log.action || '';
+    
+    try {
+      // 1. UNDO DELETED ORDER
+      if (action.startsWith('deleted order:')) {
+        const parts = actionStr.replace(/Deleted Order:\s*/i, '').split(' (');
+        const customerName = parts[0]?.trim();
+        
+        const matchingTrash = trashOrders.find(t => t.name?.trim() === customerName);
+        if (matchingTrash) {
+          await handleRestoreTrashOrder(matchingTrash);
+          toast.success(`Restored deleted order for "${customerName}"`);
+          logActivity(`Undid Action: Restored Deleted Order for ${customerName}`, 'Platform History');
+        } else {
+          toast.error("Could not find this order in the Trash Bin");
+        }
+        return;
+      }
+      
+      // 2. UNDO ADDED NEW ORDER
+      if (action.startsWith('added new order:')) {
+        const parts = actionStr.replace(/Added New Order:\s*/i, '').split(' (');
+        const customerName = parts[0]?.trim();
+        
+        const matchingOrder = orders.find(o => o.name?.trim() === customerName);
+        if (matchingOrder) {
+          const trashOrder = {
+            ...matchingOrder,
+            deletedAt: Date.now(),
+            deletedBy: localStorage.getItem('loggedInName') || 'System'
+          };
+          const trashFireId = matchingOrder.fireId;
+          delete (trashOrder as any).fireId;
+          
+          await addDoc(collection(db, "trash_orders"), trashOrder);
+          await deleteDoc(doc(db, "orders", trashFireId));
+          
+          toast.success(`Removed added order for "${customerName}" (moved to Trash)`);
+          logActivity(`Undid Action: Removed Added Order for ${customerName}`, 'Platform History');
+        } else {
+          toast.error("Could not find the added order (it may have already been deleted)");
+        }
+        return;
+      }
+
+      // 3. UNDO ADDED PRODUCT
+      if (action.startsWith('added new product:')) {
+        const parts = actionStr.replace(/Added New Product:\s*/i, '').split(' (');
+        const productName = parts[0]?.trim();
+        
+        const matchingProd = customProducts.find(p => p.name?.trim() === productName);
+        if (matchingProd) {
+          await deleteDoc(doc(db, "products", matchingProd.fireId));
+          toast.success(`Deleted added product "${productName}"`);
+          logActivity(`Undid Action: Deleted Added Product "${productName}"`, 'Platform History');
+        } else {
+          toast.error("Product not found in database");
+        }
+        return;
+      }
+
+      // 4. UNDO DELETED PRODUCT
+      if (action.startsWith('deleted product:')) {
+        const productName = actionStr.replace(/Deleted Product:\s*/i, '').trim();
+        
+        const prevLog = activityLogs.find(l => 
+          (l.action || '').toLowerCase().includes(productName.toLowerCase()) && 
+          (l.action || '').toLowerCase().includes('₹')
+        );
+        
+        let price = 0;
+        if (prevLog) {
+          const matchPrice = (prevLog.action || '').match(/₹([\d.]+)/);
+          if (matchPrice) price = parseFloat(matchPrice[1]);
+        }
+        
+        if (price > 0) {
+          await addDoc(collection(db, "products"), {
+            name: productName,
+            price: price,
+            createdAt: new Date().toISOString()
+          });
+          toast.success(`Restored deleted product "${productName}" with price ₹${price}`);
+          logActivity(`Undid Action: Restored Deleted Product "${productName}"`, 'Platform History');
+        } else {
+          toast.error(`Could not retrieve price for "${productName}" to restore it.`);
+        }
+        return;
+      }
+
+      // 5. UNDO ADDED CHOCOLATE
+      if (action.startsWith('added chocolate:')) {
+        const parts = actionStr.replace(/Added Chocolate:\s*/i, '').split(' (');
+        const chocName = parts[0]?.trim();
+        
+        const matchingChoc = managedChocolates.find(c => c.name?.trim() === chocName);
+        if (matchingChoc) {
+          await deleteDoc(doc(db, "managed_chocolates", matchingChoc.fireId));
+          toast.success(`Deleted added chocolate "${chocName}"`);
+          logActivity(`Undid Action: Deleted Added Chocolate "${chocName}"`, 'Platform History');
+        } else {
+          toast.error("Chocolate not found in database");
+        }
+        return;
+      }
+
+      // 6. UNDO DELETED CHOCOLATE
+      if (action.startsWith('deleted chocolate:')) {
+        const chocName = actionStr.replace(/Deleted Chocolate:\s*/i, '').trim();
+        
+        const prevLog = activityLogs.find(l => 
+          (l.action || '').toLowerCase().includes(chocName.toLowerCase()) && 
+          (l.action || '').toLowerCase().includes('r:₹')
+        );
+        
+        let retail = 0;
+        let wholesale = 0;
+        if (prevLog) {
+          const matchPrices = (prevLog.action || '').match(/R:₹([\d.]+)\s+W:₹([\d.]+)/);
+          if (matchPrices) {
+            retail = parseFloat(matchPrices[1]);
+            wholesale = parseFloat(matchPrices[2]);
+          }
+        }
+        
+        if (retail > 0 && wholesale > 0) {
+          await addDoc(collection(db, "managed_chocolates"), {
+            name: chocName,
+            retailPrice: retail,
+            wholesalePrice: wholesale,
+            createdAt: new Date().toISOString()
+          });
+          toast.success(`Restored deleted chocolate "${chocName}" (R:₹${retail} W:₹${wholesale})`);
+          logActivity(`Undid Action: Restored Deleted Chocolate "${chocName}"`, 'Platform History');
+        } else {
+          toast.error(`Could not retrieve pricing details for "${chocName}" to restore it.`);
+        }
+        return;
+      }
+      
+      toast.info("This action type cannot be automatically undone.");
+    } catch (err) {
+      console.error("Revert failed:", err);
+      toast.error("Failed to undo this action");
+    }
+  };
+
+  useEffect(() => {
+    const handleGlobalKeyDown = async (e: KeyboardEvent) => {
+      // Check if Ctrl + Z (or Cmd + Z on Mac) is pressed
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+          // Allow native undo to work in text boxes/inputs
+          return;
+        }
+        
+        e.preventDefault();
+        
+        // Filter logs starting with 'deleted'
+        const deleteLogs = activityLogs.filter(log => 
+          (log.action || '').toLowerCase().startsWith('deleted ')
+        );
+        
+        if (deleteLogs.length > 0) {
+          // Sort by timestamp desc to find the most recent deletion log
+          const sortedDeletes = [...deleteLogs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          const lastDeleteLog = sortedDeletes[0];
+          
+          toast.loading("Undoing last deleted item...", { id: "global-undo" });
+          try {
+            await handleUndoActivity(lastDeleteLog);
+            toast.success("Last deletion undone successfully!", { id: "global-undo" });
+          } catch (err) {
+            toast.error("Failed to undo last deletion", { id: "global-undo" });
+          }
+        } else {
+          toast.info("No recent deletions found to undo", { id: "global-undo" });
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [activityLogs, trashOrders, orders, customProducts, managedChocolates]);
 
   const handleDeleteTrashOrderPermanently = async (fireId: string) => {
     if (window.confirm("Are you sure you want to permanently delete this record from Trash? This cannot be undone.")) {
@@ -2481,7 +2712,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`flex h-screen font-sans bg-[#3f4144] text-amber-950 relative ${isExportPreviewOpen || isReportPreviewOpen ? 'print:hidden' : ''}`}>
+    <div className={`flex h-screen font-sans bg-[#3f4144] text-amber-950 relative ${isExportPreviewOpen || isReportPreviewOpen ? 'print:hidden' : ''} ${isWallpaperActive ? 'wallpaper-active' : ''}`}>
 
       <datalist id="discount-suggestions">
         <option value="0" />
@@ -2612,7 +2843,13 @@ export default function Dashboard() {
               ? (d1Wallpaper.startsWith('data:image') ? `url(${d1Wallpaper}) center/cover no-repeat` : d1Wallpaper)
               : activeTab === 'dashboard2' && d2Wallpaper
                 ? (d2Wallpaper.startsWith('data:image') ? `url(${d2Wallpaper}) center/cover no-repeat` : d2Wallpaper)
-                : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)'
+                : activeTab === 'inventories' && invWallpaper
+                  ? (invWallpaper.startsWith('data:image') ? `url(${invWallpaper}) center/cover no-repeat` : invWallpaper)
+                  : activeTab === 'tracking' && trackWallpaper
+                    ? (trackWallpaper.startsWith('data:image') ? `url(${trackWallpaper}) center/cover no-repeat` : trackWallpaper)
+                    : activeTab === 'reports' && reportsWallpaper
+                      ? (reportsWallpaper.startsWith('data:image') ? `url(${reportsWallpaper}) center/cover no-repeat` : reportsWallpaper)
+                      : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)'
         }}
       >
 
@@ -2663,7 +2900,11 @@ export default function Dashboard() {
 
           {activeTab === 'daily_tasks' && (
             <div className="w-full h-full animate-in fade-in duration-300">
-              <DailyTasksBoard />
+              <DailyTasksBoard
+                onWallpaperChange={() => {
+                  setDailyTasksWallpaper(localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
+                }}
+              />
             </div>
           )}
 
@@ -2671,6 +2912,37 @@ export default function Dashboard() {
 
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
+
+              <div className="bg-[#ebe6df] p-4 rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex justify-between items-center gap-4">
+                <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
+                  <Archive className="text-amber-700" /> Stock Control Center
+                </h2>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => document.getElementById('inventories-wallpaper-upload')?.click()}
+                    className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer shadow-sm"
+                    title="Set Background Wallpaper"
+                  >
+                    <ImageIcon size={18} className="text-amber-700" />
+                  </button>
+                  <input
+                    type="file"
+                    id="inventories-wallpaper-upload"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleWallpaperUpload(e, 'inventories')}
+                  />
+                  {invWallpaper && (
+                    <button
+                      onClick={() => handleClearWallpaper('inventories')}
+                      className="w-10 h-10 flex justify-center items-center text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-lg cursor-pointer bg-white shadow-sm"
+                      title="Remove Background"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
 
               <div className="bg-gradient-to-br from-red-600 to-red-800 p-4 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)] border-4 border-red-500/50">
                 <h2 className="text-3xl font-black text-white mb-6 text-center tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
@@ -3851,6 +4123,32 @@ export default function Dashboard() {
                       <option value="Delivered">Delivered</option>
                       <option value="In Process">In Process</option>
                     </select>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => document.getElementById('tracking-wallpaper-upload')?.click()}
+                        className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer shadow-sm animate-in fade-in duration-300"
+                        title="Set Background Wallpaper"
+                      >
+                        <ImageIcon size={18} className="text-amber-700" />
+                      </button>
+                      <input
+                        type="file"
+                        id="tracking-wallpaper-upload"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleWallpaperUpload(e, 'tracking')}
+                      />
+                      {trackWallpaper && (
+                        <button
+                          onClick={() => handleClearWallpaper('tracking')}
+                          className="w-10 h-10 flex justify-center items-center text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-lg cursor-pointer bg-white shadow-sm animate-in fade-in duration-300"
+                          title="Remove Background"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3978,6 +4276,29 @@ export default function Dashboard() {
                     >
                       <Lock size={16} strokeWidth={2.5} />
                     </button>
+                    <button
+                      onClick={() => document.getElementById('reports-wallpaper-upload')?.click()}
+                      className="p-1.5 bg-white border border-[#d7ccc8] hover:border-amber-500 hover:text-amber-700 rounded-xl text-[#5d4037] shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px]"
+                      title="Set Background Wallpaper"
+                    >
+                      <ImageIcon size={16} strokeWidth={2.5} />
+                    </button>
+                    <input
+                      type="file"
+                      id="reports-wallpaper-upload"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleWallpaperUpload(e, 'reports')}
+                    />
+                    {reportsWallpaper && (
+                      <button
+                        onClick={() => handleClearWallpaper('reports')}
+                        className="p-1.5 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] animate-in fade-in duration-300"
+                        title="Remove Background"
+                      >
+                        <X size={16} strokeWidth={2.5} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -4040,8 +4361,8 @@ export default function Dashboard() {
                       {reportData.chartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={reportData.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#5d4037', fontWeight: 'bold' }} />
-                            <YAxis tick={{ fontSize: 12, fill: '#5d4037', fontWeight: 'bold' }} />
+                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
+                            <YAxis tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
                             <Tooltip cursor={{ fill: '#f5f5f5' }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} />
                             <Bar
                               dataKey="count"
@@ -4319,8 +4640,8 @@ export default function Dashboard() {
                         {adminReportData.chartData.length > 0 ? (
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={adminReportData.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#5d4037', fontWeight: 'bold' }} />
-                              <YAxis tick={{ fontSize: 12, fill: '#5d4037', fontWeight: 'bold' }} />
+                              <XAxis dataKey="name" tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
+                              <YAxis tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
                               <Tooltip cursor={{ fill: '#f5f5f5' }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} />
                               <Bar
                                 dataKey="count"
@@ -5512,7 +5833,21 @@ export default function Dashboard() {
                                       {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                                     </p>
                                   </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-right">
+                                  <td className="px-4 py-3 whitespace-nowrap text-right flex items-center justify-end gap-2">
+                                    {(actionLower.startsWith('deleted order:') ||
+                                      actionLower.startsWith('added new order:') ||
+                                      actionLower.startsWith('added new product:') ||
+                                      actionLower.startsWith('deleted product:') ||
+                                      actionLower.startsWith('added chocolate:') ||
+                                      actionLower.startsWith('deleted chocolate:')) && (
+                                      <button
+                                        onClick={() => handleUndoActivity(log)}
+                                        className="p-1 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 font-bold text-[9px] uppercase border border-indigo-500/20 px-2 py-1 shadow-sm"
+                                        title="Undo/Revert Action"
+                                      >
+                                        <RotateCcw size={10} /> Undo
+                                      </button>
+                                    )}
                                     <button
                                       onClick={async () => {
                                         const logToDelete = { ...log };
