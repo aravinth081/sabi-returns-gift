@@ -2671,7 +2671,7 @@ export default function Dashboard() {
     return (
       <div className="flex flex-wrap gap-1">
         {String(chocString).split(',').map((c, i) => (
-          <span key={i} className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">
+          <span key={i} className="chocolate-badge bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">
             {c.trim()}
           </span>
         ))}

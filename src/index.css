@@ -561,6 +561,13 @@ All colors MUST be HSL.
   border-color: rgba(37, 99, 235, 0.4) !important;
 }
 
+/* Chocolate badge overrides when wallpaper is active */
+.wallpaper-active .chocolate-badge {
+  background-color: rgba(254, 240, 138, 0.25) !important;
+  color: #fef08a !important;
+  border: 1px solid rgba(254, 240, 138, 0.4) !important;
+}
+
 /* ==================== CUSTOM PROFESSIONAL SCROLLBARS ==================== */
 /* Thin custom scrollbars for WebKit browsers (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
