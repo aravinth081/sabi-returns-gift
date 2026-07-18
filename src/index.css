@@ -1140,21 +1140,21 @@ main {
 }
 
 /* Force deep brown chocolate name text and quantity descriptions */
-.current-inventory-value-card span,
-.wallpaper-active .current-inventory-value-card span {
+.current-inventory-value-card .choc-name-badge-text,
+.wallpaper-active .current-inventory-value-card .choc-name-badge-text {
   color: #3e2723 !important;
   text-shadow: none !important;
 }
 
 /* Force dark amber for balance detail */
-.current-inventory-value-card span.text-amber-700,
-.wallpaper-active .current-inventory-value-card span.text-amber-700 {
+.current-inventory-value-card .choc-detail-badge-text,
+.wallpaper-active .current-inventory-value-card .choc-detail-badge-text {
   color: #8d6e63 !important;
 }
 
 /* Force strong reddish-brown for calculated item values */
-.current-inventory-value-card .item-value-text,
-.wallpaper-active .current-inventory-value-card .item-value-text {
+.current-inventory-value-card .choc-value-badge-text,
+.wallpaper-active .current-inventory-value-card .choc-value-badge-text {
   color: #b15d31 !important;
   font-weight: 900 !important;
 }
@@ -1185,7 +1185,7 @@ main {
   color: #6d4c41 !important;
 }
 
-.screenshot-mode-active .current-inventory-value-card .item-value-text,
-.wallpaper-active .screenshot-mode-active .current-inventory-value-card .item-value-text {
+.screenshot-mode-active .current-inventory-value-card .choc-value-badge-text,
+.wallpaper-active .screenshot-mode-active .current-inventory-value-card .choc-value-badge-text {
   color: #8b5a2b !important;
 }

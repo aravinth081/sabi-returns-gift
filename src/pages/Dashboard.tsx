@@ -3376,14 +3376,14 @@ export default function Dashboard() {
                           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                             {currentInventoryValueData.items.map((item, idx) => (
                               <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
-                                <span className="text-[11px] font-black text-amber-950 truncate leading-tight" title={item.name}>
+                                <span className="choc-name-badge-text text-[11px] font-black text-amber-950 truncate leading-tight" title={item.name}>
                                   {item.name}
                                 </span>
                                 <div className="flex justify-between items-baseline mt-1">
-                                  <span className="text-[10px] text-amber-700 font-bold whitespace-nowrap">
+                                  <span className="choc-detail-badge-text text-[10px] text-amber-700 font-bold whitespace-nowrap">
                                     {item.balance} × ₹{item.price}
                                   </span>
-                                  <span className="item-value-text text-[11px] font-black text-[#8b5a2b]">
+                                  <span className="choc-value-badge-text text-[11px] font-black text-[#8b5a2b]">
                                     ₹{item.value.toLocaleString()}
                                   </span>
                                 </div>
