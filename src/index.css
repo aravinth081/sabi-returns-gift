@@ -1110,54 +1110,67 @@ main {
 }
 
 /* ==================== CURRENT INVENTORY VALUE CARD CONTRAST & THEME OVERRIDES ==================== */
-.current-inventory-value-card {
-  background-color: #fffdf9 !important;
-  border: 1px solid #ebdccb !important;
-}
-
-.current-inventory-value-card .choc-grid-item {
-  background-color: #fdfbf7 !important;
-  border: 1px solid #ebdccb !important;
-}
-
-/* Wallpaper active glassmorphism overrides */
+/* Always force a solid light background and high-contrast dark text, matching sibling cards */
+.current-inventory-value-card,
 .wallpaper-active .current-inventory-value-card {
-  background: rgba(0, 0, 0, 0.25) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+  background-color: #fffdf9 !important;
+  background: #fffdf9 !important;
+  border: 1px solid #ebdccb !important;
 }
 
+.current-inventory-value-card .choc-grid-item,
 .wallpaper-active .current-inventory-value-card .choc-grid-item {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background-color: #fdfbf7 !important;
+  background: #fdfbf7 !important;
+  border: 1px solid #ebdccb !important;
 }
 
+/* Force dark brown titles and labels */
+.current-inventory-value-card p,
+.wallpaper-active .current-inventory-value-card p {
+  color: #5d4037 !important;
+  text-shadow: none !important;
+}
+
+/* Force deep brown grand total text */
+.current-inventory-value-card .grand-total-text,
 .wallpaper-active .current-inventory-value-card .grand-total-text {
-  color: #fbbf24 !important; /* Premium Amber Gold total */
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.2) !important;
+  color: #3e2723 !important;
+  text-shadow: none !important;
 }
 
-.wallpaper-active .current-inventory-value-card .item-value-text {
-  color: #fef08a !important; /* Soft yellow value */
-}
-
+/* Force deep brown chocolate name text and quantity descriptions */
+.current-inventory-value-card span,
 .wallpaper-active .current-inventory-value-card span {
-  color: #cbd5e1 !important;
+  color: #3e2723 !important;
+  text-shadow: none !important;
+}
+
+/* Force dark amber for balance detail */
+.current-inventory-value-card span.text-amber-700,
+.wallpaper-active .current-inventory-value-card span.text-amber-700 {
+  color: #8d6e63 !important;
+}
+
+/* Force strong reddish-brown for calculated item values */
+.current-inventory-value-card .item-value-text,
+.wallpaper-active .current-inventory-value-card .item-value-text {
+  color: #b15d31 !important;
+  font-weight: 900 !important;
 }
 
 /* Reset/High-contrast styling in screenshot mode */
 .screenshot-mode-active .current-inventory-value-card,
 .wallpaper-active .screenshot-mode-active .current-inventory-value-card {
-  background: #ffffff !important;
   background-color: #ffffff !important;
+  background: #ffffff !important;
   border: 1px solid #e2dcd0 !important;
 }
 
 .screenshot-mode-active .current-inventory-value-card .choc-grid-item,
 .wallpaper-active .screenshot-mode-active .current-inventory-value-card .choc-grid-item {
-  background: #fbfbfa !important;
   background-color: #fbfbfa !important;
+  background: #fbfbfa !important;
   border: 1px solid #e2dcd0 !important;
 }
 

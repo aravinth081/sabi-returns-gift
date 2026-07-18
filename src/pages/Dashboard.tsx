@@ -1144,16 +1144,27 @@ export default function Dashboard() {
   const currentInventoryValueData = useMemo(() => {
     const CURRENT_INVENTORY_RETAIL_PRICES: Record<string, number> = {
       "1 rs chocolate": 8,
+      "1rs chocolate": 8,
       "10 rs 5 star": 22,
+      "10rs 5 star": 22,
       "10 rs dairy milk": 20,
+      "10rs dairy milk": 20,
       "10 rs kitkat": 20,
+      "10rs kitkat": 20,
       "2 rs dairy milk shots": 10,
+      "2rs dairy milk shots": 10,
       "2 rs dairymilk shots": 10,
+      "2rs dairymilk shots": 10,
       "5 rs 5 star": 15,
+      "5rs 5 star": 15,
       "5 rs dairy milk": 15,
+      "5rs dairy milk": 15,
       "5 rs milky bar": 17,
+      "5rs milky bar": 17,
       "5 rs peanut candy": 17,
-      "5 rs dark fantasy": 17
+      "5rs peanut candy": 17,
+      "5 rs dark fantasy": 17,
+      "5rs dark fantasy": 17
     };
 
     const getRetailPrice = (chocName: string) => {
