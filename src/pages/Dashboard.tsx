@@ -1141,6 +1141,42 @@ export default function Dashboard() {
     return balances;
   }, [inventoryLogs, orders]);
 
+  const currentInventoryValueData = useMemo(() => {
+    const CURRENT_INVENTORY_RETAIL_PRICES: Record<string, number> = {
+      "1 rs chocolate": 8,
+      "10 rs 5 star": 22,
+      "10 rs dairy milk": 20,
+      "10 rs kitkat": 20,
+      "2 rs dairy milk shots": 10,
+      "2 rs dairymilk shots": 10,
+      "5 rs 5 star": 15,
+      "5 rs dairy milk": 15,
+      "5 rs milky bar": 17,
+      "5 rs peanut candy": 17,
+      "5 rs dark fantasy": 17
+    };
+
+    const getRetailPrice = (chocName: string) => {
+      const normalized = chocName.toLowerCase().trim().replace(/\s+/g, ' ');
+      if (CURRENT_INVENTORY_RETAIL_PRICES[normalized] !== undefined) {
+        return CURRENT_INVENTORY_RETAIL_PRICES[normalized];
+      }
+      const dbPriceObj = managedChocPricesMap[normalized] || CHOCOLATE_PRICES_MAP[normalized];
+      return dbPriceObj ? (dbPriceObj.retail || 0) : 0;
+    };
+
+    let totalVal = 0;
+    const items = dynamicInventory.map(choc => {
+      const balance = inventoryBalances[choc] || 0;
+      const price = getRetailPrice(choc);
+      const value = balance * price;
+      totalVal += value;
+      return { name: choc, balance, price, value };
+    });
+
+    return { items, grandTotal: totalVal };
+  }, [dynamicInventory, inventoryBalances, managedChocPricesMap]);
+
   const trackedSalesResult = useMemo(() => {
     if (!salesTrackerChoc) return { count: 0, revenue: 0 };
     let count = 0;
@@ -3311,6 +3347,38 @@ export default function Dashboard() {
                         <div className="bg-[#e6f7ec] border border-[#9fe2bf] p-4 rounded-xl text-center shadow-sm flex-1">
                           <p className="text-xs font-black text-[#047857] uppercase tracking-wider mb-1">Sales Amount</p>
                           <p className="text-3xl font-black text-[#047857]">₹{trackedSalesResult.revenue.toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      {/* Current Inventory Value Card */}
+                      <div className="bg-[#fdfaf6] border border-[#ebdccb] p-4 rounded-xl shadow-sm flex flex-col">
+                        <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-1 text-center">
+                          Current Inventory Value
+                        </p>
+                        <p className="text-3xl font-black text-[#6d4c41] text-center mb-3">
+                          ₹{currentInventoryValueData.grandTotal.toLocaleString()}
+                        </p>
+                        <div className="border-t border-[#ebdccb] pt-3">
+                          <p className="text-[10px] font-bold text-[#8d6e63] uppercase tracking-wider mb-2">
+                            Breakdown by Chocolate
+                          </p>
+                          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                            {currentInventoryValueData.items.map((item, idx) => (
+                              <div key={idx} className="bg-white/70 p-2 rounded-lg border border-[#f0e4d7] flex flex-col justify-between min-h-[56px]">
+                                <span className="text-[11px] font-black text-amber-950 truncate leading-tight" title={item.name}>
+                                  {item.name}
+                                </span>
+                                <div className="flex justify-between items-baseline mt-1">
+                                  <span className="text-[10px] text-amber-700 font-bold whitespace-nowrap">
+                                    {item.balance} × ₹{item.price}
+                                  </span>
+                                  <span className="text-[11px] font-black text-[#8b5a2b]">
+                                    ₹{item.value.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
