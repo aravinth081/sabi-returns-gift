@@ -385,36 +385,61 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     return () => unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Local undo stack for DailyTasksBoard
+  const undoStackRef = useRef<DailyTaskList[][]>([]);
+
   // Save to both Firestore and localStorage
-  const saveLists = useCallback((updatedLists: DailyTaskList[]) => {
+  const saveLists = useCallback((updatedLists: DailyTaskList[], isUndo = false) => {
+    if (!isUndo) {
+      undoStackRef.current.push(JSON.parse(JSON.stringify(lists)));
+      if (undoStackRef.current.length > 20) {
+        undoStackRef.current.shift();
+      }
+    }
     setLists(updatedLists);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLists));
     // Save to Firestore
-    if (!isFirestoreUpdate.current) {
-      setDoc(boardDocRef, {
-        lists: updatedLists,
-        updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => {
-        console.error('Failed to save lists to Firestore:', err);
-        toast.error('Failed to sync to database');
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setDoc(boardDocRef, {
+      lists: updatedLists,
+      updatedAt: new Date().toISOString()
+    }, { merge: true }).catch(err => {
+      console.error('Failed to save lists to Firestore:', err);
+      toast.error('Failed to sync to database');
+    });
+  }, [lists]);
 
   const saveSortPreferences = useCallback((prefs: Record<string, SortMode>) => {
     setSortPreferences(prefs);
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(prefs));
     // Save to Firestore
-    if (!isFirestoreUpdate.current) {
-      setDoc(boardDocRef, {
-        sortPreferences: prefs,
-        updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => {
-        console.error('Failed to save sort prefs to Firestore:', err);
-        toast.error('Failed to sync to database');
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setDoc(boardDocRef, {
+      sortPreferences: prefs,
+      updatedAt: new Date().toISOString()
+    }, { merge: true }).catch(err => {
+      console.error('Failed to save sort prefs to Firestore:', err);
+      toast.error('Failed to sync to database');
+    });
+  }, []);
+
+  // Listen to global undo events from Dashboard
+  useEffect(() => {
+    const handleUndoEvent = () => {
+      if (undoStackRef.current.length > 0) {
+        const prev = undoStackRef.current.pop();
+        if (prev) {
+          saveLists(prev, true);
+          toast.success("Board action undone!");
+        }
+      } else {
+        toast.info("No recent board actions to undo");
+      }
+    };
+
+    window.addEventListener('sabi-daily-tasks-undo', handleUndoEvent);
+    return () => {
+      window.removeEventListener('sabi-daily-tasks-undo', handleUndoEvent);
+    };
+  }, [saveLists]);
 
   // Sort cards by birthday or favorites
   const getSortedCards = useCallback((cards: DailyTaskCard[], sortMode: SortMode): DailyTaskCard[] => {
@@ -796,9 +821,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     e.preventDefault();
     e.stopPropagation();
 
-    const cardData = e.dataTransfer.getData('application/card-drag');
-    if (!cardData) return;
-
     const sourceCardId = draggedCardId;
     const sourceListId = draggedSourceListId;
 
@@ -832,8 +854,25 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       logActivity(`Reordered card '${cardToMove.title || cardToMove.phoneNumber}' inside list '${sourceList?.title}'`);
     } else {
       const targetList = updatedLists.find(l => l.id === targetListId);
-      if (targetList && targetList.title.toLowerCase().includes('print')) {
-        triggerForwardToPrintNotification(cardToMove);
+      
+      // Determine status update based on target list title
+      let newStatus = cardToMove.status;
+      const targetTitle = targetList?.title.toLowerCase().trim() || '';
+      if (targetTitle.includes('pending')) {
+        newStatus = 'Image Edit Pending';
+      } else if (targetTitle.includes('completed')) {
+        newStatus = 'Order Completed';
+      } else if (targetTitle.includes('cancelled')) {
+        newStatus = 'Cancelled';
+      } else if (targetTitle.includes('july') || targetTitle.includes('aug')) {
+        newStatus = 'Waiting for Image';
+      }
+
+      const updatedCard = { ...cardToMove, status: newStatus };
+
+      if (targetTitle.includes('print')) {
+        updatedCard.timestamp = new Date().toISOString();
+        triggerForwardToPrintNotification(updatedCard);
       }
 
       updatedLists = updatedLists.map(list => {
@@ -847,7 +886,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             targetIndex = filteredCards.findIndex(c => c.id === dragOverCardId);
             if (targetIndex === -1) targetIndex = filteredCards.length;
           }
-          filteredCards.splice(targetIndex, 0, cardToMove);
+          filteredCards.splice(targetIndex, 0, updatedCard);
           return { ...list, cards: filteredCards };
         }
         return list;
@@ -899,13 +938,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   const handleListDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    const listId = e.dataTransfer.getData('application/list-drag');
+    const listId = draggedListId;
+
+    setDraggedListId(null);
+    setDragOverListIndex(null);
+
     if (!listId) return;
 
     const sourceIndex = lists.findIndex(l => l.id === listId);
     if (sourceIndex === -1 || sourceIndex === targetIndex) {
-      setDraggedListId(null);
-      setDragOverListIndex(null);
       return;
     }
 
@@ -915,8 +956,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
     saveLists(updatedLists);
     logActivity(`Reordered list '${movedList.title}' on the board`);
-    setDraggedListId(null);
-    setDragOverListIndex(null);
     toast.success('List reordered!');
   };
 
@@ -1017,12 +1056,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         const getLabelValue = (row: any) => {
           const keys = Object.keys(row);
           for (const key of keys) {
-            const norm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (norm === 'labels' || norm === 'label' || norm === 'tag' || norm === 'tags' || norm === 'list' || norm === 'board') return row[key];
-          }
-          for (const key of keys) {
-            const norm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (norm.includes('label') || norm.includes('tag') || norm.includes('status') || norm.includes('list')) return row[key];
+            if (key.trim().toLowerCase() === 'labels') return row[key];
           }
           return undefined;
         };
@@ -1074,10 +1108,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
           // Determine target list for this row
           const labelVal = String(rawLabel || '').trim();
+          if (!labelVal) {
+            skipMissingCount++;
+            return;
+          }
           
-          // Split labels by commas, lowercase and clean them
-          const labelsList = labelVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-          const isImportant = labelsList.some(l => l.includes('important')) || labelVal.toLowerCase().includes('important');
+          const isImportant = labelVal.toLowerCase().includes('important');
 
           const defaultListMappings = [
             { key: 'july', index: 0 },
@@ -1089,38 +1125,37 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           ];
 
           let targetListIndex = -1;
-          let foundMatch = false;
 
-          // 1. Try to match any of the comma-separated labels with the existing lists' titles
-          for (const label of labelsList) {
-            const cleanedLabelLower = cleanLabelText(label).toLowerCase().replace(/\s+/g, '');
-            for (let i = 0; i < updatedLists.length; i++) {
-              const listTitleCleaned = updatedLists[i].title.toLowerCase().replace(/[^\w\s\(\)\-]/g, '').replace(/\s+/g, '');
-              if (listTitleCleaned && listTitleCleaned === cleanedLabelLower) {
-                targetListIndex = i;
-                foundMatch = true;
-                break;
-              }
-            }
-            if (foundMatch) break;
-          }
+          // 1. Try to match exact list title case-insensitively (trimmed)
+          targetListIndex = updatedLists.findIndex(
+            list => list.title.trim().toLowerCase() === labelVal.toLowerCase()
+          );
 
-          // 2. Try to match any of the comma-separated labels with the default list mappings
-          if (!foundMatch) {
-            for (const label of labelsList) {
-              const cleanedLabelLower = cleanLabelText(label).toLowerCase().replace(/\s+/g, '');
-              const match = defaultListMappings.find(m => cleanedLabelLower === m.key);
-              if (match) {
-                targetListIndex = match.index;
-                foundMatch = true;
-                break;
-              }
-            }
-          }
-
-          // 3. Fallback to default (first list, usually July) if no matching list was found
+          // 2. Try to match list title by cleaning special characters/whitespace
           if (targetListIndex === -1) {
-            targetListIndex = 0;
+            const cleanedLabelVal = cleanLabelText(labelVal).toLowerCase().replace(/\s+/g, '');
+            for (let i = 0; i < updatedLists.length; i++) {
+              const listTitleCleaned = cleanLabelText(updatedLists[i].title).toLowerCase().replace(/\s+/g, '');
+              if (listTitleCleaned && listTitleCleaned === cleanedLabelVal) {
+                targetListIndex = i;
+                break;
+              }
+            }
+          }
+
+          // 3. Try to match default list mappings
+          if (targetListIndex === -1) {
+            const cleanedLabelVal = cleanLabelText(labelVal).toLowerCase().replace(/\s+/g, '');
+            const match = defaultListMappings.find(m => cleanedLabelVal === m.key);
+            if (match) {
+              targetListIndex = match.index;
+            }
+          }
+
+          // 4. Do NOT fallback to first list if label is specified but invalid
+          if (targetListIndex === -1) {
+            skipMissingCount++;
+            return;
           }
 
           if (existingCard) {
@@ -1447,6 +1482,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       onChange={(e) => setEditingListTitle(e.target.value)}
                       onBlur={() => handleSaveListTitle(list.id)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSaveListTitle(list.id)}
+                      onMouseDown={(e) => e.stopPropagation()}
                       className="flex-1 bg-white/90 border-0 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
                   ) : (
@@ -1570,6 +1606,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       type="checkbox"
                       checked={(selectedCardIds[list.id] || []).length === list.cards.length}
                       onChange={() => toggleSelectAll(list.id, list.cards)}
+                      onMouseDown={(e) => e.stopPropagation()}
                       className="w-3.5 h-3.5 rounded border-white/20 bg-slate-900 text-blue-500 focus:ring-blue-400 cursor-pointer accent-blue-500"
                     />
                     <span>Select All</span>
@@ -1745,10 +1782,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 <div className="pt-3">
                   {isAddingCardListId === list.id ? (
                     <div className="space-y-2">
-                      <textarea
+                       <textarea
                         placeholder="Enter Phone Number / Title..."
                         value={newCardTitle}
                         onChange={(e) => setNewCardTitle(e.target.value)}
+                        onMouseDown={(e) => e.stopPropagation()}
                         className="w-full text-xs font-semibold bg-white/90 border border-slate-200 focus:border-blue-400 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400/30 shadow-inner text-slate-800 placeholder:text-slate-400"
                         rows={2}
                         autoFocus

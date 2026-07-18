@@ -495,7 +495,6 @@ export default function Dashboard() {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
 
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [isWinnerPickerModalOpen, setIsWinnerPickerModalOpen] = useState(false);
   const [historyDetailOrder, setHistoryDetailOrder] = useState<any>(null);
@@ -514,44 +513,92 @@ export default function Dashboard() {
     (activeTab === 'reports' && !!reportsWallpaper) ||
     (activeTab === 'daily_tasks' && !!dailyTasksWallpaper);
 
+  const [boardLists, setBoardLists] = useState<any[]>([]);
+  const [readCardIds, setReadCardIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_read_card_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   useEffect(() => {
-    const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
-    const unsubscribe = onSnapshot(notifyDocRef, (snapshot) => {
+    localStorage.setItem('sabi_read_card_ids', JSON.stringify(readCardIds));
+  }, [readCardIds]);
+
+  useEffect(() => {
+    const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
+    const unsubscribe = onSnapshot(boardDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        if (data.items) {
-          const sorted = [...data.items].sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-          setNotifications(sorted);
+        if (data.lists) {
+          setBoardLists(data.lists);
         }
       }
-    }, (err) => {
-      console.error("Firestore notifications listener error:", err);
+    }, (error) => {
+      console.error('Firestore board listener error in Dashboard:', error);
     });
     return () => unsubscribe();
   }, []);
 
-  const markAllNotificationsAsRead = async () => {
-    try {
-      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
-      const updated = notifications.map(n => ({ ...n, read: true }));
-      await setDoc(notifyDocRef, { items: updated }, { merge: true });
-      toast.success("All notifications marked as read");
-    } catch (err) {
-      console.error('Failed to mark notifications as read:', err);
-    }
+  const notifications = useMemo(() => {
+    const printList = boardLists.find(l => l.title.trim().toLowerCase() === 'forward to print');
+    if (!printList || !printList.cards) return [];
+    
+    return printList.cards.map((card: any) => ({
+      id: card.id,
+      cardTitle: card.title || card.phoneNumber,
+      phoneNumber: card.phoneNumber,
+      chocolateCount: card.chocolateCount || '',
+      comments: card.comments || '',
+      birthdayDate: card.birthdayDate || '',
+      timestamp: card.timestamp || new Date().toISOString(),
+      read: readCardIds.includes(card.id)
+    })).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [boardLists, readCardIds]);
+
+  const markAllNotificationsAsRead = () => {
+    const cardIds = notifications.map(n => n.id);
+    setReadCardIds(prev => Array.from(new Set([...prev, ...cardIds])));
+    toast.success("All notifications marked as read");
   };
 
   const clearAllNotifications = async () => {
     try {
-      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
-      await setDoc(notifyDocRef, { items: [] }, { merge: true });
-      toast.success("Notifications cleared");
+      const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
+      const updatedLists = boardLists.map(l => ({ ...l, cards: [...l.cards] }));
+      const printList = updatedLists.find(l => l.title.trim().toLowerCase() === 'forward to print');
+      const completedList = updatedLists.find(l => l.title.trim().toLowerCase() === 'order completed');
+      
+      if (printList && printList.cards.length > 0) {
+        const cardsToMove = printList.cards.map((c: any) => ({
+          ...c,
+          status: 'Order Completed'
+        }));
+        
+        printList.cards = [];
+        
+        if (completedList) {
+          completedList.cards.push(...cardsToMove);
+        } else {
+          updatedLists[0].cards.push(...cardsToMove);
+        }
+        
+        await setDoc(boardDocRef, {
+          lists: updatedLists,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        
+        toast.success("All notifications cleared (moved to Order Completed)");
+      }
     } catch (err) {
       console.error('Failed to clear notifications:', err);
+      toast.error('Failed to clear notifications');
     }
   };
 
-  const handleNotificationClick = async (notification: any) => {
+  const handleNotificationClick = (notification: any) => {
     const matchedOrder = orders.find(o => o.phone === notification.phoneNumber || o.name === notification.cardTitle);
 
     if (matchedOrder) {
@@ -574,13 +621,7 @@ export default function Dashboard() {
       }
     }
 
-    try {
-      const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
-      const updated = notifications.map(n => n.id === notification.id ? { ...n, read: true } : n);
-      await setDoc(notifyDocRef, { items: updated }, { merge: true });
-    } catch (e) {
-      console.error("Failed to mark notification as read:", e);
-    }
+    setReadCardIds(prev => Array.from(new Set([...prev, notification.id])));
   };
 
   const PRESET_WALLPAPERS = [
@@ -910,9 +951,25 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Self", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
+
+  // Header Visibility State
+  const [showHeader, setShowHeader] = useState(() => {
+    const saved = localStorage.getItem('showHeader');
+    return saved === 'true'; // Default is false (hidden)
+  });
+
+  useEffect(() => {
+    localStorage.setItem('showHeader', String(showHeader));
+  }, [showHeader]);
+
+  // Local Undo Stack
+  const undoStackRef = useRef<{
+    type: string;
+    undo: () => Promise<void>;
+  }[]>([]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -935,11 +992,11 @@ export default function Dashboard() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
   const [hiddenCols, setHiddenCols] = useState<Record<string, boolean>>({
-    serialNo: false,
-    role: false,
-    orderDate: false,
-    deliveryCharge: false,
-    discount: false
+    serialNo: true,
+    role: true,
+    orderDate: true,
+    deliveryCharge: true,
+    discount: true
   });
 
   const [isScreenshotMode, setIsScreenshotMode] = useState(false);
@@ -1536,6 +1593,8 @@ export default function Dashboard() {
     if (window.confirm(`Are you sure you want to delete ${selectedOrders.length} records?`)) {
       try {
         const selectedFireOrders = orders.filter(o => selectedOrders.includes(o.id));
+        const deletedRecords: { originalFireId: string; originalOrderData: any; trashFireId: string }[] = [];
+        
         for (const order of selectedFireOrders) {
           try {
             const trashOrder = {
@@ -1543,15 +1602,45 @@ export default function Dashboard() {
               deletedAt: Date.now(),
               deletedBy: role ? `${role} (${loggedInName})` : loggedInName
             };
+            const originalFireId = order.fireId;
+            const originalOrderData = { ...order };
+            delete (originalOrderData as any).fireId;
+
             delete (trashOrder as any).fireId;
-            await addDoc(collection(db, "trash_orders"), trashOrder);
+            const trashRef = await addDoc(collection(db, "trash_orders"), trashOrder);
+            const trashFireId = trashRef.id;
+
+            await deleteDoc(doc(db, "orders", originalFireId));
+            
+            deletedRecords.push({
+              originalFireId,
+              originalOrderData,
+              trashFireId
+            });
           } catch (err) {
             console.error("Failed to copy bulk order to trash:", err);
           }
-          await deleteDoc(doc(db, "orders", order.fireId));
         }
+        
+        // Track bulk deletion in undo stack
+        if (deletedRecords.length > 0) {
+          undoStackRef.current.push({
+            type: 'BULK_DELETE',
+            undo: async () => {
+              for (const rec of deletedRecords) {
+                await setDoc(doc(db, "orders", rec.originalFireId), rec.originalOrderData);
+                await deleteDoc(doc(db, "trash_orders", rec.trashFireId));
+              }
+              logActivity(`Restored ${deletedRecords.length} bulk deleted orders`, 'Trash Bin');
+            }
+          });
+          toast.success(`Moved ${deletedRecords.length} orders to trash. Press Ctrl+Z to undo.`);
+        }
+        
         setSelectedOrders([]);
-      } catch (err) { console.error("Bulk delete failed:", err); }
+      } catch (err) {
+        console.error("Bulk delete failed:", err);
+      }
     }
   };
 
@@ -1696,19 +1785,20 @@ export default function Dashboard() {
     setFormData(newFormData);
   };
 
-
-
-  const handleAddClick = (categoryOverride?: 'chocolate' | 'product') => {
+  const handleAddClick = (categoryOverride?: any) => {
     const today = new Date().toISOString().split('T')[0];
-    const category = categoryOverride || (activeTab === 'dashboard2' ? 'product' : 'chocolate');
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Self", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    const category = (categoryOverride === 'chocolate' || categoryOverride === 'product')
+      ? categoryOverride
+      : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    setOrderTypeOthersToggle(true);
     setIsModalOpen(true);
   };
 
   const handleAddOrderFromNotification = async (n: any) => {
     const today = new Date().toISOString().split('T')[0];
     const category = activeTab === 'dashboard2' ? 'product' : 'chocolate';
-    const birthdayVal = n.birthdayDate ? parseDateToYYYYMMDD(n.birthdayDate) : today;
+    const birthdayVal = n.birthdayDate ? parseDateToYYYYMMDD(n.birthdayDate) : "";
     
     try {
       const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
@@ -1724,8 +1814,8 @@ export default function Dashboard() {
       name: n.cardTitle || "",
       phone: n.phoneNumber || "",
       orderDate: today,
-      functionDate: birthdayVal || today,
-      deliveryDate: birthdayVal || today,
+      functionDate: birthdayVal,
+      deliveryDate: birthdayVal,
       chocolate: "",
       count: n.chocolateCount || "",
       address: n.comments || "",
@@ -1735,7 +1825,7 @@ export default function Dashboard() {
       isDeliveryFree: false,
       isChennai: false,
       orderType: "Sabi",
-      role: "Self",
+      role: "Others",
       orderStatus: "image edited (not paid)",
       category,
       manualDeliveryFee: "",
@@ -1743,12 +1833,14 @@ export default function Dashboard() {
       manualProductPrice: "",
       pricingType: 'retail'
     });
+    setOrderTypeOthersToggle(true);
     setIsModalOpen(true);
   };
 
 
   const handleEditClick = (order: any) => {
     const fallbackRole = (order.orderType === 'Self' || order.orderType === 'Sabi') ? 'Self' : 'Others';
+    const currentRole = order.role || fallbackRole;
     setFormData({
       ...order,
       fireId: order.fireId, // 🟢 IMPORTANT: Ithu thaan edit aaga use aagum
@@ -1761,7 +1853,7 @@ export default function Dashboard() {
       isDeliveryFree: order.isDeliveryFree || false,
       isChennai: order.isChennai || false,
       orderType: order.orderType || "Thaaru",
-      role: order.role || fallbackRole,
+      role: currentRole,
       orderStatus: order.orderStatus || "image edited (not paid)",
       category: order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate'),
       manualDeliveryFee: order.manualDeliveryFee || "",
@@ -1770,6 +1862,7 @@ export default function Dashboard() {
       pricingType: order.pricingType || 'retail'
 
     });
+    setOrderTypeOthersToggle(currentRole === 'Others');
     setIsModalOpen(true);
   };
 
@@ -1813,6 +1906,16 @@ export default function Dashboard() {
           setSelectedOrders(selectedOrders.filter(selectedId => selectedId !== id));
           logActivity(`Deleted Order: ${order.name} (${order.chocolate || 'Product'} x${order.count})`,
             order.category === 'product' ? 'Order Management (Products)' : 'Order Management (Chocolates)');
+
+          // Track in local undo stack
+          undoStackRef.current.push({
+            type: 'DELETE_ORDER',
+            undo: async () => {
+              await setDoc(doc(db, "orders", originalFireId), originalOrderData);
+              await deleteDoc(doc(db, "trash_orders", trashFireId));
+              logActivity(`Restored Order: ${order.name}`, 'Trash Bin');
+            }
+          });
 
           toast.success("Order moved to trash", {
             action: {
@@ -2014,41 +2117,87 @@ export default function Dashboard() {
         }
         
         e.preventDefault();
+
+        // If we are currently on the Daily Tasks tab, let's trigger the undo for Daily Tasks!
+        if (activeTab === 'daily_tasks') {
+          const event = new CustomEvent('sabi-daily-tasks-undo');
+          window.dispatchEvent(event);
+          return;
+        }
         
-        // Filter logs starting with 'deleted'
-        const deleteLogs = activityLogs.filter(log => 
-          (log.action || '').toLowerCase().startsWith('deleted ')
-        );
-        
-        if (deleteLogs.length > 0) {
-          // Sort by timestamp desc to find the most recent deletion log
-          const sortedDeletes = [...deleteLogs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-          const lastDeleteLog = sortedDeletes[0];
-          
-          toast.loading("Undoing last deleted item...", { id: "global-undo" });
-          try {
-            await handleUndoActivity(lastDeleteLog);
-            toast.success("Last deletion undone successfully!", { id: "global-undo" });
-          } catch (err) {
-            toast.error("Failed to undo last deletion", { id: "global-undo" });
+        if (undoStackRef.current.length > 0) {
+          const lastAction = undoStackRef.current.pop();
+          if (lastAction) {
+            toast.loading("Undoing last action...", { id: "global-undo" });
+            try {
+              await lastAction.undo();
+              toast.success("Action undone successfully!", { id: "global-undo" });
+            } catch (err) {
+              console.error("Undo failed:", err);
+              toast.error("Failed to undo last action", { id: "global-undo" });
+            }
           }
         } else {
-          toast.info("No recent deletions found to undo", { id: "global-undo" });
+          // Filter logs starting with 'deleted'
+          const deleteLogs = activityLogs.filter(log => 
+            (log.action || '').toLowerCase().startsWith('deleted ')
+          );
+          
+          if (deleteLogs.length > 0) {
+            // Sort by timestamp desc to find the most recent deletion log
+            const sortedDeletes = [...deleteLogs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            const lastDeleteLog = sortedDeletes[0];
+            
+            toast.loading("Undoing last deleted item...", { id: "global-undo" });
+            try {
+              await handleUndoActivity(lastDeleteLog);
+              toast.success("Last deletion undone successfully!", { id: "global-undo" });
+            } catch (err) {
+              toast.error("Failed to undo last deletion", { id: "global-undo" });
+            }
+          } else {
+            toast.info("No recent actions found to undo", { id: "global-undo" });
+          }
         }
       }
     };
     
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activityLogs, trashOrders, orders, customProducts, managedChocolates]);
+  }, [activityLogs, trashOrders, orders, customProducts, managedChocolates, activeTab]);
+
+  // Keep table scrolled to the leftmost (Serial Number) column by default in RTL container
+  useEffect(() => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollLeft = -tableContainerRef.current.scrollWidth;
+    }
+  }, [sortedDashboardOrders, currentPage]);
 
   const handleDeleteTrashOrderPermanently = async (fireId: string) => {
-    if (window.confirm("Are you sure you want to permanently delete this record from Trash? This cannot be undone.")) {
+    const orderToDelete = trashOrders.find(t => t.fireId === fireId);
+    if (!orderToDelete) return;
+
+    if (window.confirm(`Are you sure you want to permanently delete this record from Trash? This cannot be undone.`)) {
       try {
+        const originalTrashData = { ...orderToDelete };
+        delete (originalTrashData as any).fireId;
+
         await deleteDoc(doc(db, "trash_orders", fireId));
-        logActivity(`Permanently Deleted Order from Trash`, 'Trash Bin');
+        logActivity(`Permanently Deleted Order from Trash: ${orderToDelete.name}`, 'Trash Bin');
+
+        // Register action on local undo stack for Ctrl + Z / Cmd + Z support
+        undoStackRef.current.push({
+          type: 'PERMANENT_DELETE_TRASH_ORDER',
+          undo: async () => {
+            await setDoc(doc(db, "trash_orders", fireId), originalTrashData);
+            logActivity(`Undid Action: Restored Permanent Deleted Order to Trash: ${orderToDelete.name}`, 'Trash Bin');
+          }
+        });
+
+        toast.success(`Permanently deleted order for ${orderToDelete.name}. Press Ctrl+Z to undo.`);
       } catch (err) {
         console.error("Permanent deletion failed:", err);
+        toast.error("Failed to delete order permanently");
       }
     }
   };
@@ -2057,8 +2206,6 @@ export default function Dashboard() {
     e.preventDefault();
 
     const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
-
-
 
     const rawAdvance = Number(formData.advanceAmount) || 0;
     let finalPaymentStatus = formData.paymentStatus;
@@ -2081,8 +2228,6 @@ export default function Dashboard() {
       manualProductPrice: Number(formData.manualProductPrice) || 0,
       paymentStatus: finalPaymentStatus,
 
-
-
       isDeliveryFree: Boolean(formData.isDeliveryFree || formData.isChennai),
       isChennai: Boolean(formData.isChennai),
       totalOrderPrice: priceData.fullTotalPrice || 0,
@@ -2093,6 +2238,7 @@ export default function Dashboard() {
     try {
       const moduleName = (formData.category === 'product') ? 'Order Management (Products)' : 'Order Management (Chocolates)';
       if (formData.fireId) {
+        const previousOrder = orders.find(o => o.id === formData.id);
         const { fireId, ...dataToUpdate } = formattedOrder;
 
         // 🛠️ Automatic-a undefined error-a thadukkum code
@@ -2100,6 +2246,21 @@ export default function Dashboard() {
 
         await updateDoc(doc(db, "orders", formData.fireId), dataToUpdate);
         logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
+        toast.success("Order updated successfully!");
+
+        // Track in local undo stack
+        if (previousOrder) {
+          undoStackRef.current.push({
+            type: 'EDIT_ORDER',
+            undo: async () => {
+              const restored = { ...previousOrder };
+              const fid = restored.fireId;
+              delete restored.fireId;
+              Object.keys(restored).forEach(key => restored[key] === undefined && delete restored[key]);
+              await setDoc(doc(db, "orders", fid), restored);
+            }
+          });
+        }
       } else {
         const nextId = orders.length > 0 ? Math.max(...orders.map(o => Number(o.id) || 0)) + 1 : 1;
         formattedOrder.id = nextId;
@@ -2108,19 +2269,27 @@ export default function Dashboard() {
         // 🛠️ Automatic-a undefined error-a thadukkum code
         Object.keys(formattedOrder).forEach(key => formattedOrder[key] === undefined && delete formattedOrder[key]);
 
-        await addDoc(collection(db, "orders"), formattedOrder);
+        const newDocRef = await addDoc(collection(db, "orders"), formattedOrder);
         logActivity(`Added New Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
+        toast.success("Order added successfully!");
+
+        // Track in local undo stack
+        undoStackRef.current.push({
+          type: 'ADD_ORDER',
+          undo: async () => {
+            await deleteDoc(doc(db, "orders", newDocRef.id));
+          }
+        });
       }
 
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Self", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
-
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
 
     } catch (err) {
       console.error("Error saving:", err);
-      alert("Failed to save order. Please check console.");
+      toast.error("Failed to save order. Please check console.");
     }
   };
 
@@ -2201,10 +2370,52 @@ export default function Dashboard() {
   const handleDeleteProductClick = async (fireId: string) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       const prod = customProducts.find(p => p.fireId === fireId);
+      if (prod) {
+        try {
+          const originalProdData = { ...prod };
+          delete (originalProdData as any).fireId;
+
+          await deleteDoc(doc(db, "products", fireId));
+          logActivity(`Deleted Product: ${prod?.name || 'Unknown'}`, 'Products');
+          toast.success("Product deleted successfully!");
+
+          // Track in local undo stack
+          undoStackRef.current.push({
+            type: 'DELETE_PRODUCT',
+            undo: async () => {
+              await setDoc(doc(db, "products", fireId), originalProdData);
+              logActivity(`Restored Product: ${prod?.name || 'Unknown'}`, 'Products');
+            }
+          });
+        } catch (e) {
+          console.error("Failed to delete product:", e);
+        }
+      }
+    }
+  };
+
+  const handleDeleteChocClick = async (choc: any) => {
+    if (window.confirm(`Are you sure you want to delete chocolate "${choc.name}"?`)) {
       try {
-        await deleteDoc(doc(db, "products", fireId));
-        logActivity(`Deleted Product: ${prod?.name || 'Unknown'}`, 'Products');
-      } catch (e) { }
+        const fireId = choc.fireId;
+        const originalChocData = { ...choc };
+        delete (originalChocData as any).fireId;
+
+        await deleteDoc(doc(db, "managed_chocolates", fireId));
+        logActivity(`Deleted Chocolate: ${choc.name}`, 'Chocolates');
+        toast.success("Chocolate deleted successfully!");
+
+        // Track in local undo stack
+        undoStackRef.current.push({
+          type: 'DELETE_CHOCOLATE',
+          undo: async () => {
+            await setDoc(doc(db, "managed_chocolates", fireId), originalChocData);
+            logActivity(`Restored Chocolate: ${choc.name}`, 'Chocolates');
+          }
+        });
+      } catch (err) {
+        console.error("Failed to delete chocolate:", err);
+      }
     }
   };
 
@@ -2835,66 +3046,94 @@ export default function Dashboard() {
       </aside>
 
       <main
-        className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500"
+        className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500 relative"
         style={{
-          background: activeTab === 'daily_tasks'
+          backgroundImage: activeTab === 'daily_tasks'
             ? 'linear-gradient(to bottom right, #0f172a, #1e3a5f, rgba(96, 165, 250, 0.3))'
             : activeTab === 'dashboard1' && d1Wallpaper
-              ? (d1Wallpaper.startsWith('data:image') ? `url(${d1Wallpaper}) center/cover no-repeat` : d1Wallpaper)
+              ? (d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper)
               : activeTab === 'dashboard2' && d2Wallpaper
-                ? (d2Wallpaper.startsWith('data:image') ? `url(${d2Wallpaper}) center/cover no-repeat` : d2Wallpaper)
+                ? (d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper)
                 : activeTab === 'inventories' && invWallpaper
-                  ? (invWallpaper.startsWith('data:image') ? `url(${invWallpaper}) center/cover no-repeat` : invWallpaper)
+                  ? (invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper)
                   : activeTab === 'tracking' && trackWallpaper
-                    ? (trackWallpaper.startsWith('data:image') ? `url(${trackWallpaper}) center/cover no-repeat` : trackWallpaper)
+                    ? (trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper)
                     : activeTab === 'reports' && reportsWallpaper
-                      ? (reportsWallpaper.startsWith('data:image') ? `url(${reportsWallpaper}) center/cover no-repeat` : reportsWallpaper)
-                      : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)'
+                      ? (reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper)
+                      : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'scroll'
         }}
       >
 
-        <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm relative z-50 print:hidden border-amber-100`}>
-          <div className="flex items-center gap-3 md:gap-5">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200" title="Toggle Menu">
-              <Menu size={24} />
-            </button>
-            <div>
-              <h1 className={`text-2xl md:text-3xl font-bold text-amber-950`}>
-                {activeTab === 'dashboard1' && 'Order Management (Chocolates)'}
-                {activeTab === 'dashboard2' && 'Order Management (Products)'}
-                {activeTab === 'tracking' && 'Orders Tracking Center'}
-                {activeTab === 'reports' && 'Analytics & Reports'}
-                {activeTab === 'inventories' && 'Inventory Management'}
-                {activeTab === 'daily_tasks' && 'Daily Task Management Board'}
-                {activeTab === 'random_picker' && 'Monthly Winner Picker'}
-              </h1>
-              <p className={`hidden md:block text-sm text-amber-700`}>
-                {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
-                {activeTab === 'tracking' && 'Search and trace live order statuses.'}
-                {activeTab === 'reports' && 'View your sales and item statistics.'}
-                {activeTab === 'inventories' && 'Track live chocolate stock & manual entries.'}
-                {activeTab === 'daily_tasks' && 'Track your daily operations, follow-ups, and customer pipeline.'}
-                {activeTab === 'random_picker' && 'Draw monthly random winners for cashback rewards (Instagram Reels ready).'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-
-
-            <div className="hidden sm:block text-right">
-              <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
-              <p className="text-sm font-bold text-amber-600 tracking-widest uppercase">return Gifts</p>
-            </div>
-            <div
-              className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-[#d4a373] to-[#3e2723] shadow-md flex items-center justify-center select-none"
+        {!showHeader && (
+          <div className="absolute top-4 left-4 z-50 flex items-center gap-2 print:hidden">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-amber-800 bg-white hover:bg-amber-50 rounded-lg shadow-md transition-colors border border-amber-200 cursor-pointer flex items-center justify-center"
+              title="Toggle Menu"
             >
-              <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-amber-50 shadow-inner">
-                <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+              <Menu size={18} />
+            </button>
+            <button
+              onClick={() => setShowHeader(true)}
+              className="px-3 py-2 text-xs font-bold text-amber-800 bg-white hover:bg-amber-50 rounded-lg shadow-md transition-colors border border-amber-200 cursor-pointer flex items-center gap-1.5"
+              title="Show Header"
+            >
+              <Eye size={14} className="text-amber-700" /> Show Header
+            </button>
+          </div>
+        )}
+
+        {showHeader && (
+          <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm relative z-50 print:hidden border-amber-100`}>
+            <div className="flex items-center gap-3 md:gap-5">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200" title="Toggle Menu">
+                <Menu size={24} />
+              </button>
+              <button onClick={() => setShowHeader(false)} className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200" title="Hide Header">
+                <EyeOff size={24} />
+              </button>
+              <div>
+                <h1 className={`text-2xl md:text-3xl font-bold text-amber-950`}>
+                  {activeTab === 'dashboard1' && 'Order Management (Chocolates)'}
+                  {activeTab === 'dashboard2' && 'Order Management (Products)'}
+                  {activeTab === 'tracking' && 'Orders Tracking Center'}
+                  {activeTab === 'reports' && 'Analytics & Reports'}
+                  {activeTab === 'inventories' && 'Inventory Management'}
+                  {activeTab === 'daily_tasks' && 'Daily Task Management Board'}
+                  {activeTab === 'random_picker' && 'Monthly Winner Picker'}
+                </h1>
+                <p className={`hidden md:block text-sm text-amber-700`}>
+                  {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
+                  {activeTab === 'tracking' && 'Search and trace live order statuses.'}
+                  {activeTab === 'reports' && 'View your sales and item statistics.'}
+                  {activeTab === 'inventories' && 'Track live chocolate stock & manual entries.'}
+                  {activeTab === 'daily_tasks' && 'Track your daily operations, follow-ups, and customer pipeline.'}
+                  {activeTab === 'random_picker' && 'Draw monthly random winners for cashback rewards (Instagram Reels ready).'}
+                </p>
               </div>
             </div>
-          </div>
-        </header>
+
+            <div className="flex items-center gap-4">
+
+
+              <div className="hidden sm:block text-right">
+                <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
+                <p className="text-sm font-bold text-amber-600 tracking-widest uppercase">return Gifts</p>
+              </div>
+              <div
+                className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-[#d4a373] to-[#3e2723] shadow-md flex items-center justify-center select-none"
+              >
+                <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-amber-50 shadow-inner">
+                  <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                </div>
+              </div>
+            </div>
+          </header>
+        )}
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible">
 
@@ -2944,15 +3183,34 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-red-600 to-red-800 p-4 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)] border-4 border-red-500/50">
+              <div 
+                className={`p-4 rounded-[2rem] transition-all duration-500 ${
+                  isWallpaperActive 
+                    ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg' 
+                    : 'bg-gradient-to-br from-amber-700 to-amber-950 border-4 border-amber-600/50 shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)]'
+                }`}
+              >
                 <h2 className="text-3xl font-black text-white mb-6 text-center tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
                 <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
                   {dynamicInventory.map((choc, i) => {
                     const bal = inventoryBalances[choc] || 0;
                     return (
-                      <div key={i} className="bg-[#fffdf7] p-3 rounded-xl shadow-inner text-center border-2 border-transparent flex flex-col justify-center items-center transform hover:scale-105 transition-transform shrink-0 min-w-[100px] sm:min-w-[120px] flex-1">
-                        <span className="text-[11px] font-black text-red-900 uppercase leading-tight mb-2 h-8 flex items-center justify-center">{choc}</span>
-                        <span className={`text-2xl font-black ${bal < 0 ? 'text-red-600' : 'text-green-600'}`}>{bal}</span>
+                      <div 
+                        key={i} 
+                        className={`p-3 rounded-xl text-center border transition-all duration-300 shrink-0 min-w-[100px] sm:min-w-[120px] flex-1 flex flex-col justify-center items-center transform hover:scale-105 transition-transform ${
+                          isWallpaperActive
+                            ? 'bg-black/35 border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]'
+                            : 'bg-[#fffdf7] border-transparent shadow-inner'
+                        }`}
+                      >
+                        <span className={`text-[11px] font-black uppercase leading-tight mb-2 h-8 flex items-center justify-center ${
+                          isWallpaperActive ? 'text-amber-200' : 'text-amber-900'
+                        }`}>{choc}</span>
+                        <span className={`text-2xl font-black ${
+                          bal < 0 
+                            ? 'text-rose-400' 
+                            : (isWallpaperActive ? 'text-green-400 font-extrabold' : 'text-green-600')
+                        }`}>{bal}</span>
                       </div>
                     )
                   })}
@@ -3095,7 +3353,19 @@ export default function Dashboard() {
             >
 
               <div className="relative z-10 flex flex-col gap-6">
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-5' : 'lg:grid-cols-6'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
+
+                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex justify-between items-start mb-3 relative z-10">
+                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Role Filter</p>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><User size={16} /></div>
+                    </div>
+                    <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
+                      <option value="All">All Roles</option>
+                      <option value="Others">Others</option>
+                      <option value="Self">Self</option>
+                    </select>
+                  </div>
 
                   <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                     <div className="flex justify-between items-start mb-2 relative z-10">
@@ -3282,14 +3552,14 @@ export default function Dashboard() {
                           {showCheckboxes ? <CheckSquare size={15} strokeWidth={2.5} /> : <Square size={15} strokeWidth={2.5} />}
                         </button>
 
-                        <div className="relative w-40 sm:w-48 md:w-56">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" size={14} />
+                        <div className="relative w-full max-w-[240px] sm:max-w-[280px] md:max-w-[360px] lg:max-w-[400px]">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
                           <input
                             type="text"
-                            placeholder="Search..."
+                            placeholder="Search orders..."
                             value={dashboardSearch}
                             onChange={(e) => setDashboardSearch(e.target.value)}
-                            className="pl-8 pr-3 py-1 bg-white border border-amber-200 rounded-lg text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs w-full shadow-sm h-8"
+                            className="pl-9 pr-4 py-2 bg-white border-2 border-amber-100 focus:border-amber-500 rounded-xl text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-sm w-full shadow-sm h-9 md:h-10 transition-all duration-300"
                           />
                         </div>
                       </div>
@@ -3421,16 +3691,31 @@ export default function Dashboard() {
                                     </div>
                                     <div className="flex justify-between items-center mt-1">
                                       <p className="text-[10px] text-slate-500 font-medium">{n.phoneNumber}</p>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setShowNotificationDropdown(false);
-                                          handleAddOrderFromNotification(n);
-                                        }}
-                                        className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[9px] font-bold shadow-sm transition-all cursor-pointer border border-amber-500/20"
-                                      >
-                                        + Add Order
-                                      </button>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowNotificationDropdown(false);
+                                            const phoneDigits = n.phoneNumber.replace(/\D/g, '');
+                                            const waUrl = `https://wa.me/91${phoneDigits}`;
+                                            window.open(waUrl, '_blank');
+                                          }}
+                                          className="p-1 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors flex items-center justify-center cursor-pointer border border-transparent"
+                                          title="Chat on WhatsApp"
+                                        >
+                                          <MessageCircle size={14} className="stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowNotificationDropdown(false);
+                                            handleAddOrderFromNotification(n);
+                                          }}
+                                          className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[9px] font-bold shadow-sm transition-all cursor-pointer border border-amber-500/20"
+                                        >
+                                          + Add Order
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 ))
@@ -3468,7 +3753,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-auto max-h-[75vh]'}`}>
+                  <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-scroll max-h-[75vh]'}`}>
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
@@ -4046,28 +4331,30 @@ export default function Dashboard() {
                         <ChevronLeft size={20} />
                       </button>
 
-                      <div className="flex items-center gap-1 bg-white/50 p-1 rounded-xl border border-amber-100">
-                        {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }).map((_, i) => {
-                          const pageNum = i + 1;
-                          // Logic to show limited page numbers
-                          if (pageNum === 1 || pageNum === Math.ceil(sortedDashboardOrders.length / itemsPerPage) || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() => {
-                                  setCurrentPage(pageNum);
-                                  tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-white text-amber-800 hover:bg-amber-50'}`}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          }
-                          if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="px-1 text-amber-400 font-black">...</span>;
-                          return null;
-                        })}
-                      </div>
+                       {Math.ceil(sortedDashboardOrders.length / itemsPerPage) > 0 && (
+                        <div className="flex items-center gap-1 bg-white/50 p-1 rounded-xl border border-amber-100">
+                          {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }).map((_, i) => {
+                            const pageNum = i + 1;
+                            // Logic to show limited page numbers
+                            if (pageNum === 1 || pageNum === Math.ceil(sortedDashboardOrders.length / itemsPerPage) || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => {
+                                    setCurrentPage(pageNum);
+                                    tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-white text-amber-800 hover:bg-amber-50'}`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            }
+                            if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="px-1 text-amber-400 font-black">...</span>;
+                            return null;
+                          })}
+                        </div>
+                      )}
 
                       <button
                         disabled={currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
@@ -4155,8 +4442,16 @@ export default function Dashboard() {
 
               <div className="space-y-4 pb-10">
                 {trackingSearchResults.length === 0 ? (
-                  <div className="text-center py-10 bg-white rounded-2xl border border-amber-100">
-                    <p className="text-amber-700 font-medium">No tracking records found.</p>
+                  <div 
+                    className={`text-center py-10 rounded-2xl transition-all duration-300 ${
+                      isWallpaperActive
+                        ? 'bg-black/45 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]'
+                        : 'bg-white border border-amber-100 shadow-sm'
+                    }`}
+                  >
+                    <p className={`font-bold tracking-wide ${isWallpaperActive ? 'text-white' : 'text-amber-700'}`}>
+                      No tracking records found.
+                    </p>
                   </div>
                 ) : (
                   trackingSearchResults.map(order => {
@@ -6389,7 +6684,7 @@ export default function Dashboard() {
                         }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
 
 
-                        <button onClick={async () => { await deleteDoc(doc(db, "managed_chocolates", choc.fireId)); logActivity(`Deleted Chocolate: ${choc.name}`, 'Chocolates'); }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={() => handleDeleteChocClick(choc)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}

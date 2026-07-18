@@ -108,26 +108,32 @@ All colors MUST be HSL.
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+  display: block !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(139, 94, 60, 0.2);
-  border-radius: 10px;
-  transition: all 0.3s ease;
+  background: rgba(217, 119, 6, 0.4) !important; /* amber translucent */
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  transition: background-color 0.2s ease-in-out !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 94, 60, 0.4);
+  background: rgba(217, 119, 6, 0.75) !important;
+  border-radius: 9999px !important;
+  border: 1px solid transparent !important;
+  background-clip: padding-box !important;
 }
 
 /* Firefox support */
 .custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(139, 94, 60, 0.2) transparent;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(217, 119, 6, 0.4) transparent !important;
 }
 
 @keyframes loading-bar {
@@ -376,15 +382,49 @@ All colors MUST be HSL.
 
 /* Ensure inputs and dropdowns are perfectly readable in the dark glass */
 .wallpaper-active select,
-.wallpaper-active input[type="date"],
+.wallpaper-active textarea,
+.wallpaper-active input:not([type]),
 .wallpaper-active input[type="text"],
 .wallpaper-active input[type="number"],
-.wallpaper-active input[type="password"] {
+.wallpaper-active input[type="password"],
+.wallpaper-active input[type="date"] {
   background: rgba(15, 23, 42, 0.6) !important;
   color: #f8fafc !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
   border-radius: 0.75rem !important;
+}
+
+/* Date input fields text colors when empty / placeholder (outside of fixed modals) */
+.wallpaper-active input[type="date"]:not(.fixed *)::-webkit-datetime-edit-text,
+.wallpaper-active input[type="date"]:not(.fixed *)::-webkit-datetime-edit-month-field,
+.wallpaper-active input[type="date"]:not(.fixed *)::-webkit-datetime-edit-day-field,
+.wallpaper-active input[type="date"]:not(.fixed *)::-webkit-datetime-edit-year-field {
+  color: #cbd5e1 !important;
+}
+
+/* Date input fields text colors when date is selected/filled (outside of fixed modals) */
+.wallpaper-active input[type="date"]:not(.fixed *)::-webkit-datetime-edit {
+  color: #f8fafc !important;
+}
+
+/* Style calendar picker icon color to be light (outside of fixed modals) */
+.wallpaper-active input[type="date"]:not(.fixed *)::-webkit-calendar-picker-indicator {
+  filter: invert(1) !important;
+  opacity: 0.7 !important;
+  cursor: pointer;
+}
+
+/* Input placeholder text styling for dark wallpaper mode */
+.wallpaper-active input::placeholder,
+.wallpaper-active textarea::placeholder,
+.wallpaper-active input::-webkit-input-placeholder,
+.wallpaper-active textarea::-webkit-input-placeholder,
+.wallpaper-active input::-moz-placeholder,
+.wallpaper-active textarea::-moz-placeholder,
+.wallpaper-active input:-ms-input-placeholder,
+.wallpaper-active textarea:-ms-input-placeholder {
+  color: #cbd5e1 !important;
 }
 
 /* Style option elements inside select dropdowns */
@@ -393,46 +433,47 @@ All colors MUST be HSL.
   color: #f8fafc !important;
 }
 
-/* Buttons with white backgrounds converted to glassmorphic */
-.wallpaper-active button[class*="bg-white"],
-.wallpaper-active div[class*="bg-white"] {
+/* Buttons with white backgrounds converted to glassmorphic (scoped to not affect fixed modals/overlays) */
+.wallpaper-active button[class*="bg-white"]:not(.fixed *),
+.wallpaper-active div[class*="bg-white"]:not(.fixed *) {
   background: rgba(255, 255, 255, 0.08) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
   color: #f8fafc !important;
 }
 
-.wallpaper-active button[class*="bg-white"]:hover {
+.wallpaper-active button[class*="bg-white"]:not(.fixed *):hover {
   background: rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Text overrides inside dark cards */
-.wallpaper-active .text-amber-950,
-.wallpaper-active .text-amber-900,
-.wallpaper-active .text-slate-800,
-.wallpaper-active .text-gray-800,
-.wallpaper-active .text-\[\#3e2723\],
-.wallpaper-active .text-\[\#c2410c\],
-.wallpaper-active .text-\[\#5d4037\],
-.wallpaper-active h1,
-.wallpaper-active h2,
-.wallpaper-active h3,
-.wallpaper-active h4 {
+/* Text overrides inside dark cards (scoped to not affect fixed modals/overlays) */
+.wallpaper-active .text-amber-950:not(.fixed *),
+.wallpaper-active .text-amber-900:not(.fixed *),
+.wallpaper-active .text-slate-800:not(.fixed *),
+.wallpaper-active .text-gray-800:not(.fixed *),
+.wallpaper-active .text-\[\#3e2723\]:not(.fixed *),
+.wallpaper-active .text-\[\#c2410c\]:not(.fixed *),
+.wallpaper-active .text-\[\#5d4037\]:not(.fixed *),
+.wallpaper-active h1:not(.fixed *),
+.wallpaper-active h2:not(.fixed *),
+.wallpaper-active h3:not(.fixed *),
+.wallpaper-active h4:not(.fixed *) {
   color: #f8fafc !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
 }
 
-.wallpaper-active .text-amber-700,
-.wallpaper-active .text-slate-600,
-.wallpaper-active .text-gray-600,
-.wallpaper-active .text-slate-500,
-.wallpaper-active .text-gray-500,
-.wallpaper-active .text-\[\#a46c3b\] {
+.wallpaper-active .text-amber-800:not(.fixed *),
+.wallpaper-active .text-amber-700:not(.fixed *),
+.wallpaper-active .text-slate-600:not(.fixed *),
+.wallpaper-active .text-gray-600:not(.fixed *),
+.wallpaper-active .text-slate-500:not(.fixed *),
+.wallpaper-active .text-gray-500:not(.fixed *),
+.wallpaper-active .text-\[\#a46c3b\]:not(.fixed *) {
   color: #cbd5e1 !important;
 }
 
-.wallpaper-active td,
-.wallpaper-active label,
-.wallpaper-active span:not([class*="text-green"]):not([class*="text-rose"]):not([class*="text-red"]):not([class*="text-blue"]):not([class*="text-orange"]):not([class*="text-purple"]) {
+.wallpaper-active td:not(.fixed *),
+.wallpaper-active label:not(.fixed *),
+.wallpaper-active span:not(.fixed *):not([class*="text-green"]):not([class*="text-rose"]):not([class*="text-red"]):not([class*="text-blue"]):not([class*="text-orange"]):not([class*="text-purple"]) {
   color: #e2e8f0 !important;
 }
 
@@ -442,29 +483,50 @@ All colors MUST be HSL.
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Table head style - Purple Translucent */
-.wallpaper-active thead,
-.wallpaper-active thead tr {
+/* Table head style - Purple Translucent (scoped to not affect fixed modals/overlays) */
+.wallpaper-active thead:not(.fixed *),
+.wallpaper-active thead tr:not(.fixed *) {
   background: rgba(88, 80, 236, 0.25) !important;
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-.wallpaper-active th,
-.wallpaper-active th span {
+.wallpaper-active th:not(.fixed *),
+.wallpaper-active th span:not(.fixed *) {
   color: #ffffff !important;
   font-weight: 800 !important;
 }
 
-.wallpaper-active tr {
+/* Override color for specific column headers that have light colored bg utilities */
+.wallpaper-active th.bg-orange-100\/80,
+.wallpaper-active th[class*="bg-orange-100"],
+.wallpaper-active th[class*="bg-orange-200"],
+.wallpaper-active th[class*="bg-orange-50"],
+.wallpaper-active th.bg-orange-100\/80 span,
+.wallpaper-active th[class*="bg-orange-100"] span {
+  background-color: rgba(249, 115, 22, 0.25) !important;
+  border-color: rgba(249, 115, 22, 0.45) !important;
+  color: #ffedd5 !important;
+}
+
+.wallpaper-active th.bg-red-50,
+.wallpaper-active th[class*="bg-red-50"],
+.wallpaper-active th.bg-red-50 span,
+.wallpaper-active th[class*="bg-red-50"] span {
+  background-color: rgba(239, 68, 68, 0.25) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  color: #fee2e2 !important;
+}
+
+.wallpaper-active tr:not(.fixed *) {
   border-color: rgba(255, 255, 255, 0.06) !important;
 }
 
-.wallpaper-active tr:hover {
+.wallpaper-active tr:not(.fixed *):hover {
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Selected row background override */
-.wallpaper-active tr.bg-amber-50\/80 {
+/* Selected row background override (scoped to not affect fixed modals/overlays) */
+.wallpaper-active tr.bg-amber-50\/80:not(.fixed *) {
   background-color: rgba(88, 80, 236, 0.2) !important;
 }
 
@@ -499,24 +561,232 @@ All colors MUST be HSL.
   border-color: rgba(37, 99, 235, 0.4) !important;
 }
 
-/* ==================== GLOBAL SCROLLBAR REMOVAL ==================== */
-/* Hide scrollbars globally across all components, sidebars, tables, and views */
+/* ==================== CUSTOM PROFESSIONAL SCROLLBARS ==================== */
+/* Thin custom scrollbars for WebKit browsers (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
 }
 
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(217, 119, 6, 0.4) !important; /* amber translucent */
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  transition: background-color 0.2s ease-in-out !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 119, 6, 0.75) !important;
+  border-radius: 9999px !important;
+  border: 1px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+/* Scrollbar styling for dark wallpaper (glassmorphic) mode */
+.wallpaper-active ::-webkit-scrollbar-thumb,
+.wallpaper-active .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+.wallpaper-active ::-webkit-scrollbar-thumb:hover,
+.wallpaper-active .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border-radius: 9999px !important;
+  border: 1px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+/* FireFox & legacy Edge specific scrollbar styling */
 html, body, *,
 .custom-scrollbar,
 div,
 aside,
 main {
-  -ms-overflow-style: none !important;  /* IE and Edge */
-  scrollbar-width: none !important;  /* Firefox */
+  -ms-overflow-style: auto !important;  /* IE and Edge */
+  scrollbar-width: thin !important;  /* Firefox */
+  scrollbar-color: rgba(217, 119, 6, 0.4) transparent !important;
+}
+
+.wallpaper-active,
+.wallpaper-active *,
+.wallpaper-active .custom-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent !important;
 }
 
 /* Make "Total Added" manual inventory table column transparent in wallpaper mode */
 .wallpaper-active td[class*="bg-amber-50"] {
   background-color: transparent !important;
+}
+
+/* ==================== PREVENT WALLPAPER OVERRIDES IN OVERLAYS/MODALS ==================== */
+/* Keep all overlays and modals solid (non-glassmorphic) to ensure perfect contrast and layout readability */
+.wallpaper-active .fixed .bg-\[\#fffcf9\],
+.wallpaper-active .fixed div[class*="bg-[#fffcf9]"],
+.wallpaper-active [role="dialog"],
+.wallpaper-active .fixed .bg-white {
+  background-color: #fffcf9 !important;
+  background: #fffcf9 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark.wallpaper-active .fixed .bg-\[\#fffcf9\],
+.dark.wallpaper-active .fixed div[class*="bg-[#fffcf9]"],
+.dark.wallpaper-active [role="dialog"],
+.dark.wallpaper-active .fixed .bg-white {
+  background-color: #1e293b !important;
+  background: #1e293b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: #334155 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Ensure all inputs and textareas inside modals maintain correct solid backgrounds and text contrast */
+.wallpaper-active .fixed select,
+.wallpaper-active .fixed textarea,
+.wallpaper-active .fixed input[type="date"],
+.wallpaper-active .fixed input[type="text"],
+.wallpaper-active .fixed input[type="number"],
+.wallpaper-active .fixed input[type="password"] {
+  background: white !important;
+  color: black !important;
+  border: 2px solid #d7ccc8 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075) !important;
+}
+
+.dark.wallpaper-active .fixed select,
+.dark.wallpaper-active .fixed textarea,
+.dark.wallpaper-active .fixed input[type="date"],
+.dark.wallpaper-active .fixed input[type="text"],
+.dark.wallpaper-active .fixed input[type="number"],
+.dark.wallpaper-active .fixed input[type="password"] {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border: 2px solid #334155 !important;
+}
+
+/* Restores correct option styling inside modals */
+.wallpaper-active .fixed select option {
+  background-color: white !important;
+  color: black !important;
+}
+.dark.wallpaper-active .fixed select option {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+.wallpaper-active .fixed button[class*="bg-white"],
+.wallpaper-active .fixed div[class*="bg-white"] {
+  background: white !important;
+  color: #5d4037 !important;
+  border-color: #d7ccc8 !important;
+}
+
+.dark.wallpaper-active .fixed button[class*="bg-white"],
+.dark.wallpaper-active .fixed div[class*="bg-white"] {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+/* ==================== KANBAN BOARD CARDS & INPUTS IN WALLPAPER MODE ==================== */
+/* Style cards as modern translucent glass */
+.wallpaper-active .group\/card {
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Style card inputs to be clean, inline editable fields instead of dark grey boxes */
+.wallpaper-active .group\/card input,
+.wallpaper-active .group\/card select {
+  background: transparent !important;
+  color: #f8fafc !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+.wallpaper-active .group\/card input:focus,
+.wallpaper-active .group\/card select:focus {
+  border-bottom: 1px solid #60a5fa !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Align calendar picker indicator inside card date fields */
+.wallpaper-active .group\/card input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) !important;
+  opacity: 0.7 !important;
+  margin-left: -5px !important;
+}
+
+/* ==================== NOTIFICATIONS DROPDOWN IN WALLPAPER MODE ==================== */
+/* Style the dropdown container as dark translucent glass */
+.wallpaper-active .notification-container-ref {
+  background: rgba(15, 23, 42, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* Header, footer and dividers alignment inside notifications dropdown */
+.wallpaper-active .notification-container-ref div[class*="bg-amber-50"],
+.wallpaper-active .notification-container-ref div.bg-amber-50\/50,
+.wallpaper-active .notification-container-ref div[class*="border-amber-100"],
+.wallpaper-active .notification-container-ref div[class*="border-t"] {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.wallpaper-active .notification-container-ref .divide-y > * + * {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Hover list item backgrounds in wallpaper mode */
+.wallpaper-active .notification-container-ref div[class*="hover:bg-amber-50"]:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Ensure timestamps are readable light gray */
+.wallpaper-active .notification-container-ref span[class*="text-amber-600"] {
+  color: #cbd5e1 !important;
+}
+
+/* Style disabled pagination buttons as modern glassmorphic disabled buttons */
+.wallpaper-active button.cursor-not-allowed:not(.fixed *),
+.wallpaper-active button:disabled:not(.fixed *),
+.wallpaper-active button[class*="bg-gray-100"][class*="cursor-not-allowed"]:not(.fixed *) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: none !important;
+}
+
+/* Position the vertical scrollbar on the left side next to Serial Number column */
+.left-scrollbar {
+  direction: rtl !important;
+}
+
+.left-scrollbar > * {
+  direction: ltr !important;
 }
