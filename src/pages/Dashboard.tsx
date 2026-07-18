@@ -3351,11 +3351,11 @@ export default function Dashboard() {
                       </div>
 
                       {/* Current Inventory Value Card */}
-                      <div className="bg-[#fdfaf6] border border-[#ebdccb] p-4 rounded-xl shadow-sm flex flex-col">
+                      <div className="current-inventory-value-card p-4 rounded-xl shadow-sm flex flex-col transition-all duration-300">
                         <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-1 text-center">
                           Current Inventory Value
                         </p>
-                        <p className="text-3xl font-black text-[#6d4c41] text-center mb-3">
+                        <p className="grand-total-text text-3xl font-black text-[#6d4c41] text-center mb-3">
                           ₹{currentInventoryValueData.grandTotal.toLocaleString()}
                         </p>
                         <div className="border-t border-[#ebdccb] pt-3">
@@ -3364,7 +3364,7 @@ export default function Dashboard() {
                           </p>
                           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                             {currentInventoryValueData.items.map((item, idx) => (
-                              <div key={idx} className="bg-white/70 p-2 rounded-lg border border-[#f0e4d7] flex flex-col justify-between min-h-[56px]">
+                              <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
                                 <span className="text-[11px] font-black text-amber-950 truncate leading-tight" title={item.name}>
                                   {item.name}
                                 </span>
@@ -3372,7 +3372,7 @@ export default function Dashboard() {
                                   <span className="text-[10px] text-amber-700 font-bold whitespace-nowrap">
                                     {item.balance} × ₹{item.price}
                                   </span>
-                                  <span className="text-[11px] font-black text-[#8b5a2b]">
+                                  <span className="item-value-text text-[11px] font-black text-[#8b5a2b]">
                                     ₹{item.value.toLocaleString()}
                                   </span>
                                 </div>
