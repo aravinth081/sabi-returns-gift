@@ -167,17 +167,16 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
           <div className="flex flex-col items-end ml-auto">
             <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-3 text-right">ORIGINAL FOR RECIPIENT</p>
-            <div className="w-[420px] h-[180px] bg-white flex items-center justify-end">
+            <div className="w-[160px] h-[160px] bg-white rounded-full overflow-hidden flex items-center justify-center">
               <img
                 src={`/sabi-logo.png?v=${refreshKey}`}
                 alt="Logo"
                 style={{
-                  maxWidth: '400px',
-                  maxHeight: '160px',
-                  width: 'auto',
-                  height: 'auto'
+                  width: '160px',
+                  height: '160px',
+                  objectFit: 'cover'
                 }}
-                className="block"
+                className="block rounded-full"
                 crossOrigin="anonymous"
               />
             </div>
