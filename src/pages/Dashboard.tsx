@@ -210,7 +210,6 @@ const PREDEFINED_CHOCOLATES = [
   "5 rs 5 Star", "5 rs Dairy Milk", "2 rs Dairymilk Shots", "5 rs Milky Bar",
   "1 rs Chocolate"
 ];
-
 const ChocolateSingleSelect = ({
   value,
   onChange,
@@ -237,19 +236,6 @@ const ChocolateSingleSelect = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const priceInfo = pricesMap && value
-    ? pricesMap[value.toLowerCase()]
-    : (value ? CHOCOLATE_PRICES_MAP[value.toLowerCase()] : null);
-
-  let priceSuffix = "";
-  if (priceInfo !== undefined && priceInfo !== null) {
-    if (typeof priceInfo === 'object') {
-      priceSuffix = ` (W: ₹${priceInfo.wholesale} | R: ₹${priceInfo.retail})`;
-    } else {
-      priceSuffix = ` (₹${priceInfo})`;
-    }
-  }
-
   return (
     <div ref={wrapperRef} className="relative w-full">
       <button
@@ -258,7 +244,7 @@ const ChocolateSingleSelect = ({
         className="w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner flex justify-between items-center text-left text-sm cursor-pointer"
       >
         <span className="truncate pr-2">
-          {value ? `${value}${priceSuffix}` : placeholderText}
+          {value ? value : placeholderText}
         </span>
         <ChevronDown size={18} className="text-gray-500 shrink-0" />
       </button>
@@ -275,19 +261,6 @@ const ChocolateSingleSelect = ({
             {placeholderText}
           </div>
           {suggestions.map((item, index) => {
-            const itemPriceInfo = pricesMap
-              ? pricesMap[item.toLowerCase()]
-              : CHOCOLATE_PRICES_MAP[item.toLowerCase()];
-
-            let itemPriceSuffix = "";
-            if (itemPriceInfo !== undefined && itemPriceInfo !== null) {
-              if (typeof itemPriceInfo === 'object') {
-                itemPriceSuffix = ` (W: ₹${itemPriceInfo.wholesale} | R: ₹${itemPriceInfo.retail})`;
-              } else {
-                itemPriceSuffix = ` (₹${itemPriceInfo})`;
-              }
-            }
-
             return (
               <div
                 key={index}
@@ -297,7 +270,7 @@ const ChocolateSingleSelect = ({
                   setIsOpen(false);
                 }}
               >
-                {item}{itemPriceSuffix}
+                {item}
               </div>
             );
           })}
@@ -357,7 +330,7 @@ export default function Dashboard() {
 
   const [managedChocolates, setManagedChocolates] = useState<any[]>([]);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
-  const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" });
+  const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -409,15 +382,15 @@ export default function Dashboard() {
         });
 
         const defaults = [
-          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5 },
-          { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5, stickerPrice: 1.5 },
-          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5 },
-          { name: "5 rs Peanut Candy", retailPrice: 17, wholesalePrice: 17, costPrice: 4.5, stickerPrice: 1.5 },
-          { name: "5 rs 5 Star", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5 },
-          { name: "5 rs Dairy Milk", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5 },
-          { name: "2 rs Dairymilk Shots", retailPrice: 10, wholesalePrice: 10, costPrice: 1.5, stickerPrice: 1.5 },
-          { name: "5 rs Milky Bar", retailPrice: 10, wholesalePrice: 10, costPrice: 4.5, stickerPrice: 1.5 },
-          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5, stickerPrice: 1.5 }
+          { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 1 },
+          { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 2 },
+          { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 3 },
+          { name: "5 rs Peanut Candy", retailPrice: 17, wholesalePrice: 17, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 4 },
+          { name: "5 rs 5 Star", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 5 },
+          { name: "5 rs Dairy Milk", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 6 },
+          { name: "2 rs Dairymilk Shots", retailPrice: 10, wholesalePrice: 10, costPrice: 1.5, stickerPrice: 1.5, displayOrder: 7 },
+          { name: "5 rs Milky Bar", retailPrice: 10, wholesalePrice: 10, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 8 },
+          { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5, stickerPrice: 1.5, displayOrder: 9 }
         ];
 
         defaults.forEach(d => addDoc(collection(db, "managed_chocolates"), d));
@@ -433,6 +406,17 @@ export default function Dashboard() {
           seen.add(normalized);
           return true;
         });
+
+        // Sort by custom displayOrder first, then alphabetically
+        list.sort((a: any, b: any) => {
+          const orderA = a.displayOrder !== undefined && a.displayOrder !== null && a.displayOrder !== "" ? Number(a.displayOrder) : 9999;
+          const orderB = b.displayOrder !== undefined && b.displayOrder !== null && b.displayOrder !== "" ? Number(b.displayOrder) : 9999;
+          if (orderA !== orderB) {
+            return orderA - orderB;
+          }
+          return a.name.localeCompare(b.name);
+        });
+
         setManagedChocolates(list);
       }
     });
@@ -955,15 +939,56 @@ export default function Dashboard() {
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
 
-  // Header Visibility State
-  const [showHeader, setShowHeader] = useState(() => {
-    const saved = localStorage.getItem('showHeader');
-    return saved === 'true'; // Default is false (hidden)
+  // Header Visibility State (tab-specific)
+  const [showHeaderMap, setShowHeaderMap] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('showHeaderMap');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      const oldSaved = localStorage.getItem('showHeader');
+      if (oldSaved !== null) {
+        const oldVal = oldSaved === 'true';
+        return {
+          dashboard1: oldVal,
+          dashboard2: oldVal,
+          daily_tasks: oldVal,
+          inventories: oldVal,
+          tracking: oldVal,
+          reports: oldVal,
+          random_picker: oldVal,
+        };
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return {
+      dashboard1: false,
+      dashboard2: false,
+      daily_tasks: false,
+      inventories: false,
+      tracking: false,
+      reports: false,
+      random_picker: false,
+    };
   });
 
   useEffect(() => {
-    localStorage.setItem('showHeader', String(showHeader));
-  }, [showHeader]);
+    localStorage.setItem('showHeaderMap', JSON.stringify(showHeaderMap));
+  }, [showHeaderMap]);
+
+  const showHeader = showHeaderMap[activeTab] ?? false;
+
+  const setShowHeader = (val: boolean | ((prev: boolean) => boolean)) => {
+    setShowHeaderMap(prev => {
+      const currentVal = prev[activeTab] ?? false;
+      const nextVal = typeof val === 'function' ? val(currentVal) : val;
+      return {
+        ...prev,
+        [activeTab]: nextVal
+      };
+    });
+  };
 
   // Local Undo Stack
   const undoStackRef = useRef<{
@@ -991,13 +1016,23 @@ export default function Dashboard() {
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
-  const [hiddenCols, setHiddenCols] = useState<Record<string, boolean>>({
+  const [hiddenColsD1, setHiddenColsD1] = useState<Record<string, boolean>>({
     serialNo: true,
     role: true,
     orderDate: true,
     deliveryCharge: true,
     discount: true
   });
+  const [hiddenColsD2, setHiddenColsD2] = useState<Record<string, boolean>>({
+    serialNo: true,
+    role: true,
+    orderDate: true,
+    deliveryCharge: true,
+    discount: true
+  });
+
+  const hiddenCols = activeTab === 'dashboard2' ? hiddenColsD2 : hiddenColsD1;
+  const setHiddenCols = activeTab === 'dashboard2' ? setHiddenColsD2 : setHiddenColsD1;
 
   const [isScreenshotMode, setIsScreenshotMode] = useState(false);
   const screenshotTableRef = useRef<HTMLDivElement>(null);
@@ -2208,14 +2243,7 @@ export default function Dashboard() {
     const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
 
     const rawAdvance = Number(formData.advanceAmount) || 0;
-    let finalPaymentStatus = formData.paymentStatus;
-    if (rawAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
-      finalPaymentStatus = 'Full Paid';
-    } else if (rawAdvance > 0) {
-      finalPaymentStatus = 'Partially Paid';
-    } else {
-      finalPaymentStatus = 'Pending';
-    }
+    const finalPaymentStatus = formData.paymentStatus || 'Pending';
 
     const formattedOrder: any = {
       ...formData,
@@ -2668,11 +2696,12 @@ export default function Dashboard() {
 
   const renderChocolateBadges = (chocString: string) => {
     if (!chocString) return null;
+    const items = String(chocString).split(',').map(c => c.trim()).filter(Boolean);
     return (
-      <div className="flex flex-wrap gap-1">
-        {String(chocString).split(',').map((c, i) => (
-          <span key={i} className="chocolate-badge bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">
-            {c.trim()}
+      <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+        {items.map((c, i) => (
+          <span key={i} className="chocolate-badge text-amber-950 text-xs font-bold whitespace-nowrap">
+            {c}{i < items.length - 1 ? ',' : ''}
           </span>
         ))}
       </div>
@@ -3503,7 +3532,7 @@ export default function Dashboard() {
 
                 </div>
 
-                <div ref={screenshotTableRef} className="bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-2 lg:mb-0">
+                <div ref={screenshotTableRef} className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active' : ''}`}>
                   <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
 
 
@@ -6610,11 +6639,11 @@ export default function Dashboard() {
 
       {/* 🟢 MANAGED CHOCOLATES MODAL (ANALYTICS AREA) */}
       {isAnalyticsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" }); }}>
+        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }}>
           <div className="rounded-[2.5rem] shadow-2xl w-full max-w-4xl p-8 bg-[#fffcf9] border-4 border-amber-100 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-amber-200 pb-4 shrink-0">
               <h2 className="text-2xl font-black text-[#5d4037] flex items-center gap-2 uppercase tracking-widest"><TrendingUp size={24} /> Chocolate Master Analytics</h2>
-              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
+              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-hidden">
@@ -6629,7 +6658,8 @@ export default function Dashboard() {
                     retailPrice: Number(newChocForm.retailPrice),
                     wholesalePrice: parseFloat(newChocForm.wholesalePrice) || 0,
                     costPrice: existingChoc ? (existingChoc.costPrice || 0) : 0,
-                    stickerPrice: parseFloat(newChocForm.stickerPrice) !== undefined ? parseFloat(newChocForm.stickerPrice) : 1.5
+                    stickerPrice: parseFloat(newChocForm.stickerPrice) !== undefined ? parseFloat(newChocForm.stickerPrice) : 1.5,
+                    displayOrder: newChocForm.displayOrder !== "" ? Number(newChocForm.displayOrder) : ""
                   };
                   if (editChocId) {
                     await updateDoc(doc(db, "managed_chocolates", editChocId), data);
@@ -6639,7 +6669,7 @@ export default function Dashboard() {
                     await addDoc(collection(db, "managed_chocolates"), data);
                     logActivity(`Added Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
                   }
-                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" });
+                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
                 }} className="space-y-4">
                   <div>
                     <label className="block text-xs font-black text-amber-800 uppercase mb-1">Chocolate Name</label>
@@ -6655,16 +6685,22 @@ export default function Dashboard() {
                       <input required type="number" value={newChocForm.retailPrice} onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 20" />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-black text-amber-800 uppercase mb-1">Sticker Price</label>
-                    <input required type="number" step="any" value={newChocForm.stickerPrice} onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 1.5" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Sticker Price</label>
+                      <input required type="number" step="any" value={newChocForm.stickerPrice} onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 1.5" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Display Order</label>
+                      <input type="number" min="1" value={newChocForm.displayOrder} onChange={(e) => setNewChocForm({ ...newChocForm, displayOrder: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 1" />
+                    </div>
                   </div>
                   <button type="submit" className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
                     {editChocId ? 'Update Item' : 'Add to List'}
                   </button>
 
                   {editChocId && (
-                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
+                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
                   )}
                 </form>
               </div>
@@ -6680,6 +6716,9 @@ export default function Dashboard() {
                           <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">W: ₹{choc.wholesalePrice || choc.price}</span>
                           <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold">R: ₹{choc.retailPrice || choc.price}</span>
                           <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">S: ₹{choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)}</span>
+                          {choc.displayOrder !== undefined && choc.displayOrder !== null && choc.displayOrder !== "" && (
+                            <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">Order: {choc.displayOrder}</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -6689,10 +6728,10 @@ export default function Dashboard() {
                             name: choc.name,
                             retailPrice: (choc.retailPrice || choc.price || "").toString(),
                             wholesalePrice: (choc.wholesalePrice || choc.price || "").toString(),
-                            stickerPrice: (choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)).toString()
+                            stickerPrice: (choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)).toString(),
+                            displayOrder: (choc.displayOrder !== undefined && choc.displayOrder !== null ? choc.displayOrder : "").toString()
                           });
                         }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
-
 
                         <button onClick={() => handleDeleteChocClick(choc)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
                       </div>
