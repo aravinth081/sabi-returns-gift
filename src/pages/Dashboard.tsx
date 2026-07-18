@@ -881,7 +881,7 @@ export default function Dashboard() {
   const [isInvModalOpen, setIsInvModalOpen] = useState(false);
   const [invForm, setInvForm] = useState({
     date: new Date().toISOString().split('T')[0],
-    chocolate: "10 rs 5 Star",
+    chocolate: "",
     boxCount: "",
     itemsPerBox: ""
   });
@@ -3051,15 +3051,25 @@ export default function Dashboard() {
           backgroundImage: activeTab === 'daily_tasks'
             ? 'linear-gradient(to bottom right, #0f172a, #1e3a5f, rgba(96, 165, 250, 0.3))'
             : activeTab === 'dashboard1' && d1Wallpaper
-              ? (d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper)
+              ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
+                  d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper
+                }`
               : activeTab === 'dashboard2' && d2Wallpaper
-                ? (d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper)
+                ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
+                    d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper
+                  }`
                 : activeTab === 'inventories' && invWallpaper
-                  ? (invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper)
+                  ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
+                      invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper
+                    }`
                   : activeTab === 'tracking' && trackWallpaper
-                    ? (trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper)
+                    ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
+                        trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper
+                      }`
                     : activeTab === 'reports' && reportsWallpaper
-                      ? (reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper)
+                      ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
+                          reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper
+                        }`
                       : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -3135,7 +3145,11 @@ export default function Dashboard() {
           </header>
         )}
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible">
+        <div className={`flex-1 ${
+          (activeTab === 'dashboard1' || activeTab === 'dashboard2') 
+            ? 'overflow-y-auto lg:overflow-y-hidden lg:flex lg:flex-col lg:min-h-0' 
+            : 'overflow-y-auto'
+        } custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible`}>
 
           {activeTab === 'daily_tasks' && (
             <div className="w-full h-full animate-in fade-in duration-300">
@@ -3282,7 +3296,7 @@ export default function Dashboard() {
                     <button onClick={() => {
                       setInvForm({
                         date: new Date().toISOString().split('T')[0],
-                        chocolate: "10 rs 5 Star",
+                        chocolate: managedChocolates[0]?.name || "",
                         boxCount: "",
                         itemsPerBox: ""
                       });
@@ -3319,7 +3333,7 @@ export default function Dashboard() {
                                 <button onClick={() => {
                                   setInvForm({
                                     date: log.date || new Date().toISOString().split('T')[0],
-                                    chocolate: log.chocolate || "10 rs 5 Star",
+                                    chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
                                     boxCount: String(log.boxCount || ""),
                                     itemsPerBox: String(log.itemsPerBox || "")
                                   });
@@ -3342,7 +3356,7 @@ export default function Dashboard() {
 
           {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && (
             <div
-              className={`relative p-6 rounded-[2.5rem] transition-all duration-500 overflow-hidden ${isWallpaperActive ? 'wallpaper-active' : ''}`}
+              className={`relative p-6 rounded-[2.5rem] transition-all duration-500 overflow-hidden lg:flex-1 lg:min-h-0 lg:flex lg:flex-col ${isWallpaperActive ? 'wallpaper-active' : ''}`}
               style={{
                 background: activeTab === 'dashboard1'
                   ? (d1Wallpaper ? 'transparent' : '#fffcf9')
@@ -3352,8 +3366,12 @@ export default function Dashboard() {
               }}
             >
 
-              <div className="relative z-10 flex flex-col gap-6">
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${activeTab === 'dashboard1' ? 'lg:grid-cols-5' : 'lg:grid-cols-6'} gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
+              <div className="relative z-10 flex flex-col gap-6 lg:flex-1 lg:min-h-0">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${
+                  showHeader 
+                    ? (activeTab === 'dashboard1' ? 'lg:grid-cols-5' : 'lg:grid-cols-6') 
+                    : 'hidden'
+                } gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
 
                   <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                     <div className="flex justify-between items-start mb-3 relative z-10">
@@ -3485,7 +3503,7 @@ export default function Dashboard() {
 
                 </div>
 
-                <div ref={screenshotTableRef} className="bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-auto min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-8">
+                <div ref={screenshotTableRef} className="bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-2 lg:mb-0">
                   <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
 
 
@@ -3753,7 +3771,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-scroll max-h-[75vh]'}`}>
+                  <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
@@ -3897,12 +3915,12 @@ export default function Dashboard() {
                             </th>
                           )}
 
-                          <th className="py-3 px-4 font-extrabold text-[#d35400] bg-orange-100/80 rounded-t-lg shadow-sm border border-orange-200 print:bg-transparent print:border-none print:shadow-none print:text-black align-top min-w-[140px]">
+                          <th className="py-3 px-4 font-bold align-top min-w-[140px]">
                             <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-2">
                                 <span>Dispatch Date</span>
                                 <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Dispatch Date">
-                                  <ChevronDown size={14} className="text-orange-700/30 group-hover:text-orange-700 transition-opacity" />
+                                  <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
                                   <select
                                     value={sortConfig?.key === 'deliveryDate' ? sortConfig.direction : ""}
                                     onChange={(e) => {
@@ -3916,8 +3934,8 @@ export default function Dashboard() {
                                     <option value="asc">old to new</option>
                                   </select>
                                 </div>
-                                <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-orange-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
-                                  <Calendar size={16} className="text-orange-700 pointer-events-none" />
+                                <div className="relative inline-flex items-center justify-center w-7 h-7 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Select Dates">
+                                  <Calendar size={16} className="text-amber-700 pointer-events-none" />
                                   <input
                                     type="date"
                                     value=""
@@ -3933,7 +3951,7 @@ export default function Dashboard() {
                               {deliveryDates.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {deliveryDates.map(d => (
-                                    <span key={d} className="flex items-center gap-1 bg-white text-orange-800 border border-orange-300 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">
+                                    <span key={d} className="flex items-center gap-1 bg-white text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">
                                       {formatToDisplayDate(d)}
                                       <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => setDeliveryDates(deliveryDates.filter(dd => dd !== d))} />
                                     </span>
@@ -3987,15 +4005,11 @@ export default function Dashboard() {
                                   ) : (
                                     <>
                                       <option value="">All Chocolates</option>
-                                      <option value="10 rs 5 Star">10 rs 5 Star</option>
-                                      <option value="10 rs Kitkat">10 rs Kitkat</option>
-                                      <option value="10 rs Dairy Milk">10 rs Dairy Milk</option>
-                                      <option value="5 rs Peanut Candy">5 rs Peanut Candy</option>
-                                      <option value="5 rs 5 Star">5 rs 5 Star</option>
-                                      <option value="5 rs Dairy Milk">5 rs Dairy Milk</option>
-                                      <option value="2 rs Dairymilk Shots">2 rs Dairymilk Shots</option>
-                                      <option value="5 rs Milky Bar">5 rs Milky Bar</option>
-                                      <option value="1 rs Chocolate">1 rs Chocolate</option>
+                                      {managedChocolates.map((choc) => (
+                                        <option key={choc.fireId || choc.id} value={choc.name}>
+                                          {choc.name}
+                                        </option>
+                                      ))}
                                     </>
                                   )}
                                 </select>
@@ -4163,7 +4177,7 @@ export default function Dashboard() {
                                 </td>
 
                                 {!isScreenshotMode && (
-                                  <td className="py-2.5 px-3 text-right border-r border-amber-100 print:border-gray-400 print:text-black align-middle">
+                                  <td className="py-2.5 px-3 text-right print:text-black align-middle">
                                     <div className="font-medium text-amber-900">₹{priceData.chocolatePrice.toLocaleString()}</div>
                                   </td>
                                 )}
@@ -4226,10 +4240,10 @@ export default function Dashboard() {
                                 <td className="py-2.5 px-4 text-center align-middle">
                                   {isScreenshotMode ? (
                                     <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                      ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]'
+                                      ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] payment-badge-full-paid'
                                       : order.paymentStatus === 'Partially Paid'
-                                        ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]'
-                                        : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
+                                        ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] payment-badge-partially-paid'
+                                        : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] payment-badge-pending'
                                       }`}
                                     >
                                       {order.paymentStatus || 'Pending'}
@@ -4241,10 +4255,10 @@ export default function Dashboard() {
                                           value={order.paymentStatus || "Pending"}
                                           onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
                                           className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                            ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399]'
+                                            ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399] payment-badge-full-paid'
                                             : order.paymentStatus === 'Partially Paid'
-                                              ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c]'
-                                              : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171]'
+                                              ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c] payment-badge-partially-paid'
+                                              : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171] payment-badge-pending'
                                             }`}
                                         >
                                           <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
@@ -4264,8 +4278,8 @@ export default function Dashboard() {
                                         value={order.status}
                                         onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
-                                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400'
-                                          : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400'
+                                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400 status-badge-delivered'
+                                          : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400 status-badge-in-process'
                                           }`}
                                       >
                                         <option value="Delivered" className="font-bold text-green-700">Delivered</option>
@@ -4290,7 +4304,7 @@ export default function Dashboard() {
                                       <>
                                         <div className="fixed inset-0 z-40" onClick={() => setOpenActionId(null)}></div>
 
-                                        <div className="absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
+                                        <div className="action-menu-popup absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
                                           <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Send SMS Bill"><MessageSquare size={20} /></button>
                                           <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Shipping"><Truck size={20} /></button>
                                           <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
@@ -4475,7 +4489,7 @@ export default function Dashboard() {
                             {order.address && String(order.address).trim() !== "" && (
                               <div className="flex items-start gap-1.5 mt-1.5">
                                 <span className="text-sm font-medium text-amber-600 mt-0.5">Address:</span>
-                                <span className="text-xs font-bold text-amber-900 bg-amber-50/80 px-2 py-1 rounded border border-amber-200/50 break-words max-w-[200px] md:max-w-[280px]">
+                                <span className="address-badge text-xs font-bold text-amber-900 bg-amber-50/80 px-2 py-1 rounded border border-amber-200/50 break-words max-w-[200px] md:max-w-[280px]">
                                   {order.address}
                                 </span>
                               </div>
@@ -4487,12 +4501,12 @@ export default function Dashboard() {
                           <div className="relative pt-6 pb-2">
                             <div className="flex items-center justify-between relative z-10">
                               <div className="flex flex-col items-center">
-                                <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs border-4 border-white shadow-sm"><CheckCircle size={12} /></div>
+                                <div className="tracker-circle w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs border-4 border-white shadow-sm"><CheckCircle size={12} /></div>
                                 <span className="text-xs font-bold text-amber-900 mt-2">Placed</span>
                               </div>
                               <div className={`flex-1 h-1 mx-2 rounded ${order.status === 'Delivered' ? 'bg-amber-500' : 'bg-amber-100'}`}></div>
                               <div className="flex flex-col items-center">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border-4 border-white shadow-sm ${order.status === 'Delivered' ? 'bg-amber-500 text-white' : 'bg-amber-200 text-amber-700'}`}>{order.status === 'Delivered' ? <CheckCircle size={12} /> : <Clock size={12} />}</div>
+                                <div className={`tracker-circle w-6 h-6 rounded-full flex items-center justify-center text-xs border-4 border-white shadow-sm ${order.status === 'Delivered' ? 'bg-amber-500 text-white' : 'bg-amber-200 text-amber-700'}`}>{order.status === 'Delivered' ? <CheckCircle size={12} /> : <Clock size={12} />}</div>
                                 <span className={`text-xs font-bold mt-2 ${order.status === 'Delivered' ? 'text-amber-900' : 'text-amber-600'}`}>Delivery</span>
                               </div>
                             </div>
@@ -4503,12 +4517,12 @@ export default function Dashboard() {
                         </div>
 
                         <div className="shrink-0 w-full md:w-auto text-right md:text-left mt-2 md:mt-0 flex flex-col gap-2">
-                          <span className={`px-4 py-2 rounded-full text-sm font-bold border inline-block text-center ${order.status === 'Delivered' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]'}`}>
+                          <span className={`px-4 py-2 rounded-full text-sm font-bold border inline-block text-center ${order.status === 'Delivered' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] status-badge-delivered' : 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] status-badge-in-process'}`}>
                             {order.status}
                           </span>
-                          <span className={`px-4 py-1.5 rounded-full text-xs font-bold border inline-block text-center ${order.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
-                            order.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' :
-                              'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'
+                          <span className={`px-4 py-1.5 rounded-full text-xs font-bold border inline-block text-center ${order.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] payment-badge-full-paid' :
+                            order.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] payment-badge-partially-paid' :
+                              'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] payment-badge-pending'
                             }`}>
                             {order.paymentStatus || 'Pending'}
                           </span>
@@ -5086,15 +5100,11 @@ export default function Dashboard() {
                   className="w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-amber-950 shadow-inner cursor-pointer"
                 >
                   <option value="" disabled>Select chocolate...</option>
-                  <option value="10 rs 5 Star">10 rs 5 Star</option>
-                  <option value="10 rs Kitkat">10 rs Kitkat</option>
-                  <option value="10 rs Dairy Milk">10 rs Dairy Milk</option>
-                  <option value="5 rs Peanut Candy">5 rs Peanut Candy</option>
-                  <option value="5 rs 5 Star">5 rs 5 Star</option>
-                  <option value="5 rs Dairy Milk">5 rs Dairy Milk</option>
-                  <option value="2 rs Dairymilk Shots">2 rs Dairymilk Shots</option>
-                  <option value="5 rs Milky Bar">5 rs Milky Bar</option>
-                  <option value="1 rs Chocolate">1 rs Chocolate</option>
+                  {managedChocolates.map((choc) => (
+                    <option key={choc.fireId || choc.id} value={choc.name}>
+                      {choc.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -5627,7 +5637,7 @@ export default function Dashboard() {
                           <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.functionDate}</p>
                         </td>
                         <td colSpan={2} className="pl-4 pb-2 text-right pr-4">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74]' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]'}`}>{previewData.paymentStatus || 'Pending'}</span>
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.paymentStatus === 'Full Paid' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] payment-badge-full-paid' : previewData.paymentStatus === 'Partially Paid' ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] payment-badge-partially-paid' : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] payment-badge-pending'}`}>{previewData.paymentStatus || 'Pending'}</span>
                         </td>
 
                       </tr>
@@ -5648,7 +5658,7 @@ export default function Dashboard() {
                           <p className="text-[#3e2723] font-bold flex items-center gap-1 text-[11px]"><Calendar size={12} /> {previewData.deliveryDate || previewData.functionDate || previewData.orderDate || "-"}</p>
                         </td>
                         <td colSpan={2} className="pl-4 pb-2 text-right pr-4">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}>{previewData.status}</span>
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border mt-1 ${previewData.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-300 status-badge-delivered' : 'bg-amber-100 text-amber-700 border-amber-300 status-badge-in-process'}`}>{previewData.status}</span>
                         </td>
 
                       </tr>

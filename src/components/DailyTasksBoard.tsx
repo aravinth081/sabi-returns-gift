@@ -180,6 +180,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
+  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const scrollIntervalRef = useRef<any>(null);
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
@@ -793,7 +795,47 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     setTimeout(() => { target.style.opacity = '0.4'; }, 0);
   };
 
+  const handleBoardDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!boardContainerRef.current) return;
+
+    const container = boardContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const scrollThreshold = 100;
+    const maxScrollSpeed = 20;
+
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    if (x < scrollThreshold) {
+      const speed = Math.max(2, Math.round(((scrollThreshold - x) / scrollThreshold) * maxScrollSpeed));
+      scrollIntervalRef.current = setInterval(() => {
+        container.scrollLeft -= speed;
+      }, 16);
+    } else if (x > width - scrollThreshold) {
+      const speed = Math.max(2, Math.round(((x - (width - scrollThreshold)) / scrollThreshold) * maxScrollSpeed));
+      scrollIntervalRef.current = setInterval(() => {
+        container.scrollLeft += speed;
+      }, 16);
+    }
+  };
+
+  const handleBoardDragLeave = () => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  };
+
   const handleCardDragEnd = (e: React.DragEvent) => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
     const target = e.currentTarget as HTMLElement;
     target.style.opacity = '1';
     setDraggedCardId(null);
@@ -820,6 +862,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const handleCardDrop = (e: React.DragEvent, targetListId: string) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
 
     const sourceCardId = draggedCardId;
     const sourceListId = draggedSourceListId;
@@ -921,6 +968,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   };
 
   const handleListDragEnd = (e: React.DragEvent) => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
     const target = e.currentTarget as HTMLElement;
     target.style.opacity = '1';
     target.style.transform = '';
@@ -938,6 +989,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   const handleListDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
     const listId = draggedListId;
 
     setDraggedListId(null);
@@ -1293,7 +1348,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     >
       {/* Semi-transparent dark overlay for wallpaper readability */}
       {wallpaper && (
-        <div className="absolute inset-0 bg-slate-950/50 z-0 pointer-events-none" />
+        <div className="absolute inset-0 bg-slate-950/60 z-0 pointer-events-none" />
       )}
 
       {/* File Drag and Drop Overlay */}
@@ -1414,7 +1469,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
 
       {/* Trello Columns Horizontal Scroll */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 flex gap-4 items-start custom-scrollbar h-full min-h-[500px]">
+      <div 
+        ref={boardContainerRef}
+        onDragOver={handleBoardDragOver}
+        onDragLeave={handleBoardDragLeave}
+        className="flex-1 overflow-x-auto overflow-y-hidden pb-4 flex gap-4 items-start custom-scrollbar h-full min-h-[500px]"
+      >
         {lists.map((list, listIndex) => {
           const sortMode = sortPreferences[list.id] || 'default';
           let displayCards = getSortedCards(list.cards, sortMode);
@@ -1764,7 +1824,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         </div>
 
                         {/* Status Badge */}
-                        {card.status !== 'Waiting for Image' && card.status !== 'Order Completed' && (
+                        {card.status !== 'Waiting for Image' && card.status !== 'Order Completed' && card.status !== 'Image Edit Pending' && (
                           <div className="flex items-center shrink-0 mt-0.5">
                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusStyle(card.status)}`}>
                               {card.status}
