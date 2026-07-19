@@ -5108,30 +5108,34 @@ export default function Dashboard() {
                   </div>
 
                   {/* 🟢 NEW BOOK DROPDOWN TO TOGGLE ADMIN REPORTS */}
-                  <div className="relative">
+                  {!isInvAdmin && (
+                    <div className="relative">
+                      <button
+                        onClick={() => handleSetAdminReportMenuOpen(!currentAdminReportMenuOpen)}
+                        className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-amber-50 bg-white shadow-sm transition-all flex items-center gap-1.5"
+                      >
+                        <Book size={16} /> {currentAdminReportDash === 'None' ? 'Table View' : currentAdminReportDash} <ChevronDown size={14} />
+                      </button>
+                      {currentAdminReportMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-40 bg-white border border-[#d7ccc8] rounded-xl shadow-lg z-50 overflow-hidden">
+                          <button onClick={() => { handleSetAdminReportDash('None'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
+                          <button onClick={() => { handleSetAdminReportDash('Dashboard 1'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
+                          <button onClick={() => { handleSetAdminReportDash('Dashboard 2'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 2</button>
+                          <button onClick={() => { handleSetAdminReportDash('All'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">All Dashboards</button>
+
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!isInvAdmin && (
                     <button
-                      onClick={() => handleSetAdminReportMenuOpen(!currentAdminReportMenuOpen)}
-                      className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-amber-50 bg-white shadow-sm transition-all flex items-center gap-1.5"
+                      onClick={() => setShowApprovalPanel(true)}
+                      className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-amber-700 hover:bg-amber-50 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
                     >
-                      <Book size={16} /> {currentAdminReportDash === 'None' ? 'Table View' : currentAdminReportDash} <ChevronDown size={14} />
+                      <Lock size={16} /> Approvals ({employees.filter(e => e.status === 'Pending').length})
                     </button>
-                    {currentAdminReportMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-40 bg-white border border-[#d7ccc8] rounded-xl shadow-lg z-50 overflow-hidden">
-                        <button onClick={() => { handleSetAdminReportDash('None'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
-                        <button onClick={() => { handleSetAdminReportDash('Dashboard 1'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
-                        <button onClick={() => { handleSetAdminReportDash('Dashboard 2'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 2</button>
-                        <button onClick={() => { handleSetAdminReportDash('All'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">All Dashboards</button>
-
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => setShowApprovalPanel(true)}
-                    className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-amber-700 hover:bg-amber-50 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
-                  >
-                    <Lock size={16} /> Approvals ({employees.filter(e => e.status === 'Pending').length})
-                  </button>
+                  )}
 
                   <button
                     onClick={() => setActiveTab((activeTab as any) === 'inventories_admin_panel' ? 'inventories' : 'reports')}
