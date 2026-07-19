@@ -4,7 +4,7 @@ import {
   Plus, X, Upload, Pencil, Trash2, Phone, Calendar, 
   MessageSquare, ClipboardList, ShoppingBag, Trash,
   ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical,
-  Heart, Camera
+  Heart, Camera, FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
 // --- FIREBASE IMPORTS ---
@@ -20,6 +20,7 @@ export interface DailyTaskCard {
   birthdayDate: string;
   comments: string;
   favorite?: boolean;
+  importedFromFile?: string;
 }
 
 export interface DailyTaskList {
@@ -99,6 +100,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [isAddingCardListId, setIsAddingCardListId] = useState<string | null>(null);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<{ id: string; name: string; uploadedAt: string; count: number }[]>([]);
   
   // Card Selection State
   const [selectedCardIds, setSelectedCardIds] = useState<Record<string, string[]>>({});
@@ -339,6 +341,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     if (savedWallpaper) {
       setWallpaper(savedWallpaper);
     }
+    
+    // Load uploaded files list from cache
+    const savedFiles = localStorage.getItem('sabi_daily_tasks_uploaded_files');
+    if (savedFiles) {
+      try { setUploadedFiles(JSON.parse(savedFiles)); } catch (e) {
+        console.error('Failed to parse cached files list', e);
+      }
+    }
+
     // 1. Instant load from localStorage cache
     const savedLists = localStorage.getItem(STORAGE_KEY);
     if (savedLists) {
@@ -366,6 +377,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           setLists(data.lists);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data.lists));
         }
+        if (data.uploadedFiles) {
+          setUploadedFiles(data.uploadedFiles);
+          localStorage.setItem('sabi_daily_tasks_uploaded_files', JSON.stringify(data.uploadedFiles));
+        } else {
+          setUploadedFiles([]);
+          localStorage.removeItem('sabi_daily_tasks_uploaded_files');
+        }
         if (data.sortPreferences) {
           setSortPreferences(data.sortPreferences);
           localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(data.sortPreferences));
@@ -375,6 +393,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         // First time: save default data to Firestore
         setDoc(boardDocRef, {
           lists: DEFAULT_LISTS,
+          uploadedFiles: [],
           sortPreferences: {},
           updatedAt: new Date().toISOString()
         }).catch(err => console.error('Failed to init Firestore board:', err));
@@ -387,28 +406,42 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     return () => unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Local undo stack for DailyTasksBoard
+  // Local undo/redo stacks for DailyTasksBoard
   const undoStackRef = useRef<DailyTaskList[][]>([]);
+  const redoStackRef = useRef<DailyTaskList[][]>([]);
 
   // Save to both Firestore and localStorage
-  const saveLists = useCallback((updatedLists: DailyTaskList[], isUndo = false) => {
-    if (!isUndo) {
+  const saveLists = useCallback((updatedLists: DailyTaskList[], isUndoOrRedo = false, newFilesList?: typeof uploadedFiles) => {
+    if (!isUndoOrRedo) {
       undoStackRef.current.push(JSON.parse(JSON.stringify(lists)));
       if (undoStackRef.current.length > 20) {
         undoStackRef.current.shift();
       }
+      redoStackRef.current = []; // Clear redo stack on new action
     }
     setLists(updatedLists);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLists));
+
+    const filesToSave = newFilesList !== undefined ? newFilesList : uploadedFiles;
+    if (newFilesList !== undefined) {
+      setUploadedFiles(newFilesList);
+      localStorage.setItem('sabi_daily_tasks_uploaded_files', JSON.stringify(newFilesList));
+    }
+
+    // Clean any undefined values before saving to Firestore to prevent serialization errors
+    const cleanedLists = JSON.parse(JSON.stringify(updatedLists));
+    const cleanedFiles = JSON.parse(JSON.stringify(filesToSave));
+
     // Save to Firestore
     setDoc(boardDocRef, {
-      lists: updatedLists,
+      lists: cleanedLists,
+      uploadedFiles: cleanedFiles,
       updatedAt: new Date().toISOString()
     }, { merge: true }).catch(err => {
       console.error('Failed to save lists to Firestore:', err);
       toast.error('Failed to sync to database');
     });
-  }, [lists]);
+  }, [lists, uploadedFiles]);
 
   const saveSortPreferences = useCallback((prefs: Record<string, SortMode>) => {
     setSortPreferences(prefs);
@@ -423,12 +456,16 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     });
   }, []);
 
-  // Listen to global undo events from Dashboard
+  // Listen to global undo/redo events from Dashboard
   useEffect(() => {
     const handleUndoEvent = () => {
       if (undoStackRef.current.length > 0) {
         const prev = undoStackRef.current.pop();
         if (prev) {
+          redoStackRef.current.push(JSON.parse(JSON.stringify(lists)));
+          if (redoStackRef.current.length > 20) {
+            redoStackRef.current.shift();
+          }
           saveLists(prev, true);
           toast.success("Board action undone!");
         }
@@ -437,11 +474,29 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       }
     };
 
+    const handleRedoEvent = () => {
+      if (redoStackRef.current.length > 0) {
+        const next = redoStackRef.current.pop();
+        if (next) {
+          undoStackRef.current.push(JSON.parse(JSON.stringify(lists)));
+          if (undoStackRef.current.length > 20) {
+            undoStackRef.current.shift();
+          }
+          saveLists(next, true);
+          toast.success("Board action redone!");
+        }
+      } else {
+        toast.info("No recent board actions to redo");
+      }
+    };
+
     window.addEventListener('sabi-daily-tasks-undo', handleUndoEvent);
+    window.addEventListener('sabi-daily-tasks-redo', handleRedoEvent);
     return () => {
       window.removeEventListener('sabi-daily-tasks-undo', handleUndoEvent);
+      window.removeEventListener('sabi-daily-tasks-redo', handleRedoEvent);
     };
-  }, [saveLists]);
+  }, [saveLists, lists]);
 
   // Sort cards by birthday or favorites
   const getSortedCards = useCallback((cards: DailyTaskCard[], sortMode: SortMode): DailyTaskCard[] => {
@@ -1095,6 +1150,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           return;
         }
 
+        const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const fileName = file.name;
+        const uploadedAt = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
         const getPhoneValue = (row: any) => {
           const keys = Object.keys(row);
           for (const key of keys) {
@@ -1267,7 +1326,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             chocolateCount: '',
             birthdayDate: '',
             comments: '',
-            favorite: isImportant ? true : undefined
+            favorite: isImportant ? true : undefined,
+            importedFromFile: fileId
           };
 
           const targetTitle = updatedLists[targetListIndex].title.toLowerCase().trim();
@@ -1288,7 +1348,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           }
         });
 
-        saveLists(updatedLists);
+        const newFileEntry = {
+          id: fileId,
+          name: fileName,
+          uploadedAt,
+          count: importCount
+        };
+        const updatedFilesList = [...uploadedFiles, newFileEntry];
+
+        saveLists(updatedLists, false, updatedFilesList);
         logActivity(`Uploaded Excel file to Daily Tasks board, added/moved ${importCount} cards`);
         toast.success(`Import complete: Added/Moved ${importCount} cards! (Skipped ${skipDuplicateCount} duplicates in same lists, ${skipMissingCount} invalid numbers)`);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1298,6 +1366,18 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleDeleteUploadedFile = (fileId: string) => {
+    if (window.confirm("Are you sure you want to delete this file and all new cards imported from it?")) {
+      const updatedFilesList = uploadedFiles.filter(f => f.id !== fileId);
+      const updatedLists = lists.map(list => ({
+        ...list,
+        cards: list.cards.filter((card: any) => card.importedFromFile !== fileId)
+      }));
+      saveLists(updatedLists, false, updatedFilesList);
+      toast.success("Uploaded file and its imported cards deleted!");
+    }
   };
 
   // ==================== HELPERS ====================
@@ -1465,8 +1545,35 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                <Heart size={16} fill={showFavoritesOnly ? "currentColor" : "none"} className={showFavoritesOnly ? "text-white" : "text-white/60"} />
                <span>Favorites</span>
              </button>
-          </div>
         </div>
+      </div>
+
+      {/* Uploaded Files Chips */}
+      {uploadedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2.5 mb-5 shrink-0 print:hidden relative z-10 animate-in fade-in duration-300">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 backdrop-blur-md rounded-xl border border-blue-500/20 text-xs font-bold text-blue-200 select-none">
+            <FileSpreadsheet size={14} className="text-blue-300" />
+            <span className="uppercase tracking-wider">Uploaded Excel Leads:</span>
+          </div>
+          {uploadedFiles.map(file => (
+            <div 
+              key={file.id} 
+              className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 backdrop-blur-md text-white rounded-xl border border-white/10 text-xs font-semibold shadow-md transition-all hover:-translate-y-0.5"
+            >
+              <FileSpreadsheet size={13} className="text-emerald-400" />
+              <span className="max-w-[160px] truncate" title={`${file.name} - uploaded at ${file.uploadedAt}`}>{file.name}</span>
+              <span className="text-[10px] text-blue-200/50 font-normal">({file.count} cards)</span>
+              <button
+                onClick={() => handleDeleteUploadedFile(file.id)}
+                className="p-1 hover:bg-rose-500/25 rounded-lg text-rose-300 hover:text-rose-100 transition-colors ml-1"
+                title="Delete this import and its cards"
+              >
+                <Trash size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Trello Columns Horizontal Scroll */}
       <div 

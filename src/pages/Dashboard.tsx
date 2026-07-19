@@ -113,7 +113,7 @@ const normalizeChocName = (name: string, dynamicInventory: string[] = []) => {
 const calculatePriceInfo = (chocolateString: string, count: number | string, discountValue: number | string = 0, isDeliveryFree: boolean = false, paymentStatus: string = "Full Paid", category: string = "chocolate", customPricesMap: Record<string, number> = {}, manualDeliveryFee: number | string = 0, orderStatus: string = "", managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {}, pricingType: 'retail' | 'wholesale' = 'retail', manualProductPrice: number | string = 0) => {
 
   const quantity = Number(count) || 0;
-  if (!chocolateString || quantity === 0) return { unitPrice: 0, chocolatePrice: 0, deliveryCharge: 0, discount: 0, totalPrice: 0, revenue: 0, fullChocolatePrice: 0, fullDeliveryCharge: 0, fullTotalPrice: 0 };
+  if (!chocolateString || quantity === 0) return { unitPrice: 0, chocolatePrice: 0, deliveryCharge: 0, discount: 0, totalPrice: 0, revenue: 0, fullChocolatePrice: 0, fullDeliveryCharge: 0, fullTotalPrice: 0, fullRevenue: 0 };
 
   const chocs = String(chocolateString).split(',').map(c => c.trim()).filter(Boolean);
   let sumPrice = 0;
@@ -163,16 +163,70 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
   const discount = Math.round(baseDiscountAmt * multiplier);
   const finalTotal = Math.round(rawTotal * multiplier);
 
+  const rawRevenue = Math.max(0, baseChocolatePrice - baseDiscountAmt);
+  const revenue = Math.round(rawRevenue * multiplier);
+  const fullRevenue = Math.round(rawRevenue);
+
   return {
     unitPrice: Number(unitPrice.toFixed(2)),
     chocolatePrice,
     deliveryCharge,
     discount,
     totalPrice: finalTotal,
-    revenue: finalTotal,
+    revenue,
     fullChocolatePrice: Math.round(baseChocolatePrice),
     fullDeliveryCharge: Math.round(baseDeliveryCharge),
-    fullTotalPrice: Math.round(rawTotal)
+    fullTotalPrice: Math.round(rawTotal),
+    fullRevenue
+  };
+};
+
+
+const calculateOrderFinalCost = (
+  order: any,
+  managedChocPricesMap: Record<string, { retail: number; wholesale: number }>,
+  managedChocStickersMap: Record<string, number>,
+  customPricesMap: Record<string, number>
+) => {
+  const count = Number(order.count) || 0;
+  const category = order.category || "chocolate";
+  const chocolateName = order.chocolate || "N/A";
+
+  let purchasePricePerItem = 0;
+  if (category === 'product') {
+    const key = String(order.chocolate || "").toLowerCase();
+    const baseProductPrice = Number(order.manualProductPrice) || customPricesMap[key] || 0;
+    purchasePricePerItem = baseProductPrice * 0.7;
+  } else {
+    const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
+    let sumPurchase = 0;
+    chocs.forEach(c => {
+      const key = c.toLowerCase();
+      sumPurchase += (managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0);
+    });
+    purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
+  }
+
+  const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
+  let sumSticker = 0;
+  chocs.forEach(c => {
+    const key = c.toLowerCase();
+    sumSticker += (managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5);
+  });
+  const stickerPricePerItem = chocs.length > 0 ? sumSticker / chocs.length : 1.5;
+
+  const stickerCost = count * stickerPricePerItem;
+  const labourCost = count * 1;
+  const totalPurchase = purchasePricePerItem * count;
+  const finalCost = stickerCost + labourCost + totalPurchase;
+
+  return {
+    purchasePricePerItem,
+    stickerPricePerItem,
+    stickerCost,
+    labourCost,
+    totalPurchase,
+    finalCost
   };
 };
 
@@ -990,10 +1044,17 @@ export default function Dashboard() {
     });
   };
 
-  // Local Undo Stack
+  // Local Undo and Redo Stacks
   const undoStackRef = useRef<{
     type: string;
     undo: () => Promise<void>;
+    redo: () => Promise<void>;
+  }[]>([]);
+
+  const redoStackRef = useRef<{
+    type: string;
+    undo: () => Promise<void>;
+    redo: () => Promise<void>;
   }[]>([]);
 
   useEffect(() => {
@@ -1388,26 +1449,13 @@ export default function Dashboard() {
       const chocolateName = order.chocolate || "N/A";
       const count = Number(order.count) || 0;
 
-      const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
-      let sumPurchase = 0;
-      chocs.forEach(c => {
-        const key = c.toLowerCase();
-        sumPurchase += (managedChocCostsMap[key] || CHOCOLATE_PURCHASE_MAP[key] || 0);
-      });
-
-      const purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
-
-      let sumSticker = 0;
-      chocs.forEach(c => {
-        const key = c.toLowerCase();
-        sumSticker += (managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5);
-      });
-      const stickerPricePerItem = chocs.length > 0 ? sumSticker / chocs.length : 1.5;
-
-      const stickerCost = count * stickerPricePerItem;
-      const labourCost = count * 1;
-      const totalPurchase = purchasePricePerItem * count;
-      const finalCost = stickerCost + labourCost + totalPurchase;
+      const {
+        purchasePricePerItem,
+        stickerCost,
+        labourCost,
+        totalPurchase,
+        finalCost
+      } = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
 
       return { serialNo, deliveryDate, chocolateName, purchasePricePerItem, count, stickerCost, labourCost, totalPurchase, finalCost };
     });
@@ -1424,7 +1472,7 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, adminDateRange, adminDateType, managedChocCostsMap, managedChocStickersMap]);
+  }, [orders, adminDateRange, adminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
@@ -1462,7 +1510,7 @@ export default function Dashboard() {
 
     baseOrders.forEach(order => {
       const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
-      totalRev += priceInfo.fullTotalPrice;
+      totalRev += priceInfo.fullRevenue;
       totalItems += Number(order.count || 0);
       totalDelivery += priceInfo.deliveryCharge;
 
@@ -1574,21 +1622,12 @@ export default function Dashboard() {
     filtered.forEach(order => {
       if (order.status === "Delivered" || order.status === "In Process") {
         const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
-        totalRev += priceInfo.fullTotalPrice;
+        totalRev += priceInfo.fullRevenue;
         totalItems += Number(order.count || 0);
         totalDelivery += priceInfo.deliveryCharge;
 
-        let cost = 0;
-        if (order.category !== 'product') {
-          const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
-          const qty = Number(order.count || 0);
-          chocs.forEach(c => {
-            cost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1);
-          });
-        } else {
-          cost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
-        }
-        totalCost += cost;
+        const costInfo = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
+        totalCost += costInfo.finalCost;
 
         if (order.chocolate) {
           String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
@@ -1611,12 +1650,12 @@ export default function Dashboard() {
       totalCost,
       totalProfit: totalRev - totalCost
     };
-  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, managedChocCostsMap, managedChocPricesMap]);
+  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, managedChocPricesMap, managedChocStickersMap]);
 
   const displayRevenue = useMemo(() => {
     return filteredDashboardOrders.reduce((sum, o) => {
       const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
-      return sum + priceInfo.totalPrice;
+      return sum + priceInfo.revenue;
     }, 0);
   }, [filteredDashboardOrders, customPricesMap, managedChocPricesMap]);
 
@@ -1714,8 +1753,22 @@ export default function Dashboard() {
                 await deleteDoc(doc(db, "trash_orders", rec.trashFireId));
               }
               logActivity(`Restored ${deletedRecords.length} bulk deleted orders`, 'Trash Bin');
+            },
+            redo: async () => {
+              for (const rec of deletedRecords) {
+                const trashOrder = {
+                  ...rec.originalOrderData,
+                  deletedAt: Date.now(),
+                  deletedBy: role ? `${role} (${loggedInName})` : loggedInName
+                };
+                delete (trashOrder as any).fireId;
+                await setDoc(doc(db, "trash_orders", rec.trashFireId), trashOrder);
+                await deleteDoc(doc(db, "orders", rec.originalFireId));
+              }
+              logActivity(`Deleted ${deletedRecords.length} bulk orders via Redo`, 'Bulk Action');
             }
           });
+          redoStackRef.current = [];
           toast.success(`Moved ${deletedRecords.length} orders to trash. Press Ctrl+Z to undo.`);
         }
         
@@ -1996,8 +2049,20 @@ export default function Dashboard() {
               await setDoc(doc(db, "orders", originalFireId), originalOrderData);
               await deleteDoc(doc(db, "trash_orders", trashFireId));
               logActivity(`Restored Order: ${order.name}`, 'Trash Bin');
+            },
+            redo: async () => {
+              const trashOrder = {
+                ...originalOrderData,
+                deletedAt: Date.now(),
+                deletedBy: role ? `${role} (${loggedInName})` : loggedInName
+              };
+              delete (trashOrder as any).fireId;
+              await setDoc(doc(db, "trash_orders", trashFireId), trashOrder);
+              await deleteDoc(doc(db, "orders", originalFireId));
+              logActivity(`Deleted Order: ${order.name} via Redo`, order.category === 'product' ? 'Order Management (Products)' : 'Order Management (Chocolates)');
             }
           });
+          redoStackRef.current = [];
 
           toast.success("Order moved to trash", {
             action: {
@@ -2190,29 +2255,70 @@ export default function Dashboard() {
 
   useEffect(() => {
     const handleGlobalKeyDown = async (e: KeyboardEvent) => {
-      // Check if Ctrl + Z (or Cmd + Z on Mac) is pressed
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        const activeEl = document.activeElement;
-        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-          // Allow native undo to work in text boxes/inputs
-          return;
-        }
-        
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        // Allow native undo/redo to work in text boxes/inputs
+        return;
+      }
+
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      const isZ = e.key.toLowerCase() === 'z';
+      const isY = e.key.toLowerCase() === 'y';
+
+      // 1. Check REDO shortcut: Ctrl + Shift + Z OR Ctrl + Y
+      if ((isCtrlOrCmd && e.shiftKey && isZ) || (isCtrlOrCmd && isY)) {
         e.preventDefault();
 
-        // If we are currently on the Daily Tasks tab, let's trigger the undo for Daily Tasks!
+        // If Daily Tasks is active, dispatch redo event
+        if (activeTab === 'daily_tasks') {
+          const event = new CustomEvent('sabi-daily-tasks-redo');
+          window.dispatchEvent(event);
+          return;
+        }
+
+        if (redoStackRef.current.length > 0) {
+          const lastAction = redoStackRef.current.pop();
+          if (lastAction) {
+            toast.loading("Redoing last action...", { id: "global-redo" });
+            try {
+              await lastAction.redo();
+              undoStackRef.current.push(lastAction);
+              if (undoStackRef.current.length > 20) {
+                undoStackRef.current.shift();
+              }
+              toast.success("Action redone successfully!", { id: "global-redo" });
+            } catch (err) {
+              console.error("Redo failed:", err);
+              toast.error("Failed to redo last action", { id: "global-redo" });
+            }
+          }
+        } else {
+          toast.info("No recent actions found to redo", { id: "global-redo" });
+        }
+        return;
+      }
+
+      // 2. Check UNDO shortcut: Ctrl + Z (without Shift)
+      if (isCtrlOrCmd && !e.shiftKey && isZ) {
+        e.preventDefault();
+
+        // If Daily Tasks is active, dispatch undo event
         if (activeTab === 'daily_tasks') {
           const event = new CustomEvent('sabi-daily-tasks-undo');
           window.dispatchEvent(event);
           return;
         }
-        
+
         if (undoStackRef.current.length > 0) {
           const lastAction = undoStackRef.current.pop();
           if (lastAction) {
             toast.loading("Undoing last action...", { id: "global-undo" });
             try {
               await lastAction.undo();
+              redoStackRef.current.push(lastAction);
+              if (redoStackRef.current.length > 20) {
+                redoStackRef.current.shift();
+              }
               toast.success("Action undone successfully!", { id: "global-undo" });
             } catch (err) {
               console.error("Undo failed:", err);
@@ -2273,8 +2379,13 @@ export default function Dashboard() {
           undo: async () => {
             await setDoc(doc(db, "trash_orders", fireId), originalTrashData);
             logActivity(`Undid Action: Restored Permanent Deleted Order to Trash: ${orderToDelete.name}`, 'Trash Bin');
+          },
+          redo: async () => {
+            await deleteDoc(doc(db, "trash_orders", fireId));
+            logActivity(`Redid Action: Permanently Deleted Order from Trash: ${orderToDelete.name}`, 'Trash Bin');
           }
         });
+        redoStackRef.current = [];
 
         toast.success(`Permanently deleted order for ${orderToDelete.name}. Press Ctrl+Z to undo.`);
       } catch (err) {
@@ -2333,8 +2444,18 @@ export default function Dashboard() {
               delete restored.fireId;
               Object.keys(restored).forEach(key => restored[key] === undefined && delete restored[key]);
               await setDoc(doc(db, "orders", fid), restored);
+              logActivity(`Restored Order: ${previousOrder.name} (${previousOrder.chocolate || 'Product'} x${previousOrder.count})`, moduleName);
+            },
+            redo: async () => {
+              const updatedData = { ...formattedOrder };
+              const fid = formData.fireId;
+              delete (updatedData as any).fireId;
+              Object.keys(updatedData).forEach(key => updatedData[key] === undefined && delete updatedData[key]);
+              await setDoc(doc(db, "orders", fid), updatedData);
+              logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count}) via Redo`, moduleName);
             }
           });
+          redoStackRef.current = [];
         }
       } else {
         const nextId = orders.length > 0 ? Math.max(...orders.map(o => Number(o.id) || 0)) + 1 : 1;
@@ -2353,8 +2474,17 @@ export default function Dashboard() {
           type: 'ADD_ORDER',
           undo: async () => {
             await deleteDoc(doc(db, "orders", newDocRef.id));
+            logActivity(`Undid Action: Removed Added Order: ${formData.name}`, moduleName);
+          },
+          redo: async () => {
+            const addedOrder = { ...formattedOrder };
+            delete (addedOrder as any).fireId;
+            Object.keys(addedOrder).forEach(key => addedOrder[key] === undefined && delete addedOrder[key]);
+            await setDoc(doc(db, "orders", newDocRef.id), addedOrder);
+            logActivity(`Added New Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count}) via Redo`, moduleName);
           }
         });
+        redoStackRef.current = [];
       }
 
       setIsModalOpen(false);
@@ -2460,8 +2590,13 @@ export default function Dashboard() {
             undo: async () => {
               await setDoc(doc(db, "products", fireId), originalProdData);
               logActivity(`Restored Product: ${prod?.name || 'Unknown'}`, 'Products');
+            },
+            redo: async () => {
+              await deleteDoc(doc(db, "products", fireId));
+              logActivity(`Deleted Product: ${prod?.name || 'Unknown'} via Redo`, 'Products');
             }
           });
+          redoStackRef.current = [];
         } catch (e) {
           console.error("Failed to delete product:", e);
         }
@@ -2486,8 +2621,13 @@ export default function Dashboard() {
           undo: async () => {
             await setDoc(doc(db, "managed_chocolates", fireId), originalChocData);
             logActivity(`Restored Chocolate: ${choc.name}`, 'Chocolates');
+          },
+          redo: async () => {
+            await deleteDoc(doc(db, "managed_chocolates", fireId));
+            logActivity(`Deleted Chocolate: ${choc.name} via Redo`, 'Chocolates');
           }
         });
+        redoStackRef.current = [];
       } catch (err) {
         console.error("Failed to delete chocolate:", err);
       }
@@ -6890,20 +7030,8 @@ export default function Dashboard() {
                   {reportData.filteredOrders.map((order: any) => {
                     const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
-                    // Calculate Total Cost
-                    let totalCost = 0;
-                    if (order.category !== 'product') {
-                      const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
-                      const qty = Number(order.count || 0);
-                      chocs.forEach(c => {
-                        totalCost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1);
-                      });
-                    } else {
-                      // For products, assume 70% of price is cost if not defined
-                      totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
-                    }
-
-                    const profit = priceInfo.fullTotalPrice - totalCost;
+                    const costInfo = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
+                    const profit = priceInfo.fullRevenue - costInfo.finalCost;
 
                     return (
                       <tr key={order.fireId} className="border-b border-emerald-50 hover:bg-emerald-50/30 transition-colors">
@@ -6911,8 +7039,8 @@ export default function Dashboard() {
                         <td className="p-4 text-xs font-black text-emerald-800">{getSerial(order.id)}</td>
                         <td className="p-4 text-sm font-bold text-gray-800">{order.name}</td>
                         <td className="p-4 text-sm font-black text-center text-emerald-700">{order.count}</td>
-                        <td className="p-4 text-sm font-black text-right text-green-700">₹{priceInfo.fullTotalPrice.toLocaleString()}</td>
-                        <td className="p-4 text-sm font-bold text-right text-red-600">₹{Math.round(totalCost).toLocaleString()}</td>
+                        <td className="p-4 text-sm font-black text-right text-green-700">₹{priceInfo.fullRevenue.toLocaleString()}</td>
+                        <td className="p-4 text-sm font-bold text-right text-red-600">₹{Math.round(costInfo.finalCost).toLocaleString()}</td>
                         <td className={`p-4 text-sm font-black text-right ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>₹{Math.round(profit).toLocaleString()}</td>
                       </tr>
                     );
@@ -6928,31 +7056,11 @@ export default function Dashboard() {
               </div>
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
                 <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Cost</p>
-                <p className="text-xl font-black text-red-600">₹{Math.round(reportData.filteredOrders.reduce((acc: any, order: any) => {
-                  let totalCost = 0;
-                  if (order.category !== 'product') {
-                    const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
-                    const qty = Number(order.count || 0);
-                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1); });
-                  } else {
-                    totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
-                  }
-                  return acc + totalCost;
-                }, 0)).toLocaleString()}</p>
+                <p className="text-xl font-black text-red-600">₹{Math.round(reportData.totalCost).toLocaleString()}</p>
               </div>
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
                 <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Net Profit</p>
-                <p className="text-xl font-black text-emerald-600">₹{Math.round(reportData.totalRev - reportData.filteredOrders.reduce((acc: any, order: any) => {
-                  let totalCost = 0;
-                  if (order.category !== 'product') {
-                    const chocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase());
-                    const qty = Number(order.count || 0);
-                    chocs.forEach(c => { totalCost += (managedChocCostsMap[c] || 0) * qty / (chocs.length || 1); });
-                  } else {
-                    totalCost = (customPricesMap[order.chocolate?.toLowerCase()] || 0) * 0.7 * Number(order.count || 0);
-                  }
-                  return acc + totalCost;
-                }, 0)).toLocaleString()}</p>
+                <p className="text-xl font-black text-emerald-600">₹{Math.round(reportData.totalProfit).toLocaleString()}</p>
               </div>
             </div>
           </div>
