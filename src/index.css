@@ -1189,3 +1189,47 @@ main {
 .wallpaper-active .screenshot-mode-active .current-inventory-value-card .choc-value-badge-text {
   color: #8b5a2b !important;
 }
+
+/* ==================== APPROXIMATE PROFIT CARD ==================== */
+.approximate-profit-card,
+.wallpaper-active .approximate-profit-card {
+  background-color: #f4faf6 !important;
+  background: #f4faf6 !important;
+  border: 1px solid #ccebd6 !important;
+}
+
+.approximate-profit-card .choc-grid-item,
+.wallpaper-active .approximate-profit-card .choc-grid-item {
+  background-color: #f7fcf9 !important;
+  background: #f7fcf9 !important;
+  border: 1px solid #ccebd6 !important;
+}
+
+.approximate-profit-card p,
+.wallpaper-active .approximate-profit-card p {
+  color: #1b5e20 !important;
+  text-shadow: none !important;
+}
+
+.approximate-profit-card .grand-total-text,
+.wallpaper-active .approximate-profit-card .grand-total-text {
+  color: #1b5e20 !important;
+  text-shadow: none !important;
+}
+
+.approximate-profit-card .choc-name-badge-text,
+.wallpaper-active .approximate-profit-card .choc-name-badge-text {
+  color: #1b5e20 !important;
+  text-shadow: none !important;
+}
+
+.approximate-profit-card .choc-detail-badge-text,
+.wallpaper-active .approximate-profit-card .choc-detail-badge-text {
+  color: #2e7d32 !important;
+}
+
+.approximate-profit-card .choc-value-badge-text,
+.wallpaper-active .approximate-profit-card .choc-value-badge-text {
+  color: #2e7d32 !important;
+  font-weight: 900 !important;
+}

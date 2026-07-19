@@ -1290,6 +1290,52 @@ export default function Dashboard() {
     return { items, grandTotal: totalVal };
   }, [dynamicInventory, inventoryBalances, managedChocPricesMap]);
 
+  const allTimeProfitData = useMemo(() => {
+    let totalRev = 0;
+    let totalCost = 0;
+    const chocProfitMap: Record<string, number> = {};
+
+    orders.forEach(order => {
+      if (order.orderStatus === 'cancelled') return;
+      if (order.status === "Delivered" || order.status === "In Process") {
+        const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
+        const costInfo = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
+
+        const profit = priceInfo.fullRevenue - costInfo.finalCost;
+        totalRev += priceInfo.fullRevenue;
+        totalCost += costInfo.finalCost;
+
+        if (order.chocolate) {
+          const chocs = String(order.chocolate).split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean);
+          chocs.forEach((chocName) => {
+            chocProfitMap[chocName] = (chocProfitMap[chocName] || 0) + (profit / chocs.length);
+          });
+        }
+      }
+    });
+
+    return {
+      totalProfit: totalRev - totalCost,
+      chocProfitMap
+    };
+  }, [orders, customPricesMap, managedChocPricesMap, managedChocStickersMap]);
+
+  const approximateProfitData = useMemo(() => {
+    const items = currentInventoryValueData.items.map(item => {
+      const profit = allTimeProfitData.chocProfitMap[item.name.toLowerCase()] || 0;
+      const value = item.value + profit;
+      return {
+        name: item.name,
+        profit,
+        invValue: item.value,
+        value
+      };
+    });
+
+    const grandTotal = currentInventoryValueData.grandTotal + allTimeProfitData.totalProfit;
+    return { items, grandTotal };
+  }, [currentInventoryValueData, allTimeProfitData]);
+
   const trackedSalesResult = useMemo(() => {
     if (!salesTrackerChoc) return { count: 0, revenue: 0 };
     let count = 0;
@@ -3575,6 +3621,38 @@ export default function Dashboard() {
                                   </span>
                                   <span className="choc-value-badge-text text-[11px] font-black text-[#8b5a2b]">
                                     ₹{item.value.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Approximate Profit Card */}
+                      <div className="current-inventory-value-card approximate-profit-card p-4 rounded-xl shadow-sm flex flex-col transition-all duration-300">
+                        <p className="text-xs font-black uppercase tracking-wider mb-1 text-center">
+                          Approximate Profit
+                        </p>
+                        <p className="grand-total-text text-3xl font-black text-center mb-3">
+                          ₹{Math.round(approximateProfitData.grandTotal).toLocaleString()}
+                        </p>
+                        <div className="border-t border-[#ccebd6] pt-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-2">
+                            Approximate Profit Breakdown
+                          </p>
+                          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                            {approximateProfitData.items.map((item, idx) => (
+                              <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
+                                <span className="choc-name-badge-text text-[11px] font-black truncate leading-tight" title={item.name}>
+                                  {item.name}
+                                </span>
+                                <div className="flex justify-between items-baseline mt-1">
+                                  <span className="choc-detail-badge-text text-[10px] font-bold whitespace-nowrap">
+                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()}
+                                  </span>
+                                  <span className="choc-value-badge-text text-[11px] font-black">
+                                    ₹{Math.round(item.value).toLocaleString()}
                                   </span>
                                 </div>
                               </div>
