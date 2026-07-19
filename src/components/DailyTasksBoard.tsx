@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { 
-  Plus, X, Upload, Pencil, Trash2, Phone, Calendar, 
+  Plus, X, Upload, Pencil, Trash2, Phone, Calendar as CalendarIcon, 
   MessageSquare, ClipboardList, ShoppingBag, Trash,
   ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical,
   Heart, Camera, FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 // --- FIREBASE IMPORTS ---
 import { doc, setDoc, getDoc, onSnapshot, arrayUnion, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -90,6 +92,14 @@ const DEFAULT_LISTS: DailyTaskList[] = [
   { id: 'list-completed', title: 'Order Completed', cards: [] }
 ];
 
+const formatDateToDDMMYYYY = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  return `${day}-${month}-${year}`;
+};
+
 const STORAGE_KEY = 'sabi_daily_tasks_board';
 const SORT_STORAGE_KEY = 'sabi_daily_tasks_sort';
 
@@ -100,6 +110,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [isAddingCardListId, setIsAddingCardListId] = useState<string | null>(null);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [selectedFilterDate, setSelectedFilterDate] = useState<string>("");
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<{ id: string; name: string; uploadedAt: string; count: number }[]>([]);
   
   // Card Selection State
@@ -1454,6 +1466,72 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           </div>
 
           <div className="flex items-center gap-2.5">
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <button 
+                  onClick={() => setIsCalendarOpen(true)}
+                  className="flex items-center bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl border border-white/20 hover:border-white/40 transition-all shadow-lg px-4 py-2 gap-2.5 h-[42px] shrink-0 select-none outline-none focus:ring-2 focus:ring-emerald-400/50 cursor-pointer"
+                >
+                  <CalendarIcon size={16} className={`${selectedFilterDate ? 'text-emerald-400' : 'text-slate-300'} shrink-0 transition-colors`} />
+                  <span className={`text-[13px] font-semibold tracking-wide ${selectedFilterDate ? 'text-emerald-400 font-bold' : 'text-slate-200'}`}>
+                    {selectedFilterDate ? formatDateToDDMMYYYY(selectedFilterDate) : "Filter Date"}
+                  </span>
+                  {selectedFilterDate && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFilterDate('');
+                      }}
+                      className="ml-0.5 p-0.5 hover:bg-white/25 rounded-full text-emerald-400/80 hover:text-emerald-400 transition-all flex items-center justify-center shrink-0"
+                      title="Clear Date Filter"
+                    >
+                      <X size={12} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-white border border-slate-200 text-slate-900 shadow-xl rounded-xl z-[1000] sabi-calendar-popover" align="end">
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedFilterDate ? new Date(selectedFilterDate + 'T00:00:00') : undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      const yyyy = date.getFullYear();
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      setSelectedFilterDate(`${yyyy}-${mm}-${dd}`);
+                    } else {
+                      setSelectedFilterDate('');
+                    }
+                    setIsCalendarOpen(false);
+                  }}
+                  className="rounded-xl border-none p-3 bg-white"
+                  classNames={{
+                    months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                    month: "space-y-4",
+                    caption: "flex justify-center pt-1 relative items-center mb-2",
+                    caption_label: "text-sm font-bold text-slate-800 tracking-wide",
+                    nav: "space-x-1 flex items-center",
+                    nav_button: "h-7 w-7 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
+                    nav_button_previous: "absolute left-1",
+                    nav_button_next: "absolute right-1",
+                    table: "w-full border-collapse space-y-1",
+                    head_row: "flex mb-1",
+                    head_cell: "text-slate-500 font-bold text-[0.7rem] uppercase tracking-wider text-center py-1.5 w-8",
+                    row: "flex w-full mt-1.5",
+                    cell: "h-8 w-8 text-center text-xs p-0 relative focus-within:relative focus-within:z-20",
+                    day: "h-8 w-8 p-0 font-semibold hover:bg-slate-100 rounded-lg transition-all text-slate-800 text-center flex items-center justify-center cursor-pointer",
+                    day_selected: "bg-slate-900 text-white hover:bg-slate-800 hover:text-white focus:bg-slate-900 focus:text-white font-bold rounded-lg shadow-md",
+                    day_today: "bg-slate-100 text-slate-900 font-bold border border-slate-300 rounded-lg",
+                    day_outside: "day-outside text-slate-400 opacity-40 hover:bg-transparent cursor-pointer",
+                    day_disabled: "text-slate-300 opacity-30 cursor-not-allowed",
+                    day_hidden: "invisible",
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
             {/* Add List Button */}
             {isAddingList ? (
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-xl p-1.5 border border-white/20">
@@ -1559,6 +1637,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         {lists.map((list, listIndex) => {
           const sortMode = sortPreferences[list.id] || 'default';
           let displayCards = getSortedCards(list.cards, sortMode);
+          if (selectedFilterDate) {
+            displayCards = displayCards.filter(card => card.birthdayDate === selectedFilterDate);
+          }
 
           return (
             <div
@@ -1633,7 +1714,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       title="Click to rename"
                     >
                       {list.title} 
-                      <span className="text-[10px] text-blue-300/60 font-semibold normal-case tracking-normal">({list.cards.length})</span>
+                      <span className="text-[10px] text-blue-300/60 font-semibold normal-case tracking-normal">({displayCards.length})</span>
                       <Pencil size={11} className="text-white/30 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                     </h3>
                   )}
@@ -1740,17 +1821,17 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </div>
 
               {/* Bulk Actions Panel */}
-              {list.cards.length > 0 && (
+              {displayCards.length > 0 && (
                 <div className="px-4 py-2 flex items-center justify-between bg-white/5 border-b border-white/5 text-[11px] font-semibold select-none shrink-0">
-                  <label className="flex items-center gap-1.5 text-white/70 hover:text-white cursor-pointer transition-colors">
+                   <label className="flex items-center gap-1.5 text-white/70 hover:text-white cursor-pointer transition-colors">
                     <input
                       type="checkbox"
-                      checked={(selectedCardIds[list.id] || []).length === list.cards.length}
-                      onChange={() => toggleSelectAll(list.id, list.cards)}
+                      checked={(selectedCardIds[list.id] || []).length === displayCards.length}
+                      onChange={() => toggleSelectAll(list.id, displayCards)}
                       onMouseDown={(e) => e.stopPropagation()}
                       className="w-3.5 h-3.5 rounded border-white/20 bg-slate-900 text-blue-500 focus:ring-blue-400 cursor-pointer accent-blue-500"
                     />
-                    <span>Select All</span>
+                    <span>Select All ({displayCards.length})</span>
                   </label>
                   
                   {(selectedCardIds[list.id] || []).length > 0 && (
@@ -1875,7 +1956,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
                           {/* Birthday Date Input */}
                           <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium flex-1 min-w-0">
-                            <Calendar size={10} className="text-emerald-400 shrink-0" />
+                            <CalendarIcon size={10} className="text-emerald-400 shrink-0" />
                             <input
                               type="date"
                               value={card.birthdayDate || ''}
@@ -2054,7 +2135,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Birthday Date</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3.5 top-3 text-slate-400" size={16} />
+                  <CalendarIcon className="absolute left-3.5 top-3 text-slate-400" size={16} />
                   <input
                     type="date"
                     value={selectedCard.birthdayDate}

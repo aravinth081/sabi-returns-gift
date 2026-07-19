@@ -186,7 +186,8 @@ const calculateOrderFinalCost = (
   order: any,
   managedChocPricesMap: Record<string, { retail: number; wholesale: number }>,
   managedChocStickersMap: Record<string, number>,
-  customPricesMap: Record<string, number>
+  customPricesMap: Record<string, number>,
+  countOverride?: number
 ) => {
   const orderCount = Number(order.count) || 0;
   const category = order.category || "chocolate";
@@ -194,14 +195,8 @@ const calculateOrderFinalCost = (
 
   // Extract the stock price number from the name as the count multiplier (only for category !== 'product')
   let multiplier = 1;
-  if (category !== 'product') {
-    const match = String(chocolateName).match(/(\d+)\s*rs/i);
-    if (match) {
-      multiplier = Number(match[1]);
-    }
-  }
 
-  const count = orderCount * multiplier;
+  const count = countOverride !== undefined ? countOverride : (orderCount * multiplier);
 
   let purchasePricePerItem = 0;
   if (category === 'product') {
@@ -1535,6 +1530,12 @@ export default function Dashboard() {
       const deliveryDate = formatToDisplayDate(order.deliveryDate || order.functionDate || order.orderDate) || "-";
       const chocolateName = order.chocolate || "N/A";
 
+      let overrideCount: number | undefined = undefined;
+      if ((activeTab as any) === 'inventories_admin_panel') {
+        const key = normalizeChocName(chocolateName, dynamicInventory);
+        overrideCount = inventoryBalances[key] !== undefined ? inventoryBalances[key] : 0;
+      }
+
       const {
         count,
         purchasePricePerItem,
@@ -1542,7 +1543,7 @@ export default function Dashboard() {
         labourCost,
         totalPurchase,
         finalCost
-      } = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
+      } = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap, overrideCount);
 
       return { serialNo, deliveryDate, chocolateName, purchasePricePerItem, count, stickerCost, labourCost, totalPurchase, finalCost };
     });
@@ -1559,7 +1560,7 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap]);
+  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap, inventoryBalances, dynamicInventory, activeTab]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
@@ -2574,6 +2575,51 @@ export default function Dashboard() {
         redoStackRef.current = [];
       }
 
+      // Automatically move card from 'forward to print' to 'order completed' in Daily Tasks board if it matches phone number
+      if (formData.phone) {
+        const normalizePhoneStr = (p: string) => {
+          if (!p) return "";
+          const digits = p.replace(/\D/g, '');
+          return digits.length >= 10 ? digits.slice(-10) : digits;
+        };
+        const normInput = normalizePhoneStr(formData.phone);
+
+        if (normInput) {
+          const updatedLists = boardLists.map(l => ({ ...l, cards: [...l.cards] }));
+          const printList = updatedLists.find(l => l.title.trim().toLowerCase() === 'forward to print');
+          
+          if (printList && printList.cards && printList.cards.length > 0) {
+            const matchingCards = printList.cards.filter((c: any) => normalizePhoneStr(c.phoneNumber) === normInput);
+            if (matchingCards.length > 0) {
+              // Remove matching cards from print list
+              printList.cards = printList.cards.filter((c: any) => normalizePhoneStr(c.phoneNumber) !== normInput);
+              
+              // Move them to completed list
+              const completedList = updatedLists.find(l => l.title.trim().toLowerCase() === 'order completed');
+              const cardsToMove = matchingCards.map((c: any) => ({
+                ...c,
+                status: 'Order Completed'
+              }));
+              
+              if (completedList) {
+                if (!completedList.cards) completedList.cards = [];
+                completedList.cards.push(...cardsToMove);
+              } else {
+                if (!updatedLists[0].cards) updatedLists[0].cards = [];
+                updatedLists[0].cards.push(...cardsToMove);
+              }
+              
+              // Save updated board lists back to Firestore
+              const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
+              await setDoc(boardDocRef, {
+                lists: updatedLists,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            }
+          }
+        }
+      }
+
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
@@ -3021,6 +3067,7 @@ export default function Dashboard() {
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('loggedInName', 'Subash');
         localStorage.setItem('role', 'Admin');
+        localStorage.setItem('loginTimestamp', Date.now().toString());
         setLoginError("");
         setIsLoggingIn(false);
       }, 2000);
@@ -3049,6 +3096,7 @@ export default function Dashboard() {
           localStorage.setItem('loggedInName', emp.name);
           localStorage.setItem('role', 'Employee');
           localStorage.setItem('employeeId', emp.fireId);
+          localStorage.setItem('loginTimestamp', Date.now().toString());
           setLoginError("");
           setIsLoggingIn(false);
         }, 2000);
@@ -3078,7 +3126,31 @@ export default function Dashboard() {
     localStorage.removeItem('loggedInName');
     localStorage.removeItem('role');
     localStorage.removeItem('employeeId');
+    localStorage.removeItem('loginTimestamp');
   };
+
+  // Auto-logout after 24 hours of login (both Admin and Employee)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const checkSession = () => {
+      const loginTime = localStorage.getItem('loginTimestamp');
+      if (!loginTime) {
+        localStorage.setItem('loginTimestamp', Date.now().toString());
+        return;
+      }
+      const diff = Date.now() - Number(loginTime);
+      const limit = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      if (diff >= limit) {
+        handleLogout();
+      }
+    };
+
+    checkSession();
+    const interval = setInterval(checkSession, 10000); // Check session timeout every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   if (isLoggingIn) {
     return (
@@ -4147,22 +4219,39 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div ref={tableContainerRef} className={`flex-1 w-full shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? '' : 'overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
+                  <div ref={tableContainerRef} className={`w-full shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none' : 'flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
-                      <div className="bg-gradient-to-r from-amber-100 via-orange-50 to-amber-100 px-6 py-4 border-b-2 border-amber-300">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h1 className="text-2xl font-black text-amber-950 tracking-tight">SABI Return Gifts</h1>
-                            <p className="text-sm font-bold text-amber-700 mt-0.5">Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}</p>
+                      <div 
+                        style={{
+                          background: 'linear-gradient(to right, #fdfbf7, #fdfbf7)', // Warm premium alabaster bg
+                          padding: '16px 24px',
+                          borderBottom: '2px solid #cbd5e1', // Slate border
+                          display: 'block',
+                          width: '100%',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ textAlign: 'left' }}>
+                            <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#1e1b4b', margin: 0, padding: 0, textShadow: 'none', letterSpacing: '-0.025em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
+                              SABI Return Gifts
+                            </h1>
+                            <p style={{ fontSize: '14px', fontWeight: 700, color: '#4f46e5', margin: '4px 0 0 0', textShadow: 'none' }}>
+                              Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}
+                            </p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs font-bold text-amber-600">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                            <div className="flex gap-4 mt-1">
-                              <span className="text-xs font-black text-amber-900">Orders: {filteredDashboardOrders.length}</span>
-                              <span className="text-xs font-black text-amber-900">Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}</span>
-                              <span className="text-xs font-black text-green-700">Revenue: ₹{displayRevenue.toLocaleString()}</span>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1e1b4b', margin: 0, textShadow: 'none' }}>
+                              {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
+                                Orders: {filteredDashboardOrders.length}
+                              </span>
+                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
+                                Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -4615,17 +4704,24 @@ export default function Dashboard() {
 
                                 <td className="py-2.5 px-4 text-center align-middle">
                                   {isScreenshotMode ? (
-                                    <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                      ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] payment-badge-full-paid'
-                                      : order.paymentStatus === 'Partially Paid'
-                                        ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] payment-badge-partially-paid'
-                                        : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] payment-badge-pending'
-                                      }`}
-                                    >
-                                      {order.paymentStatus || 'Pending'}
-                                    </span>
+                                    <div className="flex flex-col items-center">
+                                      <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
+                                        ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] payment-badge-full-paid'
+                                        : order.paymentStatus === 'Partially Paid'
+                                          ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] payment-badge-partially-paid'
+                                          : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] payment-badge-pending'
+                                        }`}
+                                      >
+                                        {order.paymentStatus || 'Pending'}
+                                      </span>
+                                      {order.paymentStatus === 'Partially Paid' && (
+                                        <span className="text-[10px] font-extrabold text-[#d35400] mt-1 whitespace-nowrap">
+                                          Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
                                   ) : (
-                                    <>
+                                    <div className="flex flex-col items-center gap-1">
                                       <div className="print:hidden">
                                         <select
                                           value={order.paymentStatus || "Pending"}
@@ -4643,7 +4739,13 @@ export default function Dashboard() {
                                         </select>
                                       </div>
                                       <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
-                                    </>
+                                      
+                                      {order.paymentStatus === 'Partially Paid' && (
+                                        <span className="text-[10px] font-extrabold text-[#d35400] whitespace-nowrap">
+                                          Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </td>
 
@@ -5243,8 +5345,8 @@ export default function Dashboard() {
                     <table className="w-full text-left border-collapse min-w-[1100px]">
                       <thead className="sticky top-0 bg-amber-50 z-30 shadow-md border-b-2 border-amber-200">
                         <tr className="text-xs uppercase tracking-widest text-[#5d4037]">
-                          <th className="p-4 font-black border-r border-amber-200/50">Serial No</th>
-                          <th className="p-4 font-black border-r border-amber-200/50">Dispatch Date</th>
+                          {!isInvAdmin && <th className="p-4 font-black border-r border-amber-200/50">Serial No</th>}
+                          {!isInvAdmin && <th className="p-4 font-black border-r border-amber-200/50">Dispatch Date</th>}
                           <th className="p-4 font-black">Chocolate Name</th>
                           <th className="p-4 font-black text-right border-l border-amber-200/50">Purch. Cost <br /><span className="text-[9px] font-bold text-amber-600">(Per Item)</span></th>
                           <th className="p-4 font-black text-center border-l border-amber-200/50">Count</th>
@@ -5256,12 +5358,12 @@ export default function Dashboard() {
                       </thead>
                       <tbody>
                         {costAnalyticsData.rows.length === 0 ? (
-                          <tr><td colSpan={9} className="p-8 text-center text-amber-700 font-bold">No records found for the selected date range.</td></tr>
+                          <tr><td colSpan={isInvAdmin ? 7 : 9} className="p-8 text-center text-amber-700 font-bold">No records found for the selected date range.</td></tr>
                         ) : (
                           costAnalyticsData.rows.map((row, idx) => (
                             <tr key={idx} className="border-b border-amber-100 text-sm hover:bg-amber-50/30 transition-colors relative z-0">
-                              <td className="p-4 font-extrabold text-amber-900 border-r border-amber-50">{row.serialNo}</td>
-                              <td className="p-4 font-bold text-amber-900 border-r border-amber-50 whitespace-nowrap">{row.deliveryDate}</td>
+                              {!isInvAdmin && <td className="p-4 font-extrabold text-amber-900 border-r border-amber-50">{row.serialNo}</td>}
+                              {!isInvAdmin && <td className="p-4 font-bold text-amber-900 border-r border-amber-50 whitespace-nowrap">{row.deliveryDate}</td>}
                               <td className="p-4 font-bold text-amber-950 border-r border-amber-50 max-w-[200px] truncate" title={row.chocolateName}>{row.chocolateName}</td>
                               <td className="p-4 text-right font-medium text-amber-800 border-r border-amber-50">₹{row.purchasePricePerItem.toFixed(2)}</td>
                               <td className="p-4 text-center font-black text-[#4a2c1d] border-r border-amber-50 bg-amber-50/50">{row.count.toLocaleString()}</td>
@@ -5276,8 +5378,8 @@ export default function Dashboard() {
                       {costAnalyticsData.rows.length > 0 && (
                         <tfoot className="sticky bottom-0 bg-[#3e2723] text-amber-50 z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.2)]">
                           <tr className="text-sm">
-                            <td className="p-4 border-r border-[#5d4037]"></td>
-                            <td className="p-4 border-r border-[#5d4037]"></td>
+                            {!isInvAdmin && <td className="p-4 border-r border-[#5d4037]"></td>}
+                            {!isInvAdmin && <td className="p-4 border-r border-[#5d4037]"></td>}
                             <td className="p-4 border-r border-[#5d4037]"></td>
                             <td className="p-4 text-right font-black uppercase tracking-widest border-r border-[#5d4037]">Grand Total:</td>
                             <td className="p-4 text-center font-black border-r border-[#5d4037]">{costAnalyticsData.grandTotals.count.toLocaleString()}</td>
