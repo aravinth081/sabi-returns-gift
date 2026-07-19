@@ -188,9 +188,20 @@ const calculateOrderFinalCost = (
   managedChocStickersMap: Record<string, number>,
   customPricesMap: Record<string, number>
 ) => {
-  const count = Number(order.count) || 0;
+  const orderCount = Number(order.count) || 0;
   const category = order.category || "chocolate";
   const chocolateName = order.chocolate || "N/A";
+
+  // Extract the stock price number from the name as the count multiplier (only for category !== 'product')
+  let multiplier = 1;
+  if (category !== 'product') {
+    const match = String(chocolateName).match(/(\d+)\s*rs/i);
+    if (match) {
+      multiplier = Number(match[1]);
+    }
+  }
+
+  const count = orderCount * multiplier;
 
   let purchasePricePerItem = 0;
   if (category === 'product') {
@@ -221,6 +232,7 @@ const calculateOrderFinalCost = (
   const finalCost = stickerCost + labourCost + totalPurchase;
 
   return {
+    count,
     purchasePricePerItem,
     stickerPricePerItem,
     stickerCost,
@@ -1476,9 +1488,9 @@ export default function Dashboard() {
       const serialNo = getSerial(order.id);
       const deliveryDate = formatToDisplayDate(order.deliveryDate || order.functionDate || order.orderDate) || "-";
       const chocolateName = order.chocolate || "N/A";
-      const count = Number(order.count) || 0;
 
       const {
+        count,
         purchasePricePerItem,
         stickerCost,
         labourCost,
