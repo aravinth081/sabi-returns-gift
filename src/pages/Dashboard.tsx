@@ -355,9 +355,14 @@ export default function Dashboard() {
   const itemsPerPage = 10;
 
 
-  // 🟢 NEW STATES FOR ADMIN REPORT VIEW
   const [adminReportDash, setAdminReportDash] = useState<'None' | 'Dashboard 1' | 'Dashboard 2'>('None');
   const [adminReportMenuOpen, setAdminReportMenuOpen] = useState(false);
+
+  // Separate states for Inventories Cost Analytics settings to prevent linkage
+  const [invAdminDateType, setInvAdminDateType] = useState<string>('Dispatch Date');
+  const [invAdminDateRange, setInvAdminDateRange] = useState({ from: "", to: "" });
+  const [invAdminReportDash, setInvAdminReportDash] = useState<'None' | 'Dashboard 1' | 'Dashboard 2'>('None');
+  const [invAdminReportMenuOpen, setInvAdminReportMenuOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [orders, setOrders] = useState<any[]>([]);
@@ -895,6 +900,30 @@ export default function Dashboard() {
   const trackingSearch = trkSearch;
   const setTrackingSearch = setTrkSearch;
 
+  // Wrapper helpers for cost analytics states depending on Reports vs Inventories settings
+  const isInvAdmin = (activeTab as any) === 'inventories_admin_panel';
+  const currentAdminDateType = isInvAdmin ? invAdminDateType : adminDateType;
+  const currentAdminDateRange = isInvAdmin ? invAdminDateRange : adminDateRange;
+  const currentAdminReportDash = isInvAdmin ? invAdminReportDash : adminReportDash;
+  const currentAdminReportMenuOpen = isInvAdmin ? invAdminReportMenuOpen : adminReportMenuOpen;
+
+  const handleSetAdminDateType = (val: string) => {
+    if (isInvAdmin) setInvAdminDateType(val);
+    else setAdminDateType(val);
+  };
+  const handleSetAdminDateRange = (val: { from: string; to: string }) => {
+    if (isInvAdmin) setInvAdminDateRange(val);
+    else setAdminDateRange(val);
+  };
+  const handleSetAdminReportDash = (val: 'None' | 'Dashboard 1' | 'Dashboard 2') => {
+    if (isInvAdmin) setInvAdminReportDash(val);
+    else setAdminReportDash(val);
+  };
+  const handleSetAdminReportMenuOpen = (val: boolean) => {
+    if (isInvAdmin) setInvAdminReportMenuOpen(val);
+    else setAdminReportMenuOpen(val);
+  };
+
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [reportDashboardFilter, setReportDashboardFilter] = useState("All");
 
@@ -1425,18 +1454,18 @@ export default function Dashboard() {
   const costAnalyticsData = useMemo(() => {
     let baseOrders = orders.filter(order => order.status === "Delivered" || order.status === "In Process");
 
-    if (adminDateRange.from || adminDateRange.to) {
+    if (currentAdminDateRange.from || currentAdminDateRange.to) {
       baseOrders = baseOrders.filter(order => {
         let targetDateStr = "";
-        if (adminDateType === 'Order Date') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
-        else if (adminDateType === 'Function Date') targetDateStr = parseDateToYYYYMMDD(order.functionDate);
+        if (currentAdminDateType === 'Order Date') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
+        else if (currentAdminDateType === 'Function Date') targetDateStr = parseDateToYYYYMMDD(order.functionDate);
         else targetDateStr = parseDateToYYYYMMDD(order.deliveryDate);
 
         if (!targetDateStr) return false;
 
         const orderTime = new Date(targetDateStr).getTime();
-        const fromTime = adminDateRange.from ? new Date(adminDateRange.from).getTime() : 0;
-        const toTime = adminDateRange.to ? new Date(adminDateRange.to).getTime() : Infinity;
+        const fromTime = currentAdminDateRange.from ? new Date(currentAdminDateRange.from).getTime() : 0;
+        const toTime = currentAdminDateRange.to ? new Date(currentAdminDateRange.to).getTime() : Infinity;
 
         return orderTime >= fromTime && orderTime <= toTime;
       });
@@ -1472,34 +1501,34 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, adminDateRange, adminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap]);
+  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
-    if (adminReportDash === 'None') return null;
+    if (currentAdminReportDash === 'None') return null;
 
     let baseOrders = orders.filter(order => order.status === "Delivered" || order.status === "In Process");
 
-    if (adminDateRange.from || adminDateRange.to) {
+    if (currentAdminDateRange.from || currentAdminDateRange.to) {
       baseOrders = baseOrders.filter(order => {
         let targetDateStr = "";
-        if (adminDateType === 'Order Date') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
-        else if (adminDateType === 'Function Date') targetDateStr = parseDateToYYYYMMDD(order.functionDate);
+        if (currentAdminDateType === 'Order Date') targetDateStr = parseDateToYYYYMMDD(order.orderDate);
+        else if (currentAdminDateType === 'Function Date') targetDateStr = parseDateToYYYYMMDD(order.functionDate);
         else targetDateStr = parseDateToYYYYMMDD(order.deliveryDate);
 
         if (!targetDateStr) return false;
 
         const orderTime = new Date(targetDateStr).getTime();
-        const fromTime = adminDateRange.from ? new Date(adminDateRange.from).getTime() : 0;
-        const toTime = adminDateRange.to ? new Date(adminDateRange.to).getTime() : Infinity;
+        const fromTime = currentAdminDateRange.from ? new Date(currentAdminDateRange.from).getTime() : 0;
+        const toTime = currentAdminDateRange.to ? new Date(currentAdminDateRange.to).getTime() : Infinity;
 
         return orderTime >= fromTime && orderTime <= toTime;
       });
     }
 
-    if (adminReportDash === 'Dashboard 1') {
+    if (currentAdminReportDash === 'Dashboard 1') {
       baseOrders = baseOrders.filter(o => o.category !== 'product');
-    } else if (adminReportDash === 'Dashboard 2') {
+    } else if (currentAdminReportDash === 'Dashboard 2') {
       baseOrders = baseOrders.filter(o => o.category === 'product');
     }
 
@@ -1526,7 +1555,7 @@ export default function Dashboard() {
     const chartData = topChocs.slice(0, 8).map(([name, count]) => ({ name, count }));
 
     return { filteredOrders: baseOrders, topChocs, chartData, totalRev, totalItems, totalDeliveryCharge: totalDelivery };
-  }, [orders, adminDateRange, adminDateType, adminReportDash, customPricesMap]);
+  }, [orders, currentAdminDateRange, currentAdminDateType, currentAdminReportDash, customPricesMap]);
 
   const trackingSearchResults = useMemo(() => {
     let result = orders;
@@ -3423,7 +3452,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-center gap-3 mb-6">
                   <h2 className="text-3xl font-black text-white tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
                   <button
-                    onClick={() => setActiveTab('admin_panel' as any)}
+                    onClick={() => setActiveTab('inventories_admin_panel' as any)}
                     className="p-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] shrink-0"
                     title="Open Admin Cost Analytics"
                   >
@@ -5033,14 +5062,14 @@ export default function Dashboard() {
           )}
 
           {/* 🟢 ADMIN DASHBOARD VIEW (Cost Calculation Concept) */}
-          {(activeTab as any) === 'admin_panel' && (
+          {((activeTab as any) === 'admin_panel' || (activeTab as any) === 'inventories_admin_panel') && (
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
 
               {/* 🟢 MODIFIED HEADER: ADDED BOOK DROPDOWN AND SMALLER CLOSE BUTTON */}
               <div className="flex justify-between items-center bg-[#f2eee6] p-4 rounded-2xl shadow-sm border border-[#d7ccc8] shrink-0 z-40 relative">
                 <div>
                   <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                    <TrendingUp className="text-amber-700" /> {adminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${adminReportDash})`}
+                    <TrendingUp className="text-amber-700" /> {currentAdminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${currentAdminReportDash})`}
                   </h2>
                   <p className="text-sm font-medium text-amber-700 mt-1">Sticker (Dynamic) | Labour (₹1) | Order wise mapped data.</p>
                 </div>
@@ -5048,8 +5077,8 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#d7ccc8] shadow-sm">
                     <select
-                      value={adminDateType}
-                      onChange={(e) => setAdminDateType(e.target.value)}
+                      value={currentAdminDateType}
+                      onChange={(e) => handleSetAdminDateType(e.target.value)}
                       className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
                     >
                       <option value="Dispatch Date">Dispatch Date</option>
@@ -5060,19 +5089,19 @@ export default function Dashboard() {
                     <span className="text-xs font-bold text-amber-800">From:</span>
                     <input
                       type="date"
-                      value={adminDateRange.from}
-                      onChange={(e) => setAdminDateRange({ ...adminDateRange, from: e.target.value })}
+                      value={currentAdminDateRange.from}
+                      onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, from: e.target.value })}
                       className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
                     />
                     <span className="text-xs font-bold text-amber-800">To:</span>
                     <input
                       type="date"
-                      value={adminDateRange.to}
-                      onChange={(e) => setAdminDateRange({ ...adminDateRange, to: e.target.value })}
+                      value={currentAdminDateRange.to}
+                      onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, to: e.target.value })}
                       className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
                     />
-                    {(adminDateRange.from || adminDateRange.to) && (
-                      <button onClick={() => setAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
+                    {(currentAdminDateRange.from || currentAdminDateRange.to) && (
+                      <button onClick={() => handleSetAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
                         <X size={14} />
                       </button>
                     )}
@@ -5081,17 +5110,17 @@ export default function Dashboard() {
                   {/* 🟢 NEW BOOK DROPDOWN TO TOGGLE ADMIN REPORTS */}
                   <div className="relative">
                     <button
-                      onClick={() => setAdminReportMenuOpen(!adminReportMenuOpen)}
+                      onClick={() => handleSetAdminReportMenuOpen(!currentAdminReportMenuOpen)}
                       className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-amber-50 bg-white shadow-sm transition-all flex items-center gap-1.5"
                     >
-                      <Book size={16} /> {adminReportDash === 'None' ? 'Table View' : adminReportDash} <ChevronDown size={14} />
+                      <Book size={16} /> {currentAdminReportDash === 'None' ? 'Table View' : currentAdminReportDash} <ChevronDown size={14} />
                     </button>
-                    {adminReportMenuOpen && (
+                    {currentAdminReportMenuOpen && (
                       <div className="absolute right-0 mt-2 w-40 bg-white border border-[#d7ccc8] rounded-xl shadow-lg z-50 overflow-hidden">
-                        <button onClick={() => { setAdminReportDash('None'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
-                        <button onClick={() => { setAdminReportDash('Dashboard 1'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
-                        <button onClick={() => { setAdminReportDash('Dashboard 2'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 2</button>
-                        <button onClick={() => { setAdminReportDash('All'); setAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">All Dashboards</button>
+                        <button onClick={() => { handleSetAdminReportDash('None'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
+                        <button onClick={() => { handleSetAdminReportDash('Dashboard 1'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
+                        <button onClick={() => { handleSetAdminReportDash('Dashboard 2'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 2</button>
+                        <button onClick={() => { handleSetAdminReportDash('All'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">All Dashboards</button>
 
                       </div>
                     )}
@@ -5105,7 +5134,7 @@ export default function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('reports')}
+                    onClick={() => setActiveTab((activeTab as any) === 'inventories_admin_panel' ? 'inventories' : 'reports')}
                     className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-red-50 hover:text-red-700 hover:border-red-200 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
                   >
                     <X size={16} /> Close Admin
@@ -5114,7 +5143,7 @@ export default function Dashboard() {
               </div>
 
               {/* 🟢 CONDITIONAL RENDER: TABLE VS REPORT VIEW */}
-              {adminReportDash === 'None' ? (
+              {currentAdminReportDash === 'None' ? (
                 <div className="bg-white rounded-[2rem] shadow-md border border-[#d7ccc8] overflow-hidden flex-1 flex flex-col">
                   <div className="overflow-auto flex-1 px-6">
                     <table className="w-full text-left border-collapse min-w-[1100px]">
@@ -5174,7 +5203,7 @@ export default function Dashboard() {
                     <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
                       <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                          <TrendingUp className="text-amber-700" /> Top Selling {adminReportDash === 'Dashboard 2' ? 'Products' : 'Chocolates'}
+                          <TrendingUp className="text-amber-700" /> Top Selling {currentAdminReportDash === 'Dashboard 2' ? 'Products' : 'Chocolates'}
                         </h2>
                       </div>
                       <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
