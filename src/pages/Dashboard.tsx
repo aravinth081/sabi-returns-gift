@@ -1316,20 +1316,29 @@ export default function Dashboard() {
   }, [orders, customPricesMap, managedChocPricesMap, managedChocStickersMap]);
 
   const approximateProfitData = useMemo(() => {
+    let totalInvFinalCost = 0;
     const items = currentInventoryValueData.items.map(item => {
       const profit = allTimeProfitData.chocProfitMap[item.name.toLowerCase()] || 0;
-      const value = item.value + profit;
+      const key = item.name.toLowerCase();
+      const count = inventoryBalances[item.name] || 0;
+      const purchasePricePerItem = managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0;
+      const stickerPricePerItem = managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5;
+      const invFinalCost = count * (purchasePricePerItem + stickerPricePerItem + 1);
+      
+      totalInvFinalCost += invFinalCost;
+      const value = item.value + profit - invFinalCost;
       return {
         name: item.name,
         profit,
         invValue: item.value,
+        invFinalCost,
         value
       };
     });
 
-    const grandTotal = currentInventoryValueData.grandTotal + allTimeProfitData.totalProfit;
+    const grandTotal = currentInventoryValueData.grandTotal + allTimeProfitData.totalProfit - totalInvFinalCost;
     return { items, grandTotal };
-  }, [currentInventoryValueData, allTimeProfitData]);
+  }, [currentInventoryValueData, allTimeProfitData, inventoryBalances, managedChocPricesMap, managedChocStickersMap]);
 
   const trackedSalesResult = useMemo(() => {
     if (!salesTrackerChoc) return { count: 0, revenue: 0 };
@@ -1505,6 +1514,45 @@ export default function Dashboard() {
   }, [filteredDashboardOrders, customPricesMap]);
 
   const costAnalyticsData = useMemo(() => {
+    if (isInvAdmin) {
+      const rows = dynamicInventory.map(choc => {
+        const key = choc.toLowerCase();
+        const count = inventoryBalances[choc] || 0;
+        const purchasePricePerItem = managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0;
+        const stickerPricePerItem = managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5;
+
+        const stickerCost = count * stickerPricePerItem;
+        const labourCost = count * 1;
+        const totalPurchase = purchasePricePerItem * count;
+        const finalCost = stickerCost + labourCost + totalPurchase;
+
+        return {
+          serialNo: "",
+          deliveryDate: "",
+          chocolateName: choc,
+          purchasePricePerItem,
+          count,
+          stickerCost,
+          labourCost,
+          totalPurchase,
+          finalCost
+        };
+      });
+
+      rows.sort((a, b) => b.finalCost - a.finalCost);
+
+      const grandTotals = rows.reduce((acc, row) => {
+        acc.count += row.count;
+        acc.stickerCost += row.stickerCost;
+        acc.labourCost += row.labourCost;
+        acc.totalPurchase += row.totalPurchase;
+        acc.finalCost += row.finalCost;
+        return acc;
+      }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
+
+      return { rows, grandTotals };
+    }
+
     let baseOrders = orders.filter(order => order.status === "Delivered" || order.status === "In Process");
 
     if (currentAdminDateRange.from || currentAdminDateRange.to) {
@@ -1531,10 +1579,6 @@ export default function Dashboard() {
       const chocolateName = order.chocolate || "N/A";
 
       let overrideCount: number | undefined = undefined;
-      if ((activeTab as any) === 'inventories_admin_panel') {
-        const key = normalizeChocName(chocolateName, dynamicInventory);
-        overrideCount = inventoryBalances[key] !== undefined ? inventoryBalances[key] : 0;
-      }
 
       const {
         count,
@@ -1560,7 +1604,7 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap, inventoryBalances, dynamicInventory, activeTab]);
+  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap, inventoryBalances, dynamicInventory, activeTab, isInvAdmin]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
@@ -3721,7 +3765,7 @@ export default function Dashboard() {
                                 </span>
                                 <div className="flex justify-between items-baseline mt-1">
                                   <span className="choc-detail-badge-text text-[10px] font-bold whitespace-nowrap">
-                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()}
+                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()} - ₹{Math.round((item as any).invFinalCost || 0).toLocaleString()}
                                   </span>
                                   <span className="choc-value-badge-text text-[11px] font-black">
                                     ₹{Math.round(item.value).toLocaleString()}
@@ -5263,41 +5307,47 @@ export default function Dashboard() {
                   <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
                     <TrendingUp className="text-amber-700" /> {currentAdminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${currentAdminReportDash})`}
                   </h2>
-                  <p className="text-sm font-medium text-amber-700 mt-1">Sticker (Dynamic) | Labour (₹1) | Order wise mapped data.</p>
+                  <p className="text-sm font-medium text-amber-700 mt-1">
+                    {isInvAdmin 
+                      ? 'Sticker (Dynamic) | Labour (₹1) | Live stock balance mapped data.' 
+                      : 'Sticker (Dynamic) | Labour (₹1) | Order wise mapped data.'}
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#d7ccc8] shadow-sm">
-                    <select
-                      value={currentAdminDateType}
-                      onChange={(e) => handleSetAdminDateType(e.target.value)}
-                      className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
-                    >
-                      <option value="Dispatch Date">Dispatch Date</option>
-                      <option value="Order Date">Order Date</option>
-                      <option value="Function Date">Function Date</option>
-                    </select>
-                    <div className="h-4 w-[1px] bg-amber-200 mx-1"></div>
-                    <span className="text-xs font-bold text-amber-800">From:</span>
-                    <input
-                      type="date"
-                      value={currentAdminDateRange.from}
-                      onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, from: e.target.value })}
-                      className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
-                    />
-                    <span className="text-xs font-bold text-amber-800">To:</span>
-                    <input
-                      type="date"
-                      value={currentAdminDateRange.to}
-                      onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, to: e.target.value })}
-                      className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
-                    />
-                    {(currentAdminDateRange.from || currentAdminDateRange.to) && (
-                      <button onClick={() => handleSetAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
+                  {!isInvAdmin && (
+                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#d7ccc8] shadow-sm">
+                      <select
+                        value={currentAdminDateType}
+                        onChange={(e) => handleSetAdminDateType(e.target.value)}
+                        className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
+                      >
+                        <option value="Dispatch Date">Dispatch Date</option>
+                        <option value="Order Date">Order Date</option>
+                        <option value="Function Date">Function Date</option>
+                      </select>
+                      <div className="h-4 w-[1px] bg-amber-200 mx-1"></div>
+                      <span className="text-xs font-bold text-amber-800">From:</span>
+                      <input
+                        type="date"
+                        value={currentAdminDateRange.from}
+                        onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, from: e.target.value })}
+                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
+                      />
+                      <span className="text-xs font-bold text-amber-800">To:</span>
+                      <input
+                        type="date"
+                        value={currentAdminDateRange.to}
+                        onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, to: e.target.value })}
+                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
+                      />
+                      {(currentAdminDateRange.from || currentAdminDateRange.to) && (
+                        <button onClick={() => handleSetAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* 🟢 NEW BOOK DROPDOWN TO TOGGLE ADMIN REPORTS */}
                   {!isInvAdmin && (
