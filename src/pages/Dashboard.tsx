@@ -3609,7 +3609,7 @@ export default function Dashboard() {
                           <p className="text-[10px] font-bold text-[#8d6e63] uppercase tracking-wider mb-2">
                             Breakdown by Chocolate
                           </p>
-                          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                          <div className="grid grid-cols-2 gap-2 max-h-[110px] overflow-y-auto custom-scrollbar pr-1">
                             {currentInventoryValueData.items.map((item, idx) => (
                               <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
                                 <span className="choc-name-badge-text text-[11px] font-black text-amber-950 truncate leading-tight" title={item.name}>
@@ -3641,7 +3641,7 @@ export default function Dashboard() {
                           <p className="text-[10px] font-bold uppercase tracking-wider mb-2">
                             Approximate Profit Breakdown
                           </p>
-                          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                          <div className="grid grid-cols-2 gap-2 max-h-[110px] overflow-y-auto custom-scrollbar pr-1">
                             {approximateProfitData.items.map((item, idx) => (
                               <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
                                 <span className="choc-name-badge-text text-[11px] font-black truncate leading-tight" title={item.name}>
