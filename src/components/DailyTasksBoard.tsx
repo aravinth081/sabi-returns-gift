@@ -1548,32 +1548,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
       </div>
 
-      {/* Uploaded Files Chips */}
-      {uploadedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2.5 mb-5 shrink-0 print:hidden relative z-10 animate-in fade-in duration-300">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 backdrop-blur-md rounded-xl border border-blue-500/20 text-xs font-bold text-blue-200 select-none">
-            <FileSpreadsheet size={14} className="text-blue-300" />
-            <span className="uppercase tracking-wider">Uploaded Excel Leads:</span>
-          </div>
-          {uploadedFiles.map(file => (
-            <div 
-              key={file.id} 
-              className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 backdrop-blur-md text-white rounded-xl border border-white/10 text-xs font-semibold shadow-md transition-all hover:-translate-y-0.5"
-            >
-              <FileSpreadsheet size={13} className="text-emerald-400" />
-              <span className="max-w-[160px] truncate" title={`${file.name} - uploaded at ${file.uploadedAt}`}>{file.name}</span>
-              <span className="text-[10px] text-blue-200/50 font-normal">({file.count} cards)</span>
-              <button
-                onClick={() => handleDeleteUploadedFile(file.id)}
-                className="p-1 hover:bg-rose-500/25 rounded-lg text-rose-300 hover:text-rose-100 transition-colors ml-1"
-                title="Delete this import and its cards"
-              >
-                <Trash size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Trello Columns Horizontal Scroll */}
       <div 
