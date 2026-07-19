@@ -906,6 +906,8 @@ export default function Dashboard() {
   const [isReportsAuthModalOpen, setIsReportsAuthModalOpen] = useState(false);
   const [reportsPassword, setReportsPassword] = useState("");
   const [reportsAuthError, setReportsAuthError] = useState("");
+  const [reportsAuthRedirectTo, setReportsAuthRedirectTo] = useState<'reports' | 'admin_panel'>('reports');
+  const [adminPanelSource, setAdminPanelSource] = useState<'reports' | 'inventories'>('reports');
 
   const [reportsPasscode, setReportsPasscode] = useState('963');
   const [historyPasscode, setHistoryPasscode] = useState('852');
@@ -950,7 +952,7 @@ export default function Dashboard() {
   const handleReportsAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (reportsPassword === reportsPasscode || reportsPassword === "561997" || reportsPassword === "8520") {
-      setActiveTab('reports');
+      setActiveTab(reportsAuthRedirectTo);
       setShowSidebarHighlight(true);
       setIsReportsAuthModalOpen(false);
       setReportsPassword("");
@@ -3216,6 +3218,7 @@ export default function Dashboard() {
 
               <button
                 onClick={() => {
+                  setReportsAuthRedirectTo('reports');
                   setIsReportsAuthModalOpen(true);
                   setReportsPassword("");
                   setReportsAuthError("");
@@ -3420,7 +3423,22 @@ export default function Dashboard() {
                     : 'bg-gradient-to-br from-amber-700 to-amber-950 border-4 border-amber-600/50 shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)]'
                 }`}
               >
-                <h2 className="text-3xl font-black text-white mb-6 text-center tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
+                <div className="flex justify-center items-center gap-3 mb-6 relative">
+                  <h2 className="text-3xl font-black text-white tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
+                  <button
+                    onClick={() => {
+                      setReportsAuthRedirectTo('admin_panel');
+                      setAdminPanelSource('inventories');
+                      setIsReportsAuthModalOpen(true);
+                      setReportsPassword("");
+                      setReportsAuthError("");
+                    }}
+                    className="p-1.5 bg-white/15 hover:bg-white/30 border border-white/20 hover:border-white/40 rounded-xl text-white shadow-md cursor-pointer transition-all hover:scale-110 active:scale-95 flex items-center justify-center h-8 w-8 backdrop-blur-md"
+                    title="Open Admin Settings"
+                  >
+                    <Settings size={16} strokeWidth={2.5} />
+                  </button>
+                </div>
                 <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
                   {dynamicInventory.map((choc, i) => {
                     const bal = inventoryBalances[choc] || 0;
@@ -4807,7 +4825,10 @@ export default function Dashboard() {
                     </div>
 
                     <button
-                      onClick={() => setActiveTab('admin_panel' as any)}
+                      onClick={() => {
+                        setAdminPanelSource('reports');
+                        setActiveTab('admin_panel' as any);
+                      }}
                       className="p-1.5 bg-white border border-[#d7ccc8] hover:border-amber-500 hover:text-amber-700 rounded-xl text-[#5d4037] shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px]"
                       title="Open Admin Cost Analytics"
                     >
@@ -5096,7 +5117,7 @@ export default function Dashboard() {
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('reports')}
+                    onClick={() => setActiveTab(adminPanelSource)}
                     className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-red-50 hover:text-red-700 hover:border-red-200 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
                   >
                     <X size={16} /> Close Admin
