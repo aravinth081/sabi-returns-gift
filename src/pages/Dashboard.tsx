@@ -1323,7 +1323,10 @@ export default function Dashboard() {
       const count = inventoryBalances[item.name] || 0;
       const purchasePricePerItem = managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0;
       const stickerPricePerItem = managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5;
-      const invFinalCost = count * (purchasePricePerItem + stickerPricePerItem + 1);
+      const stickerCost = count * stickerPricePerItem;
+      const labourCost = count * 1;
+      const totalPurchase = purchasePricePerItem * count;
+      const invFinalCost = stickerCost + labourCost + totalPurchase;
       
       totalInvFinalCost += invFinalCost;
       const value = item.value + profit - invFinalCost;
@@ -3775,7 +3778,7 @@ export default function Dashboard() {
                                 <div className="mt-1.5 flex justify-between items-center text-[10px] font-bold border-t border-emerald-100/50 pt-1.5 choc-detail-badge-text">
                                   <span className="opacity-75">Calculation:</span>
                                   <span className="font-mono tracking-tight">
-                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()} - ₹{Math.round((item as any).invFinalCost || 0).toLocaleString()}
+                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()} - ₹{((item as any).invFinalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                   </span>
                                 </div>
                               </div>
