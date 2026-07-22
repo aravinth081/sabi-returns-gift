@@ -3726,18 +3726,21 @@ export default function Dashboard() {
                           <p className="text-[10px] font-bold text-[#8d6e63] uppercase tracking-wider mb-2">
                             Breakdown by Chocolate
                           </p>
-                          <div className="grid grid-cols-2 gap-2 max-h-[110px] overflow-y-auto custom-scrollbar pr-1">
+                          <div className="grid grid-cols-1 gap-2 max-h-[135px] overflow-y-auto custom-scrollbar pr-1">
                             {currentInventoryValueData.items.map((item, idx) => (
-                              <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
-                                <span className="choc-name-badge-text text-[11px] font-black text-amber-950 truncate leading-tight" title={item.name}>
-                                  {item.name}
-                                </span>
-                                <div className="flex justify-between items-baseline mt-1">
-                                  <span className="choc-detail-badge-text text-[10px] text-amber-700 font-bold whitespace-nowrap">
-                                    {item.balance} × ₹{item.price}
+                              <div key={idx} className="choc-grid-item p-2.5 rounded-xl flex flex-col justify-between transition-colors border border-[#ebdccb]">
+                                <div className="flex justify-between items-center w-full gap-2">
+                                  <span className="choc-name-badge-text text-xs font-black truncate text-amber-950" title={item.name}>
+                                    {item.name}
                                   </span>
-                                  <span className="choc-value-badge-text text-[11px] font-black text-[#8b5a2b]">
+                                  <span className="choc-value-badge-text text-xs font-black text-[#8b5a2b] shrink-0">
                                     ₹{item.value.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="mt-1.5 flex justify-between items-center text-[10px] font-bold border-t border-[#ebdccb]/50 pt-1.5 choc-detail-badge-text text-amber-700">
+                                  <span className="opacity-75">Calculation:</span>
+                                  <span className="font-mono tracking-tight">
+                                    {item.balance} × ₹{item.price}
                                   </span>
                                 </div>
                               </div>
@@ -3758,18 +3761,21 @@ export default function Dashboard() {
                           <p className="text-[10px] font-bold uppercase tracking-wider mb-2">
                             Approximate Profit Breakdown
                           </p>
-                          <div className="grid grid-cols-2 gap-2 max-h-[110px] overflow-y-auto custom-scrollbar pr-1">
+                          <div className="grid grid-cols-1 gap-2 max-h-[135px] overflow-y-auto custom-scrollbar pr-1">
                             {approximateProfitData.items.map((item, idx) => (
-                              <div key={idx} className="choc-grid-item p-2 rounded-lg flex flex-col justify-between min-h-[56px] transition-colors">
-                                <span className="choc-name-badge-text text-[11px] font-black truncate leading-tight" title={item.name}>
-                                  {item.name}
-                                </span>
-                                <div className="flex justify-between items-baseline mt-1">
-                                  <span className="choc-detail-badge-text text-[10px] font-bold whitespace-nowrap">
-                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()} - ₹{Math.round((item as any).invFinalCost || 0).toLocaleString()}
+                              <div key={idx} className="choc-grid-item p-2.5 rounded-xl flex flex-col justify-between transition-colors border border-emerald-100">
+                                <div className="flex justify-between items-center w-full gap-2">
+                                  <span className="choc-name-badge-text text-xs font-black truncate" title={item.name}>
+                                    {item.name}
                                   </span>
-                                  <span className="choc-value-badge-text text-[11px] font-black">
+                                  <span className="choc-value-badge-text text-xs font-black shrink-0">
                                     ₹{Math.round(item.value).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="mt-1.5 flex justify-between items-center text-[10px] font-bold border-t border-emerald-100/50 pt-1.5 choc-detail-badge-text">
+                                  <span className="opacity-75">Calculation:</span>
+                                  <span className="font-mono tracking-tight">
+                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()} - ₹{Math.round((item as any).invFinalCost || 0).toLocaleString()}
                                   </span>
                                 </div>
                               </div>
