@@ -403,7 +403,7 @@ export default function Dashboard() {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
       const ordersList = snapshot.docs.map(doc => {
         const data = doc.data() as any;
-        const fallbackRole = (data.orderType === 'Self' || data.orderType === 'Sabi') ? 'Self' : 'Others';
+        const fallbackRole = data.orderType === 'Self' ? 'Self' : 'Others';
         return {
           fireId: doc.id,
           ...data,
@@ -1218,8 +1218,8 @@ export default function Dashboard() {
 
     orders.forEach(order => {
       if (order.orderStatus === 'cancelled') return;
-      // Exclude 'Self' and 'Sabi' orders from inventory calculations (only 'Others' affect inventory)
-      const isSelf = order.orderType === 'Self' || order.orderType === 'Sabi';
+      // Exclude 'Self' orders from inventory calculations (only 'Others' affect inventory)
+      const isSelf = order.role === 'Self';
       if (isSelf) return;
       if (!order.chocolate) return;
 
@@ -1236,7 +1236,7 @@ export default function Dashboard() {
     });
 
     return balances;
-  }, [inventoryLogs, orders]);
+  }, [inventoryLogs, orders, dynamicInventory]);
 
   const currentInventoryValueData = useMemo(() => {
     const CURRENT_INVENTORY_RETAIL_PRICES: Record<string, number> = {
@@ -2106,7 +2106,7 @@ export default function Dashboard() {
 
 
   const handleEditClick = (order: any) => {
-    const fallbackRole = (order.orderType === 'Self' || order.orderType === 'Sabi') ? 'Self' : 'Others';
+    const fallbackRole = order.orderType === 'Self' ? 'Self' : 'Others';
     const currentRole = order.role || fallbackRole;
     setFormData({
       ...order,
@@ -2881,6 +2881,7 @@ export default function Dashboard() {
                 orderStatus: row['Order Status'] || row.orderStatus || "image edited (not paid)",
                 category: row.Category || row.category || "chocolate",
                 orderType: row['Order Type'] || row.orderType || "Thaaru",
+                role: row.Role || row.role || (((row['Order Type'] || row.orderType) === 'Self') ? 'Self' : 'Others'),
                 manualDeliveryFee: Number(row['Delivery Fee'] || row.manualDeliveryFee) || 0,
                 advanceAmount: Number(row['Advance Amount'] || row.advanceAmount) || 0,
               };
