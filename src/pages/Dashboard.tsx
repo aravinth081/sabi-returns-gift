@@ -112,29 +112,36 @@ const normalizeChocName = (name: string, dynamicInventory: string[] = []) => {
 
 const calculatePriceInfo = (chocolateString: string, count: number | string, discountValue: number | string = 0, isDeliveryFree: boolean = false, paymentStatus: string = "Full Paid", category: string = "chocolate", customPricesMap: Record<string, number> = {}, manualDeliveryFee: number | string = 0, orderStatus: string = "", managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {}, pricingType: 'retail' | 'wholesale' = 'retail', manualProductPrice: number | string = 0) => {
 
-  const quantity = Number(count) || 0;
-  if (!chocolateString || quantity === 0) return { unitPrice: 0, chocolatePrice: 0, deliveryCharge: 0, discount: 0, totalPrice: 0, revenue: 0, fullChocolatePrice: 0, fullDeliveryCharge: 0, fullTotalPrice: 0, fullRevenue: 0 };
+  const chocs = String(chocolateString || "").split(',').map(c => c.trim()).filter(Boolean);
+  const countParts = String(count || "0").split(',').map(c => Number(c.trim()) || 0);
+  const chocCounts = chocs.map((c, i) => countParts[i] !== undefined ? countParts[i] : (countParts[0] || 0));
+  const totalQuantity = chocCounts.reduce((sum, val) => sum + val, 0);
 
-  const chocs = String(chocolateString).split(',').map(c => c.trim()).filter(Boolean);
-  let sumPrice = 0;
-  chocs.forEach(c => {
+  if (!chocolateString || totalQuantity === 0) return { unitPrice: 0, chocolatePrice: 0, deliveryCharge: 0, discount: 0, totalPrice: 0, revenue: 0, fullChocolatePrice: 0, fullDeliveryCharge: 0, fullTotalPrice: 0, fullRevenue: 0 };
+
+  let baseChocolatePrice = 0;
+  chocs.forEach((c, idx) => {
+    const qty = chocCounts[idx] || 0;
     if (category === 'product') {
-      sumPrice += (customPricesMap[c.toLowerCase()] || 0);
+      const price = (customPricesMap[c.toLowerCase()] || 0);
+      baseChocolatePrice += price * qty;
     } else {
       const priceObj = managedChocPricesMap[c.toLowerCase()] || CHOCOLATE_PRICES_MAP[c.toLowerCase()] || { retail: 0, wholesale: 0 };
-      sumPrice += priceObj[pricingType] || 0;
+      const price = priceObj[pricingType] || 0;
+      baseChocolatePrice += price * qty;
     }
   });
 
   let unitPrice = 0;
-  if (chocs.length > 0) unitPrice = sumPrice / chocs.length;
+  if (totalQuantity > 0) {
+    unitPrice = baseChocolatePrice / totalQuantity;
+  }
 
   // Use manualProductPrice as unitPrice if provided (for Dashboard 2)
   if (category === 'product' && Number(manualProductPrice) > 0) {
     unitPrice = Number(manualProductPrice);
+    baseChocolatePrice = Number((unitPrice * totalQuantity).toFixed(2));
   }
-
-  const baseChocolatePrice = Number((unitPrice * quantity).toFixed(2));
 
   let baseDeliveryCharge = 0;
   if (isDeliveryFree) {
@@ -144,7 +151,7 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
   } else if (category === 'product') {
     baseDeliveryCharge = 0;
   } else {
-    baseDeliveryCharge = quantity > 99 ? 200 : 150;
+    baseDeliveryCharge = totalQuantity > 99 ? 200 : 150;
   }
 
   const baseDiscountAmt = Number(discountValue) || 0;
@@ -189,47 +196,48 @@ const calculateOrderFinalCost = (
   customPricesMap: Record<string, number>,
   countOverride?: number
 ) => {
-  const orderCount = Number(order.count) || 0;
   const category = order.category || "chocolate";
   const chocolateName = order.chocolate || "N/A";
 
-  // Extract the stock price number from the name as the count multiplier (only for category !== 'product')
-  let multiplier = 1;
+  const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
+  const countStr = String(order.count || "0");
+  const countParts = countStr.split(',').map(c => Number(c.trim()) || 0);
+  const chocCounts = chocs.map((c, i) => countParts[i] !== undefined ? countParts[i] : (countParts[0] || 0));
+  const totalCount = countOverride !== undefined ? countOverride : chocCounts.reduce((sum, val) => sum + val, 0);
 
-  const count = countOverride !== undefined ? countOverride : (orderCount * multiplier);
+  let totalPurchase = 0;
+  let stickerCost = 0;
+  let labourCost = 0;
 
-  let purchasePricePerItem = 0;
   if (category === 'product') {
+    const qty = totalCount;
     const key = String(order.chocolate || "").toLowerCase();
     const baseProductPrice = Number(order.manualProductPrice) || customPricesMap[key] || 0;
-    purchasePricePerItem = baseProductPrice * 0.7;
+    const purchasePricePerItem = baseProductPrice * 0.7;
+    totalPurchase = purchasePricePerItem * qty;
+    stickerCost = 0;
+    labourCost = 0;
   } else {
-    const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
-    let sumPurchase = 0;
-    chocs.forEach(c => {
+    chocs.forEach((c, idx) => {
       const key = c.toLowerCase();
-      sumPurchase += (managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0);
+      const qty = chocCounts[idx] || 0;
+      
+      const purchasePricePerItem = managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0;
+      totalPurchase += purchasePricePerItem * qty;
+
+      const stickerPricePerItem = managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5;
+      stickerCost += qty * stickerPricePerItem;
+
+      labourCost += qty * 1;
     });
-    purchasePricePerItem = chocs.length > 0 ? sumPurchase / chocs.length : 0;
   }
 
-  const chocs = String(chocolateName).split(',').map(c => c.trim()).filter(Boolean);
-  let sumSticker = 0;
-  chocs.forEach(c => {
-    const key = c.toLowerCase();
-    sumSticker += (managedChocStickersMap[key] !== undefined ? managedChocStickersMap[key] : 1.5);
-  });
-  const stickerPricePerItem = chocs.length > 0 ? sumSticker / chocs.length : 1.5;
-
-  const stickerCost = count * stickerPricePerItem;
-  const labourCost = count * 1;
-  const totalPurchase = purchasePricePerItem * count;
   const finalCost = stickerCost + labourCost + totalPurchase;
 
   return {
-    count,
-    purchasePricePerItem,
-    stickerPricePerItem,
+    count: totalCount,
+    purchasePricePerItem: totalCount > 0 ? totalPurchase / totalCount : 0,
+    stickerPricePerItem: totalCount > 0 ? stickerCost / totalCount : 1.5,
     stickerCost,
     labourCost,
     totalPurchase,
@@ -398,6 +406,7 @@ export default function Dashboard() {
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
+  const [chocolateRows, setChocolateRows] = useState<{ chocolate: string; count: string }[]>([{ chocolate: "", count: "" }]);
 
   useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
@@ -1224,15 +1233,16 @@ export default function Dashboard() {
       if (!order.chocolate) return;
 
       const orderChocs = String(order.chocolate).split(',');
-      const orderQty = Number(order.count || 0);
+      const orderCountStr = String(order.count || 0);
+      const countParts = orderCountStr.split(',').map(c => Number(c.trim()) || 0);
 
-      orderChocs.forEach(c => {
+      orderChocs.forEach((c, idx) => {
         const key = normalizeChocName(c, dynamicInventory);
+        const qty = countParts[idx] !== undefined ? countParts[idx] : (countParts[0] || 0);
         if (balances[key] !== undefined) {
-          balances[key] -= orderQty;
+          balances[key] -= qty;
         }
       });
-
     });
 
     return balances;
@@ -1266,10 +1276,13 @@ export default function Dashboard() {
 
     const getRetailPrice = (chocName: string) => {
       const normalized = chocName.toLowerCase().trim().replace(/\s+/g, ' ');
+      const dbPriceObj = managedChocPricesMap[normalized] || CHOCOLATE_PRICES_MAP[normalized];
+      if (dbPriceObj && dbPriceObj.retail !== undefined) {
+        return dbPriceObj.retail;
+      }
       if (CURRENT_INVENTORY_RETAIL_PRICES[normalized] !== undefined) {
         return CURRENT_INVENTORY_RETAIL_PRICES[normalized];
       }
-      const dbPriceObj = managedChocPricesMap[normalized] || CHOCOLATE_PRICES_MAP[normalized];
       return dbPriceObj ? (dbPriceObj.retail || 0) : 0;
     };
 
@@ -1302,8 +1315,14 @@ export default function Dashboard() {
 
         if (order.chocolate) {
           const chocs = String(order.chocolate).split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean);
-          chocs.forEach((chocName) => {
-            chocProfitMap[chocName] = (chocProfitMap[chocName] || 0) + (profit / chocs.length);
+          const countParts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
+          const chocCounts = chocs.map((c, i) => countParts[i] !== undefined ? countParts[i] : (countParts[0] || 0));
+          const totalQty = chocCounts.reduce((sum, val) => sum + val, 0);
+
+          chocs.forEach((chocName, idx) => {
+            const qty = chocCounts[idx] || 0;
+            const share = totalQty > 0 ? (qty / totalQty) : (1 / chocs.length);
+            chocProfitMap[chocName] = (chocProfitMap[chocName] || 0) + (profit * share);
           });
         }
       }
@@ -1362,29 +1381,32 @@ export default function Dashboard() {
 
       if (order.chocolate) {
         const chocs = String(order.chocolate).split(',').map(c => normalizeChocName(c.trim(), dynamicInventory));
+        const countParts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        const chocCounts = chocs.map((c, i) => countParts[i] !== undefined ? countParts[i] : (countParts[0] || 0));
 
         if (salesTrackerChoc === 'All') {
           if (order.category !== 'product') {
-            const orderQty = Number(order.count || 0);
+            const orderQty = chocCounts.reduce((sum, val) => sum + val, 0);
             count += orderQty;
             const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
             revenue += priceInfo.chocolatePrice;
           }
         } else {
           const targetChoc = normalizeChocName(salesTrackerChoc, dynamicInventory);
-          if (chocs.includes(targetChoc) && order.category !== 'product') {
-            const orderQty = Number(order.count || 0);
+          const targetIndex = chocs.indexOf(targetChoc);
+          if (targetIndex !== -1 && order.category !== 'product') {
+            const orderQty = chocCounts[targetIndex] || 0;
             count += orderQty;
 
             let multiplier = 1;
             if (order.paymentStatus === 'Partially Paid') multiplier = 0.5;
             else if (order.paymentStatus === 'Pending') multiplier = 0;
 
-            const basePrice = managedChocPricesMap[targetChoc.toLowerCase()] || CHOCOLATE_PRICES_MAP[targetChoc.toLowerCase()] || 0;
+            const priceObj = managedChocPricesMap[targetChoc.toLowerCase()] || CHOCOLATE_PRICES_MAP[targetChoc.toLowerCase()] || { retail: 0, wholesale: 0 };
+            const basePrice = priceObj[order.pricingType || 'retail'] || 0;
             revenue += (orderQty * basePrice * multiplier);
           }
         }
-
       }
     });
     return { count, revenue: Math.round(revenue) };
@@ -1482,7 +1504,10 @@ export default function Dashboard() {
     const total = filteredDashboardOrders.length;
     const delivered = filteredDashboardOrders.filter(o => o.status === "Delivered").length;
     const inProcess = filteredDashboardOrders.filter(o => o.status === "In Process").length;
-    const items = filteredDashboardOrders.reduce((sum, o) => sum + Number(o.count || 0), 0);
+    const items = filteredDashboardOrders.reduce((sum, o) => {
+      const counts = String(o.count || 0).split(',').map(c => Number(c.trim()) || 0);
+      return sum + counts.reduce((s, val) => s + val, 0);
+    }, 0);
 
     const chocolateCounts: Record<string, number> = {};
     let netRevenue = 0;
@@ -1498,8 +1523,11 @@ export default function Dashboard() {
 
 
       if (o.chocolate) {
-        String(o.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
-          chocolateCounts[key] = (chocolateCounts[key] || 0) + Number(o.count || 0);
+        const orderChocs = String(o.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean);
+        const counts = String(o.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        orderChocs.forEach((key, idx) => {
+          const qty = counts[idx] !== undefined ? counts[idx] : (counts[0] || 0);
+          chocolateCounts[key] = (chocolateCounts[key] || 0) + qty;
         });
       }
     });
@@ -1646,13 +1674,17 @@ export default function Dashboard() {
     baseOrders.forEach(order => {
       const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
       totalRev += priceInfo.fullRevenue;
-      totalItems += Number(order.count || 0);
+      const counts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
+      const sumQty = counts.reduce((s, val) => s + val, 0);
+      totalItems += sumQty;
       totalDelivery += priceInfo.deliveryCharge;
 
 
       if (order.chocolate) {
-        String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
-          itemCounts[key] = (itemCounts[key] || 0) + Number(order.count || 0);
+        const orderChocs = String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean);
+        orderChocs.forEach((key, idx) => {
+          const qty = counts[idx] !== undefined ? counts[idx] : (counts[0] || 0);
+          itemCounts[key] = (itemCounts[key] || 0) + qty;
         });
       }
     });
@@ -1758,15 +1790,19 @@ export default function Dashboard() {
       if (order.status === "Delivered" || order.status === "In Process") {
         const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
         totalRev += priceInfo.fullRevenue;
-        totalItems += Number(order.count || 0);
+        const counts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        const sumQty = counts.reduce((s, val) => s + val, 0);
+        totalItems += sumQty;
         totalDelivery += priceInfo.deliveryCharge;
 
         const costInfo = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
         totalCost += costInfo.finalCost;
 
         if (order.chocolate) {
-          String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean).forEach((key: string) => {
-            chocolateCounts[key] = (chocolateCounts[key] || 0) + Number(order.count || 0);
+          const orderChocs = String(order.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean);
+          orderChocs.forEach((key, idx) => {
+            const qty = counts[idx] !== undefined ? counts[idx] : (counts[0] || 0);
+            chocolateCounts[key] = (chocolateCounts[key] || 0) + qty;
           });
         }
       }
@@ -2043,12 +2079,14 @@ export default function Dashboard() {
       );
 
 
-      if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
-        newFormData.paymentStatus = 'Full Paid';
-      } else if (currentAdvance > 0) {
-        newFormData.paymentStatus = 'Partially Paid';
-      } else {
-        newFormData.paymentStatus = 'Pending';
+      if (formData.fireId === null) {
+        if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+          newFormData.paymentStatus = 'Full Paid';
+        } else if (currentAdvance > 0) {
+          newFormData.paymentStatus = 'Partially Paid';
+        } else {
+          newFormData.paymentStatus = 'Pending';
+        }
       }
     }
 
@@ -2061,6 +2099,7 @@ export default function Dashboard() {
       ? categoryOverride
       : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
     setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    setChocolateRows([{ chocolate: "", count: "" }]);
     setOrderTypeOthersToggle(true);
     setIsModalOpen(true);
   };
@@ -2103,6 +2142,7 @@ export default function Dashboard() {
       manualProductPrice: "",
       pricingType: 'retail'
     });
+    setChocolateRows([{ chocolate: "", count: String(n.chocolateCount || "") }]);
     setOrderTypeOthersToggle(true);
     setIsModalOpen(true);
   };
@@ -2130,8 +2170,17 @@ export default function Dashboard() {
       advanceAmount: order.advanceAmount || "",
       manualProductPrice: order.manualProductPrice || "",
       pricingType: order.pricingType || 'retail'
-
     });
+
+    // Populate chocolateRows by splitting chocolate and count values
+    const chocs = String(order.chocolate || "").split(',').map(c => c.trim()).filter(Boolean);
+    const counts = String(order.count || "").split(',').map(c => c.trim()).filter(Boolean);
+    const rows = chocs.map((choc, idx) => ({
+      chocolate: choc,
+      count: counts[idx] !== undefined ? counts[idx] : (counts[0] || "")
+    }));
+    setChocolateRows(rows.length > 0 ? rows : [{ chocolate: "", count: "" }]);
+
     setOrderTypeOthersToggle(currentRole === 'Others');
     setIsModalOpen(true);
   };
@@ -3808,7 +3857,7 @@ export default function Dashboard() {
                       <Plus size={16} /> Add Entry
                     </button>
                   </div>
-                  <div className="overflow-auto flex-1 custom-scrollbar bg-white rounded-xl border border-[#d7ccc8] shadow-inner">
+                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-white rounded-xl border border-[#d7ccc8] shadow-inner">
                     <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead className="sticky top-0 bg-[#fff59d] z-10 shadow-sm border-b-2 border-[#fbc02d]">
                         <tr className="text-sm uppercase tracking-wider text-[#5d4037]">
@@ -5854,21 +5903,104 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>{formData.category === 'product' ? 'Product Name' : 'Chocolate Name'}</label>
-                    <ChocolateSingleSelect
-                      value={formData.chocolate}
-                      onChange={(val) => setFormData({ ...formData, chocolate: val })}
-                      suggestions={formData.category === 'product' ? customProducts.map(p => p.name) : uniqueChocolates}
-                      pricesMap={formData.category === 'product' ? customPricesMap : managedChocPricesMap}
-                      placeholderText={formData.category === 'product' ? "Select product..." : "Select chocolate..."}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Count (Quantity)</label>
-                    <input required type="number" name="count" value={formData.count} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Quantity" />
-                  </div>
+                  {formData.category === 'product' ? (
+                    <>
+                      <div>
+                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Product Name</label>
+                        <ChocolateSingleSelect
+                          value={formData.chocolate}
+                          onChange={(val) => setFormData({ ...formData, chocolate: val })}
+                          suggestions={customProducts.map(p => p.name)}
+                          pricesMap={customPricesMap}
+                          placeholderText="Select product..."
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Count (Quantity)</label>
+                        <input required type="number" name="count" value={formData.count} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Quantity" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className={`block text-[11px] font-black uppercase tracking-wider text-[#5d4037]`}>Chocolates List</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newRows = [...chocolateRows, { chocolate: "", count: "" }];
+                            setChocolateRows(newRows);
+                          }}
+                          className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black flex items-center gap-1 transition-colors"
+                        >
+                          <Plus size={10} /> Add Chocolate
+                        </button>
+                      </div>
+                      {chocolateRows.map((row, idx) => (
+                        <div key={idx} className="flex gap-2 items-center bg-amber-50/30 p-2.5 rounded-xl border border-amber-100/50">
+                          <div className="flex-1 min-w-0">
+                            <ChocolateSingleSelect
+                              value={row.chocolate}
+                              onChange={(val) => {
+                                const newRows = [...chocolateRows];
+                                newRows[idx].chocolate = val;
+                                setChocolateRows(newRows);
+                                const chocsStr = newRows.map(r => r.chocolate.trim()).filter(Boolean).join(', ');
+                                const countsStr = newRows.map(r => r.count.trim()).filter(Boolean).join(', ');
+                                setFormData(prev => ({
+                                  ...prev,
+                                  chocolate: chocsStr,
+                                  count: countsStr
+                                }));
+                              }}
+                              suggestions={uniqueChocolates}
+                              pricesMap={managedChocPricesMap}
+                              placeholderText="Select chocolate..."
+                            />
+                          </div>
+                          <div className="w-20 shrink-0">
+                            <input
+                              required
+                              type="text"
+                              value={row.count}
+                              onChange={(e) => {
+                                const newRows = [...chocolateRows];
+                                newRows[idx].count = e.target.value;
+                                setChocolateRows(newRows);
+                                const chocsStr = newRows.map(r => r.chocolate.trim()).filter(Boolean).join(', ');
+                                const countsStr = newRows.map(r => r.count.trim()).filter(Boolean).join(', ');
+                                setFormData(prev => ({
+                                  ...prev,
+                                  chocolate: chocsStr,
+                                  count: countsStr
+                                }));
+                              }}
+                              className="w-full text-xs font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner"
+                              placeholder="Qty"
+                            />
+                          </div>
+                          {chocolateRows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newRows = chocolateRows.filter((_, i) => i !== idx);
+                                setChocolateRows(newRows);
+                                const chocsStr = newRows.map(r => r.chocolate.trim()).filter(Boolean).join(', ');
+                                const countsStr = newRows.map(r => r.count.trim()).filter(Boolean).join(', ');
+                                setFormData(prev => ({
+                                  ...prev,
+                                  chocolate: chocsStr,
+                                  count: countsStr
+                                }));
+                              }}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors shrink-0"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div>
                     <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Discount Amount</label>
@@ -5910,12 +6042,14 @@ export default function Dashboard() {
                                 newFormData.manualProductPrice
                               );
                               const currentAdvance = Number(newFormData.advanceAmount);
-                              if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
-                                newFormData.paymentStatus = 'Full Paid';
-                              } else if (currentAdvance > 0) {
-                                newFormData.paymentStatus = 'Partially Paid';
-                              } else {
-                                newFormData.paymentStatus = 'Pending';
+                              if (formData.fireId === null) {
+                                if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+                                  newFormData.paymentStatus = 'Full Paid';
+                                } else if (currentAdvance > 0) {
+                                  newFormData.paymentStatus = 'Partially Paid';
+                                } else {
+                                  newFormData.paymentStatus = 'Pending';
+                                }
                               }
                               setFormData(newFormData);
                             }}
@@ -6014,12 +6148,14 @@ export default function Dashboard() {
                             newFormData.manualProductPrice
                           );
                           const currentAdvance = Number(newFormData.advanceAmount);
-                          if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
-                            newFormData.paymentStatus = 'Full Paid';
-                          } else if (currentAdvance > 0) {
-                            newFormData.paymentStatus = 'Partially Paid';
-                          } else {
-                            newFormData.paymentStatus = 'Pending';
+                          if (formData.fireId === null) {
+                            if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+                              newFormData.paymentStatus = 'Full Paid';
+                            } else if (currentAdvance > 0) {
+                              newFormData.paymentStatus = 'Partially Paid';
+                            } else {
+                              newFormData.paymentStatus = 'Pending';
+                            }
                           }
                           setFormData(newFormData);
                         }}
