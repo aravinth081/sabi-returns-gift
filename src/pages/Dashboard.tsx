@@ -5809,21 +5809,18 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <datalist id="names-list">{uniqueNames.map((name, i) => <option key={i} value={name} />)}</datalist>
-            <datalist id="phones-list">{uniquePhones.map((phone, i) => <option key={i} value={phone} />)}</datalist>
-
             <form onSubmit={handleSave} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                 {/* Column 1: Customer & Dates */}
                 <div className="space-y-3">
                   <div>
                     <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Customer Name</label>
-                    <input required list="names-list" type="text" name="name" value={formData.name} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter Name" />
+                    <input required autoComplete="off" type="text" name="name" value={formData.name} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter Name" />
                   </div>
 
                   <div>
                     <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Contact Number</label>
-                    <input required list="phones-list" type="text" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Phone Number" />
+                    <input required autoComplete="off" type="text" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Phone Number" />
                   </div>
 
 
