@@ -1,6 +1,7 @@
  import React, { useRef, useMemo, useState } from 'react';
 import { X, Download, Copy, CheckCircle2, ClipboardCheck } from "lucide-react";
 import html2canvas from 'html2canvas';
+import { formatPhoneNumber } from '@/lib/utils';
 
 export default function OrderInvoiceView({ order, onClose }: { order: any; onClose: () => void }) {
   const invoiceRef = useRef<HTMLDivElement>(null);
@@ -194,7 +195,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
         <div className="mb-6">
           <p className="font-bold text-gray-500 mb-1">Customer Details:</p>
           <p className="font-black text-lg leading-none mb-1">{order.name}</p>
-          <p className="font-bold">Ph: {order.phone}</p>
+          <p className="font-bold">Ph: {formatPhoneNumber(order.phone)}</p>
         </div>
 
         {/* Items Table */}

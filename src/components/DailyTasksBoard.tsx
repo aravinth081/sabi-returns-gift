@@ -4,7 +4,7 @@ import {
   Plus, X, Upload, Pencil, Trash2, Phone, Calendar as CalendarIcon, 
   MessageSquare, ClipboardList, ShoppingBag, Trash,
   ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical,
-  Heart, Camera, FileSpreadsheet
+  Heart, Camera, FileSpreadsheet, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -130,6 +130,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [sortPreferences, setSortPreferences] = useState<Record<string, SortMode>>({});
   const [openSortMenuListId, setOpenSortMenuListId] = useState<string | null>(null);
   const [openMoreMenuListId, setOpenMoreMenuListId] = useState<string | null>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   
   // Add List state
   const [isAddingList, setIsAddingList] = useState(false);
@@ -1380,6 +1381,45 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     reader.readAsArrayBuffer(file);
   };
 
+  const handleExportExcel = () => {
+    try {
+      const exportRows: any[] = [];
+      lists.forEach(list => {
+        const sortMode = sortPreferences[list.id] || 'default';
+        let displayCards = getSortedCards(list.cards, sortMode);
+        if (selectedFilterDate) {
+          displayCards = displayCards.filter(card => card.birthdayDate === selectedFilterDate);
+        }
+        displayCards.forEach(card => {
+          exportRows.push({
+            "List Name": list.title,
+            "Phone Number": normalizePhone(card.phoneNumber),
+            "Status": card.status || "Waiting for Image",
+            "Birthday Date": card.birthdayDate || "",
+            "Chocolate Count": card.chocolateCount || "",
+            "Comments": card.comments || "",
+            "Important": card.favorite ? "Yes" : "No"
+          });
+        });
+      });
+
+      if (exportRows.length === 0) {
+        toast.error("No Daily Task data available to export.");
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Daily_Tasks");
+      XLSX.writeFile(workbook, `Daily_Tasks_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success(`Successfully exported ${exportRows.length} Daily Task cards to Excel!`);
+    } catch (err) {
+      console.error("Daily Task Export Error:", err);
+      toast.error("Failed to export Daily Task data to Excel.");
+    }
+  };
+
+
   const handleDeleteUploadedFile = (fileId: string) => {
     if (window.confirm("Are you sure you want to delete this file and all new cards imported from it?")) {
       const updatedFilesList = uploadedFiles.filter(f => f.id !== fileId);
@@ -1570,13 +1610,34 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </button>
             )}
 
-            {/* Import Excel */}
-            <button 
-              onClick={handleImportClick}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 border border-blue-500/50"
-            >
-              <Upload size={16} /> Upload File
-            </button>
+            {/* More Options Popover Menu */}
+            <Popover open={isMoreMenuOpen} onOpenChange={setIsMoreMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex items-center gap-2 px-3 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl border border-white/20 hover:border-white/40 font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg cursor-pointer"
+                  title="More Options"
+                >
+                  <MoreVertical size={18} />
+                  <span className="hidden sm:inline">Options</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-48 p-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  onClick={() => { setIsMoreMenuOpen(false); handleImportClick(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-left"
+                >
+                  <Upload size={16} className="text-blue-500" />
+                  <span>📥 Import Excel</span>
+                </button>
+                <button
+                  onClick={() => { setIsMoreMenuOpen(false); handleExportExcel(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors text-left border-t border-slate-100 mt-1 pt-2"
+                >
+                  <Download size={16} className="text-emerald-500" />
+                  <span>📤 Export Excel</span>
+                </button>
+              </PopoverContent>
+            </Popover>
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -1584,6 +1645,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               accept=".xlsx,.xls" 
               className="hidden" 
             />
+
 
             {/* Wallpaper Controls */}
             <button 

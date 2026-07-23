@@ -2,6 +2,7 @@
 import { 
   Home, User, FileText, LogOut, Bell, Plus, Download, Eye, Pencil, Trash2, MapPin, Clock, Users, Droplet 
 } from "lucide-react";
+import { formatPhoneNumber } from "@/lib/utils";
 
 // Initial Table Data
 const initialUsers = [
@@ -197,7 +198,7 @@ export default function Index() {
                     users.map((user) => (
                       <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                         <td className="p-4 font-medium text-gray-800">{user.name}</td>
-                        <td className="p-4 text-gray-600">{user.phone}</td>
+                        <td className="p-4 text-gray-600">{formatPhoneNumber(user.phone)}</td>
                         <td className="p-4">
                           <span className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold border border-red-100">
                             {user.bloodGroup}
@@ -271,7 +272,7 @@ export default function Index() {
               <User size={40} className="text-gray-400" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800">{previewData.name}</h2>
-            <p className="text-gray-500 font-medium mb-6">{previewData.phone}</p>
+            <p className="text-gray-500 font-medium mb-6">{formatPhoneNumber(previewData.phone)}</p>
             
             <div className="bg-gray-50 rounded-lg p-4 text-left space-y-3 mb-6">
               <div className="flex justify-between items-center">

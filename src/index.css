@@ -1007,9 +1007,10 @@ main {
   font-weight: 800 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  font-size: 11px !important;
+  font-size: 13px !important; /* Increased font size */
+  text-align: center !important; /* Center-align all table headers */
   border: 1px solid #cbd5e1 !important;
-  padding: 8px 12px !important;
+  padding: 12px 16px !important; /* Improved spacing */
 }
 
 /* Alternating clean white/warm-stone rows */
@@ -1030,8 +1031,10 @@ main {
 .wallpaper-active .screenshot-mode-active td,
 .screenshot-mode-active td {
   color: #334155 !important; /* Elegant slate grey for secondary cell texts */
-  font-weight: 600 !important;
-  padding: 8px 12px !important;
+  font-weight: 700 !important;
+  font-size: 14px !important; /* Increased font size */
+  text-align: center !important; /* Center-align all table cells */
+  padding: 12px 16px !important; /* Improved spacing */
   border: 1px solid #cbd5e1 !important;
 }
 
@@ -1042,6 +1045,7 @@ main {
 .screenshot-mode-active td.text-amber-950 {
   color: #0f172a !important; /* Deep charcoal for main text */
   font-weight: 800 !important;
+  text-align: center !important;
 }
 
 /* Total Price highlight text */
@@ -1049,7 +1053,8 @@ main {
 .screenshot-mode-active td.text-base {
   color: #0f172a !important;
   font-weight: 800 !important;
-  font-size: 14px !important;
+  font-size: 16px !important; /* Increased font size */
+  text-align: center !important;
 }
 
 /* Pill status badges for payment */

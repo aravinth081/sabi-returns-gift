@@ -25,6 +25,9 @@ import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
 import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
 import { toast } from 'sonner';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { formatPhoneNumber } from "@/lib/utils";
+
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
   apiKey: "AIzaSyA2zPg2iKK5oTYqctmqQt3N5wUNOoZ8Kp8",
@@ -1141,7 +1144,9 @@ export default function Dashboard() {
   const setHiddenCols = activeTab === 'dashboard2' ? setHiddenColsD2 : setHiddenColsD1;
 
   const [isScreenshotMode, setIsScreenshotMode] = useState(false);
+  const [isDashMoreMenuOpen, setIsDashMoreMenuOpen] = useState(false);
   const screenshotTableRef = useRef<HTMLDivElement>(null);
+
 
   const toggleCol = (col: string) => {
     setHiddenCols(prev => ({ ...prev, [col]: !prev[col] }));
@@ -1555,7 +1560,7 @@ export default function Dashboard() {
         const stickerCost = count * stickerPricePerItem;
         const labourCost = count * 1;
         const totalPurchase = purchasePricePerItem * count;
-        const finalCost = stickerCost + labourCost + totalPurchase;
+        const invFinalCost = stickerCost + labourCost + totalPurchase;
 
         return {
           serialNo: "",
@@ -1566,7 +1571,7 @@ export default function Dashboard() {
           stickerCost,
           labourCost,
           totalPurchase,
-          finalCost
+          finalCost: invFinalCost
         };
       });
 
@@ -1577,12 +1582,12 @@ export default function Dashboard() {
         acc.stickerCost += row.stickerCost;
         acc.labourCost += row.labourCost;
         acc.totalPurchase += row.totalPurchase;
-        acc.finalCost += row.finalCost;
         return acc;
-      }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
+      }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: approximateProfitData.grandTotal });
 
       return { rows, grandTotals };
     }
+
 
     let baseOrders = orders.filter(order => order.status === "Delivered" || order.status === "In Process");
 
@@ -1635,7 +1640,7 @@ export default function Dashboard() {
     }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
     return { rows, grandTotals };
-  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap, inventoryBalances, dynamicInventory, activeTab, isInvAdmin]);
+  }, [orders, currentAdminDateRange, currentAdminDateType, managedChocPricesMap, managedChocStickersMap, customPricesMap, inventoryBalances, dynamicInventory, activeTab, isInvAdmin, approximateProfitData]);
 
   // 🟢 NEW: Calculated Report Data exclusively for the Admin Panel Dropdown
   const adminReportData = useMemo(() => {
@@ -2589,6 +2594,7 @@ export default function Dashboard() {
 
     const formattedOrder: any = {
       ...formData,
+      phone: formatPhoneNumber(formData.phone),
       orderDate: formatToDisplayDate(formData.orderDate) || "",
       functionDate: formatToDisplayDate(formData.functionDate) || "",
       deliveryDate: formatToDisplayDate(formData.deliveryDate) || "",
@@ -2873,7 +2879,7 @@ export default function Dashboard() {
           "Order ID": getSerial(order.id),
           "Order Date": order.orderDate || order.functionDate,
           "Name": order.name,
-          "Contact Number": order.phone,
+          "Contact Number": formatPhoneNumber(order.phone),
           "Function Date": order.functionDate,
           "Dispatch Date": order.deliveryDate,
           "Chocolate Name": order.chocolate,
@@ -2887,12 +2893,19 @@ export default function Dashboard() {
         };
       });
 
+      if (exportData.length === 0) {
+        toast.error("No Dashboard orders available to export.");
+        return;
+      }
+
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
-      XLSX.writeFile(workbook, "Order_Records.xlsx");
+      XLSX.writeFile(workbook, `Dashboard_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success(`Successfully exported ${exportData.length} orders to Excel!`);
     } catch (err) {
-      alert("❌ Error exporting file. Please try running 'npm install xlsx' in your terminal.");
+      console.error("Dashboard Export Error:", err);
+      toast.error("Failed to export Dashboard data to Excel.");
     }
   };
 
@@ -2901,6 +2914,12 @@ export default function Dashboard() {
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast.error("Invalid file format. Please upload a valid Excel (.xlsx or .xls) file.");
+      if (e.target) e.target.value = '';
+      return;
+    }
 
     try {
       const XLSX = await import("xlsx");
@@ -2915,25 +2934,30 @@ export default function Dashboard() {
           const data = XLSX.utils.sheet_to_json(worksheet);
 
           if (data && data.length > 0) {
+            let importedCount = 0;
             for (const row of (data as any[])) {
+              const rawName = row.Name || row.name || "";
+              const rawPhone = row['Contact Number'] || row.Phone || row.phone || "";
+              if (!rawName && !rawPhone) continue;
+
               const orderObj = {
                 id: Date.now() + Math.random(),
                 orderDate: formatToDisplayDate(row['Order Date'] || row.orderDate || row['Function Date'] || ""),
-                name: row.Name || row.name || "",
-                phone: String(row['Contact Number'] || row.Phone || row.phone || ""),
+                name: String(rawName).trim(),
+                phone: formatPhoneNumber(rawPhone),
                 deliveryDate: formatToDisplayDate(row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || row['Function Date'] || row.functionDate || row['Order Date'] || row.orderDate || ""),
                 functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || ""),
-                chocolate: row['Chocolate Name'] || row.Chocolate || row.chocolate || "",
+                chocolate: String(row['Chocolate Name'] || row.Chocolate || row.chocolate || "").trim(),
                 count: Number(row.Count || row.count) || 0,
-                status: row.Status || row.status || "In Process",
-                paymentStatus: row.Payment || row['Payment Status'] || row.paymentStatus || "Pending",
-                address: row.Address || row.address || "",
+                status: String(row.Status || row.status || "In Process").trim(),
+                paymentStatus: String(row.Payment || row['Payment Status'] || row.paymentStatus || "Pending").trim(),
+                address: String(row.Address || row.address || "").trim(),
                 discount: Number(row.Discount || row.discount) || 0,
                 isDeliveryFree: row['Delivery Charge'] === 'Free' || false,
-                orderStatus: row['Order Status'] || row.orderStatus || "image edited (not paid)",
-                category: row.Category || row.category || "chocolate",
-                orderType: row['Order Type'] || row.orderType || "Thaaru",
-                role: row.Role || row.role || (((row['Order Type'] || row.orderType) === 'Self') ? 'Self' : 'Others'),
+                orderStatus: String(row['Order Status'] || row.orderStatus || "image edited (not paid)").trim(),
+                category: String(row.Category || row.category || "chocolate").trim(),
+                orderType: String(row['Order Type'] || row.orderType || "Thaaru").trim(),
+                role: String(row.Role || row.role || (((row['Order Type'] || row.orderType) === 'Self') ? 'Self' : 'Others')).trim(),
                 manualDeliveryFee: Number(row['Delivery Fee'] || row.manualDeliveryFee) || 0,
                 advanceAmount: Number(row['Advance Amount'] || row.advanceAmount) || 0,
               };
@@ -2945,22 +2969,30 @@ export default function Dashboard() {
                 calculatedDeliveryFee: priceData.fullDeliveryCharge || 0
               };
               await addDoc(collection(db, "orders"), finalOrderObj);
+              importedCount++;
             }
-            alert(`✅ Successfully imported ${data.length} orders to Database!`);
+            if (importedCount > 0) {
+              toast.success(`Successfully imported ${importedCount} orders to Dashboard!`);
+            } else {
+              toast.error("No valid order rows found in the uploaded file.");
+            }
           } else {
-            alert("⚠️ The uploaded file is empty or missing data.");
+            toast.error("The uploaded Excel file is empty or missing data.");
           }
         } catch (err) {
-          alert("❌ Error parsing the Excel file contents. Ensure it matches the template.");
+          console.error("Dashboard Import Error:", err);
+          toast.error("Error parsing the Excel file contents. Ensure columns match the template.");
         }
       };
 
       reader.readAsBinaryString(file);
     } catch (err) {
-      alert("❌ Error importing file. Please try running 'npm install xlsx' in your terminal.");
+      console.error("Dashboard Import Error:", err);
+      toast.error("Error importing file.");
     }
     if (e.target) e.target.value = '';
   };
+
 
   const handleSendSMS = (order: any) => {
     const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
@@ -4259,7 +4291,7 @@ export default function Dashboard() {
                                       </span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1">
-                                      <p className="text-[10px] text-slate-500 font-medium">{n.phoneNumber}</p>
+                                      <p className="text-[10px] text-slate-500 font-medium">{formatPhoneNumber(n.phoneNumber)}</p>
                                       <div className="flex items-center gap-1.5">
                                         <button
                                           onClick={(e) => {
@@ -4310,6 +4342,42 @@ export default function Dashboard() {
                         )}
                       </div>
 
+
+                      {/* More Options Popover Menu (Dashboard) */}
+                      <Popover open={isDashMoreMenuOpen} onOpenChange={setIsDashMoreMenuOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer shadow-sm"
+                            title="More Options"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-48 p-1.5 bg-white border border-amber-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                          <button
+                            onClick={() => { setIsDashMoreMenuOpen(false); handleImportClick(); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-left"
+                          >
+                            <Upload size={16} className="text-blue-500" />
+                            <span>📥 Import Excel</span>
+                          </button>
+                          <button
+                            onClick={() => { setIsDashMoreMenuOpen(false); handleExportExcel(); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors text-left border-t border-amber-100 mt-1 pt-2"
+                          >
+                            <Download size={16} className="text-emerald-500" />
+                            <span>📤 Export Excel</span>
+                          </button>
+                        </PopoverContent>
+                      </Popover>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileImport} 
+                        accept=".xlsx,.xls" 
+                        className="hidden" 
+                      />
+
                       {activeTab === 'dashboard2' && (
                         <button onClick={() => setIsAddProductModalOpen(true)} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700`}>
                           <Plus size={18} /> Add Product
@@ -4319,6 +4387,7 @@ export default function Dashboard() {
                       <button onClick={handleAddClick} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-amber-600 text-white hover:bg-amber-700`}>
                         <Plus size={18} /> Add Order
                       </button>
+
                     </div>
                   </div>
 
@@ -4705,7 +4774,7 @@ export default function Dashboard() {
                                 )}
 
                                 <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
-                                {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.phone}</td>}
+                                {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{formatPhoneNumber(order.phone)}</td>}
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
                                 <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
 
@@ -5061,7 +5130,7 @@ export default function Dashboard() {
                           <div>
                             <h3 className="text-lg font-bold text-amber-950">{order.name}</h3>
                             <p className="text-sm font-medium text-amber-700 mb-1">
-                              {order.phone} • {order.count} Items • <span className="font-bold text-amber-900">₹{priceData.totalPrice}</span>
+                              {formatPhoneNumber(order.phone)} • {order.count} Items • <span className="font-bold text-amber-900">₹{priceData.totalPrice}</span>
                             </p>
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm font-medium text-amber-600">Item:</span>
@@ -5786,7 +5855,7 @@ export default function Dashboard() {
                     return (
                       <tr key={idx} className="border-b border-amber-100 text-sm print:border-gray-400">
                         <td className="p-3 font-bold text-amber-950 border-r border-amber-100 print:border-gray-400 print:text-black">{order.name}</td>
-                        <td className="p-3 text-amber-800 border-r border-amber-100 print:border-gray-400 print:text-black">{order.phone}</td>
+                        <td className="p-3 text-amber-800 border-r border-amber-100 print:border-gray-400 print:text-black">{formatPhoneNumber(order.phone)}</td>
                         <td className="p-3 font-medium text-amber-900 border-r border-amber-100 print:border-gray-400 print:text-black">{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
                         <td className="p-3 text-amber-800 border-r border-amber-100 print:border-gray-400 print:text-black max-w-[200px] truncate">{order.chocolate}</td>
 
@@ -6225,7 +6294,7 @@ export default function Dashboard() {
                       <User size={24} className="absolute -z-10" />
                     </div>
                     <h2 className="text-xl font-black text-[#3e2723]">{previewData.name}</h2>
-                    <p className="font-bold text-amber-700 text-[12px] mb-1">{previewData.phone}</p>
+                    <p className="font-bold text-amber-700 text-[12px] mb-1">{formatPhoneNumber(previewData.phone)}</p>
                     <span className="inline-block bg-amber-200 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black tracking-widest border border-amber-300 w-max shadow-sm mb-0.5">
                       INV: {getSerial(previewData.id)}
                     </span>
@@ -6408,7 +6477,7 @@ export default function Dashboard() {
                     <h3 className="text-base font-extrabold text-black tracking-wide mb-3">Shipping Label</h3>
                     <p className="font-extrabold text-[15px] mb-1 text-black">Shipping To:</p>
                     <p className="text-[15px] text-black tracking-wide">{shippingOrder.name}</p>
-                    <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {shippingOrder.phone}</p>
+                    <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {formatPhoneNumber(shippingOrder.phone)}</p>
                   </div>
                   <div className="flex-shrink-0 ml-4">
                     <img src={"/sabi-logo.png"} alt="Logo" className="w-44 h-44 object-contain" crossOrigin="anonymous" onError={(e) => (e.currentTarget.style.display = "none")} />
@@ -6513,7 +6582,7 @@ export default function Dashboard() {
                         <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
                           <td className="p-3">
                             <div className="font-bold text-[#5d4037] text-sm">{order.name}</div>
-                            <div className="text-gray-500 font-semibold">{order.phone}</div>
+                            <div className="text-gray-500 font-semibold">{formatPhoneNumber(order.phone)}</div>
                           </td>
                           <td className="p-3">
                             <div className="font-semibold text-gray-800">{order.chocolate || order.productName || "Product"}</div>
@@ -7607,7 +7676,7 @@ export default function Dashboard() {
 
                   <div>
                     <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider block">Contact Number</span>
-                    <span className="text-sm font-black text-amber-900">{historyDetailOrder.phone || 'N/A'}</span>
+                    <span className="text-sm font-black text-amber-900">{formatPhoneNumber(historyDetailOrder.phone) || 'N/A'}</span>
                   </div>
 
                   {historyDetailOrder.address && (
