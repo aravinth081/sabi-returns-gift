@@ -4,7 +4,7 @@ import {
   Plus, X, Upload, Pencil, Trash2, Phone, Calendar as CalendarIcon, 
   MessageSquare, ClipboardList, ShoppingBag, Trash,
   ArrowUpDown, ArrowUp, ArrowDown, GripVertical, MoreVertical,
-  Heart, Camera, FileSpreadsheet, Download
+  Heart, Camera, FileSpreadsheet, Download, Eye, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -113,6 +113,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [selectedFilterDate, setSelectedFilterDate] = useState<string>("");
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<{ id: string; name: string; uploadedAt: string; count: number }[]>([]);
+  const [showUploadHistoryModal, setShowUploadHistoryModal] = useState(false);
+  const [viewingFileCards, setViewingFileCards] = useState<string | null>(null);
   
   // Card Selection State
   const [selectedCardIds, setSelectedCardIds] = useState<Record<string, string[]>>({});
@@ -1195,8 +1197,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         };
 
         let importCount = 0;
+        let newCardsCount = 0;
+        let existingCardsCount = 0;
         let skipDuplicateCount = 0;
         let skipMissingCount = 0;
+        const importedLabelsSet = new Set<string>();
 
         const updatedLists = lists.map(list => ({ ...list, cards: [...list.cards] }));
 
@@ -1309,10 +1314,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               const movedCard = { 
                 ...existingCard, 
                 status: newStatus,
-                favorite: isImportant ? true : existingCard.favorite
+                favorite: isImportant ? true : existingCard.favorite,
+                importedFromFile: fileId
               };
               updatedLists[targetListIndex].cards.push(movedCard);
               importCount++;
+              existingCardsCount++;
+              importedLabelsSet.add(updatedLists[targetListIndex].title);
 
               // Trigger notification if target list is "Forward to Print"
               if (targetTitle === 'forward to print') {
@@ -1322,7 +1330,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               // Same list, update favorite if needed
               if (isImportant && !existingCard.favorite) {
                 updatedLists[existingListIndex].cards[existingCardIndex].favorite = true;
+                updatedLists[existingListIndex].cards[existingCardIndex].importedFromFile = fileId;
                 importCount++;
+                existingCardsCount++;
+                importedLabelsSet.add(updatedLists[targetListIndex].title);
               } else {
                 skipDuplicateCount++;
               }
@@ -1354,6 +1365,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
           updatedLists[targetListIndex].cards.push(newCard);
           importCount++;
+          newCardsCount++;
+          importedLabelsSet.add(updatedLists[targetListIndex].title);
 
           // Trigger notification if target list is "Forward to Print"
           if (targetTitle === 'forward to print') {
@@ -1361,10 +1374,20 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           }
         });
 
+        const today = new Date();
+        const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+        const loggedInName = localStorage.getItem('loggedInName') || 'Guest';
+        const uploadedBy = loggedInName.toLowerCase() === 'subash' ? 'Subash G' : loggedInName;
+        const label = Array.from(importedLabelsSet).join(', ') || 'N/A';
+
         const newFileEntry = {
           id: fileId,
           name: fileName,
-          uploadedAt,
+          uploadedAt: formattedDate,
+          uploadedBy,
+          label,
+          newCards: newCardsCount,
+          existingCards: existingCardsCount,
           count: importCount
         };
         const updatedFilesList = [...uploadedFiles, newFileEntry];
@@ -1635,6 +1658,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 >
                   <Download size={16} className="text-emerald-500" />
                   <span>📤 Export Excel</span>
+                </button>
+                <button
+                  onClick={() => { setIsMoreMenuOpen(false); setShowUploadHistoryModal(true); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors text-left border-t border-slate-100 mt-1 pt-2"
+                >
+                  <History size={16} className="text-indigo-500" />
+                  <span>📥 Upload History</span>
                 </button>
               </PopoverContent>
             </Popover>
@@ -1962,6 +1992,19 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           />
                           
                           <div className="flex items-center gap-1 shrink-0">
+                            {/* Eye (View) Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDetailsModal(card, list.id);
+                              }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded transition-all cursor-pointer text-slate-400 hover:text-blue-500 hover:bg-blue-50/50"
+                              title="View Details"
+                            >
+                              <Eye size={16} className="stroke-[2.5]" />
+                            </button>
+
                             {/* Favorite Button (Heart) */}
                             <button
                               onClick={(e) => {
@@ -2246,6 +2289,207 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 >
                   Save Changes
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📥 EXCEL UPLOAD HISTORY MODAL */}
+      {showUploadHistoryModal && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setShowUploadHistoryModal(false)}>
+          <div 
+            className="w-full max-w-4xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+            style={{
+              background: 'rgba(255,255,255,0.98)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '1.5rem',
+              border: '1px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-5 flex justify-between items-center" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderBottom: '1px solid #e2e8f0' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-indigo-500/10 rounded-lg">
+                  <History className="text-indigo-600" size={20} />
+                </div>
+                <h3 className="text-lg font-extrabold text-slate-800 uppercase tracking-wider">Excel Upload History</h3>
+              </div>
+              <button 
+                onClick={() => setShowUploadHistoryModal(false)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-xl transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-inner overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-blue-600 text-white text-xs uppercase tracking-wider font-bold">
+                      <th className="p-3 border border-blue-500">Uploaded By</th>
+                      <th className="p-3 border border-blue-500">Date</th>
+                      <th className="p-3 border border-blue-500">Label</th>
+                      <th className="p-3 border border-blue-500 text-center">New Card</th>
+                      <th className="p-3 border border-blue-500 text-center">Existing card</th>
+                      <th className="p-3 border border-blue-500 text-center">Total</th>
+                      <th className="p-3 border border-blue-500 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {uploadedFiles.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-500 font-bold">
+                          No upload history records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      uploadedFiles.map((file: any) => {
+                        const newCards = file.newCards !== undefined ? file.newCards : file.count || 0;
+                        const existingCards = file.existingCards !== undefined ? file.existingCards : 0;
+                        const total = newCards + existingCards;
+                        
+                        return (
+                          <tr key={file.id} className="text-sm hover:bg-slate-50 transition-colors border-b border-slate-200">
+                            <td className="p-3 font-semibold text-slate-700 border border-slate-200">{file.uploadedBy || 'Subash G'}</td>
+                            <td className="p-3 text-slate-600 border border-slate-200">{file.uploadedAt || 'N/A'}</td>
+                            <td className="p-3 text-slate-600 font-medium border border-slate-200">{file.label || 'July'}</td>
+                            <td className="p-3 text-center font-bold text-blue-600 border border-slate-200">{newCards}</td>
+                            <td className="p-3 text-center font-bold text-indigo-600 border border-slate-200">{existingCards}</td>
+                            <td className="p-3 text-center font-extrabold text-slate-800 border border-slate-200">{total}</td>
+                            <td className="p-3 text-center border border-slate-200">
+                              <div className="flex items-center justify-center gap-2">
+                                <button 
+                                  onClick={() => setViewingFileCards(file.id)}
+                                  className="text-blue-500 hover:text-blue-750 transition-colors p-1"
+                                  title="View Uploaded Cards"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteUploadedFile(file.id)}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                  title="Delete Upload"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  {uploadedFiles.length > 0 && (
+                    <tfoot>
+                      <tr className="bg-slate-100 font-black text-slate-700 text-sm">
+                        <td colSpan={3} className="p-3 text-right font-extrabold border border-slate-200">Grand Total</td>
+                        <td className="p-3 text-center text-blue-700 border border-slate-200">
+                          {uploadedFiles.reduce((sum: number, file: any) => sum + (file.newCards !== undefined ? file.newCards : file.count || 0), 0)}
+                        </td>
+                        <td className="p-3 text-center text-indigo-700 border border-slate-200">
+                          {uploadedFiles.reduce((sum: number, file: any) => sum + (file.existingCards !== undefined ? file.existingCards : 0), 0)}
+                        </td>
+                        <td className="p-3 text-center text-slate-900 border border-slate-200">
+                          {uploadedFiles.reduce((sum: number, file: any) => {
+                            const newCards = file.newCards !== undefined ? file.newCards : file.count || 0;
+                            const existingCards = file.existingCards !== undefined ? file.existingCards : 0;
+                            return sum + newCards + existingCards;
+                          }, 0)}
+                        </td>
+                        <td className="p-3 border border-slate-200"></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📄 VIEW CARDS IN FILE MODAL */}
+      {viewingFileCards && (
+        <div className="fixed inset-0 bg-black/60 z-[210] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setViewingFileCards(null)}>
+          <div 
+            className="w-full max-w-3xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+            style={{
+              background: 'rgba(255,255,255,0.98)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '1.5rem',
+              border: '1px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-5 flex justify-between items-center" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderBottom: '1px solid #e2e8f0' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                  <ClipboardList className="text-blue-600" size={20} />
+                </div>
+                <h3 className="text-lg font-extrabold text-slate-800 uppercase tracking-wider">Cards in Uploaded File</h3>
+              </div>
+              <button 
+                onClick={() => setViewingFileCards(null)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-xl transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-inner overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider font-bold">
+                      <th className="p-3 border-b border-slate-200">Phone Number</th>
+                      <th className="p-3 border-b border-slate-200">Status</th>
+                      <th className="p-3 border-b border-slate-200 text-center">Choc Count</th>
+                      <th className="p-3 border-b border-slate-200 font-bold">Comments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const fileCards: DailyTaskCard[] = [];
+                      lists.forEach(l => {
+                        l.cards.forEach(c => {
+                          if (c.importedFromFile === viewingFileCards) {
+                            fileCards.push(c);
+                          }
+                        });
+                      });
+
+                      if (fileCards.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={4} className="p-6 text-center text-slate-500 font-bold">
+                              No cards found associated with this file.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return fileCards.map((card) => (
+                        <tr key={card.id} className="text-sm hover:bg-slate-50 border-b border-slate-200">
+                          <td className="p-3 font-semibold text-slate-700">{card.phoneNumber}</td>
+                          <td className="p-3">
+                            <span className={`px-2.5 py-1 rounded text-xs font-bold border ${getStatusStyle(card.status)}`}>
+                              {card.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center font-extrabold text-slate-800">{card.chocolateCount || '-'}</td>
+                          <td className="p-3 text-slate-600 text-xs italic">{card.comments || '-'}</td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

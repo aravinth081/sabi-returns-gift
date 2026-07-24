@@ -1104,8 +1104,8 @@ main {
 .wallpaper-active .screenshot-mode-active .chocolate-badge,
 .screenshot-mode-active .chocolate-badge {
   color: #1e40af !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
 }
 
 /* ==================== RECHARTS TOOLTIP CONTRAST FIX ==================== */

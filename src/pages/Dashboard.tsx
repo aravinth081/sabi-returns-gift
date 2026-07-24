@@ -972,6 +972,7 @@ export default function Dashboard() {
     itemsPerBox: ""
   });
   const [editInvId, setEditInvId] = useState<string | null>(null);
+  const [viewingInvLog, setViewingInvLog] = useState<any>(null);
 
   const [salesTrackerChoc, setSalesTrackerChoc] = useState("All");
   const [salesTrackerFrom, setSalesTrackerFrom] = useState("");
@@ -1353,17 +1354,20 @@ export default function Dashboard() {
       const invFinalCost = stickerCost + labourCost + totalPurchase;
       
       totalInvFinalCost += invFinalCost;
-      const value = item.value + profit - invFinalCost;
+      const value = invFinalCost;
       return {
         name: item.name,
         profit,
         invValue: item.value,
+        stickerCost,
+        labourCost,
+        totalPurchase,
         invFinalCost,
         value
       };
     });
 
-    const grandTotal = currentInventoryValueData.grandTotal + allTimeProfitData.totalProfit - totalInvFinalCost;
+    const grandTotal = totalInvFinalCost;
     return { items, grandTotal };
   }, [currentInventoryValueData, allTimeProfitData, inventoryBalances, managedChocPricesMap, managedChocStickersMap]);
 
@@ -1582,8 +1586,9 @@ export default function Dashboard() {
         acc.stickerCost += row.stickerCost;
         acc.labourCost += row.labourCost;
         acc.totalPurchase += row.totalPurchase;
+        acc.finalCost += row.finalCost;
         return acc;
-      }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: approximateProfitData.grandTotal });
+      }, { count: 0, stickerCost: 0, labourCost: 0, totalPurchase: 0, finalCost: 0 });
 
       return { rows, grandTotals };
     }
@@ -3147,9 +3152,9 @@ export default function Dashboard() {
     if (!chocString) return null;
     const items = String(chocString).split(',').map(c => c.trim()).filter(Boolean);
     return (
-      <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+      <div className="flex flex-wrap gap-x-1 gap-y-0.5 justify-center items-center text-center">
         {items.map((c, i) => (
-          <span key={i} className="chocolate-badge text-amber-950 text-xs font-bold whitespace-nowrap">
+          <span key={i} className="chocolate-badge text-amber-950 text-sm font-black whitespace-nowrap">
             {c}{i < items.length - 1 ? ',' : ''}
           </span>
         ))}
@@ -3858,8 +3863,8 @@ export default function Dashboard() {
                                 </div>
                                 <div className="mt-1.5 flex justify-between items-center text-[10px] font-bold border-t border-emerald-100/50 pt-1.5 choc-detail-badge-text">
                                   <span className="opacity-75">Calculation:</span>
-                                  <span className="font-mono tracking-tight">
-                                    ₹{Math.round(item.profit).toLocaleString()} + ₹{Math.round(item.invValue).toLocaleString()} - ₹{((item as any).invFinalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  <span className="font-mono tracking-tight text-amber-700">
+                                    ₹{Math.round(item.stickerCost || 0).toLocaleString()} + ₹{Math.round(item.labourCost || 0).toLocaleString()} + ₹{Math.round(item.totalPurchase || 0).toLocaleString()}
                                   </span>
                                 </div>
                               </div>
@@ -3913,6 +3918,7 @@ export default function Dashboard() {
                               <td className="p-4 text-center font-bold text-amber-800">{log.itemsPerBox}</td>
                               <td className="p-4 text-center font-black text-[#3e2723] bg-amber-50/50">+{log.totalChocolates}</td>
                               <td className="p-4 text-center flex items-center justify-center gap-3">
+                                <button onClick={() => setViewingInvLog(log)} className="text-blue-500 hover:text-blue-750 transition-colors" title="View Entry"><Eye size={18} /></button>
                                 <button onClick={() => {
                                   setInvForm({
                                     date: log.date || new Date().toISOString().split('T')[0],
@@ -4620,8 +4626,8 @@ export default function Dashboard() {
                             </th>
                           )}
 
-                          <th className="py-3 px-4 font-bold align-top min-w-[150px]">
-                            <div className="flex items-center gap-1.5 group">
+                          <th className="py-3 px-4 font-bold align-top min-w-[150px] text-center">
+                            <div className="flex items-center justify-center gap-1.5 group">
                               <span>{activeTab === 'dashboard2' ? 'Product Name' : 'Chocolate Name'}</span>
 
                               {/* Dropdown Filter for Chocolates or Products */}
@@ -4805,7 +4811,7 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                <td className={`py-2.5 px-4 print:text-gray-800 align-middle`}>
+                                <td className={`py-2.5 px-4 print:text-gray-800 align-middle text-center`}>
                                   {renderChocolateBadges(order.chocolate)}
                                 </td>
 
@@ -4942,13 +4948,22 @@ export default function Dashboard() {
 
                                 {!isScreenshotMode && (
                                   <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
-                                    <button
-                                      onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
-                                      className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
-                                      title="Actions Menu"
-                                    >
-                                      <MoreVertical size={20} />
-                                    </button>
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        onClick={() => setHistoryDetailOrder(order)}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                                        title="View Detailed Record"
+                                      >
+                                        <Eye size={18} />
+                                      </button>
+                                      <button
+                                        onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
+                                        className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
+                                        title="Actions Menu"
+                                      >
+                                        <MoreVertical size={20} />
+                                      </button>
+                                    </div>
 
                                     {openActionId === order.id && (
                                       <>
@@ -5790,6 +5805,42 @@ export default function Dashboard() {
                 <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all">Save Entry</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 NEW: MANUAL INVENTORY VIEW DETAILS MODAL */}
+      {viewingInvLog && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setViewingInvLog(null)}>
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#fffcf9] border border-amber-100" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-extrabold mb-6 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4">
+              Manual Inventory Log Details
+            </h2>
+            <div className="space-y-4 text-sm font-bold text-amber-900">
+              <div className="flex justify-between border-b border-amber-50 pb-2">
+                <span className="text-[#8d6e63]">Date:</span>
+                <span>{formatToDisplayDate(viewingInvLog.date)}</span>
+              </div>
+              <div className="flex justify-between border-b border-amber-50 pb-2">
+                <span className="text-[#8d6e63]">Chocolate Name:</span>
+                <span className="text-amber-950 font-black">{viewingInvLog.chocolate}</span>
+              </div>
+              <div className="flex justify-between border-b border-amber-50 pb-2">
+                <span className="text-[#8d6e63]">Boxes Added:</span>
+                <span>{viewingInvLog.boxCount} boxes</span>
+              </div>
+              <div className="flex justify-between border-b border-amber-50 pb-2">
+                <span className="text-[#8d6e63]">Items per Box:</span>
+                <span>{viewingInvLog.itemsPerBox} items</span>
+              </div>
+              <div className="flex justify-between bg-amber-50 p-4 rounded-xl border border-amber-200 text-center flex-col items-center">
+                <span className="text-xs font-bold text-amber-800 uppercase mb-1">Total Chocolates Added</span>
+                <span className="text-3xl font-black text-[#3e2723]">+{viewingInvLog.totalChocolates}</span>
+              </div>
+              <div className="pt-4 flex justify-center">
+                <button onClick={() => setViewingInvLog(null)} className="w-full px-4 py-3 rounded-xl font-black text-sm uppercase tracking-widest text-white bg-[#3e2723] hover:bg-[#2d1b18] shadow-md transition-all">Close Details</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
