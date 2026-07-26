@@ -949,6 +949,52 @@ export default function Dashboard() {
   const [reportFromMonth, setReportFromMonth] = useState("");
   const [reportToMonth, setReportToMonth] = useState("");
 
+  // Sequential serial number map: oldest order = SR001, next = SR002, etc.
+  const orderSerialMap = useMemo(() => {
+    const sorted = [...orders].sort((a, b) => a.id - b.id);
+    const map: Record<number, number> = {};
+    sorted.forEach((order, index) => { map[order.id] = index + 1; });
+    return map;
+  }, [orders]);
+  const getSerial = (id: number) => `SR${String(orderSerialMap[id] || id).padStart(3, '0')}`;
+  const managedChocPricesMap = useMemo(() => {
+    const map: Record<string, { retail: number; wholesale: number }> = {};
+    managedChocolates.forEach(c => map[c.name.toLowerCase()] = { retail: Number(c.retailPrice || c.price || 0), wholesale: Number(c.wholesalePrice || c.price || 0) });
+    return map;
+  }, [managedChocolates]);
+
+  const managedChocCostsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    managedChocolates.forEach(c => {
+      map[c.name.toLowerCase()] = Number(c.stickerPrice !== undefined ? c.stickerPrice : (c.costPrice !== undefined ? c.costPrice : 0));
+    });
+    return map;
+  }, [managedChocolates]);
+
+  const managedChocStickersMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    managedChocolates.forEach(c => map[c.name.toLowerCase()] = Number(c.stickerPrice !== undefined ? c.stickerPrice : (c.costPrice !== undefined ? c.costPrice : 1.5)));
+    return map;
+  }, [managedChocolates]);
+
+  const dynamicInventory = useMemo(() => {
+    return managedChocolates.map(c => c.name);
+  }, [managedChocolates]);
+
+  const uniqueChocolates = useMemo(() => {
+    const allChocs = new Set<string>(dynamicInventory);
+    orders.forEach(o => {
+      if (o.chocolate) { String(o.chocolate).split(',').forEach(c => allChocs.add(c.trim())); }
+    });
+    return Array.from(allChocs).filter(Boolean);
+  }, [orders, dynamicInventory]);
+
+  const customPricesMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    customProducts.forEach(p => map[p.name.toLowerCase()] = Number(p.price));
+    return map;
+  }, [customProducts]);
+
   const monthWiseReportData = useMemo(() => {
     const monthsMap: Record<string, { monthKey: string; monthName: string; totalRevenue: number; totalCost: number; netProfit: number }> = {};
 
@@ -1211,53 +1257,7 @@ export default function Dashboard() {
     });
   }, [historyDetailOrder, activityLogs]);
 
-  // Sequential serial number map: oldest order = SR001, next = SR002, etc.
-  const orderSerialMap = useMemo(() => {
-    const sorted = [...orders].sort((a, b) => a.id - b.id);
-    const map: Record<number, number> = {};
-    sorted.forEach((order, index) => { map[order.id] = index + 1; });
-    return map;
-  }, [orders]);
-  const getSerial = (id: number) => `SR${String(orderSerialMap[id] || id).padStart(3, '0')}`;
-  const managedChocPricesMap = useMemo(() => {
-    const map: Record<string, { retail: number; wholesale: number }> = {};
-    managedChocolates.forEach(c => map[c.name.toLowerCase()] = { retail: Number(c.retailPrice || c.price || 0), wholesale: Number(c.wholesalePrice || c.price || 0) });
-    return map;
-  }, [managedChocolates]);
 
-  const managedChocCostsMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    managedChocolates.forEach(c => {
-      map[c.name.toLowerCase()] = Number(c.stickerPrice !== undefined ? c.stickerPrice : (c.costPrice !== undefined ? c.costPrice : 0));
-    });
-    return map;
-  }, [managedChocolates]);
-
-  const managedChocStickersMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    managedChocolates.forEach(c => map[c.name.toLowerCase()] = Number(c.stickerPrice !== undefined ? c.stickerPrice : (c.costPrice !== undefined ? c.costPrice : 1.5)));
-    return map;
-  }, [managedChocolates]);
-
-
-  const dynamicInventory = useMemo(() => {
-    return managedChocolates.map(c => c.name);
-  }, [managedChocolates]);
-
-  const uniqueChocolates = useMemo(() => {
-    const allChocs = new Set<string>(dynamicInventory);
-    orders.forEach(o => {
-      if (o.chocolate) { String(o.chocolate).split(',').forEach(c => allChocs.add(c.trim())); }
-    });
-    return Array.from(allChocs).filter(Boolean);
-  }, [orders, dynamicInventory]);
-
-
-  const customPricesMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    customProducts.forEach(p => map[p.name.toLowerCase()] = Number(p.price));
-    return map;
-  }, [customProducts]);
 
   const inventoryBalances = useMemo(() => {
     const balances: Record<string, number> = {};
