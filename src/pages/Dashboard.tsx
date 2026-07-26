@@ -19,11 +19,12 @@ import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
   Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
 import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
 import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
+import AttendanceLog from "@/components/AttendanceLog";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { formatPhoneNumber } from "@/lib/utils";
@@ -549,7 +550,7 @@ export default function Dashboard() {
   const [showApprovalPanel, setShowApprovalPanel] = useState(false);
   const [openActionId, setOpenActionId] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker'>(
+  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker' | 'attendance'>(
     (localStorage.getItem('activeTab') as any) || 'dashboard1'
   );
 
@@ -945,6 +946,46 @@ export default function Dashboard() {
 
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [reportDashboardFilter, setReportDashboardFilter] = useState("All");
+  const [reportFromMonth, setReportFromMonth] = useState("");
+  const [reportToMonth, setReportToMonth] = useState("");
+
+  const monthWiseReportData = useMemo(() => {
+    const monthsMap: Record<string, { monthKey: string; monthName: string; totalRevenue: number; totalCost: number; netProfit: number }> = {};
+
+    orders.forEach(order => {
+      if (order.status === 'Cancelled') return;
+      const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
+      if (!targetDateStr) return;
+
+      const dateObj = new Date(targetDateStr);
+      if (isNaN(dateObj.getTime())) return;
+
+      const mKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+      const mName = dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+      if (!monthsMap[mKey]) {
+        monthsMap[mKey] = { monthKey: mKey, monthName: mName, totalRevenue: 0, totalCost: 0, netProfit: 0 };
+      }
+
+      const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree || order.isChennai, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
+      const costInfo = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
+
+      monthsMap[mKey].totalRevenue += priceInfo.fullRevenue;
+      monthsMap[mKey].totalCost += costInfo.finalCost;
+      monthsMap[mKey].netProfit = monthsMap[mKey].totalRevenue - monthsMap[mKey].totalCost;
+    });
+
+    let sorted = Object.values(monthsMap).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+    if (reportFromMonth) {
+      sorted = sorted.filter(m => m.monthKey >= reportFromMonth);
+    }
+    if (reportToMonth) {
+      sorted = sorted.filter(m => m.monthKey <= reportToMonth);
+    }
+
+    return sorted;
+  }, [orders, customPricesMap, managedChocPricesMap, managedChocStickersMap, reportFromMonth, reportToMonth]);
 
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
   const [adminCreds, setAdminCreds] = useState({ username: "", password: "" });
@@ -1509,7 +1550,7 @@ export default function Dashboard() {
     });
   }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1ChennaiFilter, d1RoleFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2ChennaiFilter, d2RoleFilter]);
 
-  const { totalOrders, deliveredCount, inProcessCount, totalItems, topChocolates, totalRevenue, totalDeliveryCharge } = useMemo(() => {
+  const { totalOrders, deliveredCount, inProcessCount, totalItems, topChocolates, totalRevenue, totalDeliveryCharge, totalPendingAmount } = useMemo(() => {
     const total = filteredDashboardOrders.length;
     const delivered = filteredDashboardOrders.filter(o => o.status === "Delivered").length;
     const inProcess = filteredDashboardOrders.filter(o => o.status === "In Process").length;
@@ -1521,15 +1562,18 @@ export default function Dashboard() {
     const chocolateCounts: Record<string, number> = {};
     let netRevenue = 0;
     let totalDelivery = 0;
+    let pendingSum = 0;
 
     filteredDashboardOrders.forEach(o => {
-      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
+      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree || o.isChennai, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
 
       netRevenue += priceInfo.revenue;
+      const orderPending = Math.max(0, priceInfo.fullTotalPrice - priceInfo.totalPrice);
+      pendingSum += orderPending;
+
       if (o.paymentStatus !== 'Pending') {
         totalDelivery += priceInfo.deliveryCharge;
       }
-
 
       if (o.chocolate) {
         const orderChocs = String(o.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean);
@@ -1549,9 +1593,13 @@ export default function Dashboard() {
       totalItems: items,
       topChocolates: top,
       totalRevenue: netRevenue,
-      totalDeliveryCharge: totalDelivery
+      totalDeliveryCharge: totalDelivery,
+      totalPendingAmount: pendingSum
     };
   }, [filteredDashboardOrders, customPricesMap]);
+
+  const displayRevenue = totalRevenue;
+  const displayPendingAmount = totalPendingAmount;
 
   const costAnalyticsData = useMemo(() => {
     if (isInvAdmin) {
@@ -1833,12 +1881,7 @@ export default function Dashboard() {
     };
   }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, managedChocPricesMap, managedChocStickersMap]);
 
-  const displayRevenue = useMemo(() => {
-    return filteredDashboardOrders.reduce((sum, o) => {
-      const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
-      return sum + priceInfo.revenue;
-    }, 0);
-  }, [filteredDashboardOrders, customPricesMap, managedChocPricesMap]);
+
 
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3519,6 +3562,12 @@ export default function Dashboard() {
                 <span style={showSidebarHighlight && activeTab === 'reports' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Reports</span>
               </button>
 
+              <button
+                onClick={() => { setActiveTab('attendance'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'attendance' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
+                <Calendar size={18} className={showSidebarHighlight && activeTab === 'attendance' ? 'drop-shadow-md' : ''} />
+                <span style={showSidebarHighlight && activeTab === 'attendance' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Attendance Log</span>
+              </button>
 
             </nav>
           </div>
@@ -3815,7 +3864,7 @@ export default function Dashboard() {
                           <p className="text-[10px] font-bold text-[#8d6e63] uppercase tracking-wider mb-2">
                             Breakdown by Chocolate
                           </p>
-                          <div className="grid grid-cols-1 gap-2 max-h-[135px] overflow-y-auto custom-scrollbar pr-1">
+                          <div className="grid grid-cols-1 gap-2 pr-1">
                             {currentInventoryValueData.items.map((item, idx) => (
                               <div key={idx} className="choc-grid-item p-2.5 rounded-xl flex flex-col justify-between transition-colors border border-[#ebdccb]">
                                 <div className="flex justify-between items-center w-full gap-2">
@@ -3830,41 +3879,6 @@ export default function Dashboard() {
                                   <span className="opacity-75">Calculation:</span>
                                   <span className="font-mono tracking-tight">
                                     {item.balance} × ₹{item.price}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Approximate Profit Card */}
-                      <div className="current-inventory-value-card approximate-profit-card p-4 rounded-xl shadow-sm flex flex-col transition-all duration-300">
-                        <p className="text-xs font-black uppercase tracking-wider mb-1 text-center">
-                          Approximate Profit
-                        </p>
-                        <p className="grand-total-text text-3xl font-black text-center mb-3">
-                          ₹{Math.round(approximateProfitData.grandTotal).toLocaleString()}
-                        </p>
-                        <div className="border-t border-[#ccebd6] pt-3">
-                          <p className="text-[10px] font-bold uppercase tracking-wider mb-2">
-                            Approximate Profit Breakdown
-                          </p>
-                          <div className="grid grid-cols-1 gap-2 max-h-[135px] overflow-y-auto custom-scrollbar pr-1">
-                            {approximateProfitData.items.map((item, idx) => (
-                              <div key={idx} className="choc-grid-item p-2.5 rounded-xl flex flex-col justify-between transition-colors border border-emerald-100">
-                                <div className="flex justify-between items-center w-full gap-2">
-                                  <span className="choc-name-badge-text text-xs font-black truncate" title={item.name}>
-                                    {item.name}
-                                  </span>
-                                  <span className="choc-value-badge-text text-xs font-black shrink-0">
-                                    ₹{Math.round(item.value).toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="mt-1.5 flex justify-between items-center text-[10px] font-bold border-t border-emerald-100/50 pt-1.5 choc-detail-badge-text">
-                                  <span className="opacity-75">Calculation:</span>
-                                  <span className="font-mono tracking-tight text-amber-700">
-                                    ₹{Math.round(item.stickerCost || 0).toLocaleString()} + ₹{Math.round(item.labourCost || 0).toLocaleString()} + ₹{Math.round(item.totalPurchase || 0).toLocaleString()}
                                   </span>
                                 </div>
                               </div>
@@ -3939,6 +3953,35 @@ export default function Dashboard() {
                   </div>
                   <p className="text-[10px] font-bold text-amber-600 mt-3 text-center shrink-0">* Note: Dashboard orders are automatically deducted from the Live Stock Balance (Not shown in this manual entry table).</p>
                 </div>
+
+                {/* 🟢 APPROXIMATE PROFIT BOX PLACED DIRECTLY BELOW INVENTORY LOG */}
+                <div className="lg:col-span-3 bg-[#ebe6df] p-6 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 mt-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-3 border-b border-[#d7ccc8]">
+                    <div>
+                      <h3 className="text-xl font-black text-[#3e2723] uppercase tracking-wide">Approximate Profit</h3>
+                      <p className="text-xs font-bold text-emerald-700 mt-0.5">Calculated Net Profit Breakdown Across All Inventories</p>
+                    </div>
+                    <div className="text-right mt-2 sm:mt-0">
+                      <span className="text-xs font-bold text-[#5d4037] block">Grand Total Approximate Profit</span>
+                      <span className="text-3xl font-black text-emerald-600">₹{Math.round(approximateProfitData.grandTotal).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {approximateProfitData.items.map((item, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-xs font-black text-slate-900 truncate" title={item.name}>{item.name}</span>
+                          <span className="text-xs font-black text-emerald-600 shrink-0">₹{Math.round(item.value).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-2 flex justify-between items-center text-[10px] font-bold border-t border-slate-100 pt-1.5 text-slate-600">
+                          <span className="opacity-75">Calculation:</span>
+                          <span className="font-mono text-amber-800">₹{Math.round(item.stickerCost || 0)} + ₹{Math.round(item.labourCost || 0)} + ₹{Math.round(item.totalPurchase || 0)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -3975,11 +4018,23 @@ export default function Dashboard() {
                   </div>
 
                   <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex justify-between items-start mb-2 relative z-10">
+                    <div className="flex justify-between items-start mb-1 relative z-10">
                       <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={18} /></div>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={16} /></div>
                     </div>
-                    <h3 className="text-4xl font-black text-[#3e2723] relative z-10">{filteredDashboardOrders.length}</h3>
+                    <div className="flex items-center justify-between gap-2 relative z-10">
+                      <h3 className="text-3xl font-black text-[#3e2723]">{filteredDashboardOrders.length}</h3>
+                      <select
+                        value={tableTypeFilter}
+                        onChange={(e) => setTableTypeFilter(e.target.value)}
+                        className="p-2 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-amber-500 bg-white/80 cursor-pointer shadow-inner"
+                        title="Filter by Order Type (Sabi / Thaaru)"
+                      >
+                        <option value="All">All Types</option>
+                        <option value="Sabi">Sabi</option>
+                        <option value="Thaaru">Thaaru</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
@@ -4052,7 +4107,13 @@ export default function Dashboard() {
                           </select>
                         </div>
                       </div>
-                      <h3 className="text-xl font-black text-green-700 mt-1">₹{displayRevenue.toLocaleString()}</h3>
+
+                      <div className="text-right">
+                        <div className="text-[10px] font-black text-green-800 uppercase tracking-tighter">Revenue</div>
+                        <h3 className="text-lg font-black text-green-700 leading-tight">₹{displayRevenue.toLocaleString()}</h3>
+                        <div className="text-[9px] font-black text-rose-700 uppercase tracking-tighter mt-0.5">Pending Amount</div>
+                        <h4 className="text-sm font-black text-rose-600 leading-tight">₹{displayPendingAmount.toLocaleString()}</h4>
+                      </div>
                     </div>
 
                     <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter -mt-1 mb-1 z-10 relative">
@@ -4707,9 +4768,45 @@ export default function Dashboard() {
                           )}
 
 
-                          <th className="py-3 px-4 font-bold text-right align-top">Total Price</th>
-                          <th className="py-3 px-4 font-bold text-center align-top">Payment</th>
-                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Delivery Status</th>}
+                          <th className="py-3 px-4 font-bold text-center align-top min-w-[120px]">
+                            <div className="flex items-center justify-center gap-1 group">
+                              <span>Payment</span>
+                              <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Payment Status">
+                                <ChevronDown size={14} className={paymentFilter !== 'All' ? 'text-amber-800 font-bold' : 'text-amber-400'} />
+                                <select
+                                  value={paymentFilter}
+                                  onChange={(e) => setPaymentFilter(e.target.value as any)}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                >
+                                  <option value="All">All Payments</option>
+                                  <option value="Full Paid">Paid (Full)</option>
+                                  <option value="Partially Paid">Partial</option>
+                                  <option value="Pending">Pending</option>
+                                </select>
+                              </div>
+                            </div>
+                          </th>
+                          {!isScreenshotMode && (
+                            <th className="py-3 px-4 font-bold text-center align-top min-w-[140px]">
+                              <div className="flex items-center justify-center gap-1 group">
+                                <span>Delivery Status</span>
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Delivery Status">
+                                  <ChevronDown size={14} className={deliveryFilter !== 'All' ? 'text-amber-800 font-bold' : 'text-amber-400'} />
+                                  <select
+                                    value={deliveryFilter}
+                                    onChange={(e) => setDeliveryFilter(e.target.value as any)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                  >
+                                    <option value="All">All Deliveries</option>
+                                    <option value="Delivered">Delivered</option>
+                                    <option value="In Process">Pending / In Process</option>
+                                    <option value="Processing">Processing</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </th>
+                          )}
 
                           {!isScreenshotMode && (
                             <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
@@ -5200,6 +5297,12 @@ export default function Dashboard() {
             </div>
           )}
 
+          {activeTab === 'attendance' && (
+            <div className="space-y-6 print:hidden">
+              <AttendanceLog isAdminOverride={role === 'Admin'} />
+            </div>
+          )}
+
           {activeTab === 'reports' && (
             <div className="space-y-6 print:hidden">
               <div className="bg-[#ebe6df] p-4 rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-wrap justify-between items-center gap-4">
@@ -5358,6 +5461,62 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* 🟢 NEW: Month Wise Report Chart Below Sales Visual Chart */}
+                  <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 mt-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                      <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
+                        <TrendingUp className="text-emerald-700" /> Month Wise Report
+                      </h2>
+
+                      {/* Month Filters */}
+                      <div className="flex items-center gap-3 bg-white/70 p-2 rounded-xl border border-[#d7ccc8] text-xs font-bold text-[#5d4037]">
+                        <div className="flex items-center gap-1">
+                          <span>From Month:</span>
+                          <input
+                            type="month"
+                            value={reportFromMonth}
+                            onChange={e => setReportFromMonth(e.target.value)}
+                            className="bg-white border border-[#d7ccc8] rounded-lg px-2 py-1 outline-none font-bold text-xs cursor-pointer"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span>To Month:</span>
+                          <input
+                            type="month"
+                            value={reportToMonth}
+                            onChange={e => setReportToMonth(e.target.value)}
+                            className="bg-white border border-[#d7ccc8] rounded-lg px-2 py-1 outline-none font-bold text-xs cursor-pointer"
+                          />
+                        </div>
+                        {(reportFromMonth || reportToMonth) && (
+                          <button
+                            onClick={() => { setReportFromMonth(""); setReportToMonth(""); }}
+                            className="text-rose-600 hover:text-rose-800 font-bold underline text-[11px]"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="h-80 w-full">
+                      {monthWiseReportData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={monthWiseReportData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+                            <XAxis dataKey="monthName" tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
+                            <YAxis tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
+                            <Tooltip cursor={{ fill: '#f5f5f5' }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} />
+                            <Legend wrapperStyle={{ paddingTop: '10px', fontWeight: 'bold' }} />
+                            <Bar dataKey="totalRevenue" name="Total Revenue" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                            <Bar dataKey="netProfit" name="Net Profit" fill="#10b981" radius={[6, 6, 0, 0]} />
+                            <Bar dataKey="totalCost" name="Total Cost" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-400 font-bold">No Monthly Data Available for Selected Range</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="h-full flex flex-col">
@@ -6132,52 +6291,52 @@ export default function Dashboard() {
                       Delivery Charge (₹)
                     </label>
                     <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>
-                      Chennai
+                      Location
                     </label>
                     <div>
                       <input type="number" name="manualDeliveryFee" value={formData.manualDeliveryFee} onChange={handleInputChange} className={`w-full font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-sm`} placeholder={formData.category === 'product' ? 'Eg. 100' : `${Number(formData.count) > 99 ? '200' : '150'}`} />
                     </div>
 
                     <div>
-                      <div className="flex items-center h-[40px] bg-white border-2 border-[#d7ccc8] rounded-lg px-2 focus-within:border-[#8d6e63] shadow-inner">
-                        <label className="flex items-center gap-1.5 cursor-pointer w-full font-bold text-[#5d4037] text-[10px] uppercase tracking-wider">
-                          <input
-                            type="checkbox"
-                            checked={formData.isChennai || false}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              const newFormData = { ...formData, isChennai: checked };
-                              const priceData = calculatePriceInfo(
-                                newFormData.chocolate,
-                                newFormData.count,
-                                newFormData.discount,
-                                newFormData.isDeliveryFree || checked,
-                                newFormData.paymentStatus,
-                                newFormData.category,
-                                customPricesMap,
-                                newFormData.manualDeliveryFee,
-                                newFormData.orderStatus,
-                                managedChocPricesMap,
-                                newFormData.pricingType,
-                                newFormData.manualProductPrice
-                              );
-                              const currentAdvance = Number(newFormData.advanceAmount);
-                              if (formData.fireId === null) {
-                                if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
-                                  newFormData.paymentStatus = 'Full Paid';
-                                } else if (currentAdvance > 0) {
-                                  newFormData.paymentStatus = 'Partially Paid';
-                                } else {
-                                  newFormData.paymentStatus = 'Pending';
-                                }
-                              }
-                              setFormData(newFormData);
-                            }}
-                            className="w-4 h-4 accent-[#8d6e63] cursor-pointer"
-                          />
-                          Chennai
-                        </label>
-                      </div>
+                      <select
+                        value={(formData as any).location || (formData.isChennai ? "Chennai" : "Others")}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const isC = val === "Chennai";
+                          const isK = val === "Kerala";
+                          const newFormData = { ...formData, isChennai: isC, location: val } as any;
+                          const priceData = calculatePriceInfo(
+                            newFormData.chocolate,
+                            newFormData.count,
+                            newFormData.discount,
+                            newFormData.isDeliveryFree || isC || isK,
+                            newFormData.paymentStatus,
+                            newFormData.category,
+                            customPricesMap,
+                            newFormData.manualDeliveryFee,
+                            newFormData.orderStatus,
+                            managedChocPricesMap,
+                            newFormData.pricingType,
+                            newFormData.manualProductPrice
+                          );
+                          const currentAdvance = Number(newFormData.advanceAmount);
+                          if (formData.fireId === null) {
+                            if (currentAdvance >= priceData.fullTotalPrice && priceData.fullTotalPrice > 0) {
+                              newFormData.paymentStatus = 'Full Paid';
+                            } else if (currentAdvance > 0) {
+                              newFormData.paymentStatus = 'Partially Paid';
+                            } else {
+                              newFormData.paymentStatus = 'Pending';
+                            }
+                          }
+                          setFormData(newFormData);
+                        }}
+                        className="w-full h-[40px] bg-white border-2 border-[#d7ccc8] rounded-lg px-2 font-bold text-[#5d4037] text-xs uppercase tracking-wider outline-none focus:border-[#8d6e63] shadow-inner cursor-pointer"
+                      >
+                        <option value="Chennai">Chennai</option>
+                        <option value="Kerala">Kerala</option>
+                        <option value="Others">Others</option>
+                      </select>
                     </div>
                   </div>
 

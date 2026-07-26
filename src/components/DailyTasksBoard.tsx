@@ -1811,6 +1811,18 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                     </h3>
                   )}
 
+                  {/* List Heading View (Eye) Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toast.info(`Viewing List: ${list.title} (${displayCards.length} tasks)`);
+                    }}
+                    className="p-1.5 rounded-lg transition-all text-white/40 hover:text-white/80 hover:bg-white/10 shrink-0"
+                    title={`View ${list.title} Summary`}
+                  >
+                    <Eye size={14} />
+                  </button>
+
                   {/* Sort Menu */}
                   <div className="relative shrink-0">
                     <button
@@ -1992,19 +2004,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           />
                           
                           <div className="flex items-center gap-1 shrink-0">
-                            {/* Eye (View) Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenDetailsModal(card, list.id);
-                              }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              className="p-1.5 rounded transition-all cursor-pointer text-slate-400 hover:text-blue-500 hover:bg-blue-50/50"
-                              title="View Details"
-                            >
-                              <Eye size={16} className="stroke-[2.5]" />
-                            </button>
-
                             {/* Favorite Button (Heart) */}
                             <button
                               onClick={(e) => {
