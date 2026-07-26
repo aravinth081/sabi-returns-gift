@@ -3875,9 +3875,9 @@ export default function Dashboard() {
                                     ₹{item.value.toLocaleString()}
                                   </span>
                                 </div>
-                                <div className="mt-1.5 flex justify-between items-center text-[10px] font-bold border-t border-[#ebdccb]/50 pt-1.5 choc-detail-badge-text text-amber-700">
-                                  <span className="opacity-75">Calculation:</span>
-                                  <span className="font-mono tracking-tight">
+                                <div className="mt-1.5 flex justify-between items-center text-[11px] font-extrabold border-t border-[#ebdccb] pt-1.5 choc-detail-badge-text text-[#3e2723]">
+                                  <span className="font-extrabold text-[#3e2723]">Calculation:</span>
+                                  <span className="font-mono font-black text-[#2c1810] tracking-tight">
                                     {item.balance} × ₹{item.price}
                                   </span>
                                 </div>
@@ -3974,9 +3974,9 @@ export default function Dashboard() {
                           <span className="text-xs font-black text-slate-900 truncate" title={item.name}>{item.name}</span>
                           <span className="text-xs font-black text-emerald-600 shrink-0">₹{Math.round(item.value).toLocaleString()}</span>
                         </div>
-                        <div className="mt-2 flex justify-between items-center text-[10px] font-bold border-t border-slate-100 pt-1.5 text-slate-600">
-                          <span className="opacity-75">Calculation:</span>
-                          <span className="font-mono text-amber-800">₹{Math.round(item.stickerCost || 0)} + ₹{Math.round(item.labourCost || 0)} + ₹{Math.round(item.totalPurchase || 0)}</span>
+                        <div className="mt-2 flex justify-between items-center text-[11px] font-extrabold border-t border-slate-200 pt-1.5 choc-detail-badge-text text-emerald-950">
+                          <span className="font-extrabold text-emerald-950">Calculation:</span>
+                          <span className="font-mono font-black text-amber-950">₹{Math.round(item.stickerCost || 0)} + ₹{Math.round(item.labourCost || 0)} + ₹{Math.round(item.totalPurchase || 0)}</span>
                         </div>
                       </div>
                     ))}

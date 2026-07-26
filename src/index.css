@@ -1163,10 +1163,14 @@ main {
   text-shadow: none !important;
 }
 
-/* Force dark amber for balance detail */
+/* Force dark brown & high contrast for calculation detail text */
 .current-inventory-value-card .choc-detail-badge-text,
-.wallpaper-active .current-inventory-value-card .choc-detail-badge-text {
-  color: #8d6e63 !important;
+.current-inventory-value-card .choc-detail-badge-text *,
+.wallpaper-active .current-inventory-value-card .choc-detail-badge-text,
+.wallpaper-active .current-inventory-value-card .choc-detail-badge-text * {
+  color: #3e2723 !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
 }
 
 /* Force strong reddish-brown for calculated item values */
@@ -1241,8 +1245,12 @@ main {
 }
 
 .approximate-profit-card .choc-detail-badge-text,
-.wallpaper-active .approximate-profit-card .choc-detail-badge-text {
-  color: #2e7d32 !important;
+.approximate-profit-card .choc-detail-badge-text *,
+.wallpaper-active .approximate-profit-card .choc-detail-badge-text,
+.wallpaper-active .approximate-profit-card .choc-detail-badge-text * {
+  color: #1b5e20 !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
 }
 
 .approximate-profit-card .choc-value-badge-text,
