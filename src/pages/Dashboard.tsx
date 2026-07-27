@@ -3852,6 +3852,55 @@ export default function Dashboard() {
                         </div>
                       </div>
 
+                      {/* 🟢 DOUGHNUT CHART: INVENTORY VALUES COMPARISON */}
+                      <div className="bg-white/90 dark:bg-slate-800/90 border border-[#d7ccc8] p-4 rounded-xl shadow-inner flex flex-col items-center">
+                        <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-2 text-center">
+                          Inventory Value Comparison
+                        </p>
+                        <div className="w-full h-52">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'Current Inventory Value', value: currentInventoryValueData.grandTotal },
+                                  { name: 'Approx Inventory Value', value: Math.round(approximateProfitData.grandTotal) }
+                                ]}
+                                cx="50%"
+                                cy="45%"
+                                innerRadius={42}
+                                outerRadius={65}
+                                paddingAngle={5}
+                                dataKey="value"
+                                isAnimationActive={true}
+                              >
+                                <Cell key="cell-0" fill="#d35400" />
+                                <Cell key="cell-1" fill="#047857" />
+                              </Pie>
+                              <Tooltip
+                                formatter={(val, name) => {
+                                  const total = currentInventoryValueData.grandTotal + approximateProfitData.grandTotal;
+                                  const pct = total > 0 ? ((Number(val) / total) * 100).toFixed(1) : '0';
+                                  return [`₹${Number(val).toLocaleString()} (${pct}%)`, name];
+                                }}
+                                contentStyle={{
+                                  backgroundColor: '#3e2723',
+                                  color: '#fff',
+                                  borderRadius: '0.75rem',
+                                  border: '1px solid #d7ccc8',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }}
+                              />
+                              <Legend
+                                verticalAlign="bottom"
+                                height={36}
+                                formatter={(value) => <span className="text-xs font-extrabold text-[#3e2723]">{value}</span>}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
                       {/* Current Inventory Value Card */}
                       <div className="current-inventory-value-card p-4 rounded-xl shadow-sm flex flex-col transition-all duration-300">
                         <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-1 text-center">
@@ -4505,81 +4554,73 @@ export default function Dashboard() {
                               <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                             </th>
                           )}
-                          {!isScreenshotMode && (
-                            <th className={`py-3 ${hiddenCols.serialNo ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
-                              <div className={`flex items-center ${hiddenCols.serialNo ? 'justify-center' : 'gap-2'} group`}>
+                          {!isScreenshotMode && !hiddenCols.serialNo && (
+                            <th className="py-3 px-4 font-bold align-top transition-all duration-300 min-w-[90px]">
+                              <div className="flex items-center gap-2 group">
                                 <button onClick={jumpToActions} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100 print:hidden" title="Jump to Actions">
                                   <ChevronRight size={14} strokeWidth={3} />
                                 </button>
-                                {!hiddenCols.serialNo && (
-                                  <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                    <span className="whitespace-nowrap">Serial No</span>
-
-                                    <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
-                                      <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                                      <select
-                                        value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
-                                        onChange={(e) => {
-                                          if (!e.target.value) setSortConfig(null);
-                                          else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
-                                        }}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                      >
-                                        <option value="">Sort...</option>
-                                        <option value="asc">new  to old</option>
-                                        <option value="desc">old to new </option>
-                                      </select>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </th>
-                          )}
-                          {!isScreenshotMode && (
-                            <th className={`py-3 ${hiddenCols.role ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300`}>
-                              <div className={`flex items-center ${hiddenCols.role ? 'justify-center' : 'gap-1'} group`}>
-                                {!hiddenCols.role && <span className="whitespace-nowrap">Role</span>}
-                                {!hiddenCols.role && (
-                                  <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
-                                    <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
+                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                                  <span className="whitespace-nowrap">Serial No</span>
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Serial No">
+                                    <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
                                     <select
-                                      value={roleFilter}
-                                      onChange={(e) => setRoleFilter(e.target.value)}
+                                      value={sortConfig?.key === 'id' ? sortConfig.direction : ""}
+                                      onChange={(e) => {
+                                        if (!e.target.value) setSortConfig(null);
+                                        else setSortConfig({ key: 'id', direction: e.target.value as 'asc' | 'desc' });
+                                      }}
                                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     >
-                                      <option value="All">All</option>
-                                      <option value="Others">Others</option>
-                                      <option value="Self">Self</option>
+                                      <option value="">Sort...</option>
+                                      <option value="asc">new to old</option>
+                                      <option value="desc">old to new</option>
                                     </select>
                                   </div>
-                                )}
+                                </div>
                               </div>
                             </th>
                           )}
-                          {!isScreenshotMode && (
-                            <th className={`py-3 ${hiddenCols.orderDate ? 'w-10 px-1' : 'px-4'} font-bold align-top transition-all duration-300 min-w-[${hiddenCols.orderDate ? '40px' : '140px'}]`}>
-                              <div className={`flex items-center ${hiddenCols.orderDate ? 'justify-center' : 'gap-1'} group`}>
-
-                                {!hiddenCols.orderDate && (
-                                  <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                                    <span className="whitespace-nowrap">Order Date</span>
-                                    <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
-                                      <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
-                                      <select
-                                        value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
-                                        onChange={(e) => {
-                                          if (!e.target.value) setSortConfig(null);
-                                          else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
-                                        }}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                      >
-                                        <option value="">Sort...</option>
-                                        <option value="desc">new to old</option>
-                                        <option value="asc">old to new</option>
-                                      </select>
-                                    </div>
+                          {!isScreenshotMode && !hiddenCols.role && (
+                            <th className="py-3 px-4 font-bold align-top transition-all duration-300 min-w-[90px]">
+                              <div className="flex items-center gap-1 group">
+                                <span className="whitespace-nowrap">Role</span>
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
+                                  <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
+                                  <select
+                                    value={roleFilter}
+                                    onChange={(e) => setRoleFilter(e.target.value)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  >
+                                    <option value="All">All</option>
+                                    <option value="Others">Others</option>
+                                    <option value="Self">Self</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </th>
+                          )}
+                          {!isScreenshotMode && !hiddenCols.orderDate && (
+                            <th className="py-3 px-4 font-bold align-top transition-all duration-300 min-w-[130px]">
+                              <div className="flex items-center gap-1 group">
+                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                                  <span className="whitespace-nowrap">Order Date</span>
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Sort Order Date">
+                                    <ChevronDown size={14} className="text-amber-800/30 group-hover:text-amber-800 transition-opacity" />
+                                    <select
+                                      value={sortConfig?.key === 'orderDate' ? sortConfig.direction : ""}
+                                      onChange={(e) => {
+                                        if (!e.target.value) setSortConfig(null);
+                                        else setSortConfig({ key: 'orderDate', direction: e.target.value as 'asc' | 'desc' });
+                                      }}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    >
+                                      <option value="">Sort...</option>
+                                      <option value="desc">new to old</option>
+                                      <option value="asc">old to new</option>
+                                    </select>
                                   </div>
-                                )}
+                                </div>
                               </div>
                             </th>
                           )}
@@ -4750,27 +4791,32 @@ export default function Dashboard() {
                             </div>
                           </th>
 
-                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-right align-top">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>}
-                          {!isScreenshotMode && (
-                            <th className={`py-3 ${hiddenCols.deliveryCharge ? 'w-10 px-1' : 'px-4'} font-bold text-right align-top transition-all duration-300`}>
-                              <div className={`flex items-center ${hiddenCols.deliveryCharge ? 'justify-center' : 'justify-end gap-1'} group`}>
-                                {!hiddenCols.deliveryCharge && <span className="whitespace-nowrap">Delivery Charge</span>}
+                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-right align-top min-w-[110px]">{activeTab === 'dashboard2' ? 'Prod. Price' : 'Choc. Price'}</th>}
+                          {!isScreenshotMode && !hiddenCols.deliveryCharge && (
+                            <th className="py-3 px-4 font-bold text-right align-top transition-all duration-300 min-w-[120px]">
+                              <div className="flex items-center justify-end gap-1 group">
+                                <span className="whitespace-nowrap">Delivery Charge</span>
                               </div>
                             </th>
                           )}
-                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top">Advance</th>}
-                          {!isScreenshotMode && (
-                            <th className={`py-3 ${hiddenCols.discount ? 'w-10 px-1' : 'px-4'} font-bold text-center align-top print:hidden transition-all duration-300`}>
-                              <div className={`flex items-center ${hiddenCols.discount ? 'justify-center' : 'justify-center gap-1'} group`}>
-                                {!hiddenCols.discount && <span className="whitespace-nowrap">Discount</span>}
+                          {!isScreenshotMode && <th className="py-3 px-4 font-bold text-center align-top min-w-[100px]">Advance</th>}
+                          {!isScreenshotMode && !hiddenCols.discount && (
+                            <th className="py-3 px-4 font-bold text-center align-top print:hidden transition-all duration-300 min-w-[100px]">
+                              <div className="flex items-center justify-center gap-1 group">
+                                <span className="whitespace-nowrap">Discount</span>
                               </div>
                             </th>
                           )}
 
-
+                          {/* 🟢 TOTAL AMOUNT HEADER */}
                           <th className="py-3 px-4 font-bold text-center align-top min-w-[120px]">
+                            <span className="whitespace-nowrap">Total Amount</span>
+                          </th>
+
+                          {/* 🟢 PAYMENT STATUS HEADER */}
+                          <th className="py-3 px-4 font-bold text-center align-top min-w-[140px]">
                             <div className="flex items-center justify-center gap-1 group">
-                              <span>Payment</span>
+                              <span>Payment Status</span>
                               <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Payment Status">
                                 <ChevronDown size={14} className={paymentFilter !== 'All' ? 'text-amber-800 font-bold' : 'text-amber-400'} />
                                 <select
@@ -4809,7 +4855,7 @@ export default function Dashboard() {
                           )}
 
                           {!isScreenshotMode && (
-                            <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[100px]">
+                            <th className="py-3 px-4 font-bold text-center print:hidden align-top min-w-[110px] sticky-actions-col">
                               <div className="flex items-center justify-center gap-2">
                                 <button onClick={jumpToSerial} className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors shadow-sm bg-white border border-amber-100" title="Jump to Serial No">
                                   <ChevronLeft size={14} strokeWidth={3} />
@@ -4822,7 +4868,7 @@ export default function Dashboard() {
                       </thead>
                       <tbody>
                         {(isScreenshotMode ? sortedDashboardOrders : paginatedOrders).length === 0 ? (
-                          <tr><td colSpan={15} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
+                          <tr><td colSpan={20} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
                         ) : (
                           (isScreenshotMode ? sortedDashboardOrders : paginatedOrders).map((order) => {
                             const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
@@ -4836,43 +4882,39 @@ export default function Dashboard() {
                                     <input type="checkbox" checked={isSelected} onChange={() => { if (selectedOrders.includes(order.id)) setSelectedOrders(selectedOrders.filter(x => x !== order.id)); else setSelectedOrders([...selectedOrders, order.id]); }} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
                                   </td>
                                 )}
-                                {!isScreenshotMode && (
-                                  <td className={`py-2.5 ${hiddenCols.serialNo ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300`}>
-                                    {!hiddenCols.serialNo && (
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-8 shrink-0 print:hidden" />
-                                        <span>{getSerial(order.id)}</span>
-                                      </div>
-                                    )}
+                                {!isScreenshotMode && !hiddenCols.serialNo && (
+                                  <td className="py-2.5 px-4 font-extrabold text-amber-900 print:text-black align-middle whitespace-nowrap transition-all duration-300">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 shrink-0 print:hidden" />
+                                      <span>{getSerial(order.id)}</span>
+                                    </div>
                                   </td>
                                 )}
-                                {!isScreenshotMode && (
-                                  <td className={`py-2.5 ${hiddenCols.role ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} align-middle transition-all duration-300`}>
-                                    {!hiddenCols.role && (
-                                      <div className="flex items-center justify-start gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const nextRole = order.role === 'Others' ? 'Self' : 'Others';
-                                            handleRoleUpdate(order.id, order.fireId, nextRole);
-                                          }}
-                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.role === 'Others') ? 'bg-green-500' : 'bg-rose-500'}`}
-                                          title={`Click to change to ${order.role === 'Others' ? 'Self' : 'Others'}`}
-                                        >
-                                          <span
-                                            className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.role === 'Others') ? 'translate-x-3' : 'translate-x-0'}`}
-                                          />
-                                        </button>
-                                        <span className={`text-[10px] font-black uppercase tracking-wider ${(order.role === 'Others') ? 'text-green-600' : 'text-rose-600'}`}>
-                                          {order.role}
-                                        </span>
-                                      </div>
-                                    )}
+                                {!isScreenshotMode && !hiddenCols.role && (
+                                  <td className="py-2.5 px-4 align-middle transition-all duration-300">
+                                    <div className="flex items-center justify-start gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nextRole = order.role === 'Others' ? 'Self' : 'Others';
+                                          handleRoleUpdate(order.id, order.fireId, nextRole);
+                                        }}
+                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.role === 'Others') ? 'bg-green-500' : 'bg-rose-500'}`}
+                                        title={`Click to change to ${order.role === 'Others' ? 'Self' : 'Others'}`}
+                                      >
+                                        <span
+                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.role === 'Others') ? 'translate-x-3' : 'translate-x-0'}`}
+                                        />
+                                      </button>
+                                      <span className={`text-[10px] font-black uppercase tracking-wider ${(order.role === 'Others') ? 'text-green-600' : 'text-rose-600'}`}>
+                                        {order.role}
+                                      </span>
+                                    </div>
                                   </td>
                                 )}
-                                {!isScreenshotMode && (
-                                  <td className={`py-2.5 ${hiddenCols.orderDate ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} font-medium text-[#5d4037] align-middle transition-all duration-300`}>
-                                    {!hiddenCols.orderDate && order.orderDate}
+                                {!isScreenshotMode && !hiddenCols.orderDate && (
+                                  <td className="py-2.5 px-4 font-medium text-[#5d4037] align-middle transition-all duration-300">
+                                    {order.orderDate}
                                   </td>
                                 )}
 
@@ -4922,11 +4964,9 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                {!isScreenshotMode && (
-                                  <td className={`py-2.5 ${hiddenCols.deliveryCharge ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-right font-medium text-amber-900 align-middle transition-all duration-300`}>
-                                    {!hiddenCols.deliveryCharge && (
-                                      order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`
-                                    )}
+                                {!isScreenshotMode && !hiddenCols.deliveryCharge && (
+                                  <td className="py-2.5 px-4 text-right font-medium text-amber-900 align-middle transition-all duration-300">
+                                    {order.isDeliveryFree ? <span className="text-green-600 font-black">Free</span> : `₹${priceData.fullDeliveryCharge.toLocaleString()}`}
                                   </td>
                                 )}
 
@@ -4942,18 +4982,16 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                {!isScreenshotMode && (
-                                  <td className={`py-2.5 ${hiddenCols.discount ? 'w-10 px-0 overflow-hidden opacity-0' : 'px-4'} text-center print:hidden align-middle transition-all duration-300`}>
-                                    {!hiddenCols.discount && (
-                                      <input
-                                        type="number"
-                                        list="discount-suggestions"
-                                        placeholder="0"
-                                        value={order.discount || ''}
-                                        onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
-                                        className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                                      />
-                                    )}
+                                {!isScreenshotMode && !hiddenCols.discount && (
+                                  <td className="py-2.5 px-4 text-center print:hidden align-middle transition-all duration-300">
+                                    <input
+                                      type="number"
+                                      list="discount-suggestions"
+                                      placeholder="0"
+                                      value={order.discount || ''}
+                                      onChange={(e) => handleDiscountUpdate(order.id, order.fireId, e.target.value)}
+                                      className="w-20 p-1.5 border border-amber-300 rounded text-center text-sm font-bold text-amber-950 bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
                                   </td>
                                 )}
 
@@ -5044,7 +5082,7 @@ export default function Dashboard() {
                                 )}
 
                                 {!isScreenshotMode && (
-                                  <td className="py-2.5 px-4 print:hidden align-middle text-center relative">
+                                  <td className="py-2.5 px-4 print:hidden align-middle text-center relative sticky-actions-col">
                                     <div className="flex items-center justify-center gap-1">
                                       <button
                                         onClick={() => setHistoryDetailOrder(order)}

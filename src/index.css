@@ -501,6 +501,37 @@ table thead th:not(.fixed *) {
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Sticky Actions Column Specific Styles */
+table thead th.sticky-actions-col {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 30 !important;
+  background-color: #fef8f0 !important;
+}
+
+table tbody td.sticky-actions-col {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 20 !important;
+  background-color: #fffdfa !important;
+}
+
+.wallpaper-active table thead th.sticky-actions-col {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 30 !important;
+  background: rgba(43, 38, 94, 0.98) !important;
+}
+
+.wallpaper-active table tbody td.sticky-actions-col {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 20 !important;
+  background: rgba(28, 25, 68, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
 .wallpaper-active thead:not(.fixed *),
 .wallpaper-active thead tr:not(.fixed *) {
   background: transparent !important;

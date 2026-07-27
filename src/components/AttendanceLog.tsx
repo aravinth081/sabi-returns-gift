@@ -41,12 +41,14 @@ export default function AttendanceLog({ isAdminOverride = true }: { isAdminOverr
   const currentLoggedInUser = profile?.username || "Gayathiri";
   const [selectedUser, setSelectedUser] = useState<string>(currentLoggedInUser);
 
-  // Sync selected user when profile loads
+  // Sync selected user when profile loads (locked for non-admin users)
   useEffect(() => {
-    if (profile?.username) {
+    if (!isAdminOverride && profile?.username) {
+      setSelectedUser(profile.username);
+    } else if (profile?.username && !selectedUser) {
       setSelectedUser(profile.username);
     }
-  }, [profile]);
+  }, [profile, isAdminOverride]);
 
   // Attendance Records State
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
@@ -417,18 +419,20 @@ export default function AttendanceLog({ isAdminOverride = true }: { isAdminOverr
               <span>Logged In User:</span>
               <span className="bg-amber-600 text-white px-2.5 py-0.5 rounded-md text-sm font-black">{selectedUser}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span>Switch Employee View:</span>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
-              >
-                {DEFAULT_EMPLOYEES.map(emp => (
-                  <option key={emp} value={emp}>{emp}</option>
-                ))}
-              </select>
-            </div>
+            {isAdminOverride && (
+              <div className="flex items-center gap-2">
+                <span>Switch Employee View:</span>
+                <select
+                  value={selectedUser}
+                  onChange={(e) => setSelectedUser(e.target.value)}
+                  className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                >
+                  {DEFAULT_EMPLOYEES.map(emp => (
+                    <option key={emp} value={emp}>{emp}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Mark Attendance Section */}
