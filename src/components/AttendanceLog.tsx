@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Eye, User, 
-  Search, Filter, CheckCircle2, XCircle, AlertCircle, Plus, Edit2, Save, X, DollarSign, Briefcase, FileText
+  Search, Filter, CheckCircle2, XCircle, AlertCircle, Plus, Edit2, Save, X, DollarSign, Briefcase, FileText, Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/firebase";
@@ -31,12 +31,64 @@ export interface EmployeeSalary {
 
 const DEFAULT_EMPLOYEES = ["Aravinth", "Gayathiri", "Subash", "Kumar", "Suresh"];
 
-export default function AttendanceLog({ isAdminOverride = true }: { isAdminOverride?: boolean }) {
+export default function AttendanceLog({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
   const { profile } = useAuth();
   
   // Active sub-tab inside Attendance Log: 'employee' or 'admin'
   const [activeSubTab, setActiveSubTab] = useState<'employee' | 'admin'>('employee');
   
+  // Wallpaper State for Attendance Log
+  const [attendanceWallpaper, setAttendanceWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_attendance') || "");
+
+  const handleAttendanceWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        setAttendanceWallpaper(compressedBase64);
+        localStorage.setItem('sabi_wallpaper_attendance', compressedBase64);
+        toast.success("Attendance Log wallpaper updated!");
+        if (onWallpaperChange) onWallpaperChange();
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearAttendanceWallpaper = () => {
+    setAttendanceWallpaper("");
+    localStorage.removeItem('sabi_wallpaper_attendance');
+    toast.success("Attendance Log wallpaper cleared!");
+    if (onWallpaperChange) onWallpaperChange();
+  };
+
   // Selected employee for employee view
   const currentLoggedInUser = profile?.username || "Gayathiri";
   const [selectedUser, setSelectedUser] = useState<string>(currentLoggedInUser);
@@ -381,30 +433,58 @@ export default function AttendanceLog({ isAdminOverride = true }: { isAdminOverr
           </p>
         </div>
 
-        {/* View Switcher: Employee View vs Admin Attendance Panel */}
-        <div className="flex items-center gap-2 bg-white/70 p-1.5 rounded-2xl border-2 border-white shadow-inner self-stretch md:self-auto justify-center">
-          <button
-            onClick={() => setActiveSubTab('employee')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-black transition-all cursor-pointer ${
-              activeSubTab === 'employee'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'text-[#5d4037] hover:bg-white/50'
-            }`}
-          >
-            <User size={16} /> Employee View
-          </button>
-          {isAdminOverride && (
+        {/* View Switcher: Employee View vs Admin Attendance Panel & Wallpaper Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white/70 p-1.5 rounded-2xl border-2 border-white shadow-inner self-stretch md:self-auto justify-center">
             <button
-              onClick={() => setActiveSubTab('admin')}
+              onClick={() => setActiveSubTab('employee')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-black transition-all cursor-pointer ${
-                activeSubTab === 'admin'
-                  ? 'bg-emerald-600 text-white shadow-md'
+                activeSubTab === 'employee'
+                  ? 'bg-amber-600 text-white shadow-md'
                   : 'text-[#5d4037] hover:bg-white/50'
               }`}
             >
-              <Briefcase size={16} /> Admin Attendance & Salary
+              <User size={16} /> Employee View
             </button>
-          )}
+            {isAdminOverride && (
+              <button
+                onClick={() => setActiveSubTab('admin')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-black transition-all cursor-pointer ${
+                  activeSubTab === 'admin'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-[#5d4037] hover:bg-white/50'
+                }`}
+              >
+                <Briefcase size={16} /> Admin Attendance & Salary
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => document.getElementById('attendance-wallpaper-upload')?.click()}
+              className="flex justify-center items-center w-10 h-10 font-bold rounded-xl transition-all border bg-white/80 text-amber-900 border-white hover:bg-white cursor-pointer shadow-sm"
+              title="Set Background Wallpaper"
+            >
+              <ImageIcon size={18} className="text-amber-700" />
+            </button>
+            <input
+              type="file"
+              id="attendance-wallpaper-upload"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAttendanceWallpaperUpload}
+            />
+            {attendanceWallpaper && (
+              <button
+                onClick={handleClearAttendanceWallpaper}
+                className="px-3 py-2 text-xs font-black text-red-600 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200 cursor-pointer transition-colors shadow-sm"
+                title="Remove Wallpaper"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
