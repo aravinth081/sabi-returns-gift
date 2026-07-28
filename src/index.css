@@ -671,6 +671,24 @@ table tbody td.sticky-actions-col {
 .dark.wallpaper-active div.action-menu-popup button.text-blue-700 { color: #93c5fd !important; }
 .dark.wallpaper-active div.action-menu-popup button.text-green-600 { color: #4ade80 !important; }
 
+/* Attendance Log wallpaper active enhancements */
+.wallpaper-active div.bg-amber-50\/80 {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+  color: #fef3c7 !important;
+}
+
+.wallpaper-active div.bg-slate-50 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+.wallpaper-active div.bg-slate-50\/50,
+.wallpaper-active div.bg-slate-50\/40 {
+  background-color: rgba(15, 23, 42, 0.3) !important;
+}
+
 /* Custom static status and payment badge overrides for wallpaper mode */
 .wallpaper-active .status-badge-delivered,
 .wallpaper-active .payment-badge-full-paid {

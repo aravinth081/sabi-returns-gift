@@ -28,6 +28,7 @@ import AttendanceLog from "@/components/AttendanceLog";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { formatPhoneNumber } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
@@ -354,13 +355,14 @@ const ChocolateSingleSelect = ({
 };
 
 export default function Dashboard() {
+  const { profile, signOut: supabaseSignOut } = useAuth();
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loggedInName, setLoggedInName] = useState(() => localStorage.getItem('loggedInName') || "");
+  const [loggedInName, setLoggedInName] = useState(() => profile?.username || localStorage.getItem('loggedInName') || "");
   const [role, setRole] = useState<'Admin' | 'Employee'>(() => (localStorage.getItem('role') as any) || 'Admin');
   const [employeeId, setEmployeeId] = useState(() => localStorage.getItem('employeeId') || "");
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
@@ -566,8 +568,21 @@ export default function Dashboard() {
   const [invWallpaper, setInvWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_inventories') || "");
   const [reportsWallpaper, setReportsWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_reports') || "");
   const [dailyTasksWallpaper, setDailyTasksWallpaper] = useState(() => localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
-  const [attendanceWallpaper, setAttendanceWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_attendance') || "");
+  const [attendanceWallpaper, setAttendanceWallpaper] = useState(() => {
+    const activeUser = profile?.username || localStorage.getItem('loggedInName') || "";
+    return (activeUser && localStorage.getItem(`sabi_wallpaper_attendance_${activeUser}`)) || localStorage.getItem('sabi_wallpaper_attendance') || "";
+  });
   const [trackWallpaper, setTrackWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_tracking') || "");
+
+  // Sync loggedInName and attendance wallpaper when authenticated profile changes
+  useEffect(() => {
+    if (profile?.username) {
+      setLoggedInName(profile.username);
+      localStorage.setItem('loggedInName', profile.username);
+      const userWp = localStorage.getItem(`sabi_wallpaper_attendance_${profile.username}`) || localStorage.getItem('sabi_wallpaper_attendance') || "";
+      setAttendanceWallpaper(userWp);
+    }
+  }, [profile?.username]);
   const [showWallpaperDropdown, setShowWallpaperDropdown] = useState(false);
   const isWallpaperActive = 
     (activeTab === 'dashboard1' && !!d1Wallpaper) ||
@@ -3308,11 +3323,16 @@ export default function Dashboard() {
       }).catch(err => console.error("Error revoking live status:", err));
     }
 
+    if (supabaseSignOut) {
+      supabaseSignOut().catch(err => console.error("Supabase signOut error:", err));
+    }
+
     setIsLoggedIn(false);
     setUsername("");
     setPassword("");
     setLoggedInName("");
     setEmployeeId("");
+    setAttendanceWallpaper("");
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('loggedInName');
     localStorage.removeItem('role');
@@ -3613,29 +3633,37 @@ export default function Dashboard() {
       <main
         className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500 relative"
         style={{
-          backgroundImage: activeTab === 'daily_tasks'
-            ? 'linear-gradient(to bottom right, #0f172a, #1e3a5f, rgba(96, 165, 250, 0.3))'
-            : activeTab === 'dashboard1' && d1Wallpaper
-              ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
-                  d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper
-                }`
-              : activeTab === 'dashboard2' && d2Wallpaper
-                ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
-                    d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper
+          backgroundImage: activeTab === 'daily_tasks' && dailyTasksWallpaper
+            ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                dailyTasksWallpaper.startsWith('data:image') || dailyTasksWallpaper.startsWith('http') ? `url(${dailyTasksWallpaper})` : dailyTasksWallpaper
+              }`
+            : activeTab === 'daily_tasks'
+              ? 'linear-gradient(to bottom right, #0f172a, #1e3a5f, rgba(96, 165, 250, 0.3))'
+              : activeTab === 'dashboard1' && d1Wallpaper
+                ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                    d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper
                   }`
-                : activeTab === 'inventories' && invWallpaper
-                  ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
-                      invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper
+                : activeTab === 'dashboard2' && d2Wallpaper
+                  ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                      d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper
                     }`
-                  : activeTab === 'tracking' && trackWallpaper
-                    ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
-                        trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper
+                  : activeTab === 'inventories' && invWallpaper
+                    ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                        invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper
                       }`
-                    : activeTab === 'reports' && reportsWallpaper
-                      ? `linear-gradient(rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.58)), ${
-                          reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper
+                    : activeTab === 'tracking' && trackWallpaper
+                      ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                          trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper
                         }`
-                      : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)',
+                      : activeTab === 'reports' && reportsWallpaper
+                        ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                            reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper
+                          }`
+                        : activeTab === 'attendance' && attendanceWallpaper
+                          ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
+                              attendanceWallpaper.startsWith('data:image') || attendanceWallpaper.startsWith('http') ? `url(${attendanceWallpaper})` : attendanceWallpaper
+                            }`
+                          : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -5338,7 +5366,11 @@ export default function Dashboard() {
             <div className="space-y-6 print:hidden">
               <AttendanceLog
                 isAdminOverride={role === 'Admin'}
-                onWallpaperChange={() => setAttendanceWallpaper(localStorage.getItem('sabi_wallpaper_attendance') || "")}
+                onWallpaperChange={() => {
+                  const activeUser = profile?.username || localStorage.getItem('loggedInName') || "";
+                  const userWp = (activeUser && localStorage.getItem(`sabi_wallpaper_attendance_${activeUser}`)) || localStorage.getItem('sabi_wallpaper_attendance') || "";
+                  setAttendanceWallpaper(userWp);
+                }}
               />
             </div>
           )}

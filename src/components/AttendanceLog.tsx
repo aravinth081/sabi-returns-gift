@@ -33,12 +33,28 @@ const DEFAULT_EMPLOYEES = ["Aravinth", "Gayathiri", "Subash", "Kumar", "Suresh"]
 
 export default function AttendanceLog({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
   const { profile } = useAuth();
-  
-  // Active sub-tab inside Attendance Log: 'employee' or 'admin'
   const [activeSubTab, setActiveSubTab] = useState<'employee' | 'admin'>('employee');
+  const activeUser = profile?.username || localStorage.getItem('loggedInName') || "";
+  const currentLoggedInUser = activeUser || "Gayathiri";
+
+  // Helper to retrieve user-specific or global wallpaper
+  const getAttendanceWallpaper = (username?: string) => {
+    const keyUser = username || activeUser;
+    if (keyUser) {
+      const userWp = localStorage.getItem(`sabi_wallpaper_attendance_${keyUser}`);
+      if (userWp) return userWp;
+    }
+    return localStorage.getItem('sabi_wallpaper_attendance') || "";
+  };
   
   // Wallpaper State for Attendance Log
-  const [attendanceWallpaper, setAttendanceWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_attendance') || "");
+  const [attendanceWallpaper, setAttendanceWallpaper] = useState(() => getAttendanceWallpaper(currentLoggedInUser));
+
+  // Sync wallpaper when user profile changes
+  useEffect(() => {
+    const wp = getAttendanceWallpaper(profile?.username || localStorage.getItem('loggedInName') || undefined);
+    setAttendanceWallpaper(wp);
+  }, [profile?.username]);
 
   const handleAttendanceWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,6 +91,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
         setAttendanceWallpaper(compressedBase64);
         localStorage.setItem('sabi_wallpaper_attendance', compressedBase64);
+        if (activeUser) {
+          localStorage.setItem(`sabi_wallpaper_attendance_${activeUser}`, compressedBase64);
+        }
         toast.success("Attendance Log wallpaper updated!");
         if (onWallpaperChange) onWallpaperChange();
       };
@@ -85,22 +104,38 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const handleClearAttendanceWallpaper = () => {
     setAttendanceWallpaper("");
     localStorage.removeItem('sabi_wallpaper_attendance');
+    if (activeUser) {
+      localStorage.removeItem(`sabi_wallpaper_attendance_${activeUser}`);
+    }
     toast.success("Attendance Log wallpaper cleared!");
     if (onWallpaperChange) onWallpaperChange();
   };
 
   // Selected employee for employee view
-  const currentLoggedInUser = profile?.username || "Gayathiri";
   const [selectedUser, setSelectedUser] = useState<string>(currentLoggedInUser);
 
-  // Sync selected user when profile loads (locked for non-admin users)
+  // Sync selected user whenever profile loads or changes (overrides stale default)
   useEffect(() => {
-    if (!isAdminOverride && profile?.username) {
-      setSelectedUser(profile.username);
-    } else if (profile?.username && !selectedUser) {
-      setSelectedUser(profile.username);
+    const userToSet = profile?.username || localStorage.getItem('loggedInName');
+    if (userToSet) {
+      setSelectedUser(prev => {
+        if (!prev || !isAdminOverride || prev === "Gayathiri" || prev !== userToSet) {
+          return userToSet;
+        }
+        return prev;
+      });
     }
-  }, [profile, isAdminOverride]);
+  }, [profile?.username, isAdminOverride]);
+
+  // Dynamic employee list including active logged-in user
+  const employeeOptions = useMemo(() => {
+    const list = [...DEFAULT_EMPLOYEES];
+    const currentUser = profile?.username || localStorage.getItem('loggedInName');
+    if (currentUser && !list.some(e => e.toLowerCase() === currentUser.toLowerCase())) {
+      list.unshift(currentUser);
+    }
+    return Array.from(new Set(list));
+  }, [profile?.username]);
 
   // Attendance Records State
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
@@ -507,7 +542,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                   onChange={(e) => setSelectedUser(e.target.value)}
                   className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                 >
-                  {DEFAULT_EMPLOYEES.map(emp => (
+                  {employeeOptions.map(emp => (
                     <option key={emp} value={emp}>{emp}</option>
                   ))}
                 </select>
