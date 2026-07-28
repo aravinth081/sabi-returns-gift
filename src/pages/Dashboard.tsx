@@ -374,13 +374,13 @@ export default function Dashboard() {
   const itemsPerPage = 10;
 
 
-  const [adminReportDash, setAdminReportDash] = useState<'None' | 'Dashboard 1' | 'Dashboard 2'>('None');
+  const [adminReportDash, setAdminReportDash] = useState<'None' | 'Dashboard 1' | 'Dashboard 2' | 'All'>('None');
   const [adminReportMenuOpen, setAdminReportMenuOpen] = useState(false);
 
   // Separate states for Inventories Cost Analytics settings to prevent linkage
   const [invAdminDateType, setInvAdminDateType] = useState<string>('Dispatch Date');
   const [invAdminDateRange, setInvAdminDateRange] = useState({ from: "", to: "" });
-  const [invAdminReportDash, setInvAdminReportDash] = useState<'None' | 'Dashboard 1' | 'Dashboard 2'>('None');
+  const [invAdminReportDash, setInvAdminReportDash] = useState<'None' | 'Dashboard 1' | 'Dashboard 2' | 'All'>('None');
   const [invAdminReportMenuOpen, setInvAdminReportMenuOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -438,7 +438,7 @@ export default function Dashboard() {
       setCustomProducts(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
     });
     const unsubManagedChocs = onSnapshot(collection(db, "managed_chocolates"), (snapshot) => {
-      let list = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
 
       // Auto-detect and migrate old legacy defaults in DB:
       const hasOldDefaults = list.some(item =>
@@ -567,6 +567,7 @@ export default function Dashboard() {
   const [reportsWallpaper, setReportsWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_reports') || "");
   const [dailyTasksWallpaper, setDailyTasksWallpaper] = useState(() => localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
   const [attendanceWallpaper, setAttendanceWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_attendance') || "");
+  const [trackWallpaper, setTrackWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_tracking') || "");
   const [showWallpaperDropdown, setShowWallpaperDropdown] = useState(false);
   const isWallpaperActive = 
     (activeTab === 'dashboard1' && !!d1Wallpaper) ||
@@ -574,7 +575,8 @@ export default function Dashboard() {
     (activeTab === 'inventories' && !!invWallpaper) ||
     (activeTab === 'reports' && !!reportsWallpaper) ||
     (activeTab === 'attendance' && !!attendanceWallpaper) ||
-    (activeTab === 'daily_tasks' && !!dailyTasksWallpaper);
+    (activeTab === 'daily_tasks' && !!dailyTasksWallpaper) ||
+    (activeTab === 'tracking' && !!trackWallpaper);
 
   const [boardLists, setBoardLists] = useState<any[]>([]);
   const [readCardIds, setReadCardIds] = useState<string[]>(() => {
@@ -884,6 +886,15 @@ export default function Dashboard() {
   const [d2LocationFilter, setD2LocationFilter] = useState<string>('All');
   const [d2RoleFilter, setD2RoleFilter] = useState<string>('All');
 
+  // Tracking filters
+  const [trkSearch, setTrkSearch] = useState("");
+  const [trkPaymentFilter, setTrkPaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
+  const [trkDeliveryFilter, setTrkDeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
+  const [trkOrderStatusFilter, setTrkOrderStatusFilter] = useState<string>('All');
+
+  // Reports filters
+  const [reportOrderTypeFilter, setReportOrderTypeFilter] = useState<string>("All");
+
   // Computed active filters based on current tab
   const paymentFilter = activeTab === 'dashboard2' ? d2PaymentFilter : d1PaymentFilter;
   const setPaymentFilter = activeTab === 'dashboard2' ? setD2PaymentFilter : setD1PaymentFilter;
@@ -927,7 +938,7 @@ export default function Dashboard() {
     if (isInvAdmin) setInvAdminDateRange(val);
     else setAdminDateRange(val);
   };
-  const handleSetAdminReportDash = (val: 'None' | 'Dashboard 1' | 'Dashboard 2') => {
+  const handleSetAdminReportDash = (val: 'None' | 'Dashboard 1' | 'Dashboard 2' | 'All') => {
     if (isInvAdmin) setInvAdminReportDash(val);
     else setAdminReportDash(val);
   };
@@ -3012,7 +3023,7 @@ export default function Dashboard() {
                 manualDeliveryFee: Number(row['Delivery Fee'] || row.manualDeliveryFee) || 0,
                 advanceAmount: Number(row['Advance Amount'] || row.advanceAmount) || 0,
               };
-              const priceData = calculatePriceInfo(orderObj.chocolate, orderObj.count, orderObj.discount, orderObj.isDeliveryFree, orderObj.paymentStatus, orderObj.category, customPricesMap, orderObj.manualDeliveryFee, orderObj.orderStatus, managedChocPricesMap, orderObj.pricingType, orderObj.manualProductPrice);
+              const priceData = calculatePriceInfo(orderObj.chocolate, orderObj.count, orderObj.discount, orderObj.isDeliveryFree, orderObj.paymentStatus, orderObj.category, customPricesMap, orderObj.manualDeliveryFee, orderObj.orderStatus, managedChocPricesMap, (orderObj as any).pricingType, (orderObj as any).manualProductPrice);
               const finalOrderObj = {
                 ...orderObj,
                 totalOrderPrice: priceData.fullTotalPrice || 0,
@@ -5184,14 +5195,14 @@ export default function Dashboard() {
                     <input
                       type="text"
                       placeholder="Search Customer..."
-                      value={trackingSearch}
-                      onChange={(e) => setTrackingSearch(e.target.value)}
+                      value={trkSearch}
+                      onChange={(e) => setTrkSearch(e.target.value)}
                       className="w-full pl-12 pr-4 py-3 bg-white/70 border-2 border-white rounded-xl text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] text-sm"
                     />
                   </div>
 
                   <div className="flex flex-wrap flex-1 gap-3 w-full justify-end">
-                    <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider">
+                    <select value={trkOrderStatusFilter} onChange={(e) => setTrkOrderStatusFilter(e.target.value)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] uppercase tracking-wider">
                       <option value="All">All Statuses</option>
                       <option value="image edited (not paid)">I E (Not Paid)</option>
                       <option value="forward to print (paid)">F 2 P (Paid)</option>
@@ -5200,14 +5211,14 @@ export default function Dashboard() {
                     </select>
 
 
-                    <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-sm font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)]">
+                    <select value={trkPaymentFilter} onChange={(e) => setTrkPaymentFilter(e.target.value as any)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-sm font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)]">
                       <option value="All">All Payments</option>
                       <option value="Full Paid">Full Paid</option>
                       <option value="Partially Paid">Partially Paid</option>
                       <option value="Pending">Pending</option>
                     </select>
 
-                    <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as any)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-sm font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)]">
+                    <select value={trkDeliveryFilter} onChange={(e) => setTrkDeliveryFilter(e.target.value as any)} className="flex-1 md:flex-none px-3 py-3 border-2 border-white rounded-xl text-sm font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)]">
                       <option value="All">All Deliveries</option>
                       <option value="Delivered">Delivered</option>
                       <option value="In Process">In Process</option>

@@ -985,7 +985,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         newStatus = 'Waiting for Image';
       }
 
-      const updatedCard = { ...cardToMove, status: newStatus };
+      const updatedCard: any = { ...cardToMove, status: newStatus };
 
       if (targetTitle.includes('print')) {
         updatedCard.timestamp = new Date().toISOString();

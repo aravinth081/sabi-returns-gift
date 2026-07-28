@@ -305,9 +305,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
     try {
       if (todayRecord.fireId) {
-        await updateDoc(doc(db, "attendance", todayRecord.fireId), updatedRecord);
+        await updateDoc(doc(db, "attendance", todayRecord.fireId), updatedRecord as any);
       } else {
-        await addDoc(collection(db, "attendance"), updatedRecord);
+        await addDoc(collection(db, "attendance"), updatedRecord as any);
       }
     } catch (e) {
       console.log("Offline update");
