@@ -1537,9 +1537,7 @@ main {
 .sabi-calendar-popover button[name="previous-month"],
 .sabi-calendar-popover button[name="next-month"],
 .sabi-calendar-popover [class*="nav_button"],
-.sabi-calendar-popover .rdp-nav_button,
-.sabi-calendar-popover .rdp-button_reset,
-.sabi-calendar-popover .rdp-button {
+.sabi-calendar-popover .rdp-nav_button {
   color: #f8fafc !important;
   background-color: #131c2e !important;
   background: #131c2e !important;
@@ -1552,9 +1550,7 @@ main {
 .sabi-calendar-popover button[name="previous-month"]:hover,
 .sabi-calendar-popover button[name="next-month"]:hover,
 .sabi-calendar-popover [class*="nav_button"]:hover,
-.sabi-calendar-popover .rdp-nav_button:hover,
-.sabi-calendar-popover .rdp-button_reset:hover,
-.sabi-calendar-popover .rdp-button:hover {
+.sabi-calendar-popover .rdp-nav_button:hover {
   background-color: #18243b !important;
   background: #18243b !important;
   color: #fbbf24 !important;
@@ -1579,15 +1575,18 @@ main {
   stroke: #fbbf24 !important;
 }
 
-/* Calendar Day Buttons (1, 2, 3... 31) - Clean & Sleek */
+/* Calendar Day Buttons (1, 2, 3... 31) - Clean, Borderless & Sleek */
 .sabi-calendar-popover button.rdp-day,
+.sabi-calendar-popover button.rdp-button_reset,
 .sabi-calendar-popover button[class*="day"],
-.sabi-calendar-popover td button {
+.sabi-calendar-popover td button,
+.sabi-calendar-popover .rdp-day_button {
   color: #f8fafc !important; /* Crisp White */
   font-weight: 700 !important;
   font-size: 13px !important;
   border-radius: 0.75rem !important;
   border: none !important;
+  outline: none !important;
   box-shadow: none !important;
   background-color: transparent !important;
   background: transparent !important;
@@ -1595,12 +1594,15 @@ main {
 }
 
 .sabi-calendar-popover button.rdp-day:hover,
+.sabi-calendar-popover button.rdp-button_reset:hover,
 .sabi-calendar-popover button[class*="day"]:hover,
-.sabi-calendar-popover td button:hover {
+.sabi-calendar-popover td button:hover,
+.sabi-calendar-popover .rdp-day_button:hover {
   background-color: rgba(245, 158, 11, 0.2) !important;
   background: rgba(245, 158, 11, 0.2) !important;
   color: #fbbf24 !important;
   border: none !important;
+  box-shadow: none !important;
 }
 
 /* Today's Date Button (e.g. 30) */
@@ -1621,6 +1623,8 @@ main {
   color: #475569 !important;
   opacity: 0.35 !important;
   border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Selected Day (e.g. 30) */
