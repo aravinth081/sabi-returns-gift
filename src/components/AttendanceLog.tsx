@@ -838,20 +838,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Employee Search */}
+              {/* Filter by Employee Dropdown */}
               <div>
-                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Search Employee</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={adminSearch}
-                    onChange={e => setAdminSearch(e.target.value)}
-                    placeholder="Enter name..."
-                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
-                    className="w-full pl-8 pr-3 py-2 border border-white/20 rounded-xl text-xs font-bold text-white placeholder-slate-400 outline-none focus:border-amber-400"
-                  />
-                  <Search size={14} className="absolute left-2.5 top-3 text-amber-400" />
-                </div>
+                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Filter by Employee</label>
+                <select
+                  value={adminSearch}
+                  onChange={e => setAdminSearch(e.target.value)}
+                  style={{ backgroundColor: '#162035', color: '#fbbf24' }}
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl text-xs font-extrabold text-amber-400 bg-[#162035] outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="">All Employees</option>
+                  {employeeOptions.map(emp => (
+                    <option key={emp} value={emp}>{emp}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Month Filter */}
