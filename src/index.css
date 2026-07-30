@@ -1457,16 +1457,18 @@ main {
   background: transparent !important;
 }
 
+/* ==================== ULTRA-SLEEK PROFESSIONAL CALENDAR POPOVER ==================== */
 .sabi-calendar-popover {
-  background-color: #0c1427 !important;
-  background: #0c1427 !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+  background-color: #0d1527 !important;
+  background: #0d1527 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85) !important;
   color: #ffffff !important;
   border-radius: 1.25rem !important;
+  padding: 12px !important;
 }
 
-/* Day headers row container: Su Mo Tu We Th Fr Sa - Solid Black Box */
+/* Day headers row container: Su Mo Tu We Th Fr Sa - Clean & Borderless */
 .sabi-calendar-popover table thead,
 .sabi-calendar-popover table thead tr,
 .sabi-calendar-popover table thead th,
@@ -1475,8 +1477,8 @@ main {
 .sabi-calendar-popover .rdp-head_cell,
 .sabi-calendar-popover [class*="head_row"],
 .sabi-calendar-popover [class*="head_cell"] {
-  background-color: #000000 !important;
-  background: #000000 !important;
+  background-color: transparent !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
 
@@ -1484,13 +1486,14 @@ main {
 .sabi-calendar-popover thead tr,
 .sabi-calendar-popover tr.rdp-head_row,
 .sabi-calendar-popover [class*="head_row"] {
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  border-radius: 0.75rem !important;
-  padding: 6px 4px !important;
-  margin-bottom: 12px !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0 !important;
+  padding: 8px 0 !important;
+  margin-bottom: 8px !important;
   display: flex !important;
   justify-content: space-around !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 .sabi-calendar-popover th,
@@ -1499,9 +1502,9 @@ main {
 .sabi-calendar-popover th abbr,
 .sabi-calendar-popover .rdp-head_cell,
 .sabi-calendar-popover [class*="head_cell"] {
-  color: #ef4444 !important; /* Bright High-Contrast Red Text */
-  font-weight: 900 !important;
-  font-size: 13px !important;
+  color: #94a3b8 !important; /* Soft Professional Slate Gray */
+  font-weight: 800 !important;
+  font-size: 11px !important;
   letter-spacing: 0.05em !important;
   border: none !important;
   border-color: transparent !important;
@@ -1510,6 +1513,7 @@ main {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  text-transform: uppercase !important;
 }
 
 .sabi-calendar-popover tr,
@@ -1523,10 +1527,10 @@ main {
 /* Month Caption (e.g. July 2026) */
 .sabi-calendar-popover [class*="caption_label"],
 .sabi-calendar-popover .rdp-caption_label {
-  color: #ffffff !important;
+  color: #fbbf24 !important;
   font-weight: 900 !important;
-  font-size: 15px !important;
-  letter-spacing: 0.025em !important;
+  font-size: 16px !important;
+  letter-spacing: 0.04em !important;
 }
 
 /* Nav chevron buttons (< >) */
@@ -1536,13 +1540,13 @@ main {
 .sabi-calendar-popover .rdp-nav_button,
 .sabi-calendar-popover .rdp-button_reset,
 .sabi-calendar-popover .rdp-button {
-  color: #ffffff !important;
-  background-color: #162035 !important;
-  background: #162035 !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #f8fafc !important;
+  background-color: #131c2e !important;
+  background: #131c2e !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 0.75rem !important;
   opacity: 1 !important;
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s ease !important;
 }
 
 .sabi-calendar-popover button[name="previous-month"]:hover,
@@ -1551,10 +1555,11 @@ main {
 .sabi-calendar-popover .rdp-nav_button:hover,
 .sabi-calendar-popover .rdp-button_reset:hover,
 .sabi-calendar-popover .rdp-button:hover {
-  background-color: #1e293b !important;
-  background: #1e293b !important;
+  background-color: #18243b !important;
+  background: #18243b !important;
   color: #fbbf24 !important;
   border-color: rgba(251, 191, 36, 0.5) !important;
+  transform: scale(1.05) !important;
 }
 
 .sabi-calendar-popover button[name="previous-month"] svg,
@@ -1574,55 +1579,61 @@ main {
   stroke: #fbbf24 !important;
 }
 
-/* Calendar Day Buttons (1, 2, 3... 31) */
+/* Calendar Day Buttons (1, 2, 3... 31) - Clean & Sleek */
 .sabi-calendar-popover button.rdp-day,
 .sabi-calendar-popover button[class*="day"],
 .sabi-calendar-popover td button {
-  color: #ffffff !important; /* Pure white */
-  font-weight: 800 !important;
+  color: #f8fafc !important; /* Crisp White */
+  font-weight: 700 !important;
   font-size: 13px !important;
   border-radius: 0.75rem !important;
+  border: none !important;
+  box-shadow: none !important;
   background-color: transparent !important;
   background: transparent !important;
+  transition: all 0.2s ease !important;
 }
 
 .sabi-calendar-popover button.rdp-day:hover,
 .sabi-calendar-popover button[class*="day"]:hover,
 .sabi-calendar-popover td button:hover {
-  background-color: rgba(245, 158, 11, 0.25) !important;
-  background: rgba(245, 158, 11, 0.25) !important;
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  background: rgba(245, 158, 11, 0.2) !important;
   color: #fbbf24 !important;
+  border: none !important;
 }
 
 /* Today's Date Button (e.g. 30) */
 .sabi-calendar-popover [class*="day_today"]:not([aria-selected="true"]),
 .sabi-calendar-popover .rdp-day_today:not([aria-selected="true"]) {
-  background-color: rgba(245, 158, 11, 0.2) !important;
-  background: rgba(245, 158, 11, 0.2) !important;
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  background: rgba(245, 158, 11, 0.15) !important;
   color: #fbbf24 !important;
   border: 2px solid #f59e0b !important;
   font-weight: 900 !important;
   border-radius: 0.75rem !important;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4) !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3) !important;
 }
 
 /* Outside Month Days */
 .sabi-calendar-popover [class*="day_outside"],
 .sabi-calendar-popover .rdp-day_outside {
-  color: #64748b !important;
+  color: #475569 !important;
   opacity: 0.35 !important;
+  border: none !important;
 }
 
-/* Selected Day (e.g. 22) */
+/* Selected Day (e.g. 30) */
 .sabi-calendar-popover [aria-selected="true"],
 .sabi-calendar-popover .rdp-day_selected,
 .sabi-calendar-popover [class*="day_selected"] {
   background-color: #f59e0b !important;
   background: #f59e0b !important;
-  color: #000000 !important;
+  color: #020617 !important;
   font-weight: 900 !important;
   border-radius: 0.75rem !important;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.6) !important;
+  border: 1px solid #fbbf24 !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.6) !important;
 }
 
 /* Custom Sleek Dark Blue Scrollbars across the platform */
