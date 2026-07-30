@@ -3775,17 +3775,17 @@ export default function Dashboard() {
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
 
-              <div className="bg-[#ebe6df] p-4 rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex justify-between items-center gap-4">
-                <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                  <Archive className="text-amber-700" /> Stock Control Center
+              <div className="bg-[#0d1527] p-4 rounded-2xl shadow-2xl border border-white/15 flex justify-between items-center gap-4">
+                <h2 className="text-xl font-black text-amber-400 flex items-center gap-2">
+                  <Archive className="text-amber-400" /> Stock Control Center
                 </h2>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => document.getElementById('inventories-wallpaper-upload')?.click()}
-                    className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-white text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer shadow-sm"
+                    className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-[#131c2e] text-amber-400 border-white/15 hover:bg-[#18243b] cursor-pointer shadow-sm"
                     title="Set Background Wallpaper"
                   >
-                    <ImageIcon size={18} className="text-amber-700" />
+                    <ImageIcon size={18} className="text-amber-400" />
                   </button>
                   <input
                     type="file"
@@ -3797,7 +3797,7 @@ export default function Dashboard() {
                   {invWallpaper && (
                     <button
                       onClick={() => handleClearWallpaper('inventories')}
-                      className="w-10 h-10 flex justify-center items-center text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-lg cursor-pointer bg-white shadow-sm"
+                      className="w-10 h-10 flex justify-center items-center text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 border border-white/15 rounded-lg cursor-pointer bg-[#131c2e] shadow-sm"
                       title="Remove Background"
                     >
                       <X size={16} />
@@ -3849,16 +3849,16 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
                 {/* Col 1: Sales Tracker & Inventory Value Comparison Doughnut */}
                 <div className="flex flex-col h-full">
-                  <div className="bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col h-full">
-                    <h3 className="text-2xl font-black text-[#3e2723] mb-4 border-b-2 border-[#d7ccc8] pb-2 flex items-center gap-2"><TrendingUp size={22} /> Sales Tracker</h3>
+                  <div className="bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 flex flex-col h-full">
+                    <h3 className="text-2xl font-black text-amber-400 mb-4 border-b border-white/10 pb-2 flex items-center gap-2"><TrendingUp size={22} /> Sales Tracker</h3>
 
                     <div className="space-y-4">
                       <div className="relative">
-                        <Search className="absolute left-3 top-2.5 text-amber-600" size={16} />
+                        <Search className="absolute left-3 top-2.5 text-amber-400" size={16} />
                         <select
                           value={salesTrackerChoc}
                           onChange={(e) => setSalesTrackerChoc(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 font-bold rounded-xl outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-amber-950 shadow-inner appearance-none cursor-pointer"
+                          className="w-full pl-9 pr-4 py-2 font-bold rounded-xl outline-none border border-white/15 focus:border-amber-500 bg-[#131c2e] text-white shadow-inner appearance-none cursor-pointer"
                         >
                           <option value="All">All Chocolates</option>
                           {dynamicInventory.map(c => <option key={c} value={c}>{c}</option>)}
@@ -3867,39 +3867,39 @@ export default function Dashboard() {
 
                       <div className="flex items-center gap-2">
                         <div className="flex-1 relative">
-                          <span className="text-[10px] font-bold text-amber-800 absolute -top-2 left-2 bg-[#ebe6df] px-1">From</span>
+                          <span className="text-[10px] font-bold text-amber-400 absolute -top-2 left-2 bg-[#0d1527] px-1">From</span>
                           <input
                             type="date"
                             value={salesTrackerFrom}
                             onChange={(e) => setSalesTrackerFrom(e.target.value)}
-                            className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] bg-white text-amber-950 shadow-inner"
+                            className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border border-white/15 bg-[#131c2e] text-white shadow-inner"
                           />
                         </div>
                         <div className="flex-1 relative">
-                          <span className="text-[10px] font-bold text-amber-800 absolute -top-2 left-2 bg-[#ebe6df] px-1">To</span>
+                          <span className="text-[10px] font-bold text-amber-400 absolute -top-2 left-2 bg-[#0d1527] px-1">To</span>
                           <input
                             type="date"
                             value={salesTrackerTo}
                             onChange={(e) => setSalesTrackerTo(e.target.value)}
-                            className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] bg-white text-amber-950 shadow-inner"
+                            className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border border-white/15 bg-[#131c2e] text-white shadow-inner"
                           />
                         </div>
                       </div>
 
                       <div className="flex gap-4">
-                        <div className="bg-[#fff8e1] border border-[#ffe082] p-4 rounded-xl text-center shadow-sm flex-1">
-                          <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-1">Total Items Sold</p>
-                          <p className="text-3xl font-black text-[#d35400]">{trackedSalesResult.count}</p>
+                        <div className="bg-amber-500/15 border border-amber-500/30 p-4 rounded-xl text-center shadow-sm flex-1">
+                          <p className="text-xs font-black text-amber-400 uppercase tracking-wider mb-1">Total Items Sold</p>
+                          <p className="text-3xl font-black text-amber-300">{trackedSalesResult.count}</p>
                         </div>
-                        <div className="bg-[#e6f7ec] border border-[#9fe2bf] p-4 rounded-xl text-center shadow-sm flex-1">
-                          <p className="text-xs font-black text-[#047857] uppercase tracking-wider mb-1">Sales Amount</p>
-                          <p className="text-3xl font-black text-[#047857]">₹{trackedSalesResult.revenue.toLocaleString()}</p>
+                        <div className="bg-emerald-500/15 border border-emerald-500/30 p-4 rounded-xl text-center shadow-sm flex-1">
+                          <p className="text-xs font-black text-emerald-400 uppercase tracking-wider mb-1">Sales Amount</p>
+                          <p className="text-3xl font-black text-emerald-300">₹{trackedSalesResult.revenue.toLocaleString()}</p>
                         </div>
                       </div>
 
                       {/* 🟢 DOUGHNUT CHART: INVENTORY VALUES COMPARISON */}
-                      <div className="bg-white/90 dark:bg-slate-800/90 border border-[#d7ccc8] p-4 rounded-xl shadow-inner flex flex-col items-center">
-                        <p className="text-xs font-black text-[#5d4037] uppercase tracking-wider mb-2 text-center" style={{ color: '#5d4037' }}>
+                      <div className="bg-[#131c2e] border border-white/10 p-4 rounded-xl shadow-inner flex flex-col items-center">
+                        <p className="text-xs font-black text-amber-400 uppercase tracking-wider mb-2 text-center">
                           Inventory Value Comparison
                         </p>
                         <div className="w-full h-52">
@@ -3928,10 +3928,10 @@ export default function Dashboard() {
                                   return [`₹${Number(val).toLocaleString()} (${pct}%)`, name];
                                 }}
                                 contentStyle={{
-                                  backgroundColor: '#3e2723',
+                                  backgroundColor: '#0d1527',
                                   color: '#fff',
                                   borderRadius: '0.75rem',
-                                  border: '1px solid #d7ccc8',
+                                  border: '1px solid rgba(255,255,255,0.15)',
                                   fontSize: '12px',
                                   fontWeight: 'bold'
                                 }}
@@ -3939,7 +3939,7 @@ export default function Dashboard() {
                               <Legend
                                 verticalAlign="bottom"
                                 height={36}
-                                formatter={(value) => <span className="text-xs font-extrabold text-[#2c1810]" style={{ color: '#2c1810' }}>{value}</span>}
+                                formatter={(value) => <span className="text-xs font-black text-slate-100" style={{ color: '#f1f5f9' }}>{value}</span>}
                               />
                             </PieChart>
                           </ResponsiveContainer>
@@ -3950,9 +3950,9 @@ export default function Dashboard() {
                 </div>
 
                 {/* Col 2 & 3: Inventory Log */}
-                <div className="lg:col-span-2 bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col h-full min-h-[500px]">
+                <div className="lg:col-span-2 bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 overflow-hidden flex flex-col h-full min-h-[500px]">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-2xl font-black text-[#3e2723]">Inventory Log</h3>
+                    <h3 className="text-2xl font-black text-amber-400">Inventory Log</h3>
                     <button onClick={() => {
                       setInvForm({
                         date: new Date().toISOString().split('T')[0],
@@ -3966,31 +3966,31 @@ export default function Dashboard() {
                       <Plus size={16} /> Add Entry
                     </button>
                   </div>
-                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-white rounded-xl border border-[#d7ccc8] shadow-inner">
+                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
                     <table className="w-full text-left border-collapse min-w-[600px]">
-                      <thead className="sticky top-0 bg-[#fff59d] z-10 shadow-sm border-b-2 border-[#fbc02d]">
-                        <tr className="text-sm uppercase tracking-wider text-[#5d4037]">
-                          <th className="p-4 font-black border-r border-[#fff176]">Date</th>
-                          <th className="p-4 font-black border-r border-[#fff176]">Chocolate Name</th>
-                          <th className="p-4 font-black text-center border-r border-[#fff176]">Boxes</th>
-                          <th className="p-4 font-black text-center border-r border-[#fff176]">Count</th>
-                          <th className="p-4 font-black text-center border-r border-[#fff176]">Total Added</th>
+                      <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-amber-500/30">
+                        <tr className="text-sm uppercase tracking-wider text-amber-400">
+                          <th className="p-4 font-black border-r border-white/10">Date</th>
+                          <th className="p-4 font-black border-r border-white/10">Chocolate Name</th>
+                          <th className="p-4 font-black text-center border-r border-white/10">Boxes</th>
+                          <th className="p-4 font-black text-center border-r border-white/10">Count</th>
+                          <th className="p-4 font-black text-center border-r border-white/10">Total Added</th>
                           <th className="p-4 font-black text-center">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {inventoryLogs.length === 0 ? (
-                          <tr><td colSpan={6} className="p-8 text-center text-amber-700 font-bold">No manual inventory entries found.</td></tr>
+                          <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-bold">No manual inventory entries found.</td></tr>
                         ) : (
                           inventoryLogs.map(log => (
-                            <tr key={log.fireId} className="border-b border-[#f5f5f5] text-sm hover:bg-[#fffde7] transition-colors">
-                              <td className="p-4 font-bold text-amber-900">{formatToDisplayDate(log.date)}</td>
-                              <td className="p-4 font-bold text-amber-950">{log.chocolate}</td>
-                              <td className="p-4 text-center font-bold text-amber-800">{log.boxCount}</td>
-                              <td className="p-4 text-center font-bold text-amber-800">{log.itemsPerBox}</td>
-                              <td className="p-4 text-center font-black text-[#3e2723] bg-amber-50/50">+{log.totalChocolates}</td>
+                            <tr key={log.fireId} className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors">
+                              <td className="p-4 font-bold text-slate-300">{formatToDisplayDate(log.date)}</td>
+                              <td className="p-4 font-bold text-white">{log.chocolate}</td>
+                              <td className="p-4 text-center font-bold text-slate-300">{log.boxCount}</td>
+                              <td className="p-4 text-center font-bold text-slate-300">{log.itemsPerBox}</td>
+                              <td className="p-4 text-center font-black text-emerald-400">+{log.totalChocolates}</td>
                               <td className="p-4 text-center flex items-center justify-center gap-3">
-                                <button onClick={() => setViewingInvLog(log)} className="text-blue-500 hover:text-blue-750 transition-colors" title="View Entry"><Eye size={18} /></button>
+                                <button onClick={() => setViewingInvLog(log)} className="text-sky-400 hover:text-sky-300 transition-colors" title="View Entry"><Eye size={18} /></button>
                                 <button onClick={() => {
                                   setInvForm({
                                     date: log.date || new Date().toISOString().split('T')[0],
@@ -4000,8 +4000,8 @@ export default function Dashboard() {
                                   });
                                   setEditInvId(log.fireId);
                                   setIsInvModalOpen(true);
-                                }} className="text-blue-500 hover:text-blue-700 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
-                                <button onClick={() => handleDeleteInventory(log.fireId)} className="text-red-400 hover:text-red-600 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
+                                }} className="text-blue-400 hover:text-blue-300 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
+                                <button onClick={() => handleDeleteInventory(log.fireId)} className="text-rose-400 hover:text-rose-300 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
                               </td>
                             </tr>
                           ))
@@ -4009,7 +4009,7 @@ export default function Dashboard() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-[10px] font-bold text-amber-600 mt-3 text-center shrink-0">* Note: Dashboard orders are automatically deducted from the Live Stock Balance (Not shown in this manual entry table).</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-3 text-center shrink-0">* Note: Dashboard orders are automatically deducted from the Live Stock Balance (Not shown in this manual entry table).</p>
                 </div>
               </div>
 

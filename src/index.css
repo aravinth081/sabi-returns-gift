@@ -1793,4 +1793,14 @@ div.approximate-profit-card span.text-3xl,
   background-color: #0d1527 !important;
 }
 
+/* Recharts Legend Text Contrast Override for Dark Theme */
+.recharts-legend-item-text,
+.recharts-default-legend .recharts-legend-item-text,
+.recharts-legend-item span {
+  color: #f1f5f9 !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+
+
 
