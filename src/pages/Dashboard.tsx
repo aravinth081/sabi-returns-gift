@@ -4092,10 +4092,11 @@ export default function Dashboard() {
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-1 lg:min-h-0">
                 <div className={`grid grid-cols-1 sm:grid-cols-2 ${showHeader
-                    ? (activeTab === 'dashboard2' ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
+                    ? 'lg:grid-cols-4'
                     : 'hidden'
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
+                  {activeTab !== 'dashboard2' && (
                   <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
                     <div className="flex justify-between items-start mb-1 relative z-10">
                       <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
@@ -4115,6 +4116,7 @@ export default function Dashboard() {
                       </select>
                     </div>
                   </div>
+                  )}
 
                   <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
                     <div className="flex justify-between items-start mb-2 relative z-10">
