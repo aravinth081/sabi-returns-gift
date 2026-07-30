@@ -3807,16 +3807,16 @@ export default function Dashboard() {
               </div>
 
               <div
-                className={`p-4 rounded-[2rem] transition-all duration-500 ${isWallpaperActive
-                    ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg'
-                    : 'bg-gradient-to-br from-amber-700 to-amber-950 border-4 border-amber-600/50 shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)]'
+                className={`p-5 rounded-[2rem] transition-all duration-500 ${isWallpaperActive
+                    ? 'bg-[#0d1527]/80 backdrop-blur-xl border border-white/20 shadow-2xl'
+                    : 'bg-[#0d1527] border border-white/15 shadow-2xl'
                   }`}
               >
                 <div className="flex items-center justify-center gap-3 mb-6">
-                  <h2 className="text-3xl font-black text-white tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
+                  <h2 className="text-3xl font-black text-amber-400 tracking-widest uppercase" style={{ textShadow: "0 0 12px rgba(245,158,11,0.3)" }}>Live Stock Balance</h2>
                   <button
                     onClick={() => setActiveTab('inventories_admin_panel' as any)}
-                    className="p-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] shrink-0"
+                    className="p-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-amber-400 hover:text-amber-300 rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] shrink-0"
                     title="Open Admin Cost Analytics"
                   >
                     <Settings size={16} strokeWidth={2.5} />
@@ -3828,16 +3828,16 @@ export default function Dashboard() {
                     return (
                       <div
                         key={i}
-                        className={`p-3 rounded-xl text-center border transition-all duration-300 shrink-0 min-w-[100px] sm:min-w-[120px] flex-1 flex flex-col justify-center items-center transform hover:scale-105 transition-transform ${isWallpaperActive
-                            ? 'bg-black/35 border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]'
-                            : 'bg-[#fffdf7] border-transparent shadow-inner'
-                          }`}
+                        className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[100px] sm:min-w-[125px] flex-1 flex flex-col justify-center items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
                       >
-                        <span className={`text-[11px] font-black uppercase leading-tight mb-2 h-8 flex items-center justify-center ${isWallpaperActive ? 'text-amber-200' : 'text-amber-900'
-                          }`}>{choc}</span>
+                        <span className="text-xs font-extrabold text-white uppercase leading-tight mb-2 h-8 flex items-center justify-center text-center px-1">
+                          {choc}
+                        </span>
                         <span className={`text-2xl font-black ${bal < 0
-                            ? 'text-rose-400'
-                            : (isWallpaperActive ? 'text-green-400 font-extrabold' : 'text-green-600')
+                            ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                            : bal === 0
+                              ? 'text-slate-400'
+                              : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]'
                           }`}>{bal}</span>
                       </div>
                     )
