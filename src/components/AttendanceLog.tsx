@@ -534,15 +534,23 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
   }, [currentMonthRecords]);
 
-  // Admin filtered records
+  // Admin filtered records with smart precedence and sorting
   const adminFilteredRecords = useMemo(() => {
     return attendanceRecords.filter(r => {
-      const matchesSearch = !adminSearch || r.employeeName.toLowerCase().includes(adminSearch.toLowerCase());
-      const matchesMonth = !adminMonthFilter || r.date.startsWith(adminMonthFilter);
+      const searchLower = adminSearch.trim().toLowerCase();
+      const matchesSearch = !searchLower || 
+        r.employeeName.toLowerCase().includes(searchLower) ||
+        (r.remarks && r.remarks.toLowerCase().includes(searchLower)) ||
+        r.status.toLowerCase().includes(searchLower);
+
+      // If specific date filter is selected, ignore month filter conflict
       const matchesDate = !adminDateFilter || r.date === adminDateFilter;
+      const matchesMonth = adminDateFilter ? true : (!adminMonthFilter || r.date.startsWith(adminMonthFilter));
+      
       const matchesStatus = adminStatusFilter === "All" || r.status === adminStatusFilter;
-      return matchesSearch && matchesMonth && matchesDate && matchesStatus;
-    });
+
+      return matchesSearch && matchesDate && matchesMonth && matchesStatus;
+    }).sort((a, b) => b.date.localeCompare(a.date));
   }, [attendanceRecords, adminSearch, adminMonthFilter, adminDateFilter, adminStatusFilter]);
 
   return (
@@ -893,9 +901,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
               <h3 className="font-black text-sm text-amber-400 uppercase tracking-wider">
                 All Employee Attendance Records ({adminFilteredRecords.length})
               </h3>
-              {(adminSearch || adminDateFilter || adminStatusFilter !== "All") && (
+              {(adminSearch || adminDateFilter || adminMonthFilter || adminStatusFilter !== "All") && (
                 <button
-                  onClick={() => { setAdminSearch(""); setAdminDateFilter(""); setAdminStatusFilter("All"); }}
+                  onClick={() => { setAdminSearch(""); setAdminDateFilter(""); setAdminMonthFilter(""); setAdminStatusFilter("All"); }}
                   className="text-xs text-rose-400 font-extrabold hover:underline cursor-pointer"
                 >
                   Clear Filters
