@@ -113,7 +113,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   // Employee State
   const [selectedUser, setSelectedUser] = useState(currentLoggedInUser);
-  const [employeeOptions, setEmployeeOptions] = useState<string[]>(DEFAULT_EMPLOYEES);
+  const [employeeOptions, setEmployeeOptions] = useState<string[]>(currentLoggedInUser ? [currentLoggedInUser] : []);
 
   // Sync selectedUser if currentLoggedInUser changes
   useEffect(() => {
