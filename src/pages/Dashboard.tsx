@@ -4412,15 +4412,15 @@ export default function Dashboard() {
 
                         {showNotificationDropdown && (
                           <div
-                            className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-amber-100 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
+                            className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-white/15 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
                             style={{
-                              background: 'rgba(255, 255, 255, 0.98)',
+                              background: '#0d1527',
                               backdropFilter: 'blur(20px)',
                             }}
                           >
-                            <div className="px-4 py-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center shrink-0">
-                              <span className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
-                                <Bell size={14} className="text-amber-800" /> Notifications
+                            <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex justify-between items-center shrink-0">
+                              <span className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+                                <Bell size={14} className="text-amber-400" /> Notifications
                                 {notifications.filter(n => !n.read).length > 0 && (
                                   <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
                                     ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
@@ -4441,9 +4441,9 @@ export default function Dashboard() {
                                 <Plus size={11} /> Add Order
                               </button>
                             </div>
-                            <div className="max-h-64 overflow-y-auto divide-y divide-amber-100/50">
+                            <div className="max-h-64 overflow-y-auto divide-y divide-white/10">
                               {notifications.length === 0 ? (
-                                <div className="p-4 text-center text-xs text-amber-600 font-medium italic">
+                                <div className="p-4 text-center text-xs text-slate-400 font-medium italic">
                                   No notifications yet
                                 </div>
                               ) : (
@@ -4454,16 +4454,16 @@ export default function Dashboard() {
                                       setShowNotificationDropdown(false);
                                       handleNotificationClick(n);
                                     }}
-                                    className={`p-3 text-xs transition-colors hover:bg-amber-50/50 cursor-pointer ${!n.read ? 'bg-amber-50/10 font-bold' : 'text-slate-500'}`}
+                                    className={`p-3 text-xs transition-colors hover:bg-white/5 cursor-pointer ${!n.read ? 'bg-white/[0.03] font-bold' : 'text-slate-400'}`}
                                   >
                                     <div className="flex justify-between items-start gap-1">
-                                      <p className="text-slate-800">{n.cardTitle} moved to Print</p>
-                                      <span className="text-[9px] text-amber-600 shrink-0 font-bold">
+                                      <p className="text-slate-200">{n.cardTitle} moved to Print</p>
+                                      <span className="text-[9px] text-amber-400 shrink-0 font-bold">
                                         {new Date(n.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}
                                       </span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1">
-                                      <p className="text-[10px] text-slate-500 font-medium">{formatPhoneNumber(n.phoneNumber)}</p>
+                                      <p className="text-[10px] text-slate-400 font-medium">{formatPhoneNumber(n.phoneNumber)}</p>
                                       <div className="flex items-center gap-1.5">
                                         <button
                                           onClick={(e) => {
@@ -4473,7 +4473,7 @@ export default function Dashboard() {
                                             const waUrl = `https://wa.me/91${phoneDigits}`;
                                             window.open(waUrl, '_blank');
                                           }}
-                                          className="p-1 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors flex items-center justify-center cursor-pointer border border-transparent"
+                                          className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors flex items-center justify-center cursor-pointer border border-transparent"
                                           title="Chat on WhatsApp"
                                         >
                                           <MessageCircle size={14} className="stroke-[2.5]" />
@@ -4495,16 +4495,16 @@ export default function Dashboard() {
                               )}
                             </div>
                             {notifications.length > 0 && (
-                              <div className="px-4 py-2 border-t border-amber-100 bg-amber-50/20 flex justify-between items-center shrink-0">
+                              <div className="px-4 py-2 border-t border-white/10 bg-white/5 flex justify-between items-center shrink-0">
                                 <button
                                   onClick={markAllNotificationsAsRead}
-                                  className="text-[11px] font-bold text-amber-800 hover:text-amber-950 transition-colors cursor-pointer"
+                                  className="text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
                                 >
                                   Mark all read
                                 </button>
                                 <button
                                   onClick={clearAllNotifications}
-                                  className="text-[11px] font-bold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"
+                                  className="text-[11px] font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
                                 >
                                   Clear all
                                 </button>
