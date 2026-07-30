@@ -27,6 +27,8 @@ import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
 import AttendanceLog from "@/components/AttendanceLog";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -315,18 +317,19 @@ const ChocolateSingleSelect = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner flex justify-between items-center text-left text-sm cursor-pointer"
+        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+        className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner flex justify-between items-center text-left cursor-pointer transition-all hover:border-amber-400/50"
       >
-        <span className="truncate pr-2">
+        <span className={`truncate pr-2 ${value ? 'text-white font-extrabold' : 'text-slate-400 font-medium'}`}>
           {value ? value : placeholderText}
         </span>
-        <ChevronDown size={18} className="text-gray-500 shrink-0" />
+        <ChevronDown size={18} className="text-slate-400 shrink-0 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-0.5 bg-white border border-gray-400 shadow-[2px_2px_5px_rgba(0,0,0,0.15)] max-h-60 overflow-y-auto py-0.5 rounded-none text-left">
+        <div className="absolute z-[250] w-full mt-1.5 bg-[#121a2d] border border-white/20 shadow-2xl max-h-60 overflow-y-auto py-1 rounded-xl text-left backdrop-blur-xl custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
           <div
-            className="px-3 py-1.5 cursor-pointer hover:bg-[#555555] hover:text-white text-black text-sm font-normal select-none"
+            className="px-3.5 py-2 cursor-pointer hover:bg-amber-500/20 hover:text-amber-300 text-slate-400 text-xs font-semibold select-none transition-colors border-b border-white/10"
             onClick={() => {
               onChange("");
               setIsOpen(false);
@@ -335,10 +338,15 @@ const ChocolateSingleSelect = ({
             {placeholderText}
           </div>
           {suggestions.map((item, index) => {
+            const isSelected = value === item;
             return (
               <div
                 key={index}
-                className="px-3 py-1.5 cursor-pointer hover:bg-[#555555] hover:text-white text-black text-sm font-normal select-none"
+                className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold select-none transition-colors border-b border-white/5 last:border-0 ${
+                  isSelected
+                    ? 'bg-amber-500/20 text-amber-300 font-extrabold'
+                    : 'text-slate-200 hover:bg-amber-500/15 hover:text-amber-300'
+                }`}
                 onClick={() => {
                   onChange(item);
                   setIsOpen(false);
@@ -551,6 +559,23 @@ export default function Dashboard() {
   const [regData, setRegData] = useState({ name: "", username: "", password: "" });
   const [showApprovalPanel, setShowApprovalPanel] = useState(false);
   const [openActionId, setOpenActionId] = useState<number | null>(null);
+
+  // Global listener: Close 3-dot action menu when clicking ANYWHERE outside
+  useEffect(() => {
+    if (openActionId === null) return;
+    const handleGlobalClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.action-menu-popup') && !target.closest('.action-menu-trigger')) {
+        setOpenActionId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleGlobalClickOutside);
+    document.addEventListener('touchstart', handleGlobalClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClickOutside);
+      document.removeEventListener('touchstart', handleGlobalClickOutside);
+    };
+  }, [openActionId]);
 
   const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker' | 'attendance'>(
     (localStorage.getItem('activeTab') as any) || 'dashboard1'
@@ -3509,7 +3534,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`flex h-screen font-sans bg-[#3f4144] text-amber-950 relative ${isExportPreviewOpen || isReportPreviewOpen ? 'print:hidden' : ''} ${isWallpaperActive ? 'wallpaper-active' : ''}`}>
+    <div className={`flex h-screen font-sans bg-[#0b1329] text-slate-100 relative ${isExportPreviewOpen || isReportPreviewOpen ? 'print:hidden' : ''} ${isWallpaperActive ? 'wallpaper-active' : ''}`}>
 
       <datalist id="discount-suggestions">
         <option value="0" />
@@ -3521,28 +3546,28 @@ export default function Dashboard() {
       </datalist>
 
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/20 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/40 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`bg-slate-50 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0'}`}>
+      <aside className={`bg-[#1c2230] border-r border-slate-800 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0'}`}>
         <div className="w-56 h-full flex flex-col justify-between">
           <div className="overflow-y-auto flex-1 select-none">
-            <div className={`p-6 flex flex-col items-center border-b border-blue-200 relative`}>
-              <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 md:hidden p-1 text-blue-600 hover:bg-blue-50 rounded-lg">
+            <div className={`p-6 flex flex-col items-center border-b border-slate-700/60 relative`}>
+              <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 md:hidden p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg">
                 <X size={20} />
               </button>
-              <div className="relative w-20 h-20 mb-3 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900 shadow-[0_6px_12px_rgba(30,58,138,0.35)] flex items-center justify-center">
-                <div className="w-full h-full rounded-full border-[3px] border-white overflow-hidden bg-blue-50 shadow-inner">
+              <div className="relative w-20 h-20 mb-3 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-[0_0_15px_rgba(59,130,246,0.8)] flex items-center justify-center">
+                <div className="w-full h-full rounded-full border-[3px] border-white overflow-hidden bg-slate-900 shadow-inner">
                   <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
 
-              <h2 className={`font-black text-2xl text-blue-900 tracking-wide`} style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.2), -1px -1px 1px rgba(255,255,255,1)" }}>
+              <h2 className={`font-extrabold text-2xl text-white tracking-wide`} style={{ textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
                 {loggedInName}
               </h2>
 
               {role === 'Admin' && (
-                <span className={`text-xs text-white font-black px-4 py-1.5 rounded-full mt-2 border border-blue-400 bg-gradient-to-r from-blue-500 to-blue-700 shadow-[0_3px_6px_rgba(0,0,0,0.2)]`}>
+                <span className={`text-xs text-white font-black px-4 py-1 rounded-full mt-2 border border-blue-400 bg-gradient-to-r from-blue-500 to-blue-700 shadow-sm`}>
                   Admin
                 </span>
               )}
@@ -3551,30 +3576,30 @@ export default function Dashboard() {
             <nav className="p-4 space-y-2.5 mt-3">
               <button
                 onClick={() => { setActiveTab('dashboard1'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard1' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Home size={18} className={showSidebarHighlight && activeTab === 'dashboard1' ? 'drop-shadow-md' : ''} />
-                <span style={showSidebarHighlight && activeTab === 'dashboard1' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Dashboard 1</span>
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard1' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <Home size={18} className={showSidebarHighlight && activeTab === 'dashboard1' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Dashboard 1</span>
               </button>
 
               <button
                 onClick={() => { setActiveTab('daily_tasks'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'daily_tasks' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <ClipboardList size={18} className={showSidebarHighlight && activeTab === 'daily_tasks' ? 'drop-shadow-md' : ''} />
-                <span style={showSidebarHighlight && activeTab === 'daily_tasks' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Daily Tasks</span>
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'daily_tasks' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <ClipboardList size={18} className={showSidebarHighlight && activeTab === 'daily_tasks' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Daily Tasks</span>
               </button>
 
               <button
                 onClick={() => { setActiveTab('dashboard2'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard2' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Package size={18} className={showSidebarHighlight && activeTab === 'dashboard2' ? 'drop-shadow-md' : ''} />
-                <span style={showSidebarHighlight && activeTab === 'dashboard2' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Dashboard 2</span>
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard2' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <Package size={18} className={showSidebarHighlight && activeTab === 'dashboard2' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Dashboard 2</span>
               </button>
 
               <button
                 onClick={() => { setActiveTab('inventories'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'inventories' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Archive size={18} className={showSidebarHighlight && activeTab === 'inventories' ? 'drop-shadow-md' : ''} />
-                <span style={showSidebarHighlight && activeTab === 'inventories' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Inventories</span>
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'inventories' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <Archive size={18} className={showSidebarHighlight && activeTab === 'inventories' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Inventories</span>
               </button>
 
               <button
@@ -3584,22 +3609,22 @@ export default function Dashboard() {
                   setReportsAuthError("");
                   if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'reports' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'drop-shadow-md' : ''} />
-                <span style={showSidebarHighlight && activeTab === 'reports' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Reports</span>
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'reports' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Reports</span>
               </button>
 
               <button
                 onClick={() => { setActiveTab('attendance'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'attendance' ? 'bg-gradient-to-br from-[#ffffff99] to-[#ffffff44] backdrop-blur-md text-blue-900 font-black shadow-[5px_5px_15px_rgba(0,0,0,0.1),-2px_-2px_10px_rgba(255,255,255,0.8)] border border-white/50 scale-[1.02] border-l-4 border-l-blue-600' : 'text-slate-600 hover:bg-white/60 font-bold'}`}>
-                <Calendar size={18} className={showSidebarHighlight && activeTab === 'attendance' ? 'drop-shadow-md' : ''} />
-                <span style={showSidebarHighlight && activeTab === 'attendance' ? { textShadow: "1px 1px 1px rgba(0,0,0,0.1)" } : {}}>Attendance Log</span>
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'attendance' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <Calendar size={18} className={showSidebarHighlight && activeTab === 'attendance' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Attendance Log</span>
               </button>
 
             </nav>
           </div>
 
-          <div className="p-4 border-t border-blue-100 space-y-2">
+          <div className="p-4 border-t border-slate-700/60 space-y-2">
             <button
               onClick={() => {
                 setIsHistoryAuthModalOpen(true);
@@ -3607,7 +3632,7 @@ export default function Dashboard() {
                 setHistoryAuthError("");
                 if (window.innerWidth < 768) setIsSidebarOpen(false);
               }}
-              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-purple-200 bg-[#2b274c] hover:bg-[#383363] hover:text-white border border-purple-500/40 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
             >
               <History size={18} /> History
             </button>
@@ -3616,13 +3641,13 @@ export default function Dashboard() {
                 setIsTrashOpen(true);
                 if (window.innerWidth < 768) setIsSidebarOpen(false);
               }}
-              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900 border border-amber-200 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-amber-200 bg-[#3a3028] hover:bg-[#4a3e33] hover:text-white border border-amber-500/40 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
             >
               <Trash2 size={18} /> Trash Bin
             </button>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-rose-600 bg-gradient-to-r from-rose-50/70 to-blue-50/40 border border-rose-100/70 hover:from-rose-500 hover:to-rose-600 hover:text-white hover:border-rose-600 hover:shadow-[0_8px_16px_rgba(244,63,94,0.2)] active:scale-95 font-black transition-all duration-300 shadow-sm cursor-pointer"
+              className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-rose-200 bg-[#3d232a] hover:bg-[#522935] hover:text-white border border-rose-500/40 hover:shadow-md active:scale-95 font-black transition-all duration-300 shadow-sm cursor-pointer"
             >
               <Power size={18} /> Logout
             </button>
@@ -3663,7 +3688,7 @@ export default function Dashboard() {
                           ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
                               attendanceWallpaper.startsWith('data:image') || attendanceWallpaper.startsWith('http') ? `url(${attendanceWallpaper})` : attendanceWallpaper
                             }`
-                          : 'linear-gradient(to bottom right, #3e2723, #2d1b14, #1a0f0b)',
+                          : 'linear-gradient(to bottom right, #080d19, #0d1527, #101c36)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -3675,32 +3700,32 @@ export default function Dashboard() {
           <div className="absolute top-4 left-4 z-50 flex items-center gap-2 print:hidden">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-amber-800 bg-white hover:bg-amber-50 rounded-lg shadow-md transition-colors border border-amber-200 cursor-pointer flex items-center justify-center"
+              className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg shadow-md transition-colors border border-blue-800/60 cursor-pointer flex items-center justify-center"
               title="Toggle Menu"
             >
               <Menu size={18} />
             </button>
             <button
               onClick={() => setShowHeader(true)}
-              className="px-3 py-2 text-xs font-bold text-amber-800 bg-white hover:bg-amber-50 rounded-lg shadow-md transition-colors border border-amber-200 cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-2 text-xs font-bold text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg shadow-md transition-colors border border-blue-800/60 cursor-pointer flex items-center gap-1.5"
               title="Show Header"
             >
-              <Eye size={14} className="text-amber-700" /> Show Header
+              <Eye size={14} className="text-blue-400" /> Show Header
             </button>
           </div>
         )}
 
         {showHeader && (
-          <header className={`bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center shadow-sm relative z-50 print:hidden border-amber-100`}>
+          <header className="bg-[#0e1628] border-b border-blue-900/50 px-4 md:px-8 py-4 flex justify-between items-center shadow-md relative z-50 print:hidden">
             <div className="flex items-center gap-3 md:gap-5">
-              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200" title="Toggle Menu">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60" title="Toggle Menu">
                 <Menu size={24} />
               </button>
-              <button onClick={() => setShowHeader(false)} className="p-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200" title="Hide Header">
+              <button onClick={() => setShowHeader(false)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60" title="Hide Header">
                 <EyeOff size={24} />
               </button>
               <div>
-                <h1 className={`text-2xl md:text-3xl font-bold text-amber-950`}>
+                <h1 className="text-2xl md:text-3xl font-black text-white">
                   {activeTab === 'dashboard1' && 'Order Management (Chocolates)'}
                   {activeTab === 'dashboard2' && 'Order Management (Products)'}
                   {activeTab === 'tracking' && 'Orders Tracking Center'}
@@ -3709,7 +3734,7 @@ export default function Dashboard() {
                   {activeTab === 'daily_tasks' && 'Daily Task Management Board'}
                   {activeTab === 'random_picker' && 'Monthly Winner Picker'}
                 </h1>
-                <p className={`hidden md:block text-sm text-amber-700`}>
+                <p className="hidden md:block text-sm text-blue-300 font-medium">
                   {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
                   {activeTab === 'tracking' && 'Search and trace live order statuses.'}
                   {activeTab === 'reports' && 'View your sales and item statistics.'}
@@ -3724,13 +3749,13 @@ export default function Dashboard() {
 
 
               <div className="hidden sm:block text-right">
-                <p className="text-2xl font-black text-amber-900 tracking-wide uppercase">Sabi</p>
-                <p className="text-sm font-bold text-amber-600 tracking-widest uppercase">return Gifts</p>
+                <p className="text-2xl font-black text-white tracking-wide uppercase">Sabi</p>
+                <p className="text-sm font-bold text-blue-400 tracking-widest uppercase">return Gifts</p>
               </div>
               <div
-                className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-[#d4a373] to-[#3e2723] shadow-md flex items-center justify-center select-none"
+                className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-md flex items-center justify-center select-none"
               >
-                <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-amber-50 shadow-inner">
+                <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-slate-900 shadow-inner">
                   <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
@@ -4004,29 +4029,29 @@ export default function Dashboard() {
               {/* 🟢 HORIZONTAL LAYOUT: CURRENT INVENTORY VALUE & APPROX INVENTORY VALUE CARDS */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
                 {/* Current Inventory Value Card */}
-                <div className="current-inventory-value-card bg-[#ebe6df] p-6 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between">
+                <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="current-inventory-value-card bg-[#ebe6df] p-6 rounded-3xl shadow-2xl border border-amber-500/40 flex flex-col justify-between">
                   <div>
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-3 border-b border-[#d7ccc8]">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 pb-4 border-b border-white/10">
                       <div>
-                        <h3 className="text-xl font-black text-[#3e2723] uppercase tracking-wide">Current Inventory Value</h3>
-                        <p className="text-xs font-bold text-[#8d6e63] mt-0.5">Live Stock Balance Breakdown Across All Inventories</p>
+                        <h3 className="text-xl font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">Current Inventory Value</h3>
+                        <p className="text-xs font-bold text-slate-300 mt-1">Live Stock Balance Breakdown Across All Inventories</p>
                       </div>
-                      <div className="text-right mt-2 sm:mt-0">
-                        <span className="text-xs font-bold text-[#5d4037] block">Grand Total Inventory Value</span>
-                        <span className="text-3xl font-black text-[#8b5a2b]">₹{currentInventoryValueData.grandTotal.toLocaleString()}</span>
+                      <div className="text-right mt-3 sm:mt-0">
+                        <span className="text-[11px] font-extrabold text-slate-400 block uppercase tracking-wider">Grand Total Inventory Value</span>
+                        <span className="text-3xl font-black text-amber-300 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">₹{currentInventoryValueData.grandTotal.toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {currentInventoryValueData.items.map((item, idx) => (
-                        <div key={idx} className="bg-white p-3 rounded-xl border border-amber-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                        <div key={idx} style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-3.5 rounded-2xl border border-white/10 shadow-md transition-all flex flex-col justify-between hover:bg-[#18243b]">
                           <div className="flex justify-between items-center gap-2">
-                            <span className="text-xs font-black text-slate-900 truncate" title={item.name}>{item.name}</span>
-                            <span className="text-xs font-black text-[#8b5a2b] shrink-0">₹{item.value.toLocaleString()}</span>
+                            <span className="text-xs font-extrabold text-white truncate" title={item.name}>{item.name}</span>
+                            <span className="text-xs font-black text-amber-300 shrink-0">₹{item.value.toLocaleString()}</span>
                           </div>
-                          <div className="mt-2 flex justify-between items-center text-[11px] font-extrabold border-t border-slate-200 pt-1.5 choc-detail-badge-text text-[#3e2723]">
-                            <span className="font-extrabold text-[#3e2723]">Calculation:</span>
-                            <span className="font-mono font-black text-[#2c1810] tracking-tight">{item.balance} × ₹{item.price}</span>
+                          <div className="mt-2.5 flex justify-between items-center text-[11px] font-extrabold border-t border-white/10 pt-2 text-slate-300">
+                            <span className="font-bold text-slate-400">Calculation:</span>
+                            <span className="font-mono font-black text-amber-200 tracking-tight">{item.balance} × ₹{item.price}</span>
                           </div>
                         </div>
                       ))}
@@ -4035,29 +4060,29 @@ export default function Dashboard() {
                 </div>
 
                 {/* Approx Inventory Value Card */}
-                <div className="approximate-profit-card bg-[#ebe6df] p-6 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between">
+                <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="approximate-profit-card bg-[#ebe6df] p-6 rounded-3xl shadow-2xl border border-emerald-500/40 flex flex-col justify-between">
                   <div>
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-3 border-b border-[#d7ccc8]">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 pb-4 border-b border-white/10">
                       <div>
-                        <h3 className="text-xl font-black text-[#3e2723] uppercase tracking-wide">Approx Inventory Value</h3>
-                        <p className="text-xs font-bold text-emerald-700 mt-0.5">Calculated Net Profit Breakdown Across All Inventories</p>
+                        <h3 className="text-xl font-black text-emerald-400 uppercase tracking-wide flex items-center gap-2">Approx Inventory Value</h3>
+                        <p className="text-xs font-bold text-slate-300 mt-1">Calculated Net Profit Breakdown Across All Inventories</p>
                       </div>
-                      <div className="text-right mt-2 sm:mt-0">
-                        <span className="text-xs font-bold text-[#5d4037] block">Grand Total Approx Inventory Value</span>
-                        <span className="text-3xl font-black text-emerald-600">₹{Math.round(approximateProfitData.grandTotal).toLocaleString()}</span>
+                      <div className="text-right mt-3 sm:mt-0">
+                        <span className="text-[11px] font-extrabold text-slate-400 block uppercase tracking-wider">Grand Total Approx Inventory Value</span>
+                        <span className="text-3xl font-black text-emerald-300 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">₹{Math.round(approximateProfitData.grandTotal).toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {approximateProfitData.items.map((item, idx) => (
-                        <div key={idx} className="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                        <div key={idx} style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-3.5 rounded-2xl border border-white/10 shadow-md transition-all flex flex-col justify-between hover:bg-[#18243b]">
                           <div className="flex justify-between items-center gap-2">
-                            <span className="text-xs font-black text-slate-900 truncate" title={item.name}>{item.name}</span>
-                            <span className="text-xs font-black text-emerald-600 shrink-0">₹{Math.round(item.value).toLocaleString()}</span>
+                            <span className="text-xs font-extrabold text-white truncate" title={item.name}>{item.name}</span>
+                            <span className="text-xs font-black text-emerald-300 shrink-0">₹{Math.round(item.value).toLocaleString()}</span>
                           </div>
-                          <div className="mt-2 flex justify-between items-center text-[11px] font-extrabold border-t border-slate-200 pt-1.5 choc-detail-badge-text text-emerald-950">
-                            <span className="font-extrabold text-emerald-950">Calculation:</span>
-                            <span className="font-mono font-black text-amber-950">₹{Math.round(item.stickerCost || 0)} + ₹{Math.round(item.labourCost || 0)} + ₹{Math.round(item.totalPurchase || 0)}</span>
+                          <div className="mt-2.5 flex justify-between items-center text-[11px] font-extrabold border-t border-white/10 pt-2 text-slate-300">
+                            <span className="font-bold text-slate-400">Calculation:</span>
+                            <span className="font-mono font-black text-emerald-200 tracking-tight">₹{Math.round(item.stickerCost || 0)} + ₹{Math.round(item.labourCost || 0)} + ₹{Math.round(item.totalPurchase || 0)}</span>
                           </div>
                         </div>
                       ))}
@@ -4072,11 +4097,9 @@ export default function Dashboard() {
             <div
               className={`relative p-6 rounded-[2.5rem] transition-all duration-500 overflow-hidden lg:flex-1 lg:min-h-0 lg:flex lg:flex-col ${isWallpaperActive ? 'wallpaper-active' : ''}`}
               style={{
-                background: activeTab === 'dashboard1'
-                  ? (d1Wallpaper ? 'transparent' : '#fffcf9')
-                  : (d2Wallpaper ? 'transparent' : '#fffcf9'),
-                border: (activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper) ? 'none' : '1px solid rgba(251, 191, 36, 0.1)',
-                boxShadow: (activeTab === 'dashboard1' && d1Wallpaper) || (activeTab === 'dashboard2' && d2Wallpaper) ? 'none' : 'inset 0 2px 4px rgba(0, 0, 0, 0.06)'
+                background: (activeTab === 'dashboard1' ? d1Wallpaper : d2Wallpaper) ? 'transparent' : 'transparent',
+                border: 'none',
+                boxShadow: 'none'
               }}
             >
 
@@ -4156,11 +4179,11 @@ export default function Dashboard() {
                           <p className="text-amber-700/60 text-center mt-2 italic">No products added.</p>
                         ) : (
                           customProducts.map(prod => (
-                            <div key={prod.fireId} className="flex justify-between items-center bg-white/60 px-2 py-1.5 rounded-lg border border-white shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] hover:bg-white transition-colors">
-                              <span className="text-amber-950 truncate flex-1 pr-2" title={prod.name}>{prod.name} - ₹{prod.price}</span>
+                            <div key={prod.fireId} className="flex justify-between items-center bg-slate-900/80 hover:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-white/20 shadow-md transition-all">
+                              <span className="text-white font-extrabold text-xs truncate flex-1 pr-2 tracking-wide" title={prod.name}>{prod.name} - ₹{prod.price}</span>
                               <div className="flex items-center gap-1 shrink-0">
-                                <button onClick={() => handleEditProductClick(prod)} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Edit"><Pencil size={12} /></button>
-                                <button onClick={() => handleDeleteProductClick(prod.fireId)} className="text-red-500 hover:bg-red-100 p-1 rounded transition-colors" title="Delete"><Trash2 size={12} /></button>
+                                <button onClick={() => handleEditProductClick(prod)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 p-1 rounded-lg transition-colors cursor-pointer" title="Edit"><Pencil size={13} /></button>
+                                <button onClick={() => handleDeleteProductClick(prod.fireId)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1 rounded-lg transition-colors cursor-pointer" title="Delete"><Trash2 size={13} /></button>
                               </div>
                             </div>
                           ))
@@ -4334,11 +4357,17 @@ export default function Dashboard() {
                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto print:hidden shrink-0 justify-center sm:justify-end">
                       {/* Gift Icon Button to open Winner Picker Modal */}
                       <button
+                        type="button"
                         onClick={() => setIsWinnerPickerModalOpen(true)}
-                        className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-all border bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:scale-105 active:scale-95 cursor-pointer shadow-sm relative group"
-                        title="Winner Picker"
+                        style={{
+                          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+                          border: '2px solid #fef08a',
+                          boxShadow: '0 4px 15px rgba(245, 158, 11, 0.45)'
+                        }}
+                        className="flex justify-center items-center w-10 h-10 rounded-xl transition-all hover:scale-110 active:scale-95 cursor-pointer shrink-0 relative group z-20"
+                        title="Monthly Winner Picker Draw"
                       >
-                        <Gift size={18} className="text-amber-600 fill-amber-100 group-hover:text-amber-700 animate-bounce" />
+                        <Gift size={20} className="text-slate-950 fill-slate-950/30 group-hover:scale-110 transition-transform animate-bounce" />
                       </button>
 
                       {/* Wallpaper Customize Button (opens file manager directly) */}
@@ -4506,20 +4535,20 @@ export default function Dashboard() {
                             <MoreVertical size={18} />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent align="end" className="w-48 p-1.5 bg-white border border-amber-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                        <PopoverContent align="end" className="w-52 p-1.5 bg-slate-900/95 border border-white/20 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl">
                           <button
                             onClick={() => { setIsDashMoreMenuOpen(false); handleImportClick(); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-left"
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-100 hover:bg-blue-500/20 hover:text-blue-300 rounded-lg transition-all text-left group cursor-pointer"
                           >
-                            <Upload size={16} className="text-blue-500" />
-                            <span>📥 Import Excel</span>
+                            <Upload size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                            <span>Import Excel</span>
                           </button>
                           <button
                             onClick={() => { setIsDashMoreMenuOpen(false); handleExportExcel(); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors text-left border-t border-amber-100 mt-1 pt-2"
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-100 hover:bg-emerald-500/20 hover:text-emerald-300 rounded-lg transition-all text-left border-t border-white/10 mt-1 pt-2.5 group cursor-pointer"
                           >
-                            <Download size={16} className="text-emerald-500" />
-                            <span>📤 Export Excel</span>
+                            <Download size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                            <span>Export Excel</span>
                           </button>
                         </PopoverContent>
                       </Popover>
@@ -5121,7 +5150,7 @@ export default function Dashboard() {
                                     <div className="flex items-center justify-center gap-1">
                                       <button
                                         onClick={() => setOpenActionId(openActionId === order.id ? null : order.id)}
-                                        className="p-2 text-amber-700 hover:bg-amber-100 rounded-full transition-colors"
+                                        className="p-2 text-amber-400 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
                                         title="Actions Menu"
                                       >
                                         <MoreVertical size={20} />
@@ -5130,16 +5159,23 @@ export default function Dashboard() {
 
                                     {openActionId === order.id && (
                                       <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setOpenActionId(null)}></div>
+                                        <div className="fixed inset-0 z-[90]" onClick={() => setOpenActionId(null)}></div>
 
-                                        <div className="action-menu-popup absolute right-14 top-2 z-50 bg-white/90 backdrop-blur-md border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200">
-                                          <button onClick={() => { setHistoryDetailOrder(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Detailed Record"><Eye size={20} /></button>
-                                          <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-blue-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Send SMS Bill"><MessageSquare size={20} /></button>
-                                          <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Shipping"><Truck size={20} /></button>
-                                          <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Edit Order"><Pencil size={20} /></button>
-                                          <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-red-500 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Delete Order"><Trash2 size={20} /></button>
-                                          <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-blue-700 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="View Receipt"><Receipt size={20} /></button>
-                                          <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-600 hover:-translate-y-1 p-2 rounded-lg transition-transform" title="Share on WhatsApp"><MessageCircle size={20} /></button>
+                                        <div
+                                          style={{
+                                            backgroundColor: '#0d1527',
+                                            border: '2px solid rgba(245, 158, 11, 0.45)',
+                                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85)'
+                                          }}
+                                          className="action-menu-popup absolute right-14 top-2 z-[100] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200"
+                                        >
+                                          <button onClick={() => { setHistoryDetailOrder(order); setOpenActionId(null); }} className="text-sky-400 hover:text-sky-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-sky-500/20 cursor-pointer" title="View Detailed Record"><Eye size={20} /></button>
+                                          <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-indigo-400 hover:text-indigo-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-indigo-500/20 cursor-pointer" title="Send SMS Bill"><MessageSquare size={20} /></button>
+                                          <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-400 hover:text-purple-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-purple-500/20 cursor-pointer" title="Shipping"><Truck size={20} /></button>
+                                          <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-400 hover:text-emerald-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-emerald-500/20 cursor-pointer" title="Edit Order"><Pencil size={20} /></button>
+                                          <button onClick={() => { handleDeleteClick(order.id); setOpenActionId(null); }} className="text-rose-500 hover:text-rose-400 hover:scale-125 p-2 rounded-xl transition-all hover:bg-rose-500/20 cursor-pointer" title="Delete Order"><Trash2 size={20} /></button>
+                                          <button onClick={() => { setSelectedOrderForInvoice(order); setIsInvoiceOpen(true); setOpenActionId(null); }} className="text-amber-400 hover:text-amber-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-amber-500/20 cursor-pointer" title="View Receipt"><Receipt size={20} /></button>
+                                          <button onClick={() => { handleWhatsAppClick(order); setOpenActionId(null); }} className="text-green-400 hover:text-green-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-green-500/20 cursor-pointer" title="Share on WhatsApp"><MessageCircle size={20} /></button>
                                         </div>
                                       </>
                                     )}
@@ -5464,23 +5500,72 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white/70 p-2 rounded-xl border-2 border-white shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)]">
-                    <span className="text-sm font-bold text-amber-800">From:</span>
-                    <input type="date" value={reportDateRange.start} onChange={e => setReportDateRange({ ...reportDateRange, start: e.target.value })} className="text-sm p-1 rounded border-none outline-none font-medium bg-transparent" />
-                    <span className="text-sm font-bold text-amber-800">To:</span>
-                    <input type="date" value={reportDateRange.end} onChange={e => setReportDateRange({ ...reportDateRange, end: e.target.value })} className="text-sm p-1 rounded border-none outline-none font-medium bg-transparent" />
-                    {(reportDateRange.start || reportDateRange.end) && (
-                      <button onClick={() => setReportDateRange({ start: "", end: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full"><X size={16} /></button>
-                    )}
-                  </div>
-                  <button onClick={() => setIsReportPreviewOpen(true)} className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-bold shadow-[4px_4px_10px_rgba(0,0,0,0.2)] transition-transform hover:-translate-y-0.5">
-                    <Eye size={18} /> Preview Report
+                <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-300">
+                  {/* From Date Popover */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-2 bg-[#131c2e] hover:bg-[#18243b] px-3.5 py-2 rounded-xl border border-white/15 text-xs text-white font-extrabold shadow-sm transition-all cursor-pointer">
+                        <Calendar size={14} className="text-amber-400 shrink-0" />
+                        <span className="text-slate-400">From:</span>
+                        <span className="text-amber-300 font-mono font-black">
+                          {reportDateRange.start ? format(new Date(reportDateRange.start), "dd MMM yyyy") : "Select Date"}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="sabi-calendar-popover p-3 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={reportDateRange.start ? new Date(reportDateRange.start) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            setReportDateRange({ ...reportDateRange, start: format(date, "yyyy-MM-dd") });
+                          }
+                        }}
+                        className="rounded-xl border-none"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* To Date Popover */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-2 bg-[#131c2e] hover:bg-[#18243b] px-3.5 py-2 rounded-xl border border-white/15 text-xs text-white font-extrabold shadow-sm transition-all cursor-pointer">
+                        <Calendar size={14} className="text-amber-400 shrink-0" />
+                        <span className="text-slate-400">To:</span>
+                        <span className="text-amber-300 font-mono font-black">
+                          {reportDateRange.end ? format(new Date(reportDateRange.end), "dd MMM yyyy") : "Select Date"}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="sabi-calendar-popover p-3 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={reportDateRange.end ? new Date(reportDateRange.end) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            setReportDateRange({ ...reportDateRange, end: format(date, "yyyy-MM-dd") });
+                          }
+                        }}
+                        className="rounded-xl border-none"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  {(reportDateRange.start || reportDateRange.end) && (
+                    <button
+                      onClick={() => setReportDateRange({ start: "", end: "" })}
+                      className="text-red-400 hover:text-red-300 font-extrabold text-xs cursor-pointer bg-red-950/40 hover:bg-red-900/60 px-3 py-2 rounded-xl border border-red-500/30 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+
+                  <button onClick={() => setIsReportPreviewOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black px-4 py-2 rounded-xl font-black text-xs shadow-md transition-transform hover:scale-105 cursor-pointer">
+                    <Eye size={16} /> Preview Report
                   </button>
-                  <button onClick={() => setIsProfitModalOpen(true)} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold shadow-[4px_4px_10px_rgba(0,0,0,0.2)] transition-transform hover:-translate-y-0.5">
+                  <button onClick={() => setIsProfitModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white px-4 py-2 rounded-xl font-black text-xs shadow-md transition-transform hover:scale-105 cursor-pointer">
                     Profit Table
                   </button>
-
                 </div>
 
               </div>
@@ -5488,25 +5573,25 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
                 <div className="lg:col-span-2 space-y-6">
 
-                  <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-amber-500/35">
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                        <TrendingUp className="text-amber-700" /> Top Selling {reportDashboardFilter === 'Dashboard 2' ? 'Products' : 'Chocolates'}
+                      <h2 className="text-xl font-black text-amber-400 flex items-center gap-2 uppercase tracking-wide">
+                        <TrendingUp className="text-amber-400" /> Top Selling {reportDashboardFilter === 'Dashboard 2' ? 'Products' : 'Chocolates'}
                       </h2>
                     </div>
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
                       {reportData.topChocs.length === 0 ? (
-                        <p className="text-amber-700 font-medium">No sales data in this date range.</p>
+                        <p className="text-amber-400 font-extrabold text-sm">No sales data in this date range.</p>
                       ) : (
                         reportData.topChocs.map(([name, count], index) => (
-                          <div key={index} className="flex items-center justify-between p-4 bg-white/80 rounded-2xl border border-white shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-4">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ffe082] to-[#ffb300] text-amber-900 font-black flex items-center justify-center text-sm shadow-inner">
+                          <div key={index} style={{ backgroundColor: '#131c2e' }} className="flex items-center justify-between p-3.5 bg-[#131c2e] hover:bg-[#18243b] rounded-2xl border border-white/10 shadow-md transition-all">
+                            <div className="flex items-center gap-3.5">
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-black font-black flex items-center justify-center text-xs shadow-md">
                                 #{index + 1}
                               </div>
-                              <span className="font-bold text-[#5d4037] text-lg">{name}</span>
+                              <span className="font-extrabold text-white text-base truncate max-w-[240px]">{name}</span>
                             </div>
-                            <span className="font-bold text-[#b97a3d] bg-amber-50 px-4 py-1.5 rounded-xl border border-amber-200">
+                            <span className="font-black text-amber-300 bg-amber-500/15 px-3.5 py-1.5 rounded-xl border border-amber-500/30 text-xs shadow-sm">
                               {count} Items Sold
                             </span>
                           </div>
@@ -5515,17 +5600,17 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
-                    <h2 className="text-xl font-black text-[#3e2723] mb-6 flex items-center gap-2">
-                      <Package className="text-blue-600" /> Sales Visual Chart
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-white/10">
+                    <h2 className="text-xl font-black text-white mb-6 flex items-center gap-2 uppercase tracking-wide">
+                      <Package className="text-blue-400" /> Sales Visual Chart
                     </h2>
                     <div className="h-72 w-full">
                       {reportData.chartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={reportData.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
-                            <YAxis tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
-                            <Tooltip cursor={{ fill: '#f5f5f5' }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} />
+                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 'bold' }} />
+                            <YAxis tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 'bold' }} />
+                            <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#090e1a', borderRadius: '12px', borderColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontWeight: 'bold' }} />
                             <Bar
                               dataKey="count"
                               radius={[8, 8, 0, 0]}
@@ -5546,37 +5631,67 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* 🟢 NEW: Month Wise Report Chart Below Sales Visual Chart */}
-                  <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 mt-6">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-white/10 flex-1 flex flex-col relative overflow-hidden mt-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                      <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                        <TrendingUp className="text-emerald-700" /> Month Wise Report
+                      <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-wide">
+                        <TrendingUp className="text-emerald-400" /> Month Wise Report
                       </h2>
 
-                      {/* Month Filters */}
-                      <div className="flex items-center gap-3 bg-white/70 p-2 rounded-xl border border-[#d7ccc8] text-xs font-bold text-[#5d4037]">
-                        <div className="flex items-center gap-1">
-                          <span>From Month:</span>
-                          <input
-                            type="month"
-                            value={reportFromMonth}
-                            onChange={e => setReportFromMonth(e.target.value)}
-                            className="bg-white border border-[#d7ccc8] rounded-lg px-2 py-1 outline-none font-bold text-xs cursor-pointer"
-                          />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span>To Month:</span>
-                          <input
-                            type="month"
-                            value={reportToMonth}
-                            onChange={e => setReportToMonth(e.target.value)}
-                            className="bg-white border border-[#d7ccc8] rounded-lg px-2 py-1 outline-none font-bold text-xs cursor-pointer"
-                          />
-                        </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-300">
+                        {/* From Month Popover Calendar */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="flex items-center gap-2 bg-[#131c2e] hover:bg-[#18243b] px-3.5 py-2 rounded-xl border border-white/15 text-xs text-white font-extrabold shadow-sm transition-all cursor-pointer">
+                              <Calendar size={14} className="text-amber-400 shrink-0" />
+                              <span className="text-slate-400">From:</span>
+                              <span className="text-amber-300 font-mono font-black">
+                                {reportFromMonth ? format(new Date(reportFromMonth + "-02"), "MMM yyyy") : "Select Month"}
+                              </span>
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="sabi-calendar-popover p-3 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto" align="end">
+                            <CalendarComponent
+                              mode="single"
+                              selected={reportFromMonth ? new Date(reportFromMonth + "-02") : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setReportFromMonth(format(date, "yyyy-MM"));
+                                }
+                              }}
+                              className="rounded-xl border-none"
+                            />
+                          </PopoverContent>
+                        </Popover>
+
+                        {/* To Month Popover Calendar */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="flex items-center gap-2 bg-[#131c2e] hover:bg-[#18243b] px-3.5 py-2 rounded-xl border border-white/15 text-xs text-white font-extrabold shadow-sm transition-all cursor-pointer">
+                              <Calendar size={14} className="text-amber-400 shrink-0" />
+                              <span className="text-slate-400">To:</span>
+                              <span className="text-amber-300 font-mono font-black">
+                                {reportToMonth ? format(new Date(reportToMonth + "-02"), "MMM yyyy") : "Select Month"}
+                              </span>
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="sabi-calendar-popover p-3 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto" align="end">
+                            <CalendarComponent
+                              mode="single"
+                              selected={reportToMonth ? new Date(reportToMonth + "-02") : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setReportToMonth(format(date, "yyyy-MM"));
+                                }
+                              }}
+                              className="rounded-xl border-none"
+                            />
+                          </PopoverContent>
+                        </Popover>
+
                         {(reportFromMonth || reportToMonth) && (
                           <button
                             onClick={() => { setReportFromMonth(""); setReportToMonth(""); }}
-                            className="text-rose-600 hover:text-rose-800 font-bold underline text-[11px]"
+                            className="text-red-400 hover:text-red-300 font-extrabold text-xs ml-1 cursor-pointer bg-red-950/40 hover:bg-red-900/60 px-3 py-2 rounded-xl border border-red-500/30 transition-colors"
                           >
                             Clear
                           </button>
@@ -5588,62 +5703,62 @@ export default function Dashboard() {
                       {monthWiseReportData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={monthWiseReportData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-                            <XAxis dataKey="monthName" tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
-                            <YAxis tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
-                            <Tooltip cursor={{ fill: '#f5f5f5' }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} />
-                            <Legend wrapperStyle={{ paddingTop: '10px', fontWeight: 'bold' }} />
+                            <XAxis dataKey="monthName" tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 'bold' }} />
+                            <YAxis tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 'bold' }} />
+                            <Tooltip cursor={{ fill: 'rgba(255, 255, 255, 0.08)' }} contentStyle={{ backgroundColor: '#090e1a', borderRadius: '12px', borderColor: 'rgba(255, 255, 255, 0.15)', color: '#ffffff', fontWeight: 'bold' }} />
+                            <Legend wrapperStyle={{ paddingTop: '10px', fontWeight: 'bold', color: '#ffffff' }} />
                             <Bar dataKey="totalRevenue" name="Total Revenue" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                             <Bar dataKey="netProfit" name="Net Profit" fill="#10b981" radius={[6, 6, 0, 0]} />
                             <Bar dataKey="totalCost" name="Total Cost" fill="#ef4444" radius={[6, 6, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="flex h-full items-center justify-center text-gray-400 font-bold">No Monthly Data Available for Selected Range</div>
+                        <div className="flex h-full items-center justify-center text-slate-400 font-extrabold text-sm">No Monthly Data Available for Selected Range</div>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="h-full flex flex-col">
-                  <div className="bg-[#ebe6df] p-7 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex-1 flex flex-col relative overflow-hidden">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-white/10 flex-1 flex flex-col relative overflow-hidden">
 
-                    <div className="flex items-center gap-4 mb-6 shrink-0 border-b border-[#d7ccc8]/60 pb-4 relative z-10">
+                    <div className="flex items-center gap-4 mb-6 shrink-0 border-b border-white/10 pb-4 relative z-10">
                       <button
                         onClick={() => setIsAdminAuthModalOpen(true)}
-                        className="w-12 h-12 rounded-full flex items-center justify-center bg-white border border-[#d7ccc8] text-[#5d4037] hover:scale-105 cursor-pointer shadow-sm shrink-0 transition-transform"
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center bg-[#131c2e] border border-amber-500/30 text-amber-400 hover:scale-105 cursor-pointer shadow-md shrink-0 transition-transform"
                         title="Click to Login as Admin"
                       >
-                        <User size={24} strokeWidth={2.5} />
+                        <User size={22} strokeWidth={2.5} />
                       </button>
                       <div>
-                        <h2 className="text-xl font-black text-[#3e2723] leading-tight">Summary Stats Overview</h2>
-                        <span className="text-[10px] font-extrabold text-[#a46c3b] uppercase tracking-widest bg-white/50 px-3 py-0.5 rounded-full border border-[#d7ccc8]/50 inline-block mt-1">
+                        <h2 className="text-xl font-black text-amber-400 leading-tight uppercase tracking-wide">Summary Stats Overview</h2>
+                        <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest bg-amber-500/15 px-3 py-0.5 rounded-full border border-amber-500/30 inline-block mt-1">
                           PUBLIC VIEW
                         </span>
                       </div>
                     </div>
 
                     <div className="flex-1 flex flex-col transition-all duration-500">
-                      <ul className="space-y-5 shrink-0">
-                        <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                          <span className="text-[#a46c3b] font-bold">Total Orders</span>
-                          <span className="font-black text-[#3e2723] text-2xl">{reportData.filteredOrders.length}</span>
+                      <ul className="space-y-4 shrink-0">
+                        <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                          <span className="text-slate-300 font-extrabold text-sm">Total Orders</span>
+                          <span className="font-black text-white text-2xl font-mono">{reportData.filteredOrders.length}</span>
                         </li>
-                        <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                          <span className="text-[#a46c3b] font-bold">Total Items Sold</span>
-                          <span className="font-black text-[#3e2723] text-2xl">{reportData.totalItems}</span>
+                        <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                          <span className="text-slate-300 font-extrabold text-sm">Total Items Sold</span>
+                          <span className="font-black text-white text-2xl font-mono">{reportData.totalItems}</span>
                         </li>
-                        <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                          <span className="text-[#a46c3b] font-bold">Total Delivery Charge</span>
-                          <span className="font-black text-[#3e2723] text-2xl">₹{reportData.totalDeliveryCharge.toLocaleString()}</span>
+                        <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                          <span className="text-slate-300 font-extrabold text-sm">Total Delivery Charge</span>
+                          <span className="font-black text-white text-2xl font-mono">₹{reportData.totalDeliveryCharge.toLocaleString()}</span>
                         </li>
-                        <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                          <span className="text-[#a46c3b] font-bold">Total Revenue</span>
-                          <span className="font-black text-[#15803d] text-2xl">₹{reportData.totalRev.toLocaleString()}</span>
+                        <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                          <span className="text-slate-300 font-extrabold text-sm">Total Revenue</span>
+                          <span className="font-black text-amber-400 text-2xl font-mono drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">₹{reportData.totalRev.toLocaleString()}</span>
                         </li>
                       </ul>
 
-                      <div className="mt-8 flex-1 min-h-[220px] w-full relative flex items-center justify-center">
+                      <div className="mt-6 flex-1 min-h-[220px] w-full relative flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -5663,18 +5778,18 @@ export default function Dashboard() {
                               <Cell fill="#10b981" />
                               <Cell fill="#f59e0b" />
                             </Pie>
-                            <Tooltip />
+                            <Tooltip contentStyle={{ backgroundColor: '#090e1a', borderRadius: '12px', borderColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontWeight: 'bold' }} />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                          <span className="text-3xl font-black text-gray-800">{reportData.filteredOrders.length}</span>
-                          <span className="text-sm font-bold text-gray-500">Total</span>
+                          <span className="text-3xl font-black text-white">{reportData.filteredOrders.length}</span>
+                          <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">Total</span>
                         </div>
                       </div>
 
-                      <div className="flex justify-center gap-5 mt-4 shrink-0">
-                        <div className="flex items-center gap-1.5 text-sm font-bold text-gray-700"><div className="w-3.5 h-3.5 rounded-full bg-emerald-500"></div> Delivered</div>
-                        <div className="flex items-center gap-1.5 text-sm font-bold text-gray-700"><div className="w-3.5 h-3.5 rounded-full bg-amber-500"></div> Processing</div>
+                      <div className="flex justify-center gap-5 mt-3 shrink-0">
+                        <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-300"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> Delivered</div>
+                        <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-300"><div className="w-3 h-3 rounded-full bg-amber-500"></div> Processing</div>
                       </div>
                     </div>
 
@@ -5689,12 +5804,12 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto h-full animate-in fade-in duration-500 flex flex-col gap-6 w-full">
 
               {/* 🟢 MODIFIED HEADER: ADDED BOOK DROPDOWN AND SMALLER CLOSE BUTTON */}
-              <div className="flex justify-between items-center bg-[#f2eee6] p-4 rounded-2xl shadow-sm border border-[#d7ccc8] shrink-0 z-40 relative">
+              <div style={{ backgroundColor: '#0d1527', color: '#ffffff', borderColor: 'rgba(245, 158, 11, 0.35)' }} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#0d1527] p-5 rounded-2xl shadow-xl border border-amber-500/35 shrink-0 z-40 relative gap-4">
                 <div>
-                  <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                    <TrendingUp className="text-amber-700" /> {currentAdminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${currentAdminReportDash})`}
+                  <h2 className="text-xl font-black text-amber-400 flex items-center gap-2.5 uppercase tracking-wide">
+                    <TrendingUp className="text-amber-400" /> {currentAdminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${currentAdminReportDash})`}
                   </h2>
-                  <p className="text-sm font-medium text-amber-700 mt-1">
+                  <p className="text-xs font-bold text-slate-300 mt-1">
                     {isInvAdmin 
                       ? 'Sticker (Dynamic) | Labour (₹1) | Live stock balance mapped data.' 
                       : 'Sticker (Dynamic) | Labour (₹1) | Order wise mapped data.'}
@@ -5703,33 +5818,70 @@ export default function Dashboard() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   {!isInvAdmin && (
-                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#d7ccc8] shadow-sm">
+                    <div style={{ backgroundColor: '#131c2e' }} className="flex flex-wrap items-center gap-2 bg-[#131c2e] p-2 rounded-xl border border-amber-500/30 text-xs font-bold text-slate-300 shadow-md">
                       <select
                         value={currentAdminDateType}
                         onChange={(e) => handleSetAdminDateType(e.target.value)}
-                        className="font-bold text-amber-900 bg-transparent outline-none cursor-pointer text-xs"
+                        style={{ backgroundColor: '#162035', color: '#fbbf24' }}
+                        className="font-extrabold text-amber-400 bg-[#162035] outline-none cursor-pointer text-xs px-2.5 py-1.5 rounded-lg border border-white/10"
                       >
                         <option value="Dispatch Date">Dispatch Date</option>
                         <option value="Order Date">Order Date</option>
                         <option value="Function Date">Function Date</option>
                       </select>
-                      <div className="h-4 w-[1px] bg-amber-200 mx-1"></div>
-                      <span className="text-xs font-bold text-amber-800">From:</span>
-                      <input
-                        type="date"
-                        value={currentAdminDateRange.from}
-                        onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, from: e.target.value })}
-                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
-                      />
-                      <span className="text-xs font-bold text-amber-800">To:</span>
-                      <input
-                        type="date"
-                        value={currentAdminDateRange.to}
-                        onChange={(e) => handleSetAdminDateRange({ ...currentAdminDateRange, to: e.target.value })}
-                        className="text-xs p-1 rounded outline-none font-medium bg-transparent cursor-pointer text-amber-950"
-                      />
+
+                      {/* From Admin Date Popover */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1.5 bg-[#162035] hover:bg-[#1f2b45] px-3 py-1.5 rounded-lg border border-white/10 text-xs text-white font-extrabold shadow-sm transition-all cursor-pointer">
+                            <Calendar size={13} className="text-amber-400 shrink-0" />
+                            <span className="text-slate-400">From:</span>
+                            <span className="text-amber-300 font-mono font-black">
+                              {currentAdminDateRange.from ? format(new Date(currentAdminDateRange.from), "dd MMM yyyy") : "Select Date"}
+                            </span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="sabi-calendar-popover p-3 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={currentAdminDateRange.from ? new Date(currentAdminDateRange.from) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                handleSetAdminDateRange({ ...currentAdminDateRange, from: format(date, "yyyy-MM-dd") });
+                              }
+                            }}
+                            className="rounded-xl border-none"
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* To Admin Date Popover */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1.5 bg-[#162035] hover:bg-[#1f2b45] px-3 py-1.5 rounded-lg border border-white/10 text-xs text-white font-extrabold shadow-sm transition-all cursor-pointer">
+                            <Calendar size={13} className="text-amber-400 shrink-0" />
+                            <span className="text-slate-400">To:</span>
+                            <span className="text-amber-300 font-mono font-black">
+                              {currentAdminDateRange.to ? format(new Date(currentAdminDateRange.to), "dd MMM yyyy") : "Select Date"}
+                            </span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="sabi-calendar-popover p-3 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={currentAdminDateRange.to ? new Date(currentAdminDateRange.to) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                handleSetAdminDateRange({ ...currentAdminDateRange, to: format(date, "yyyy-MM-dd") });
+                              }
+                            }}
+                            className="rounded-xl border-none"
+                          />
+                        </PopoverContent>
+                      </Popover>
+
                       {(currentAdminDateRange.from || currentAdminDateRange.to) && (
-                        <button onClick={() => handleSetAdminDateRange({ from: "", to: "" })} className="text-red-500 hover:bg-red-100 p-1 rounded-full transition-colors ml-1">
+                        <button onClick={() => handleSetAdminDateRange({ from: "", to: "" })} className="text-red-400 hover:bg-red-950/60 p-1 rounded-full transition-colors ml-1 cursor-pointer">
                           <X size={14} />
                         </button>
                       )}
@@ -5741,17 +5893,17 @@ export default function Dashboard() {
                     <div className="relative">
                       <button
                         onClick={() => handleSetAdminReportMenuOpen(!currentAdminReportMenuOpen)}
-                        className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-amber-50 bg-white shadow-sm transition-all flex items-center gap-1.5"
+                        style={{ backgroundColor: '#131c2e' }}
+                        className="px-3.5 py-2 rounded-xl text-xs font-black border border-amber-500/30 text-amber-300 hover:bg-[#18243b] bg-[#131c2e] shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Book size={16} /> {currentAdminReportDash === 'None' ? 'Table View' : currentAdminReportDash} <ChevronDown size={14} />
+                        <Book size={15} /> {currentAdminReportDash === 'None' ? 'Table View' : currentAdminReportDash} <ChevronDown size={14} />
                       </button>
                       {currentAdminReportMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-40 bg-white border border-[#d7ccc8] rounded-xl shadow-lg z-50 overflow-hidden">
-                          <button onClick={() => { handleSetAdminReportDash('None'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Table View</button>
-                          <button onClick={() => { handleSetAdminReportDash('Dashboard 1'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 1</button>
-                          <button onClick={() => { handleSetAdminReportDash('Dashboard 2'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900 border-b border-[#f5f5f5]">Dashboard 2</button>
-                          <button onClick={() => { handleSetAdminReportDash('All'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-amber-50 text-sm font-bold text-amber-900">All Dashboards</button>
-
+                        <div style={{ backgroundColor: '#0d1527' }} className="absolute right-0 mt-2 w-44 bg-[#0d1527] border border-amber-500/30 rounded-xl shadow-2xl z-50 overflow-hidden">
+                          <button onClick={() => { handleSetAdminReportDash('None'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 hover:bg-amber-500/20 text-xs font-extrabold text-amber-300 border-b border-white/10 transition-colors">Table View</button>
+                          <button onClick={() => { handleSetAdminReportDash('Dashboard 1'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 hover:bg-amber-500/20 text-xs font-extrabold text-white border-b border-white/10 transition-colors">Dashboard 1</button>
+                          <button onClick={() => { handleSetAdminReportDash('Dashboard 2'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 hover:bg-amber-500/20 text-xs font-extrabold text-white border-b border-white/10 transition-colors">Dashboard 2</button>
+                          <button onClick={() => { handleSetAdminReportDash('All'); handleSetAdminReportMenuOpen(false); }} className="w-full text-left px-4 py-2.5 hover:bg-amber-500/20 text-xs font-extrabold text-amber-400 transition-colors">All Dashboards</button>
                         </div>
                       )}
                     </div>
@@ -5760,70 +5912,71 @@ export default function Dashboard() {
                   {!isInvAdmin && (
                     <button
                       onClick={() => setShowApprovalPanel(true)}
-                      className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-amber-700 hover:bg-amber-50 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                      style={{ backgroundColor: '#131c2e' }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-black border border-amber-500/30 text-amber-400 hover:bg-[#18243b] bg-[#131c2e] shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Lock size={16} /> Approvals ({employees.filter(e => e.status === 'Pending').length})
+                      <Lock size={15} /> Approvals ({employees.filter(e => e.status === 'Pending').length})
                     </button>
                   )}
 
                   <button
                     onClick={() => setActiveTab((activeTab as any) === 'inventories_admin_panel' ? 'inventories' : 'reports')}
-                    className="px-3 py-2 rounded-xl text-sm font-bold border-2 border-[#d7ccc8] text-[#5d4037] hover:bg-red-50 hover:text-red-700 hover:border-red-200 bg-white shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                    className="px-3.5 py-2 rounded-xl text-xs font-black border border-red-500/40 text-red-300 hover:bg-red-950/80 hover:text-red-200 bg-red-950/50 shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
                   >
-                    <X size={16} /> Close Admin
+                    <X size={15} /> Close Admin
                   </button>
                 </div>
               </div>
 
               {/* 🟢 CONDITIONAL RENDER: TABLE VS REPORT VIEW */}
               {currentAdminReportDash === 'None' ? (
-                <div className="bg-white rounded-[2rem] shadow-md border border-[#d7ccc8] overflow-hidden flex-1 flex flex-col">
-                  <div className="overflow-auto flex-1 px-6">
+                <div style={{ backgroundColor: '#0d1527' }} className="bg-[#0d1527] rounded-3xl shadow-2xl border border-white/10 overflow-hidden flex-1 flex flex-col">
+                  <div className="overflow-auto flex-1 px-4 py-0 custom-scrollbar">
                     <table className="w-full text-left border-collapse min-w-[1100px]">
-                      <thead className="sticky top-0 bg-amber-50 z-30 shadow-md border-b-2 border-amber-200">
-                        <tr className="text-xs uppercase tracking-widest text-[#5d4037]">
-                          {!isInvAdmin && <th className="p-4 font-black border-r border-amber-200/50">Serial No</th>}
-                          {!isInvAdmin && <th className="p-4 font-black border-r border-amber-200/50">Dispatch Date</th>}
-                          <th className="p-4 font-black">Chocolate Name</th>
-                          <th className="p-4 font-black text-right border-l border-amber-200/50">Purch. Cost <br /><span className="text-[9px] font-bold text-amber-600">(Per Item)</span></th>
-                          <th className="p-4 font-black text-center border-l border-amber-200/50">Count</th>
-                          <th className="p-4 font-black text-right border-l border-amber-200/50">Sticker Cost <br /><span className="text-[9px] font-bold text-amber-600">(Count x Sticker Price)</span></th>
-                          <th className="p-4 font-black text-right">Labour Cost <br /><span className="text-[9px] font-bold text-amber-600">(Count x 1)</span></th>
-                          <th className="p-4 font-black text-right">Total Purchase <br /><span className="text-[9px] font-bold text-amber-600">(Cost x Count)</span></th>
-                          <th className="p-4 font-black text-right bg-red-50 text-red-800 border-l border-red-200">Final Cost <br /><span className="text-[9px] font-bold text-red-600">(Sticker+Lab+Purch)</span></th>
+                      <thead style={{ backgroundColor: '#162035' }} className="sticky top-0 bg-[#162035] z-30 shadow-md border-b-2 border-amber-500/30">
+                        <tr className="text-xs uppercase tracking-wider text-amber-400">
+                          {!isInvAdmin && <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 shadow-sm">Serial No</th>}
+                          {!isInvAdmin && <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 shadow-sm">Dispatch Date</th>}
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black shadow-sm">Chocolate Name</th>
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-right border-l border-white/10 shadow-sm">Purch. Cost <br /><span className="text-[9px] font-extrabold text-slate-300">(Per Item)</span></th>
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-center border-l border-white/10 shadow-sm">Count</th>
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-right border-l border-white/10 shadow-sm">Sticker Cost <br /><span className="text-[9px] font-extrabold text-slate-300">(Count × Sticker)</span></th>
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-right border-l border-white/10 shadow-sm">Labour Cost <br /><span className="text-[9px] font-extrabold text-slate-300">(Count × 1)</span></th>
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-right border-l border-white/10 shadow-sm">Total Purchase <br /><span className="text-[9px] font-extrabold text-slate-300">(Cost × Count)</span></th>
+                          <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-right border-l border-white/10 shadow-sm">Final Cost <br /><span className="text-[9px] font-extrabold text-slate-300">(Sticker+Lab+Purch)</span></th>
                         </tr>
                       </thead>
                       <tbody>
                         {costAnalyticsData.rows.length === 0 ? (
-                          <tr><td colSpan={isInvAdmin ? 7 : 9} className="p-8 text-center text-amber-700 font-bold">No records found for the selected date range.</td></tr>
+                          <tr><td colSpan={isInvAdmin ? 7 : 9} className="p-8 text-center text-amber-400 font-extrabold">No records found for the selected date range.</td></tr>
                         ) : (
                           costAnalyticsData.rows.map((row, idx) => (
-                            <tr key={idx} className="border-b border-amber-100 text-sm hover:bg-amber-50/30 transition-colors relative z-0">
-                              {!isInvAdmin && <td className="p-4 font-extrabold text-amber-900 border-r border-amber-50">{row.serialNo}</td>}
-                              {!isInvAdmin && <td className="p-4 font-bold text-amber-900 border-r border-amber-50 whitespace-nowrap">{row.deliveryDate}</td>}
-                              <td className="p-4 font-bold text-amber-950 border-r border-amber-50 max-w-[200px] truncate" title={row.chocolateName}>{row.chocolateName}</td>
-                              <td className="p-4 text-right font-medium text-amber-800 border-r border-amber-50">₹{row.purchasePricePerItem.toFixed(2)}</td>
-                              <td className="p-4 text-center font-black text-[#4a2c1d] border-r border-amber-50 bg-amber-50/50">{row.count.toLocaleString()}</td>
-                              <td className="p-4 text-right font-medium text-amber-900 border-r border-amber-50">₹{row.stickerCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                              <td className="p-4 text-right font-medium text-amber-900 border-r border-amber-50">₹{row.labourCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                              <td className="p-4 text-right font-medium text-amber-900 border-r border-amber-50">₹{row.totalPurchase.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                              <td className="p-4 text-right font-black text-red-600 bg-red-50/30">₹{row.finalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <tr key={idx} className={`border-b border-white/5 text-sm transition-colors relative z-0 ${idx % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#131c2e]'} hover:bg-[#18243b]`}>
+                              {!isInvAdmin && <td className="p-3.5 font-extrabold text-slate-300 border-r border-white/5">{row.serialNo}</td>}
+                              {!isInvAdmin && <td className="p-3.5 font-extrabold text-amber-300 border-r border-white/5 whitespace-nowrap">{row.deliveryDate}</td>}
+                              <td className="p-3.5 font-extrabold text-white border-r border-white/5 max-w-[200px] truncate" title={row.chocolateName}>{row.chocolateName}</td>
+                              <td className="p-3.5 text-right font-mono font-bold text-amber-200 border-r border-white/5">₹{row.purchasePricePerItem.toFixed(2)}</td>
+                              <td className="p-3.5 text-center font-black text-amber-300 border-r border-white/5">{row.count.toLocaleString()}</td>
+                              <td className="p-3.5 text-right font-mono font-extrabold text-slate-100 border-r border-white/5">₹{row.stickerCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                              <td className="p-3.5 text-right font-mono font-extrabold text-slate-100 border-r border-white/5">₹{row.labourCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                              <td className="p-3.5 text-right font-mono font-extrabold text-slate-100 border-r border-white/5">₹{row.totalPurchase.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                              <td className="p-3.5 text-right font-mono font-black text-amber-300">₹{row.finalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             </tr>
                           ))
                         )}
                       </tbody>
                       {costAnalyticsData.rows.length > 0 && (
-                        <tfoot className="sticky bottom-0 bg-[#3e2723] text-amber-50 z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.2)]">
+                        <tfoot style={{ backgroundColor: '#090e1a' }} className="sticky bottom-0 bg-[#090e1a] text-white z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.5)] border-t-2 border-amber-500/40">
                           <tr className="text-sm">
-                            {!isInvAdmin && <td className="p-4 border-r border-[#5d4037]"></td>}
-                            {!isInvAdmin && <td className="p-4 border-r border-[#5d4037]"></td>}
-                            <td className="p-4 border-r border-[#5d4037]"></td>
-                            <td className="p-4 text-right font-black uppercase tracking-widest border-r border-[#5d4037]">Grand Total:</td>
-                            <td className="p-4 text-center font-black border-r border-[#5d4037]">{costAnalyticsData.grandTotals.count.toLocaleString()}</td>
-                            <td className="p-4 text-right font-bold border-r border-[#5d4037]">₹{costAnalyticsData.grandTotals.stickerCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="p-4 text-right font-bold border-r border-[#5d4037]">₹{costAnalyticsData.grandTotals.labourCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="p-4 text-right font-bold border-r border-[#5d4037]">₹{costAnalyticsData.grandTotals.totalPurchase.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="p-4 text-right font-black text-[#ffb300] text-lg">₹{costAnalyticsData.grandTotals.finalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            {!isInvAdmin && <td className="p-3.5 border-r border-white/10"></td>}
+                            {!isInvAdmin && <td className="p-3.5 border-r border-white/10"></td>}
+                            <td className="p-3.5 border-r border-white/10"></td>
+                            <td className="p-3.5 text-right font-black uppercase tracking-widest text-amber-400 border-r border-white/10">Grand Total:</td>
+                            <td className="p-3.5 text-center font-black text-amber-300 border-r border-white/10">{costAnalyticsData.grandTotals.count.toLocaleString()}</td>
+                            <td className="p-3.5 text-right font-mono font-extrabold text-slate-100 border-r border-white/10">₹{costAnalyticsData.grandTotals.stickerCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-3.5 text-right font-mono font-extrabold text-slate-100 border-r border-white/10">₹{costAnalyticsData.grandTotals.labourCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-3.5 text-right font-mono font-extrabold text-slate-100 border-r border-white/10">₹{costAnalyticsData.grandTotals.totalPurchase.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-3.5 text-right font-mono font-black text-amber-400 text-lg drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">₹{costAnalyticsData.grandTotals.finalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                           </tr>
                         </tfoot>
                       )}
@@ -5833,25 +5986,25 @@ export default function Dashboard() {
               ) : adminReportData ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch flex-1 overflow-auto custom-scrollbar pr-2 pb-6">
                   <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
+                    <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-amber-500/35">
                       <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2">
-                          <TrendingUp className="text-amber-700" /> Top Selling {currentAdminReportDash === 'Dashboard 2' ? 'Products' : 'Chocolates'}
+                        <h2 className="text-xl font-black text-amber-400 flex items-center gap-2 uppercase tracking-wide">
+                          <TrendingUp className="text-amber-400" /> Top Selling {currentAdminReportDash === 'Dashboard 2' ? 'Products' : 'Chocolates'}
                         </h2>
                       </div>
-                      <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
                         {adminReportData.topChocs.length === 0 ? (
-                          <p className="text-amber-700 font-medium">No sales data in this date range.</p>
+                          <p className="text-amber-400 font-extrabold text-sm">No sales data in this date range.</p>
                         ) : (
                           adminReportData.topChocs.map(([name, count], index) => (
-                            <div key={index} className="flex items-center justify-between p-4 bg-white/80 rounded-2xl border border-white shadow-sm hover:shadow-md transition-shadow">
-                              <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ffe082] to-[#ffb300] text-amber-900 font-black flex items-center justify-center text-sm shadow-inner">
+                            <div key={index} style={{ backgroundColor: '#131c2e' }} className="flex items-center justify-between p-3.5 bg-[#131c2e] hover:bg-[#18243b] rounded-2xl border border-white/10 shadow-md transition-all">
+                              <div className="flex items-center gap-3.5">
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-black font-black flex items-center justify-center text-xs shadow-md">
                                   #{index + 1}
                                 </div>
-                                <span className="font-bold text-[#5d4037] text-lg">{name}</span>
+                                <span className="font-extrabold text-white text-base truncate max-w-[240px]">{name}</span>
                               </div>
-                              <span className="font-bold text-[#b97a3d] bg-amber-50 px-4 py-1.5 rounded-xl border border-amber-200">
+                              <span className="font-black text-amber-300 bg-amber-500/15 px-3.5 py-1.5 rounded-xl border border-amber-500/30 text-xs shadow-sm">
                                 {count} Items Sold
                               </span>
                             </div>
@@ -5860,17 +6013,17 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="bg-[#ebe6df] p-6 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40">
-                      <h2 className="text-xl font-black text-[#3e2723] mb-6 flex items-center gap-2">
-                        <Package className="text-blue-600" /> Sales Visual Chart
+                    <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-white/10">
+                      <h2 className="text-xl font-black text-white mb-6 flex items-center gap-2 uppercase tracking-wide">
+                        <Package className="text-blue-400" /> Sales Visual Chart
                       </h2>
                       <div className="h-72 w-full">
                         {adminReportData.chartData.length > 0 ? (
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={adminReportData.chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                              <XAxis dataKey="name" tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
-                              <YAxis tick={{ fontSize: 12, fill: isWallpaperActive ? '#f8fafc' : '#5d4037', fontWeight: 'bold' }} />
-                              <Tooltip cursor={{ fill: '#f5f5f5' }} contentStyle={{ borderRadius: '12px', fontWeight: 'bold' }} />
+                              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 'bold' }} />
+                              <YAxis tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 'bold' }} />
+                              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#090e1a', borderRadius: '12px', borderColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontWeight: 'bold' }} />
                               <Bar
                                 dataKey="count"
                                 radius={[8, 8, 0, 0]}
@@ -5893,41 +6046,41 @@ export default function Dashboard() {
                   </div>
 
                   <div className="h-full flex flex-col">
-                    <div className="bg-[#ebe6df] p-7 rounded-[2rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex-1 flex flex-col relative overflow-hidden">
+                    <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="bg-[#0d1527] p-6 rounded-3xl shadow-2xl border border-white/10 flex-1 flex flex-col relative overflow-hidden">
 
-                      <div className="flex items-center gap-4 mb-6 shrink-0 border-b border-[#d7ccc8]/60 pb-4 relative z-10">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white border border-[#d7ccc8] text-[#5d4037] shadow-sm shrink-0">
-                          <User size={24} strokeWidth={2.5} />
+                      <div className="flex items-center gap-4 mb-6 shrink-0 border-b border-white/10 pb-4 relative z-10">
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-[#131c2e] border border-amber-500/30 text-amber-400 shadow-md shrink-0">
+                          <User size={22} strokeWidth={2.5} />
                         </div>
                         <div>
-                          <h2 className="text-xl font-black text-[#3e2723] leading-tight">Summary Stats Overview</h2>
-                          <span className="text-[10px] font-extrabold text-[#a46c3b] uppercase tracking-widest bg-white/50 px-3 py-0.5 rounded-full border border-[#d7ccc8]/50 inline-block mt-1">
+                          <h2 className="text-xl font-black text-amber-400 leading-tight uppercase tracking-wide">Summary Stats Overview</h2>
+                          <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest bg-amber-500/15 px-3 py-0.5 rounded-full border border-amber-500/30 inline-block mt-1">
                             ADMIN VIEW
                           </span>
                         </div>
                       </div>
 
                       <div className="flex-1 flex flex-col transition-all duration-500">
-                        <ul className="space-y-5 shrink-0">
-                          <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                            <span className="text-[#a46c3b] font-bold">Total Orders</span>
-                            <span className="font-black text-[#3e2723] text-2xl">{adminReportData.filteredOrders.length}</span>
+                        <ul className="space-y-4 shrink-0">
+                          <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                            <span className="text-slate-300 font-extrabold text-sm">Total Orders</span>
+                            <span className="font-black text-white text-2xl font-mono">{adminReportData.filteredOrders.length}</span>
                           </li>
-                          <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                            <span className="text-[#a46c3b] font-bold">Total Items Sold</span>
-                            <span className="font-black text-[#3e2723] text-2xl">{adminReportData.totalItems}</span>
+                          <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                            <span className="text-slate-300 font-extrabold text-sm">Total Items Sold</span>
+                            <span className="font-black text-white text-2xl font-mono">{adminReportData.totalItems}</span>
                           </li>
-                          <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                            <span className="text-[#a46c3b] font-bold">Total Delivery Charge</span>
-                            <span className="font-black text-[#3e2723] text-2xl">₹{adminReportData.totalDeliveryCharge.toLocaleString()}</span>
+                          <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                            <span className="text-slate-300 font-extrabold text-sm">Total Delivery Charge</span>
+                            <span className="font-black text-white text-2xl font-mono">₹{adminReportData.totalDeliveryCharge.toLocaleString()}</span>
                           </li>
-                          <li className="flex justify-between items-center pb-4 border-b border-[#d7ccc8]/70">
-                            <span className="text-[#a46c3b] font-bold">Total Revenue</span>
-                            <span className="font-black text-[#15803d] text-2xl">₹{adminReportData.totalRev.toLocaleString()}</span>
+                          <li className="flex justify-between items-center pb-3 border-b border-white/10">
+                            <span className="text-slate-300 font-extrabold text-sm">Total Revenue</span>
+                            <span className="font-black text-amber-400 text-2xl font-mono drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">₹{adminReportData.totalRev.toLocaleString()}</span>
                           </li>
                         </ul>
 
-                        <div className="mt-8 flex-1 min-h-[220px] w-full relative flex items-center justify-center">
+                        <div className="mt-6 flex-1 min-h-[220px] w-full relative flex items-center justify-center">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
@@ -5947,18 +6100,18 @@ export default function Dashboard() {
                                 <Cell fill="#10b981" />
                                 <Cell fill="#f59e0b" />
                               </Pie>
-                              <Tooltip />
+                              <Tooltip contentStyle={{ backgroundColor: '#090e1a', borderRadius: '12px', borderColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontWeight: 'bold' }} />
                             </PieChart>
                           </ResponsiveContainer>
                           <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                            <span className="text-3xl font-black text-gray-800">{adminReportData.filteredOrders.length}</span>
-                            <span className="text-sm font-bold text-gray-500">Total</span>
+                            <span className="text-3xl font-black text-white">{adminReportData.filteredOrders.length}</span>
+                            <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">Total</span>
                           </div>
                         </div>
 
-                        <div className="flex justify-center gap-5 mt-4 shrink-0">
-                          <div className="flex items-center gap-1.5 text-sm font-bold text-gray-700"><div className="w-3.5 h-3.5 rounded-full bg-emerald-500"></div> Delivered</div>
-                          <div className="flex items-center gap-1.5 text-sm font-bold text-gray-700"><div className="w-3.5 h-3.5 rounded-full bg-amber-500"></div> Processing</div>
+                        <div className="flex justify-center gap-5 mt-3 shrink-0">
+                          <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-300"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> Delivered</div>
+                          <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-300"><div className="w-3 h-3 rounded-full bg-amber-500"></div> Processing</div>
                         </div>
                       </div>
 
@@ -5975,23 +6128,23 @@ export default function Dashboard() {
 
       {/* 🟢 NEW PRODUCT MODAL */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", price: "" }); }}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-8 bg-[#fffcf9] border border-amber-100" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-extrabold mb-6 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", price: "" }); }}>
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-8 bg-[#0c1427] border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-black mb-6 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
               {editProductId ? "Edit Product" : "Add New Product"}
             </h2>
             <form onSubmit={handleAddCustomProduct} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold mb-1 text-[#5d4037]">Product Name</label>
-                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner" placeholder="Enter Product Name" />
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Product Name</label>
+                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Enter Product Name" />
               </div>
               <div>
-                <label className="block text-sm font-bold mb-1 text-[#5d4037]">Price (₹)</label>
-                <input required type="number" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner" placeholder="Enter Price" />
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Price (₹)</label>
+                <input required type="number" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Enter Price" />
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", price: "" }); }} className="flex-1 px-4 py-3 rounded-xl font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all">Save</button>
+                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", price: "" }); }} className="flex-1 px-4 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all">Save</button>
               </div>
             </form>
           </div>
@@ -6000,27 +6153,28 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: INVENTORY MODAL */}
       {isInvModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsInvModalOpen(false); setEditInvId(null); }}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#fffcf9] border border-amber-100" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-extrabold mb-6 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsInvModalOpen(false); setEditInvId(null); }}>
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#0c1427] border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-black mb-6 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
               {editInvId ? "Edit Inventory Entry" : "Add Inventory Entry"}
             </h2>
             <form onSubmit={handleAddInventory} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold mb-1 text-[#5d4037]">Date</label>
-                <input required type="date" value={invForm.date} onChange={(e) => setInvForm({ ...invForm, date: e.target.value })} className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner" />
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Date</label>
+                <input required type="date" value={invForm.date} onChange={(e) => setInvForm({ ...invForm, date: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner" />
               </div>
               <div>
-                <label className="block text-sm font-bold mb-1 text-[#5d4037]">Chocolate Name</label>
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Chocolate Name</label>
                 <select
                   required
                   value={invForm.chocolate}
                   onChange={(e) => setInvForm({ ...invForm, chocolate: e.target.value })}
-                  className="w-full font-bold rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-amber-950 shadow-inner cursor-pointer"
+                  style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                  className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner cursor-pointer"
                 >
-                  <option value="" disabled>Select chocolate...</option>
+                  <option value="" disabled className="bg-[#0f172a] text-slate-400">Select chocolate...</option>
                   {managedChocolates.map((choc) => (
-                    <option key={choc.fireId || choc.id} value={choc.name}>
+                    <option key={choc.fireId || choc.id} value={choc.name} className="bg-[#0f172a] text-white">
                       {choc.name}
                     </option>
                   ))}
@@ -6028,25 +6182,25 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold mb-1 text-[#5d4037]">Boxes</label>
-                  <input required type="number" min="1" value={invForm.boxCount} onChange={(e) => setInvForm({ ...invForm, boxCount: e.target.value })} className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner" placeholder="E.g. 10" />
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Boxes</label>
+                  <input required type="number" min="1" value={invForm.boxCount} onChange={(e) => setInvForm({ ...invForm, boxCount: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="E.g. 10" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-1 text-[#5d4037]">Count per Box</label>
-                  <input required type="number" min="1" value={invForm.itemsPerBox} onChange={(e) => setInvForm({ ...invForm, itemsPerBox: e.target.value })} className="w-full font-medium rounded-xl p-2.5 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner" placeholder="E.g. 50" />
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Count per Box</label>
+                  <input required type="number" min="1" value={invForm.itemsPerBox} onChange={(e) => setInvForm({ ...invForm, itemsPerBox: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="E.g. 50" />
                 </div>
               </div>
 
-              <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 mt-2 text-center">
-                <p className="text-xs font-bold text-amber-800 uppercase">Total Items to Add</p>
-                <p className="text-2xl font-black text-amber-950">
+              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-amber-500/30 mt-2 text-center shadow-md">
+                <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Total Items to Add</p>
+                <p className="text-2xl font-black text-amber-300">
                   {(Number(invForm.boxCount) || 0) * (Number(invForm.itemsPerBox) || 0)}
                 </p>
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setIsInvModalOpen(false); setEditInvId(null); }} className="flex-1 px-4 py-3 rounded-xl font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all">Save Entry</button>
+                <button type="button" onClick={() => { setIsInvModalOpen(false); setEditInvId(null); }} className="flex-1 px-4 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-500 shadow-lg hover:shadow-xl transition-all">Save Entry</button>
               </div>
             </form>
           </div>
@@ -6055,34 +6209,34 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: MANUAL INVENTORY VIEW DETAILS MODAL */}
       {viewingInvLog && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setViewingInvLog(null)}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#fffcf9] border border-amber-100" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-extrabold mb-6 text-[#5d4037] text-center tracking-wide border-b-2 border-dashed border-[#d7ccc8] pb-4">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setViewingInvLog(null)}>
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#0c1427] border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-black mb-6 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
               Manual Inventory Log Details
             </h2>
-            <div className="space-y-4 text-sm font-bold text-amber-900">
-              <div className="flex justify-between border-b border-amber-50 pb-2">
-                <span className="text-[#8d6e63]">Date:</span>
-                <span>{formatToDisplayDate(viewingInvLog.date)}</span>
+            <div className="space-y-4 text-sm font-bold text-slate-200">
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-slate-400">Date:</span>
+                <span className="text-white font-extrabold">{formatToDisplayDate(viewingInvLog.date)}</span>
               </div>
-              <div className="flex justify-between border-b border-amber-50 pb-2">
-                <span className="text-[#8d6e63]">Chocolate Name:</span>
-                <span className="text-amber-950 font-black">{viewingInvLog.chocolate}</span>
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-slate-400">Chocolate Name:</span>
+                <span className="text-amber-300 font-black">{viewingInvLog.chocolate}</span>
               </div>
-              <div className="flex justify-between border-b border-amber-50 pb-2">
-                <span className="text-[#8d6e63]">Boxes Added:</span>
-                <span>{viewingInvLog.boxCount} boxes</span>
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-slate-400">Boxes Added:</span>
+                <span className="text-white font-extrabold">{viewingInvLog.boxCount} boxes</span>
               </div>
-              <div className="flex justify-between border-b border-amber-50 pb-2">
-                <span className="text-[#8d6e63]">Items per Box:</span>
-                <span>{viewingInvLog.itemsPerBox} items</span>
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-slate-400">Items per Box:</span>
+                <span className="text-white font-extrabold">{viewingInvLog.itemsPerBox} items</span>
               </div>
-              <div className="flex justify-between bg-amber-50 p-4 rounded-xl border border-amber-200 text-center flex-col items-center">
-                <span className="text-xs font-bold text-amber-800 uppercase mb-1">Total Chocolates Added</span>
-                <span className="text-3xl font-black text-[#3e2723]">+{viewingInvLog.totalChocolates}</span>
+              <div className="flex justify-between bg-slate-900/80 p-4 rounded-xl border border-amber-500/30 text-center flex-col items-center shadow-md">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Total Chocolates Added</span>
+                <span className="text-3xl font-black text-amber-300">+{viewingInvLog.totalChocolates}</span>
               </div>
               <div className="pt-4 flex justify-center">
-                <button onClick={() => setViewingInvLog(null)} className="w-full px-4 py-3 rounded-xl font-black text-sm uppercase tracking-widest text-white bg-[#3e2723] hover:bg-[#2d1b18] shadow-md transition-all">Close Details</button>
+                <button onClick={() => setViewingInvLog(null)} className="w-full px-4 py-3 rounded-xl font-black text-sm uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all">Close Details</button>
               </div>
             </div>
           </div>
@@ -6194,19 +6348,20 @@ export default function Dashboard() {
           onClick={() => setIsModalOpen(false)}
         >
           <div
-            className={`rounded-2xl shadow-2xl w-full max-w-[800px] p-5 bg-[#fffcf9] overflow-y-auto max-h-[95vh] border border-[#f0e6db]`}
+            style={{ backgroundColor: '#0b1329', borderColor: 'rgba(255, 255, 255, 0.15)', color: '#ffffff' }}
+            className="rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.85)] w-full max-w-[800px] p-6 overflow-y-auto max-h-[95vh] border custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative border-b border-dashed border-[#d7ccc8] pb-2 mb-3 flex items-center justify-between">
+            <div className="relative border-b border-white/10 pb-3 mb-4 flex items-center justify-between">
               {/* Invisible spacer to center the title */}
               <div className="w-[100px] hidden sm:block"></div>
 
-              <h2 className="text-xl font-bold text-[#5d4037] text-center tracking-wide flex-1 sm:text-center text-left">
+              <h2 className="text-xl font-black text-white text-center tracking-wide flex-1 sm:text-center text-left uppercase">
                 {formData.id ? "Edit Order Details" : "Add New Order"}
               </h2>
 
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-[10px] font-black uppercase tracking-wider ${orderTypeOthersToggle ? 'text-green-600' : 'text-rose-600'}`}>
+                <span className={`text-[10px] font-black uppercase tracking-wider ${orderTypeOthersToggle ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {orderTypeOthersToggle ? 'Others' : 'Self'}
                 </span>
                 <button
@@ -6216,7 +6371,7 @@ export default function Dashboard() {
                     setOrderTypeOthersToggle(nextVal);
                     setFormData(prev => ({ ...prev, role: nextVal ? 'Others' : 'Self' }));
                   }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${orderTypeOthersToggle ? 'bg-green-500' : 'bg-rose-500'}`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${orderTypeOthersToggle ? 'bg-emerald-500' : 'bg-rose-500'}`}
                 >
                   <span
                     className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${orderTypeOthersToggle ? 'translate-x-4' : 'translate-x-0'}`}
@@ -6230,31 +6385,73 @@ export default function Dashboard() {
                 {/* Column 1: Customer & Dates */}
                 <div className="space-y-3">
                   <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Customer Name</label>
-                    <input required autoComplete="off" type="text" name="name" value={formData.name} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter Name" />
+                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Customer Name</label>
+                    <input
+                      required
+                      autoComplete="off"
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner transition-colors"
+                      placeholder="Enter Name"
+                    />
                   </div>
 
                   <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Contact Number</label>
-                    <input required autoComplete="off" type="text" name="phone" value={formData.phone} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Phone Number" />
+                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Contact Number</label>
+                    <input
+                      required
+                      autoComplete="off"
+                      type="text"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner transition-colors"
+                      placeholder="Phone Number"
+                    />
                   </div>
-
-
 
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Function Date</label>
-                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>Dispatch Date</label>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">Function Date</label>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">Dispatch Date</label>
                     <div>
-                      <input required type="date" name="functionDate" value={formData.functionDate} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
+                      <input
+                        required
+                        type="date"
+                        name="functionDate"
+                        value={formData.functionDate}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors"
+                      />
                     </div>
                     <div>
-                      <input required type="date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner`} />
+                      <input
+                        required
+                        type="date"
+                        name="deliveryDate"
+                        value={formData.deliveryDate}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors"
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Address (Optional)</label>
-                    <textarea name="address" value={formData.address} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner resize-none`} placeholder="Enter delivery address..." rows={2} />
+                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Address (Optional)</label>
+                    <textarea
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner resize-none transition-colors"
+                      placeholder="Enter delivery address..."
+                      rows={2}
+                    />
                   </div>
                 </div>
 
@@ -6262,15 +6459,23 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   {formData.category === 'product' && (
                     <div>
-                      <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Product Unit Price (₹)</label>
-                      <input type="number" name="manualProductPrice" value={formData.manualProductPrice || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter price per unit" />
+                      <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Product Unit Price (₹)</label>
+                      <input
+                        type="number"
+                        name="manualProductPrice"
+                        value={formData.manualProductPrice || ''}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
+                        placeholder="Enter price per unit"
+                      />
                     </div>
                   )}
 
                   {formData.category === 'product' ? (
                     <>
                       <div>
-                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Product Name</label>
+                        <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Product Name</label>
                         <ChocolateSingleSelect
                           value={formData.chocolate}
                           onChange={(val) => setFormData({ ...formData, chocolate: val })}
@@ -6280,27 +6485,37 @@ export default function Dashboard() {
                         />
                       </div>
                       <div>
-                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Count (Quantity)</label>
-                        <input required type="number" name="count" value={formData.count} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Quantity" />
+                        <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Count (Quantity)</label>
+                        <input
+                          required
+                          type="number"
+                          name="count"
+                          value={formData.count}
+                          onChange={handleInputChange}
+                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Quantity"
+                        />
                       </div>
                     </>
                   ) : (
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <label className={`block text-[11px] font-black uppercase tracking-wider text-[#5d4037]`}>Chocolates List</label>
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-slate-200">Chocolates List</label>
                         <button
                           type="button"
                           onClick={() => {
                             const newRows = [...chocolateRows, { chocolate: "", count: "" }];
                             setChocolateRows(newRows);
                           }}
-                          className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black flex items-center gap-1 transition-colors"
+                          style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000000' }}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 transition-all hover:brightness-110 shadow-sm cursor-pointer"
                         >
                           <Plus size={10} /> Add Chocolate
                         </button>
                       </div>
                       {chocolateRows.map((row, idx) => (
-                        <div key={idx} className="flex gap-2 items-center bg-amber-50/30 p-2.5 rounded-xl border border-amber-100/50">
+                        <div key={idx} style={{ backgroundColor: '#141d33', borderColor: 'rgba(255, 255, 255, 0.15)' }} className="flex gap-2 items-center p-2.5 rounded-xl border">
                           <div className="flex-1 min-w-0">
                             <ChocolateSingleSelect
                               value={row.chocolate}
@@ -6338,7 +6553,8 @@ export default function Dashboard() {
                                   count: countsStr
                                 }));
                               }}
-                              className="w-full text-xs font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-xs font-bold rounded-lg p-2 outline-none border focus:border-amber-400 text-white shadow-inner"
                               placeholder="Qty"
                             />
                           </div>
@@ -6356,7 +6572,7 @@ export default function Dashboard() {
                                   count: countsStr
                                 }));
                               }}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors shrink-0"
+                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -6367,19 +6583,36 @@ export default function Dashboard() {
                   )}
 
                   <div>
-                    <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Discount Amount</label>
-                    <input type="number" list="discount-suggestions" name="discount" value={formData.discount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Eg. 50" />
+                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Discount Amount</label>
+                    <input
+                      type="number"
+                      list="discount-suggestions"
+                      name="discount"
+                      value={formData.discount || ''}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
+                      placeholder="Eg. 50"
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">
                       Delivery Charge (₹)
                     </label>
-                    <label className={`block text-[10px] font-extrabold uppercase tracking-wider text-[#5d4037]`}>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">
                       Location
                     </label>
                     <div>
-                      <input type="number" name="manualDeliveryFee" value={formData.manualDeliveryFee} onChange={handleInputChange} className={`w-full font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-sm`} placeholder={formData.category === 'product' ? 'Eg. 100' : `${Number(formData.count) > 99 ? '200' : '150'}`} />
+                      <input
+                        type="number"
+                        name="manualDeliveryFee"
+                        value={formData.manualDeliveryFee}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm"
+                        placeholder={formData.category === 'product' ? 'Eg. 100' : `${Number(formData.count) > 99 ? '200' : '150'}`}
+                      />
                     </div>
 
                     <div>
@@ -6416,28 +6649,28 @@ export default function Dashboard() {
                           }
                           setFormData(newFormData);
                         }}
-                        className="w-full h-[40px] bg-white border-2 border-[#d7ccc8] rounded-lg px-2 font-bold text-[#5d4037] text-xs uppercase tracking-wider outline-none focus:border-[#8d6e63] shadow-inner cursor-pointer"
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full h-[42px] font-bold rounded-xl px-3 text-white text-xs uppercase tracking-wider outline-none focus:border-amber-400 cursor-pointer shadow-inner"
                       >
-                        <option value="Chennai">Chennai</option>
-                        <option value="Kerala">Kerala</option>
-                        <option value="Others">Others</option>
+                        <option value="Chennai" className="bg-[#0f172a] text-white">Chennai</option>
+                        <option value="Kerala" className="bg-[#0f172a] text-white">Kerala</option>
+                        <option value="Others" className="bg-[#0f172a] text-white">Others</option>
                       </select>
                     </div>
                   </div>
 
                   {formData.category !== 'product' && (
                     <div>
-                      <label className={`block text-[11px] font-black uppercase tracking-wider mb-1.5 text-[#5d4037]`}>Order Type</label>
+                      <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Order Type</label>
                       <div className="flex gap-3">
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
-                          <input type="radio" name="orderType" value="Sabi" checked={formData.orderType === "Sabi"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
+                        <label style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="flex items-center gap-1.5 cursor-pointer font-bold border px-3 py-2 rounded-xl focus-within:border-amber-400 hover:border-amber-400 transition-colors flex-1 shadow-sm text-xs">
+                          <input type="radio" name="orderType" value="Sabi" checked={formData.orderType === "Sabi"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-amber-400" />
                           Sabi
                         </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-amber-950 bg-white border-2 border-[#d7ccc8] px-3 py-1.5 rounded-lg focus-within:border-[#8d6e63] hover:bg-amber-50 transition-colors flex-1 shadow-sm text-xs">
-                          <input type="radio" name="orderType" value="Thaaru" checked={formData.orderType === "Thaaru"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-[#8d6e63]" />
+                        <label style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="flex items-center gap-1.5 cursor-pointer font-bold border px-3 py-2 rounded-xl focus-within:border-amber-400 hover:border-amber-400 transition-colors flex-1 shadow-sm text-xs">
+                          <input type="radio" name="orderType" value="Thaaru" checked={formData.orderType === "Thaaru"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-amber-400" />
                           Thaaru
                         </label>
-
                       </div>
                     </div>
                   )}
@@ -6448,19 +6681,33 @@ export default function Dashboard() {
                   {formData.category !== 'product' && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider mb-1 text-[#5d4037]`}>Payment Status</label>
-                        <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleInputChange} className={`w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-xs`}>
-                          <option value="Pending">Pending</option>
-                          <option value="Partially Paid">Part. Paid</option>
-                          <option value="Full Paid">Full Paid</option>
+                        <label className="block text-[10px] font-black uppercase tracking-wider mb-1 text-slate-200">Payment Status</label>
+                        <select
+                          required
+                          name="paymentStatus"
+                          value={formData.paymentStatus}
+                          onChange={handleInputChange}
+                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer"
+                        >
+                          <option value="Pending" className="bg-[#0f172a] text-white">Pending</option>
+                          <option value="Partially Paid" className="bg-[#0f172a] text-white">Part. Paid</option>
+                          <option value="Full Paid" className="bg-[#0f172a] text-white">Full Paid</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className={`block text-[10px] font-extrabold uppercase tracking-wider mb-1 text-[#5d4037]`}>Delivery Status</label>
-                        <select required name="status" value={formData.status} onChange={handleInputChange} className={`w-full font-bold rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black shadow-inner text-xs`}>
-                          <option value="In Process">In Process</option>
-                          <option value="Delivered">Delivered</option>
+                        <label className="block text-[10px] font-black uppercase tracking-wider mb-1 text-slate-200">Delivery Status</label>
+                        <select
+                          required
+                          name="status"
+                          value={formData.status}
+                          onChange={handleInputChange}
+                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer"
+                        >
+                          <option value="In Process" className="bg-[#0f172a] text-white">In Process</option>
+                          <option value="Delivered" className="bg-[#0f172a] text-white">Delivered</option>
                         </select>
                       </div>
                     </div>
@@ -6469,28 +6716,44 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                     {formData.category !== 'product' ? (
                       <div className="col-span-2">
-                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Advance Paid (₹)</label>
-                        <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Advance amount" />
+                        <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Advance Paid (₹)</label>
+                        <input
+                          type="number"
+                          name="advanceAmount"
+                          value={formData.advanceAmount || ''}
+                          onChange={handleInputChange}
+                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Advance amount"
+                        />
                       </div>
                     ) : (
                       <div className="col-span-2">
-                        <label className={`block text-[11px] font-black uppercase tracking-wider mb-1 text-[#5d4037]`}>Advance Amount Paid (₹)</label>
-                        <input type="number" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleInputChange} className={`w-full text-sm font-medium rounded-lg p-2 outline-none border-2 border-[#d7ccc8] focus:border-[#8d6e63] bg-white text-black placeholder-gray-400 shadow-inner`} placeholder="Enter advance amount paid" />
+                        <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Advance Amount Paid (₹)</label>
+                        <input
+                          type="number"
+                          name="advanceAmount"
+                          value={formData.advanceAmount || ''}
+                          onChange={handleInputChange}
+                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Enter advance amount paid"
+                        />
                       </div>
                     )}
                   </div>
 
-                  <div className="bg-[#fff8e1] border-2 border-[#ffecb3] rounded-lg p-3 flex flex-col gap-1.5 shadow-sm text-xs">
-                    <div className="flex justify-between items-center font-bold text-[#5d4037]">
+                  <div style={{ backgroundColor: '#141e36', borderColor: 'rgba(245, 158, 11, 0.35)', color: '#ffffff' }} className="border-2 rounded-2xl p-3 flex flex-col gap-1.5 shadow-md text-xs">
+                    <div className="flex justify-between items-center font-bold text-slate-200">
                       <span>{formData.category === 'product' ? 'Products Price:' : 'Chocolates Price:'}</span>
-                      <span>₹{(liveFormPrice.fullChocolatePrice || 0).toLocaleString()}</span>
+                      <span className="text-amber-300 font-black">₹{(liveFormPrice.fullChocolatePrice || 0).toLocaleString()}</span>
                     </div>
 
-                    <div className="flex justify-between items-center font-bold text-[#5d4037] border-b border-[#ffe082] pb-1">
+                    <div className="flex justify-between items-center font-bold text-slate-200 border-b border-white/10 pb-1.5">
                       <span>Delivery Charge:</span>
-                      <span>{(formData.isDeliveryFree || formData.isChennai) ? <span className="text-green-600">Free</span> : `₹${(liveFormPrice.fullDeliveryCharge || 0).toLocaleString()}`}</span>
+                      <span>{(formData.isDeliveryFree || formData.isChennai) ? <span className="text-emerald-400 font-black">Free</span> : <span className="text-amber-300 font-black">₹{(liveFormPrice.fullDeliveryCharge || 0).toLocaleString()}</span>}</span>
                     </div>
-                    <label className="flex items-center gap-1.5 cursor-pointer font-bold text-[#5d4037]">
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-200 pt-0.5">
                       <input
                         type="checkbox"
                         checked={formData.isDeliveryFree || false}
@@ -6523,33 +6786,47 @@ export default function Dashboard() {
                           }
                           setFormData(newFormData);
                         }}
-                        className="accent-[#8d6e63] w-3.5 h-3.5 cursor-pointer"
+                        className="accent-amber-400 w-4 h-4 cursor-pointer"
                       />
                       Delivery Free
                     </label>
 
                     {(Number(formData.discount) || 0) > 0 && (
-                      <div className="flex justify-between items-center font-bold text-red-600 border-b border-[#ffe082] pb-1 mt-0.5">
+                      <div className="flex justify-between items-center font-bold text-rose-400 border-b border-white/10 pb-1.5 mt-0.5">
                         <span>Discount Applied:</span>
                         <span>-₹{(Number(formData.discount) || 0).toLocaleString()}</span>
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center pt-1 mt-0.5">
-                      <span className="font-extrabold text-[#3e2723]">Total Order Price:</span>
-                      <span className="text-base font-black text-green-700">₹{(liveFormPrice.fullTotalPrice || 0).toLocaleString()}</span>
+                    <div className="flex justify-between items-center pt-1.5 mt-0.5 border-t border-white/10">
+                      <span className="font-black text-white text-xs uppercase tracking-wider">Total Order Price:</span>
+                      <span className="text-lg font-black text-emerald-400">₹{(liveFormPrice.fullTotalPrice || 0).toLocaleString()}</span>
                     </div>
                     {Number(formData.advanceAmount) > 0 && (
-                      <div className="flex justify-between items-center font-bold text-blue-700 border-t border-[#ffe082] pt-1 mt-0.5">
+                      <div className="flex justify-between items-center font-black text-sky-300 border-t border-white/10 pt-1 mt-0.5">
                         <span>Advance Paid:</span>
                         <span>₹{Number(formData.advanceAmount).toLocaleString()}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex gap-2 pt-1.5">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className={`flex-1 px-3 py-2 rounded-lg font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors text-xs`} fire-id="cancel-btn">Cancel</button>
-                    <button type="submit" className={`flex-1 px-3 py-2 rounded-lg font-bold text-white bg-gradient-to-r from-[#8d6e63] to-[#5d4037] shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 text-xs`}>Save Order</button>
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      style={{ backgroundColor: '#1e293b', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)', fontWeight: 800 }}
+                      className="flex-1 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider cursor-pointer hover:bg-slate-700 transition-colors"
+                      fire-id="cancel-btn"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', color: '#000000', fontWeight: 900 }}
+                      className="flex-1 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                    >
+                      Save Order
+                    </button>
                   </div>
                 </div>
               </div>
@@ -6815,55 +7092,56 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🟢 TRASH MODAL */}
+      {/* 🟢 TRASH BIN MODAL */}
       {isTrashOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md cursor-pointer"
           onClick={() => setIsTrashOpen(false)}
         >
           <div
-            className="rounded-2xl shadow-2xl w-full max-w-4xl p-6 bg-[#fffcf9] overflow-y-auto max-h-[90vh] border border-[#f0e6db] relative flex flex-col gap-4"
+            style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
+            className="rounded-3xl shadow-2xl w-full max-w-4xl p-7 bg-[#0c1427] border border-white/20 overflow-y-auto max-h-[90vh] relative flex flex-col gap-4 text-white cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setIsTrashOpen(false)}
-              className="absolute top-4 right-4 p-2 text-[#8d6e63] hover:bg-amber-50 hover:text-[#5d4037] rounded-full transition-colors"
+              className="absolute top-5 right-5 p-1 text-slate-300 hover:text-white rounded-full transition-colors cursor-pointer"
             >
-              <X size={20} />
+              <X size={22} />
             </button>
 
-            <div className="flex items-center gap-2 pb-3 border-b border-[#d7ccc8]">
-              <Trash2 size={24} className="text-red-600" />
-              <h2 className="text-xl font-bold text-[#5d4037]">Trash Bin</h2>
+            <div style={{ backgroundColor: '#131c2e' }} className="flex items-center gap-2.5 p-4 rounded-2xl bg-[#131c2e] border border-white/15 shadow-md">
+              <Trash2 size={24} className="text-rose-400" />
+              <h2 className="text-xl font-black text-amber-400 uppercase tracking-widest">Trash Bin</h2>
             </div>
 
             {/* Banner/Info message */}
-            <div className="bg-[#fff8e1] border border-[#ffe082] rounded-xl p-3 flex items-start gap-2.5 shadow-sm text-[#5d4037] text-xs">
-              <span className="shrink-0 text-amber-600 font-bold">ℹ️</span>
+            <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] border border-amber-500/30 rounded-2xl p-4 flex items-start gap-3 shadow-md text-white text-xs">
+              <span className="shrink-0 text-amber-400 font-bold text-base">ℹ️</span>
               <div>
-                <p className="font-extrabold">Auto-Cleanup Policy</p>
-                <p className="font-medium text-amber-900 mt-0.5">
-                  All deleted orders are temporarily moved here. Items in the trash are automatically deleted forever after <strong>30 days</strong>.
+                <p className="font-black text-amber-400 uppercase tracking-wider text-xs">Auto-Cleanup Policy</p>
+                <p className="font-bold text-slate-300 mt-1">
+                  All deleted orders are temporarily moved here. Items in the trash are automatically deleted forever after <strong className="text-amber-300 font-mono font-black">30 days</strong>.
                 </p>
               </div>
             </div>
 
             {/* Trash Orders Table */}
-            <div className="overflow-x-auto rounded-xl border-2 border-[#d7ccc8] bg-white">
+            <div style={{ backgroundColor: '#131c2e' }} className="overflow-x-auto rounded-2xl border border-white/15 bg-[#131c2e] shadow-xl custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-amber-50 border-b-2 border-[#d7ccc8] text-[#5d4037] uppercase tracking-wider font-extrabold text-[10px]">
-                    <th className="p-3">Customer</th>
-                    <th className="p-3">Order Details</th>
-                    <th className="p-3">Deleted By</th>
-                    <th className="p-3 text-center">Time Left</th>
-                    <th className="p-3 text-right">Actions</th>
+                  <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 uppercase tracking-wider font-black text-xs border-b border-amber-500/30">
+                    <th className="p-3.5 border-r border-white/10">Customer</th>
+                    <th className="p-3.5 border-r border-white/10">Order Details</th>
+                    <th className="p-3.5 border-r border-white/10">Deleted By</th>
+                    <th className="p-3.5 text-center border-r border-white/10">Time Left</th>
+                    <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#e8dccb] font-medium text-black">
+                <tbody>
                   {trashOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-gray-500 font-bold italic">
+                      <td colSpan={5} className="p-8 text-center text-amber-400 font-extrabold italic">
                         Trash is empty
                       </td>
                     </tr>
@@ -6874,53 +7152,53 @@ export default function Dashboard() {
                       const daysLabel = daysLeft <= 0 ? "Expired" : `${daysLeft} days remaining`;
 
                       return (
-                        <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
-                          <td className="p-3">
-                            <div className="font-bold text-[#5d4037] text-sm">{order.name}</div>
-                            <div className="text-gray-500 font-semibold">{formatPhoneNumber(order.phone)}</div>
+                        <tr key={idx} className={`border-b border-white/5 text-xs transition-colors ${idx % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#131c2e]'} hover:bg-[#18243b]`}>
+                          <td className="p-3.5 border-r border-white/5">
+                            <div className="font-extrabold text-white text-sm">{order.name}</div>
+                            <div className="text-slate-400 font-mono text-xs">{formatPhoneNumber(order.phone)}</div>
                           </td>
-                          <td className="p-3">
-                            <div className="font-semibold text-gray-800">{order.chocolate || order.productName || "Product"}</div>
-                            <div className="text-gray-500">
-                              Qty: <strong className="text-[#5d4037]">{order.count}</strong> | Total: <strong className="text-green-700">₹{(order.totalOrderPrice || 0).toLocaleString()}</strong>
+                          <td className="p-3.5 border-r border-white/5">
+                            <div className="font-extrabold text-slate-200 text-xs">{order.chocolate || order.productName || "Product"}</div>
+                            <div className="text-slate-400 mt-0.5">
+                              Qty: <strong className="text-amber-300 font-mono font-black">{order.count}</strong> | Total: <strong className="text-emerald-300 font-mono font-black">₹{(order.totalOrderPrice || 0).toLocaleString()}</strong>
                             </div>
                           </td>
-                          <td className="p-3">
+                          <td className="p-3.5 border-r border-white/5">
                             <div className="flex flex-col gap-1 items-start">
                               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : "bg-purple-50 text-purple-700 border-purple-200"
+                                  ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
                                 }`}>
                                 <User size={10} />
                                 {order.deletedBy || "Unknown"}
                               </span>
                               {order.deletedAt && (
-                                <div className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                                <div className="text-[10px] text-slate-400 font-mono font-bold mt-0.5">
                                   {new Date(order.deletedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                                 </div>
                               )}
                             </div>
                           </td>
-                          <td className="p-3 text-center">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${isUrgent
-                                ? "bg-red-50 text-red-700 border-red-200 animate-pulse"
-                                : "bg-green-50 text-green-700 border-green-200"
+                          <td className="p-3.5 text-center border-r border-white/5">
+                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border ${isUrgent
+                                ? "bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse"
+                                : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                               }`}>
                               {daysLabel}
                             </span>
                           </td>
-                          <td className="p-3 text-right">
+                          <td className="p-3.5 text-right">
                             <div className="flex gap-2 justify-end">
                               <button
                                 onClick={() => handleRestoreTrashOrder(order)}
-                                className="px-2.5 py-1.5 rounded-lg border border-green-200 text-green-700 bg-green-50 hover:bg-green-600 hover:text-white transition-all font-bold tracking-wide active:scale-95 shadow-sm uppercase text-[9px] cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500 hover:text-black font-black uppercase text-[10px] transition-all cursor-pointer shadow-sm"
                                 title="Restore Order"
                               >
                                 Restore
                               </button>
                               <button
                                 onClick={() => handleDeleteTrashOrderPermanently(order.fireId)}
-                                className="px-2.5 py-1.5 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-600 hover:text-white transition-all font-bold tracking-wide active:scale-95 shadow-sm uppercase text-[9px] cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg border border-rose-500/40 text-rose-300 bg-rose-500/10 hover:bg-rose-600 hover:text-white font-black uppercase text-[10px] transition-all cursor-pointer shadow-sm"
                                 title="Delete Permanently"
                               >
                                 Delete Forever
@@ -6935,10 +7213,10 @@ export default function Dashboard() {
               </table>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-[#d7ccc8]">
+            <div style={{ backgroundColor: '#131c2e' }} className="pt-3 flex justify-end border-t border-white/10">
               <button
                 onClick={() => setIsTrashOpen(false)}
-                className="px-5 py-2.5 rounded-lg font-bold border-2 border-[#d7ccc8] bg-white text-[#5d4037] hover:bg-gray-50 transition-colors text-xs cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
               >
                 Close Trash
               </button>
@@ -7247,68 +7525,68 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: REPORT PREVIEW & DOWNLOAD MODAL */}
       {isReportPreviewOpen && (
-        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-5 border-b-2 border-gray-300 flex justify-between items-center bg-gray-100 shadow-sm">
-              <h2 className="text-2xl font-extrabold text-gray-900 uppercase tracking-widest">Sales Report Preview</h2>
-              <button onClick={() => setIsReportPreviewOpen(false)} className="text-gray-600 hover:bg-gray-200 hover:text-red-600 p-1.5 rounded-full transition-colors"><X size={24} /></button>
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsReportPreviewOpen(false)}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-5 border-b border-white/15 flex justify-between items-center bg-[#131c2e] shadow-md">
+              <h2 className="text-2xl font-black text-amber-400 uppercase tracking-widest">Sales Report Preview</h2>
+              <button onClick={() => setIsReportPreviewOpen(false)} className="text-slate-300 hover:bg-red-950/60 hover:text-red-400 p-2 rounded-full transition-colors cursor-pointer"><X size={22} /></button>
             </div>
 
-            <div id="final-report-document" className="p-8 overflow-auto bg-white flex-1 relative">
+            <div id="final-report-document" style={{ backgroundColor: '#090e1a', color: '#ffffff' }} className="p-8 overflow-auto bg-[#090e1a] flex-1 relative custom-scrollbar">
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-black text-amber-900 uppercase tracking-wider">Sabi Return Gifts</h1>
-                <h2 className="text-xl font-bold text-gray-600 mt-2">Official Sales & Analytics Report</h2>
+                <h1 className="text-3xl font-black text-amber-400 uppercase tracking-wider drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">Sabi Return Gifts</h1>
+                <h2 className="text-lg font-extrabold text-slate-200 mt-1">Official Sales & Analytics Report</h2>
                 {reportDateRange.start && reportDateRange.end ? (
-                  <p className="text-sm font-medium text-gray-500 mt-1">Period: {formatToDisplayDate(reportDateRange.start)} to {formatToDisplayDate(reportDateRange.end)}</p>
+                  <p className="text-xs font-bold text-slate-400 mt-1">Period: {formatToDisplayDate(reportDateRange.start)} to {formatToDisplayDate(reportDateRange.end)}</p>
                 ) : (
-                  <p className="text-sm font-medium text-gray-500 mt-1">Period: All Time Overview</p>
+                  <p className="text-xs font-bold text-slate-400 mt-1">Period: All Time Overview</p>
                 )}
 
                 {/* Dashboard Type Subtitle inside Report */}
                 {reportDashboardFilter !== 'All' && (
-                  <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mt-1">
+                  <p className="text-xs font-black text-amber-300 uppercase tracking-widest mt-2 bg-amber-500/15 px-3.5 py-1 rounded-full border border-amber-500/30 inline-block">
                     Filter: {reportDashboardFilter === 'Dashboard 1' ? 'Chocolates Only' : 'Products Only'}
                   </p>
                 )}
               </div>
 
-              <div className="grid grid-cols-4 gap-4 mb-8">
-                <div className="border border-gray-200 p-4 rounded-xl bg-gray-50 text-center shadow-sm">
-                  <p className="text-xs font-bold text-gray-500 uppercase">Total Orders</p>
-                  <p className="text-2xl font-black text-gray-800">{reportData.filteredOrders.length}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                <div className="border border-white/15 p-4 rounded-2xl bg-[#131c2e] text-center shadow-md">
+                  <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Total Orders</p>
+                  <p className="text-2xl font-black text-white font-mono mt-1">{reportData.filteredOrders.length}</p>
                 </div>
-                <div className="border border-gray-200 p-4 rounded-xl bg-gray-50 text-center shadow-sm">
-                  <p className="text-xs font-bold text-gray-500 uppercase">Items Sold</p>
-                  <p className="text-2xl font-black text-gray-800">{reportData.totalItems}</p>
+                <div className="border border-white/15 p-4 rounded-2xl bg-[#131c2e] text-center shadow-md">
+                  <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Items Sold</p>
+                  <p className="text-2xl font-black text-white font-mono mt-1">{reportData.totalItems}</p>
                 </div>
-                <div className="border border-green-200 p-4 rounded-xl bg-green-50 text-center shadow-sm">
-                  <p className="text-xs font-bold text-green-700 uppercase">Total Revenue Generated</p>
-                  <p className="text-2xl font-black text-green-700">₹{reportData.totalRev.toLocaleString()}</p>
+                <div className="border border-amber-500/30 p-4 rounded-2xl bg-[#131c2e] text-center shadow-md">
+                  <p className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">Total Revenue Generated</p>
+                  <p className="text-2xl font-black text-amber-300 font-mono mt-1 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">₹{reportData.totalRev.toLocaleString()}</p>
                 </div>
-                <div className="border border-emerald-200 p-4 rounded-xl bg-emerald-50 text-center shadow-sm">
-                  <p className="text-xs font-bold text-emerald-700 uppercase">Total Profit</p>
-                  <p className="text-2xl font-black text-emerald-700">₹{Math.round(reportData.totalProfit || 0).toLocaleString()}</p>
+                <div className="border border-emerald-500/30 p-4 rounded-2xl bg-[#131c2e] text-center shadow-md">
+                  <p className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">Total Profit</p>
+                  <p className="text-2xl font-black text-emerald-300 font-mono mt-1 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">₹{Math.round(reportData.totalProfit || 0).toLocaleString()}</p>
                 </div>
               </div>
 
               <div className="mb-8">
-                <h3 className="text-xl font-extrabold text-gray-900 border-b-2 border-gray-300 pb-3 mb-5 tracking-wide uppercase">
+                <h3 className="text-xl font-black text-amber-400 border-b border-white/15 pb-3 mb-5 tracking-wide uppercase flex items-center gap-2">
                   Top Selling {reportDashboardFilter === 'Dashboard 2' ? 'Products' : 'Chocolates'} Leaderboard
                 </h3>
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-amber-50 text-amber-900 text-sm">
-                      <th className="p-3 border border-amber-100 font-bold w-16 text-center">Rank</th>
-                      <th className="p-3 border border-amber-100 font-bold">Item Name</th>
-                      <th className="p-3 border border-amber-100 font-bold text-center w-32">Units Sold</th>
+                    <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 text-xs font-black uppercase tracking-wider">
+                      <th className="p-3.5 border border-white/10 w-16 text-center">Rank</th>
+                      <th className="p-3.5 border border-white/10">Item Name</th>
+                      <th className="p-3.5 border border-white/10 text-center w-36">Units Sold</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportData.topChocs.map(([name, count], idx) => (
-                      <tr key={idx} className="border-b text-sm hover:bg-gray-50">
-                        <td className="p-3 border border-gray-100 text-center font-bold text-gray-500">#{idx + 1}</td>
-                        <td className="p-3 border border-gray-100 font-medium text-gray-800">{name}</td>
-                        <td className="p-3 border border-gray-100 text-center font-bold text-amber-700">{count}</td>
+                      <tr key={idx} className={`border-b border-white/5 text-sm transition-colors ${idx % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#131c2e]'} hover:bg-[#18243b]`}>
+                        <td className="p-3.5 border border-white/5 text-center font-black text-amber-400">#{idx + 1}</td>
+                        <td className="p-3.5 border border-white/5 font-extrabold text-white">{name}</td>
+                        <td className="p-3.5 border border-white/5 text-center font-mono font-black text-amber-300">{count}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -7316,8 +7594,8 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="p-4 border-t bg-gray-50 flex justify-end gap-4 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-              <button onClick={() => setIsReportPreviewOpen(false)} className="px-6 py-2.5 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-4 border-t border-white/15 bg-[#131c2e] flex justify-end gap-4 shadow-2xl">
+              <button onClick={() => setIsReportPreviewOpen(false)} className="px-6 py-2.5 rounded-xl font-extrabold border border-white/20 text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer">Cancel</button>
               <button
                 onClick={async () => {
                   const element = document.getElementById("final-report-document");
@@ -7330,7 +7608,7 @@ export default function Dashboard() {
                     link.click();
                   }
                 }}
-                className="px-6 py-2.5 rounded-lg font-bold text-white bg-amber-600 hover:bg-amber-700 flex items-center gap-2 shadow-md hover:-translate-y-0.5 transition-transform"
+                className="px-6 py-2.5 rounded-xl font-black text-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 flex items-center gap-2 shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
               >
                 <Download size={18} /> Download Report
               </button>
@@ -7343,33 +7621,35 @@ export default function Dashboard() {
       {isReportsAuthModalOpen && (
         <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsReportsAuthModalOpen(false)}>
           <div
-            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-sm border-2 border-blue-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
+            style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
+            className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-sm border border-white/20 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-6 text-center relative border-b-4 border-indigo-950">
-              <button type="button" onClick={() => setIsReportsAuthModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"><X size={20} /></button>
-              <div className="w-16 h-16 bg-[#fffcf9] rounded-full mx-auto flex items-center justify-center shadow-inner mb-3">
-                <Lock size={28} className="text-indigo-800" strokeWidth={2.5} />
+            <div className="bg-gradient-to-br from-[#131c2e] to-[#090e1a] p-6 text-center relative border-b border-amber-500/30">
+              <button type="button" onClick={() => setIsReportsAuthModalOpen(false)} className="absolute top-4 right-4 text-slate-300 hover:text-white transition-colors cursor-pointer"><X size={20} /></button>
+              <div className="w-16 h-16 bg-[#162035] rounded-2xl mx-auto flex items-center justify-center shadow-md border border-amber-500/30 mb-3">
+                <Lock size={26} className="text-amber-400" strokeWidth={2.5} />
               </div>
-              <h2 className="text-2xl font-black text-white tracking-wide">Enter Password</h2>
-              <p className="text-blue-200/80 text-xs font-bold mt-1 tracking-widest uppercase">Restricted Reports Area</p>
+              <h2 className="text-2xl font-black text-white tracking-wide uppercase">Enter Password</h2>
+              <p className="text-amber-400/90 text-xs font-bold mt-1 tracking-widest uppercase">Restricted Reports Area</p>
             </div>
 
-            <form onSubmit={handleReportsAuthSubmit} className="p-7 space-y-5">
+            <form onSubmit={handleReportsAuthSubmit} className="p-7 space-y-5 bg-[#090e1a]">
               {reportsAuthError && (
-                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 text-sm font-bold rounded shadow-sm text-center animate-in zoom-in duration-200">
+                <div className="bg-red-950/60 border-l-4 border-red-500 text-red-300 p-3 text-xs font-bold rounded-lg shadow-sm text-center animate-in zoom-in duration-200">
                   {reportsAuthError}
                 </div>
               )}
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-black text-blue-900 uppercase tracking-wider mb-1.5">Reports Password</label>
+                  <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-2">Reports Password</label>
                   <input
                     type="password"
                     value={reportsPassword}
                     onChange={(e) => setReportsPassword(e.target.value)}
-                    className="w-full font-bold text-center text-lg rounded-xl p-3 border-2 border-blue-200 focus:border-indigo-600 bg-white text-black outline-none shadow-inner"
+                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                    className="w-full font-mono font-black text-center text-xl rounded-xl p-3 border border-white/20 focus:border-amber-400 bg-[#162035] text-white outline-none shadow-inner"
                     placeholder="••••"
                     required
                   />
@@ -7378,9 +7658,9 @@ export default function Dashboard() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-indigo-700 text-white font-black rounded-xl border-b-4 border-indigo-900 active:border-b-0 hover:-translate-y-0.5 active:translate-y-1 transition-all shadow-md uppercase tracking-wider text-xs"
+                className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                Access Reports
+                <Lock size={18} /> Unlock Reports
               </button>
             </form>
           </div>
@@ -7508,7 +7788,7 @@ export default function Dashboard() {
                       toast.error("Failed to update passcodes");
                     }
                   }}
-                  className="flex-1 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-xl transition-all shadow-md border-b-4 border-indigo-900 active:border-b-0"
+                  className="flex-1 py-3 text-xs font-black text-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 rounded-xl transition-all shadow-lg"
                 >
                   Save
                 </button>
@@ -7522,41 +7802,43 @@ export default function Dashboard() {
       {isAdminAuthModalOpen && (
         <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsAdminAuthModalOpen(false)}>
           <div
-            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-sm border-2 border-[#d7ccc8] overflow-hidden transform transition-all"
+            style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
+            className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-sm border border-white/20 overflow-hidden transform transition-all text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-br from-[#5d4037] to-[#3e2723] p-6 text-center relative border-b-4 border-[#8b5a2b]">
-              <button type="button" onClick={() => setIsAdminAuthModalOpen(false)} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"><X size={20} /></button>
-              <div className="w-16 h-16 bg-[#fffcf9] rounded-full mx-auto flex items-center justify-center shadow-inner mb-3">
-                <User size={28} className="text-[#8b5a2b]" strokeWidth={2.5} />
+            <div className="bg-gradient-to-br from-[#131c2e] to-[#090e1a] p-6 text-center relative border-b border-amber-500/30">
+              <button type="button" onClick={() => setIsAdminAuthModalOpen(false)} className="absolute top-4 right-4 text-slate-300 hover:text-white transition-colors cursor-pointer"><X size={20} /></button>
+              <div className="w-16 h-16 bg-[#162035] rounded-2xl mx-auto flex items-center justify-center shadow-md border border-amber-500/30 mb-3">
+                <User size={26} className="text-amber-400" strokeWidth={2.5} />
               </div>
-              <h2 className="text-2xl font-black text-white tracking-wide">Login</h2>
-              <p className="text-amber-200/80 text-xs font-bold mt-1 tracking-widest uppercase">Restricted Analytics Area</p>
+              <h2 className="text-2xl font-black text-white tracking-wide uppercase">Login</h2>
+              <p className="text-amber-400/90 text-xs font-bold mt-1 tracking-widest uppercase">Restricted Analytics Area</p>
             </div>
 
-            <form onSubmit={handleAdminLogin} className="p-7 space-y-5">
+            <form onSubmit={handleAdminLogin} className="p-7 space-y-5 bg-[#090e1a]">
               {authError && (
-                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 text-sm font-bold rounded shadow-sm text-center animate-in zoom-in duration-200">
+                <div className="bg-red-950/60 border-l-4 border-red-500 text-red-300 p-3 text-xs font-bold rounded-lg shadow-sm text-center animate-in zoom-in duration-200">
                   {authError}
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-black text-[#5d4037] uppercase tracking-wider mb-2">Password</label>
+                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-2">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3.5 text-[#a46c3b]" size={18} />
+                  <Lock className="absolute left-3.5 top-3.5 text-amber-400" size={18} />
                   <input
                     type="password"
                     required
                     value={adminCreds.password}
                     onChange={(e) => setAdminCreds({ ...adminCreds, password: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 bg-white border-2 border-[#eaddcf] rounded-xl outline-none focus:border-[#8b5a2b] font-bold text-[#3e2723] transition-colors"
+                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                    className="w-full pl-10 pr-4 py-3 bg-[#162035] border border-white/20 rounded-xl outline-none focus:border-amber-400 font-bold text-white transition-colors placeholder-slate-400"
                     placeholder="Enter Password"
                   />
                 </div>
               </div>
 
-              <button type="submit" className="w-full py-4 bg-gradient-to-r from-[#8b5a2b] to-[#5d4037] hover:from-[#5d4037] hover:to-[#3e2723] text-white rounded-xl font-black uppercase tracking-widest shadow-lg hover:shadow-xl transition-all active:scale-95 mt-4 flex items-center justify-center gap-2">
+              <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 mt-4">
                 <Lock size={18} /> Login securely
               </button>
             </form>
@@ -7566,33 +7848,33 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: EMPLOYEE APPROVAL MODAL */}
       {showApprovalPanel && (
-        <div className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4">
-          <div className="bg-[#fffdf7] rounded-[2rem] shadow-2xl w-full max-w-2xl border-4 border-[#e8dccb] overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="p-6 border-b-2 border-[#d7ccc8] flex justify-between items-center bg-[#f2eee6]">
-              <h2 className="text-xl font-black text-[#3e2723] flex items-center gap-2"><Lock className="text-amber-700" /> Approvals</h2>
-              <button onClick={() => setShowApprovalPanel(false)} className="text-[#7c4d36] hover:text-[#4a2c1d]"><X size={24} /></button>
+        <div className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowApprovalPanel(false)}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-2xl border border-white/20 overflow-hidden flex flex-col max-h-[80vh] text-white" onClick={(e) => e.stopPropagation()}>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-6 border-b border-white/15 flex justify-between items-center bg-[#131c2e] shadow-md">
+              <h2 className="text-xl font-black text-amber-400 flex items-center gap-2 uppercase tracking-wide"><Lock className="text-amber-400" /> Approvals</h2>
+              <button onClick={() => setShowApprovalPanel(false)} className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors"><X size={22} /></button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1 space-y-8 custom-scrollbar">
+            <div className="p-6 overflow-y-auto flex-1 space-y-8 bg-[#090e1a] custom-scrollbar">
               {/* SECTION 1: PENDING REQUESTS */}
               <div>
-                <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest mb-3 pb-1 border-b border-amber-200 flex items-center justify-between">
+                <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest mb-3 pb-2 border-b border-white/10 flex items-center justify-between">
                   <span>Pending Requests ({employees.filter(e => e.status === 'Pending').length})</span>
                 </h3>
                 {employees.filter(e => e.status === 'Pending').length === 0 ? (
-                  <div className="bg-amber-50/40 p-4 rounded-xl border border-dashed border-amber-200 text-center text-amber-800 font-bold">
+                  <div className="bg-[#131c2e] p-5 rounded-2xl border border-dashed border-amber-500/30 text-center text-amber-300 font-extrabold text-sm">
                     No pending requests.
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {employees.filter(e => e.status === 'Pending').map(emp => (
-                      <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center">
+                      <div key={emp.fireId} className="bg-[#131c2e] p-4 rounded-2xl border border-white/10 shadow-md flex justify-between items-center">
                         <div>
-                          <p className="font-bold text-amber-950 text-base">{emp.name}</p>
-                          <p className="text-xs font-medium text-amber-700">Username: <span className="font-bold">{emp.username}</span> | Password: <span className="font-bold">{emp.password}</span></p>
+                          <p className="font-extrabold text-white text-base">{emp.name}</p>
+                          <p className="text-xs font-bold text-slate-300 mt-0.5">Username: <span className="text-amber-300 font-mono">{emp.username}</span> | Password: <span className="text-amber-300 font-mono">{emp.password}</span></p>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' }); logActivity(`Approved Employee: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 font-bold rounded-lg hover:bg-green-200 transition-colors border border-green-300">Accept</button>
-                          <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' }); logActivity(`Declined Employee: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3 py-1.5 text-xs bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-300">Decline</button>
+                          <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Approved' }); logActivity(`Approved Employee: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3.5 py-1.5 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-extrabold rounded-xl transition-colors border border-emerald-500/40 cursor-pointer">Accept</button>
+                          <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined' }); logActivity(`Declined Employee: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3.5 py-1.5 text-xs bg-red-950/40 hover:bg-red-900/60 text-red-400 font-extrabold rounded-xl transition-colors border border-red-500/30 cursor-pointer">Decline</button>
                         </div>
                       </div>
                     ))}
@@ -7602,11 +7884,11 @@ export default function Dashboard() {
 
               {/* SECTION 2: APPROVED EMPLOYEES */}
               <div>
-                <h3 className="text-sm font-black text-emerald-900 uppercase tracking-widest mb-3 pb-1 border-b border-emerald-200 flex items-center justify-between">
+                <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-3 pb-2 border-b border-white/10 flex items-center justify-between">
                   <span>Approved Employees ({employees.filter(e => e.status === 'Approved').length})</span>
                 </h3>
                 {employees.filter(e => e.status === 'Approved').length === 0 ? (
-                  <div className="bg-emerald-50/20 p-4 rounded-xl border border-dashed border-emerald-200 text-center text-emerald-800 font-bold">
+                  <div className="bg-[#131c2e] p-5 rounded-2xl border border-dashed border-emerald-500/30 text-center text-emerald-300 font-extrabold text-sm">
                     No approved employees yet.
                   </div>
                 ) : (
@@ -7614,27 +7896,27 @@ export default function Dashboard() {
                     {employees.filter(e => e.status === 'Approved').map(emp => {
                       const isLive = emp.isLive && emp.lastActive && (Date.now() - new Date(emp.lastActive).getTime() < 90000);
                       return (
-                        <div key={emp.fireId} className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex justify-between items-center">
+                        <div key={emp.fireId} className="bg-[#131c2e] p-4 rounded-2xl border border-white/10 shadow-md flex justify-between items-center">
                           <div>
-                            <p className="font-bold text-emerald-950 text-base">{emp.name}</p>
-                            <p className="text-xs font-medium text-emerald-700 flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
-                              <span>Username: <span className="font-bold">{emp.username}</span></span>
-                              <span className="text-emerald-300">|</span>
-                              <span>Password: <span className="font-bold">{emp.password}</span></span>
+                            <p className="font-extrabold text-white text-base">{emp.name}</p>
+                            <p className="text-xs font-bold text-slate-300 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                              <span>Username: <span className="text-amber-300 font-mono">{emp.username}</span></span>
+                              <span className="text-slate-500">|</span>
+                              <span>Password: <span className="text-amber-300 font-mono">{emp.password}</span></span>
                               {isLive && (
-                                <span className="inline-flex items-center gap-1 text-[9px] bg-green-100 text-green-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live
+                                <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
                                 </span>
                               )}
                             </p>
                             {emp.lastLoginAt && (
-                              <p className="text-[10px] font-bold text-emerald-600 mt-1">
+                              <p className="text-[10px] font-extrabold text-slate-400 mt-1">
                                 Last login: {new Date(emp.lastLoginAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                               </p>
                             )}
                           </div>
                           <div className="flex gap-2">
-                            <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined', isLive: false }); logActivity(`Revoked Access: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3 py-1.5 text-xs bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">Revoke Access</button>
+                            <button onClick={async () => { await updateDoc(doc(db, "employees", emp.fireId), { status: 'Declined', isLive: false }); logActivity(`Revoked Access: ${emp.name} (@${emp.username})`, 'Employees'); }} className="px-3.5 py-1.5 text-xs bg-red-950/40 hover:bg-red-900/60 text-red-400 font-extrabold rounded-xl transition-colors border border-red-500/30 cursor-pointer">Revoke Access</button>
                           </div>
                         </div>
                       );
@@ -7649,17 +7931,17 @@ export default function Dashboard() {
 
       {/* 🟢 MANAGED CHOCOLATES MODAL (ANALYTICS AREA) */}
       {isAnalyticsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }}>
-          <div className="rounded-[2.5rem] shadow-2xl w-full max-w-4xl p-8 bg-[#fffcf9] border-4 border-amber-100 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-amber-200 pb-4 shrink-0">
-              <h2 className="text-2xl font-black text-[#5d4037] flex items-center gap-2 uppercase tracking-widest"><TrendingUp size={24} /> Chocolate Master Analytics</h2>
-              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="text-amber-700 hover:text-red-500 transition-colors"><X size={28} /></button>
+        <div className="fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="rounded-3xl shadow-2xl w-full max-w-4xl p-7 bg-[#0c1427] border border-white/20 flex flex-col max-h-[90vh] text-white" onClick={(e) => e.stopPropagation()}>
+            <div style={{ backgroundColor: '#131c2e' }} className="flex justify-between items-center mb-6 border-b border-white/15 p-4 rounded-2xl bg-[#131c2e] shadow-md shrink-0">
+              <h2 className="text-2xl font-black text-amber-400 flex items-center gap-2.5 uppercase tracking-widest"><TrendingUp size={24} className="text-amber-400" /> Chocolate Master Analytics</h2>
+              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors"><X size={24} /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-hidden">
               {/* Form Section */}
-              <div className="bg-amber-50/50 p-6 rounded-3xl border-2 border-white shadow-inner h-fit">
-                <h3 className="text-lg font-black text-[#8d6e63] mb-4 flex items-center gap-2"><Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}</h3>
+              <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-6 rounded-3xl border border-white/10 shadow-lg h-fit text-white">
+                <h3 className="text-lg font-black text-amber-400 mb-4 flex items-center gap-2 uppercase tracking-wider"><Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}</h3>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   const existingChoc = editChocId ? managedChocolates.find(c => c.fireId === editChocId) : null;
@@ -7682,35 +7964,35 @@ export default function Dashboard() {
                   setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
                 }} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-amber-800 uppercase mb-1">Chocolate Name</label>
-                    <input required type="text" value={newChocForm.name} onChange={(e) => setNewChocForm({ ...newChocForm, name: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. Munch" />
+                    <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Chocolate Name</label>
+                    <input required type="text" value={newChocForm.name} onChange={(e) => setNewChocForm({ ...newChocForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. Munch" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Wholesale Price</label>
-                      <input required type="number" step="any" value={newChocForm.wholesalePrice} onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 18.50" />
+                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Wholesale Price</label>
+                      <input required type="number" step="any" value={newChocForm.wholesalePrice} onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 18.50" />
                     </div>
                     <div>
-                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Retail Price</label>
-                      <input required type="number" value={newChocForm.retailPrice} onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 20" />
+                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Retail Price</label>
+                      <input required type="number" value={newChocForm.retailPrice} onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 20" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Sticker Price</label>
-                      <input required type="number" step="any" value={newChocForm.stickerPrice} onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 1.5" />
+                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Sticker Price</label>
+                      <input required type="number" step="any" value={newChocForm.stickerPrice} onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 1.5" />
                     </div>
                     <div>
-                      <label className="block text-xs font-black text-amber-800 uppercase mb-1">Display Order</label>
-                      <input type="number" min="1" value={newChocForm.displayOrder} onChange={(e) => setNewChocForm({ ...newChocForm, displayOrder: e.target.value })} className="w-full font-bold rounded-xl p-3 outline-none border-2 border-amber-200 focus:border-amber-500 bg-white text-amber-950 shadow-sm" placeholder="Eg. 1" />
+                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Display Order</label>
+                      <input type="number" min="1" value={newChocForm.displayOrder} onChange={(e) => setNewChocForm({ ...newChocForm, displayOrder: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 1" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
+                  <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer">
                     {editChocId ? 'Update Item' : 'Add to List'}
                   </button>
 
                   {editChocId && (
-                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="w-full py-2 text-amber-700 font-bold text-sm">Cancel Edit</button>
+                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="w-full py-2 text-slate-400 hover:text-white font-extrabold text-xs cursor-pointer">Cancel Edit</button>
                   )}
                 </form>
               </div>
@@ -7719,15 +8001,15 @@ export default function Dashboard() {
               <div className="md:col-span-2 overflow-auto custom-scrollbar pr-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {managedChocolates.map((choc) => (
-                    <div key={choc.fireId} className="bg-white p-4 rounded-2xl border-2 border-amber-50 shadow-sm flex justify-between items-center group hover:border-amber-200 transition-all">
+                    <div key={choc.fireId} style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-4 rounded-2xl border border-white/10 shadow-md flex justify-between items-center group hover:border-amber-500/40 transition-all">
                       <div>
-                        <p className="font-black text-amber-950">{choc.name}</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">W: ₹{choc.wholesalePrice || choc.price}</span>
-                          <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold">R: ₹{choc.retailPrice || choc.price}</span>
-                          <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">S: ₹{choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)}</span>
+                        <p className="font-extrabold text-white text-base">{choc.name}</p>
+                        <div className="flex flex-wrap gap-2 mt-1.5">
+                          <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-extrabold">W: ₹{choc.wholesalePrice || choc.price}</span>
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-extrabold">R: ₹{choc.retailPrice || choc.price}</span>
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-extrabold">S: ₹{choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)}</span>
                           {choc.displayOrder !== undefined && choc.displayOrder !== null && choc.displayOrder !== "" && (
-                            <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">Order: {choc.displayOrder}</span>
+                            <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-extrabold">Order: {choc.displayOrder}</span>
                           )}
                         </div>
                       </div>
@@ -7741,9 +8023,9 @@ export default function Dashboard() {
                             stickerPrice: (choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)).toString(),
                             displayOrder: (choc.displayOrder !== undefined && choc.displayOrder !== null ? choc.displayOrder : "").toString()
                           });
-                        }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={16} /></button>
+                        }} className="p-2 text-blue-400 hover:bg-blue-950/60 rounded-xl transition-colors cursor-pointer"><Pencil size={16} /></button>
 
-                        <button onClick={() => handleDeleteChocClick(choc)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={() => handleDeleteChocClick(choc)} className="p-2 text-rose-400 hover:bg-red-950/60 rounded-xl transition-colors cursor-pointer"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
@@ -7798,41 +8080,41 @@ export default function Dashboard() {
       {/* 🟢 PROFIT TABLE MODAL */}
       {isProfitModalOpen && (
         <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setIsProfitModalOpen(false)}>
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border-4 border-emerald-100" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 bg-emerald-50 border-b-2 border-emerald-100 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-emerald-900 uppercase tracking-widest flex items-center gap-2"><DollarSign /> Profit Analytics Table</h2>
-              <button onClick={() => setIsProfitModalOpen(false)} className="text-emerald-700 hover:text-red-500 transition-colors bg-white p-1 rounded-full shadow-sm"><X size={28} /></button>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-6 bg-[#131c2e] border-b border-white/15 flex justify-between items-center shadow-md">
+              <h2 className="text-2xl font-black text-amber-400 uppercase tracking-widest flex items-center gap-2.5"><DollarSign className="text-amber-400" /> Profit Analytics Table</h2>
+              <button onClick={() => setIsProfitModalOpen(false)} className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors"><X size={24} /></button>
             </div>
 
-            <div className="overflow-auto flex-1 p-4">
+            <div className="overflow-auto flex-1 px-4 py-0 bg-[#090e1a] custom-scrollbar">
               <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 z-10 bg-emerald-600 text-white shadow-md">
-                  <tr>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest border-r border-emerald-500">Date</th>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest border-r border-emerald-500">Inv #</th>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest border-r border-emerald-500">Name</th>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest border-r border-emerald-500 text-center">Items</th>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest border-r border-emerald-500 text-right">Revenue</th>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest border-r border-emerald-500 text-right">Cost</th>
-                    <th className="p-4 font-black uppercase text-xs tracking-widest text-right">Profit</th>
+                <thead style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] text-amber-400 shadow-md border-b-2 border-amber-500/30">
+                  <tr className="text-xs uppercase tracking-wider text-amber-400">
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 shadow-sm">Date</th>
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 shadow-sm">Inv #</th>
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 shadow-sm">Name</th>
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 text-center shadow-sm">Items</th>
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 text-right shadow-sm">Revenue</th>
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black border-r border-white/10 text-right shadow-sm">Cost</th>
+                    <th style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] p-3.5 font-black text-right shadow-sm">Profit</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white">
-                  {reportData.filteredOrders.map((order: any) => {
+                <tbody>
+                  {reportData.filteredOrders.map((order: any, idx: number) => {
                     const priceInfo = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
 
                     const costInfo = calculateOrderFinalCost(order, managedChocPricesMap, managedChocStickersMap, customPricesMap);
                     const profit = priceInfo.fullRevenue - costInfo.finalCost;
 
                     return (
-                      <tr key={order.fireId} className="border-b border-emerald-50 hover:bg-emerald-50/30 transition-colors">
-                        <td className="p-4 text-xs font-bold text-gray-600">{order.orderDate || order.functionDate}</td>
-                        <td className="p-4 text-xs font-black text-emerald-800">{getSerial(order.id)}</td>
-                        <td className="p-4 text-sm font-bold text-gray-800">{order.name}</td>
-                        <td className="p-4 text-sm font-black text-center text-emerald-700">{order.count}</td>
-                        <td className="p-4 text-sm font-black text-right text-green-700">₹{priceInfo.fullRevenue.toLocaleString()}</td>
-                        <td className="p-4 text-sm font-bold text-right text-red-600">₹{Math.round(costInfo.finalCost).toLocaleString()}</td>
-                        <td className={`p-4 text-sm font-black text-right ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>₹{Math.round(profit).toLocaleString()}</td>
+                      <tr key={order.fireId} className={`border-b border-white/5 text-sm transition-colors ${idx % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#131c2e]'} hover:bg-[#18243b]`}>
+                        <td className="p-3.5 text-xs font-extrabold text-slate-300 border-r border-white/5">{order.orderDate || order.functionDate}</td>
+                        <td className="p-3.5 text-xs font-black text-amber-300 font-mono border-r border-white/5">{getSerial(order.id)}</td>
+                        <td className="p-3.5 text-sm font-extrabold text-white border-r border-white/5 max-w-[200px] truncate" title={order.name}>{order.name}</td>
+                        <td className="p-3.5 text-sm font-black text-center text-amber-300 font-mono border-r border-white/5">{order.count}</td>
+                        <td className="p-3.5 text-sm font-mono font-black text-right text-emerald-300 border-r border-white/5">₹{priceInfo.fullRevenue.toLocaleString()}</td>
+                        <td className="p-3.5 text-sm font-mono font-black text-right text-rose-400 border-r border-white/5">₹{Math.round(costInfo.finalCost).toLocaleString()}</td>
+                        <td className={`p-3.5 text-sm font-mono font-black text-right ${profit >= 0 ? 'text-amber-300' : 'text-red-400'}`}>₹{Math.round(profit).toLocaleString()}</td>
                       </tr>
                     );
                   })}
@@ -7840,18 +8122,18 @@ export default function Dashboard() {
               </table>
             </div>
 
-            <div className="p-6 bg-emerald-50 border-t-2 border-emerald-100 grid grid-cols-3 gap-4">
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
-                <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Revenue</p>
-                <p className="text-xl font-black text-green-700">₹{Math.round(reportData.totalRev).toLocaleString()}</p>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-6 bg-[#131c2e] border-t border-white/15 grid grid-cols-1 sm:grid-cols-3 gap-4 shadow-2xl">
+              <div className="bg-[#090e1a] p-4 rounded-2xl border border-emerald-500/30 text-center shadow-md">
+                <p className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">Total Revenue</p>
+                <p className="text-2xl font-black text-emerald-300 font-mono mt-1 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">₹{Math.round(reportData.totalRev).toLocaleString()}</p>
               </div>
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
-                <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Total Cost</p>
-                <p className="text-xl font-black text-red-600">₹{Math.round(reportData.totalCost).toLocaleString()}</p>
+              <div className="bg-[#090e1a] p-4 rounded-2xl border border-red-500/30 text-center shadow-md">
+                <p className="text-xs font-extrabold text-red-400 uppercase tracking-wider">Total Cost</p>
+                <p className="text-2xl font-black text-red-400 font-mono mt-1 drop-shadow-[0_0_10px_rgba(239,68,68,0.4)]">₹{Math.round(reportData.totalCost).toLocaleString()}</p>
               </div>
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-200">
-                <p className="text-[10px] font-black text-emerald-800 uppercase mb-1">Net Profit</p>
-                <p className="text-xl font-black text-emerald-600">₹{Math.round(reportData.totalProfit).toLocaleString()}</p>
+              <div className="bg-[#090e1a] p-4 rounded-2xl border border-amber-500/30 text-center shadow-md">
+                <p className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">Net Profit</p>
+                <p className="text-2xl font-black text-amber-300 font-mono mt-1 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">₹{Math.round(reportData.totalProfit).toLocaleString()}</p>
               </div>
             </div>
           </div>

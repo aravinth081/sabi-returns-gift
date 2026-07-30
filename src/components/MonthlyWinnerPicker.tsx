@@ -169,6 +169,7 @@ interface Particle {
 
 export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPickerProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [cashbackAmount, setCashbackAmount] = useState<string>('1,000');
   const [isPicking, setIsPicking] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(10);
   const [currentCandidate, setCurrentCandidate] = useState<Customer | null>(null);
@@ -210,7 +211,7 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
         phone: winnerObj.phone || '',
         month: source === 'orders' ? monthName : 'Manual List',
         drawSource: source,
-        prize: "₹1,000 Cashback",
+        prize: `₹${cashbackAmount} Cashback`,
         timestamp: new Date().toISOString()
       });
     } catch (e) {
@@ -603,7 +604,7 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
         <div className="flex items-center justify-between z-20 w-full shrink-0">
           <div className="flex items-center gap-1 text-amber-500 font-black tracking-widest text-[10px] uppercase">
             <Gift size={12} className="animate-pulse" />
-            <span>Realconnect Draw</span>
+            <span>Sabi Return Gifts</span>
           </div>
           
           <div className="flex items-center gap-1.5">
@@ -664,28 +665,30 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                   pastWinners.map(item => (
                     <div 
                       key={item.id} 
-                      className="bg-white/5 border border-white/10 rounded-2xl p-3 flex justify-between items-center hover:bg-white/10 transition-all shadow-[inset_1px_1px_2px_rgba(255,255,255,0.05)]"
+                      style={{ backgroundColor: '#28150a', border: '1px solid rgba(245, 158, 11, 0.35)', color: '#ffffff' }}
+                      className="rounded-2xl p-3 flex justify-between items-center transition-all shadow-md"
                     >
                       <div className="space-y-1 truncate pr-2 flex-1">
-                        <p className="text-xs font-black text-amber-100 uppercase tracking-wide truncate">{item.name}</p>
-                        <p className="text-[10px] text-amber-400 font-bold tracking-wider">{item.phone || 'No Contact'}</p>
+                        <p className="text-xs font-black uppercase tracking-wide truncate" style={{ color: '#ffffff' }}>{item.name}</p>
+                        <p className="text-[11px] font-black tracking-wider" style={{ color: '#fbbf24' }}>{item.phone || 'No Contact'}</p>
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <span className="text-[7px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/25 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{item.month}</span>
+                          <span className="text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider" style={{ backgroundColor: 'rgba(245, 158, 11, 0.25)', color: '#fef08a', border: '1px solid rgba(245, 158, 11, 0.4)' }}>{item.month}</span>
                           {item.drawSource === 'manual' ? (
-                            <span className="text-[7px] font-black bg-purple-500/10 text-purple-300 border border-purple-500/25 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Manual</span>
+                            <span className="text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider" style={{ backgroundColor: 'rgba(168, 85, 247, 0.25)', color: '#e9d5ff', border: '1px solid rgba(168, 85, 247, 0.4)' }}>Manual</span>
                           ) : (
-                            <span className="text-[7px] font-black bg-blue-500/10 text-blue-300 border border-blue-500/25 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Orders</span>
+                            <span className="text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider" style={{ backgroundColor: 'rgba(59, 130, 246, 0.25)', color: '#bfdbfe', border: '1px solid rgba(59, 130, 246, 0.4)' }}>Orders</span>
                           )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end shrink-0 gap-2">
-                        <span className="text-[7px] text-white/30 font-bold uppercase tracking-wider">
+                        <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#cbd5e1' }}>
                           {item.timestamp ? new Date(item.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}
                         </span>
                         <button 
                           type="button"
                           onClick={() => deleteWinnerEntry(item.id)} 
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-lg border border-transparent hover:border-red-500/25 transition-all cursor-pointer flex items-center justify-center"
+                          style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)' }}
+                          className="p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center hover:brightness-125"
                           title="Delete Record"
                         >
                           <Trash2 size={12} />
@@ -700,7 +703,8 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                 <button
                   type="button"
                   onClick={clearAllWinners}
-                  className="w-full max-w-[200px] mx-auto py-2.5 px-3 rounded-2xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-300 hover:text-red-200 font-black text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 900 }}
+                  className="w-full max-w-[200px] mx-auto py-2.5 px-3 rounded-2xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5 hover:brightness-125"
                 >
                   <Trash2 size={11} />
                   <span>Clear All History</span>
@@ -717,41 +721,53 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                   </div>
                 </div>
                 <div>
-                  <span className="inline-block text-[8px] font-black tracking-widest px-2.5 py-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/30 rounded-full text-amber-300 uppercase shadow-sm">
-                    ₹1,000 Cashback Reward
-                  </span>
+                  <div className="inline-flex items-center gap-1 px-3 py-1 bg-[#1c0d05] border-2 border-amber-400/60 rounded-full shadow-md">
+                    <span className="text-amber-400 font-black text-xs">₹</span>
+                    <input
+                      type="text"
+                      value={cashbackAmount}
+                      onChange={(e) => setCashbackAmount(e.target.value)}
+                      style={{ backgroundColor: 'transparent', color: '#fbbf24' }}
+                      className="w-16 text-amber-300 font-black text-xs outline-none text-center border-b border-amber-400/40 focus:border-amber-300"
+                      title="Click to edit reward amount"
+                      placeholder="1,000"
+                    />
+                    <span className="text-amber-300 font-black text-[9px] uppercase tracking-wider">Cashback Reward</span>
+                  </div>
                   <h2 className="text-2xl font-black bg-gradient-to-r from-amber-100 via-amber-300 to-yellow-100 bg-clip-text text-transparent uppercase tracking-wider mt-1.5" style={{ textShadow: "0 2px 10px rgba(245,158,11,0.15)" }}>
                     Cashback Draw
                   </h2>
-                  <p className="text-[10px] text-amber-400/60 max-w-[210px] mx-auto font-bold mt-1 leading-normal">
+                  <p className="text-[10px] text-amber-300 max-w-[210px] mx-auto font-bold mt-1 leading-normal">
                     Select a month or enter candidates manually to spin and pick a random winner.
                   </p>
                 </div>
               </div>
 
-              <div className="flex bg-black/60 p-1 rounded-2xl border border-amber-500/10 max-w-[240px] mx-auto w-full shadow-inner">
+              <div className="flex p-1.5 rounded-2xl border border-amber-500/40 max-w-[250px] mx-auto w-full shadow-inner" style={{ backgroundColor: '#120803' }}>
                 <button
                   type="button"
                   onClick={() => setDrawSource('orders')}
-                  className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex justify-center items-center gap-1 cursor-pointer ${
+                  style={
                     drawSource === 'orders'
-                      ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-amber-950 shadow-md font-black border border-amber-300/30 scale-[1.02]'
-                      : 'text-amber-400/80 hover:text-amber-200 hover:bg-white/5'
-                  }`}
+                      ? { background: 'linear-gradient(to right, #fbbf24, #f59e0b, #d97706)', color: '#000000', fontWeight: 900 }
+                      : { backgroundColor: '#1f1007', color: '#ffffff', fontWeight: 800 }
+                  }
+                  className="flex-1 py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all duration-300 flex justify-center items-center gap-1.5 cursor-pointer shadow-md"
                 >
-                  <Calendar size={11} />
+                  <Calendar size={12} />
                   <span>From Orders</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setDrawSource('manual')}
-                  className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex justify-center items-center gap-1 cursor-pointer ${
+                  style={
                     drawSource === 'manual'
-                      ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-amber-950 shadow-md font-black border border-amber-300/30 scale-[1.02]'
-                      : 'text-amber-400/80 hover:text-amber-200 hover:bg-white/5'
-                  }`}
+                      ? { background: 'linear-gradient(to right, #fbbf24, #f59e0b, #d97706)', color: '#000000', fontWeight: 900 }
+                      : { backgroundColor: '#1f1007', color: '#ffffff', fontWeight: 800 }
+                  }
+                  className="flex-1 py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all duration-300 flex justify-center items-center gap-1.5 cursor-pointer shadow-md"
                 >
-                  <Sparkles size={11} />
+                  <Sparkles size={12} />
                   <span>Manual List</span>
                 </button>
               </div>
@@ -759,16 +775,17 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
               <div className="space-y-3.5 max-w-[240px] mx-auto w-full">
                 {drawSource === 'orders' ? (
                   <div className="space-y-1.5 text-left animate-in fade-in duration-200">
-                    <label className="block text-[9px] font-black text-amber-400/80 uppercase tracking-widest pl-1">Select Draw Month</label>
+                    <label className="block text-[9px] font-black text-amber-300 uppercase tracking-widest pl-1">Select Draw Month</label>
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setIsMonthSelectOpen(!isMonthSelectOpen)}
-                        className="w-full bg-black/50 border border-amber-500/20 rounded-2xl p-3 pl-9 pr-8 text-xs text-amber-100 text-left outline-none focus:border-amber-500/80 transition-colors cursor-pointer font-bold shadow-inner flex items-center justify-between min-h-[38px] relative hover:bg-black/70"
+                        style={{ backgroundColor: '#180b04', color: '#ffffff', border: '2px solid rgba(245, 158, 11, 0.4)' }}
+                        className="w-full rounded-2xl p-3 pl-9 pr-8 text-xs text-left outline-none transition-colors cursor-pointer font-black shadow-inner flex items-center justify-between min-h-[42px] relative"
                       >
-                        <Calendar size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400" />
-                        <span className="truncate">{selectedMonth || 'Choose Month...'}</span>
-                        <ChevronDown size={13} className={`text-amber-400 transition-transform duration-200 ${isMonthSelectOpen ? 'rotate-180' : ''}`} />
+                        <Calendar size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400" />
+                        <span className="truncate text-white font-extrabold">{selectedMonth || 'Choose Month...'}</span>
+                        <ChevronDown size={14} className={`text-amber-400 transition-transform duration-200 ${isMonthSelectOpen ? 'rotate-180' : ''}`} />
                       </button>
                       
                       {isMonthSelectOpen && (
@@ -777,7 +794,7 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                             onClick={() => setIsMonthSelectOpen(false)}
                             className="fixed inset-0 z-[90]" 
                           />
-                          <div className="absolute top-full left-0 mt-1 w-full bg-[#1c0d06]/98 backdrop-blur-xl border border-amber-500/30 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.8)] py-1.5 z-[100] max-h-40 overflow-y-auto custom-scrollbar animate-in slide-in-from-top-2 duration-150">
+                          <div className="absolute top-full left-0 mt-1 w-full border-2 border-amber-500/60 rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.95)] py-1.5 z-[100] max-h-48 overflow-y-auto custom-scrollbar animate-in slide-in-from-top-2 duration-150" style={{ backgroundColor: '#0d0603' }}>
                             {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m) => (
                               <button
                                 key={m}
@@ -786,11 +803,12 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                                   setSelectedMonth(m);
                                   setIsMonthSelectOpen(false);
                                 }}
-                                className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors ${
+                                style={
                                   selectedMonth === m
-                                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 font-black'
-                                    : 'text-amber-200 hover:bg-amber-900/60 hover:text-white'
-                                }`}
+                                    ? { backgroundColor: '#fbbf24', color: '#000000', fontWeight: 900 }
+                                    : { backgroundColor: 'transparent', color: '#ffffff', fontWeight: 800 }
+                                }
+                                className="w-full text-left px-4 py-2.5 text-xs font-black transition-colors hover:bg-amber-500/30 hover:text-amber-300"
                               >
                                 {m}
                               </button>
@@ -802,11 +820,12 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                   </div>
                 ) : (
                   <div className="space-y-1.5 text-left animate-in fade-in duration-200">
-                    <label className="block text-[9px] font-black text-amber-400/80 uppercase tracking-widest pl-1">Manual Candidates List</label>
+                    <label className="block text-[9px] font-black text-amber-300 uppercase tracking-widest pl-1">Manual Candidates List</label>
                     <textarea
                       value={manualInput}
                       onChange={(e) => setManualInput(e.target.value)}
-                      className="w-full bg-black/50 border border-amber-500/20 rounded-2xl p-3 text-xs text-amber-100 placeholder-amber-400/20 outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/20 transition-all cursor-text font-bold shadow-inner h-28 resize-none custom-scrollbar"
+                      style={{ backgroundColor: '#140903', color: '#ffffff', border: '2px solid rgba(245, 158, 11, 0.5)' }}
+                      className="w-full rounded-2xl p-3 text-xs font-black placeholder-amber-400/50 outline-none focus:border-amber-400 transition-all cursor-text shadow-inner h-28 resize-none custom-scrollbar"
                       placeholder="Name, Phone (One per line)&#10;Example:&#10;Subash, 9876543210&#10;Aravinth, 9988776655"
                     />
                   </div>
@@ -815,18 +834,18 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                 {activePool.length > 0 ? (
                   <div className="space-y-1.5 text-left animate-in fade-in duration-200">
                     <div className="flex justify-between items-center px-1">
-                      <label className="block text-[9px] font-black text-amber-400/80 uppercase tracking-widest">
+                      <label className="block text-[9px] font-black text-amber-300 uppercase tracking-widest">
                         Eligible Candidates
                       </label>
-                      <span className="text-[10px] font-black text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 uppercase tracking-wide">
+                      <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/40 uppercase tracking-wide">
                         {activePool.length}
                       </span>
                     </div>
-                    <div className="bg-black/40 border border-amber-500/10 rounded-2xl p-2.5 max-h-[105px] overflow-y-auto custom-scrollbar space-y-1.5 w-full">
+                    <div className="border border-amber-500/20 rounded-2xl p-2.5 max-h-[105px] overflow-y-auto custom-scrollbar space-y-1.5 w-full" style={{ backgroundColor: '#120803' }}>
                       {activePool.map((c, i) => (
-                        <div key={i} className="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl px-3 py-1.5 hover:bg-white/10 transition-colors">
-                          <span className="text-[10px] font-black text-amber-100 uppercase truncate pr-2 flex-1">{c.name}</span>
-                          <span className="text-[9px] font-semibold text-amber-400/80 tracking-wider shrink-0">
+                        <div key={i} className="flex justify-between items-center rounded-xl px-3 py-2 transition-colors shadow-sm" style={{ backgroundColor: '#28150a', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                          <span className="text-xs font-black uppercase truncate pr-2 flex-1 tracking-wide" style={{ color: '#ffffff' }}>{c.name}</span>
+                          <span className="text-[11px] font-black tracking-wider shrink-0" style={{ color: '#fbbf24' }}>
                             {c.phone ? c.phone.replace(/(\d{4})$/, '****') : 'No Contact'}
                           </span>
                         </div>
@@ -834,22 +853,23 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                     </div>
                   </div>
                 ) : selectedMonth && drawSource === 'orders' ? (
-                  <div className="bg-gradient-to-br from-red-500/5 to-red-500/10 border border-red-400/20 rounded-2xl p-3.5 text-center animate-in fade-in duration-200">
-                    <p className="text-[9px] font-black text-red-400 uppercase tracking-widest">No Candidates Found</p>
-                    <p className="text-[10px] text-red-300/60 font-bold mt-1">Please add orders for {selectedMonth} in Dashboard 1 or 2.</p>
+                  <div className="bg-gradient-to-br from-red-500/10 to-red-500/20 border border-red-400/40 rounded-2xl p-3.5 text-center animate-in fade-in duration-200">
+                    <p className="text-[9px] font-black text-red-300 uppercase tracking-widest">No Candidates Found</p>
+                    <p className="text-[10px] text-white font-bold mt-1">Please add orders for {selectedMonth} in Dashboard 1 or 2.</p>
                   </div>
                 ) : null}
 
                 <button
                   onClick={handleStartPicking}
                   disabled={activePool.length === 0}
-                  className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 flex justify-center items-center gap-2 shadow-lg ${
+                  style={
                     activePool.length > 0
-                      ? 'bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-500 text-amber-950 hover:brightness-110 hover:scale-105 active:scale-95 shadow-[0_6px_25px_rgba(245,158,11,0.35)] hover:shadow-[0_8px_30px_rgba(245,158,11,0.5)] cursor-pointer font-black border border-amber-300/30'
-                      : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
-                  }`}
+                      ? { background: 'linear-gradient(to right, #fbbf24, #f59e0b, #d97706)', color: '#000000', fontWeight: 900 }
+                      : { backgroundColor: '#281a10', color: 'rgba(255, 255, 255, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)' }
+                  }
+                  className="w-full py-3.5 px-4 rounded-2xl text-xs uppercase tracking-widest transition-all duration-300 flex justify-center items-center gap-2 shadow-lg cursor-pointer hover:brightness-110 active:scale-95"
                 >
-                  <Play size={13} className="fill-amber-950 text-amber-950" />
+                  <Play size={13} className="fill-black text-black" />
                   <span>Start Draw</span>
                 </button>
               </div>
@@ -952,7 +972,9 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                 <div className="w-full border-t border-dashed border-amber-400/20 pt-3 text-center">
                   <p className="text-[9px] text-amber-400/70 font-black uppercase tracking-widest">Prize Cash Reward</p>
                   <p className="text-lg font-black text-amber-100 flex items-center justify-center gap-1">
-                    <span className="bg-gradient-to-r from-amber-200 to-yellow-100 bg-clip-text text-transparent text-xl">₹1,000</span>
+                    <span className="bg-gradient-to-r from-amber-200 to-yellow-100 bg-clip-text text-transparent text-xl font-black">
+                      ₹{cashbackAmount}
+                    </span>
                     <span className="text-[9px] font-black bg-amber-500 text-amber-950 px-2 py-0.5 rounded-full uppercase shadow-sm">Cashback</span>
                   </p>
                 </div>
@@ -974,7 +996,7 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
         </div>
 
         <div className="w-full shrink-0 flex flex-col items-center justify-center border-t border-white/5 pt-4 text-center z-20">
-          <p className="text-[9px] font-semibold text-white/40 tracking-wider">REALCONNECT ORDER SYSTEM</p>
+          <p className="text-[9px] font-semibold text-white/40 tracking-wider">SABI RETURN GIFTS SYSTEM</p>
         </div>
 
       </div>

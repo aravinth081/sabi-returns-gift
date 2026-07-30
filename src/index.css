@@ -152,6 +152,147 @@ All colors MUST be HSL.
   animation: loading-bar 2s ease-in-out infinite;
 }
 
+/* ==================== GLOBAL DARK BLUE THEME & GRAY SIDEBAR OVERRIDES ==================== */
+/* Entire platform main background */
+body, #root {
+  background-color: #0b1329 !important;
+  color: #f8fafc !important;
+}
+
+/* Sidebar default & wallpaper mode - Cool Dark Gray (Image 1 style) */
+aside {
+  background-color: #1c2230 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* All sections, cards, containers across the platform - Deep Dark Blue (Image 2 style) */
+.bg-\[\#ebe6df\],
+div[class*="bg-[#ebe6df]"],
+.bg-white:not([class*="bg-white/"]):not(.fixed *):not(.action-menu-popup):not(aside *):not(.sabi-calendar-popover *),
+.bg-slate-50:not(aside),
+div[class*="bg-slate-50"]:not(aside) {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Section headings, titles, labels readability */
+h1:not(.fixed *),
+h2:not(.fixed *),
+h3:not(.fixed *),
+h4:not(.fixed *),
+h5:not(.fixed *),
+h6:not(.fixed *) {
+  color: #ffffff !important;
+}
+
+.text-amber-950:not(.fixed *),
+.text-amber-900:not(.fixed *),
+.text-amber-800:not(.fixed *),
+.text-slate-800:not(.fixed *),
+.text-slate-900:not(.fixed *),
+.text-gray-800:not(.fixed *),
+.text-gray-900:not(.fixed *),
+.text-\[\#3e2723\]:not(.fixed *),
+.text-\[\#5d4037\]:not(.fixed *) {
+  color: #ffffff !important;
+}
+
+.text-amber-700:not(.fixed *),
+.text-amber-600:not(.fixed *),
+.text-slate-600:not(.fixed *),
+.text-gray-600:not(.fixed *),
+.text-slate-500:not(.fixed *),
+.text-gray-500:not(.fixed *) {
+  color: #cbd5e1 !important;
+}
+
+/* Form inputs & select dropdowns */
+select:not(.fixed *),
+textarea:not(.fixed *),
+input[type="text"]:not(.fixed *),
+input[type="number"]:not(.fixed *),
+input[type="password"]:not(.fixed *),
+input[type="date"]:not(.fixed *) {
+  background-color: #162035 !important;
+  background: #162035 !important;
+  color: #ffffff !important;
+  border: 1px solid #1e3a5f !important;
+  border-radius: 0.75rem !important;
+}
+
+select:not(.fixed *) option {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Table styling for all section tables (Image 2 style) */
+table:not(.fixed *) {
+  background-color: #0d1425 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+table thead th:not(.fixed *):not(.sabi-calendar-popover *) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  background-color: #151e36 !important;
+  background: #151e36 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+table thead th span:not(.fixed *):not(.sabi-calendar-popover *) {
+  color: #ffffff !important;
+}
+
+table tbody tr:not(.fixed *):not(.sabi-calendar-popover *) {
+  background-color: #0e1628 !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+table tbody tr:nth-child(even):not(.fixed *):not(.sabi-calendar-popover *) {
+  background-color: #111a30 !important;
+}
+
+table tbody tr:hover:not(.fixed *):not(.sabi-calendar-popover *) {
+  background-color: #182542 !important;
+}
+
+table tbody td:not(.fixed *):not(.sabi-calendar-popover *) {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+/* Sticky Actions column in tables */
+table thead th.sticky-actions-col:not(.fixed *) {
+  background-color: #151e36 !important;
+  background: #151e36 !important;
+}
+
+table tbody td.sticky-actions-col:not(.fixed *) {
+  background-color: #0e1628 !important;
+  background: #0e1628 !important;
+}
+
+table tbody tr:nth-child(even) td.sticky-actions-col:not(.fixed *) {
+  background-color: #111a30 !important;
+  background: #111a30 !important;
+}
+
+table tbody tr:hover td.sticky-actions-col:not(.fixed *) {
+  background-color: #182542 !important;
+  background: #182542 !important;
+}
+
 /* ==================== WALLPAPER ACTIVE GLASS THEME ==================== */
 /* Premium dark glassmorphism styling when a background wallpaper is active */
 
@@ -162,7 +303,7 @@ All colors MUST be HSL.
 
 /* Sidebar styling under wallpaper active */
 .wallpaper-active aside {
-  background: rgba(15, 23, 42, 0.65) !important;
+  background: rgba(28, 34, 48, 0.85) !important;
   backdrop-filter: blur(25px) !important;
   -webkit-backdrop-filter: blur(25px) !important;
   border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -433,15 +574,14 @@ All colors MUST be HSL.
   color: #f8fafc !important;
 }
 
-/* Buttons with white backgrounds converted to glassmorphic (scoped to not affect fixed modals/overlays) */
-.wallpaper-active button[class*="bg-white"]:not(.fixed *),
-.wallpaper-active div[class*="bg-white"]:not(.action-menu-popup):not(.fixed *) {
+.wallpaper-active button.bg-white:not([class*="bg-white/"]):not(.fixed *),
+.wallpaper-active div.bg-white:not([class*="bg-white/"]):not(.action-menu-popup):not(.fixed *) {
   background: rgba(255, 255, 255, 0.08) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
   color: #f8fafc !important;
 }
 
-.wallpaper-active button[class*="bg-white"]:not(.fixed *):hover {
+.wallpaper-active button.bg-white:not([class*="bg-white/"]):not(.fixed *):hover {
   background: rgba(255, 255, 255, 0.15) !important;
 }
 
@@ -653,23 +793,25 @@ table tbody td.sticky-actions-col {
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Ensure action menu popup is solid and readable */
-.wallpaper-active div.action-menu-popup {
-  background: rgba(255, 255, 255, 0.98) !important;
-  border-color: rgba(0, 0, 0, 0.12) !important;
-}
-
+/* 3-Dot Action Menu Popup - Deep Dark Blue Theme */
+div.action-menu-popup,
+.wallpaper-active div.action-menu-popup,
 .dark.wallpaper-active div.action-menu-popup {
-  background: rgba(30, 41, 59, 0.98) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: #0d1527 !important;
+  background-color: #0d1527 !important;
+  border: 2px solid rgba(245, 158, 11, 0.45) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85) !important;
 }
 
-.dark.wallpaper-active div.action-menu-popup button.text-blue-600 { color: #60a5fa !important; }
-.dark.wallpaper-active div.action-menu-popup button.text-purple-600 { color: #c084fc !important; }
-.dark.wallpaper-active div.action-menu-popup button.text-emerald-600 { color: #34d399 !important; }
-.dark.wallpaper-active div.action-menu-popup button.text-red-500 { color: #f87171 !important; }
-.dark.wallpaper-active div.action-menu-popup button.text-blue-700 { color: #93c5fd !important; }
-.dark.wallpaper-active div.action-menu-popup button.text-green-600 { color: #4ade80 !important; }
+div.action-menu-popup button,
+.wallpaper-active div.action-menu-popup button {
+  background: transparent !important;
+}
+
+div.action-menu-popup button:hover,
+.wallpaper-active div.action-menu-popup button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
 
 /* Attendance Log wallpaper active enhancements */
 .wallpaper-active div.bg-amber-50\/80 {
@@ -798,48 +940,66 @@ main {
 .wallpaper-active .fixed div[class*="bg-[#fffcf9]"],
 .wallpaper-active [role="dialog"],
 .wallpaper-active .fixed .bg-white {
-  background-color: #fffcf9 !important;
-  background: #fffcf9 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border-color: #e5e7eb !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  background-color: #0c1427 !important;
+  background: #0c1427 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+  color: #f8fafc !important;
 }
 
 .dark.wallpaper-active .fixed .bg-\[\#fffcf9\],
 .dark.wallpaper-active .fixed div[class*="bg-[#fffcf9]"],
 .dark.wallpaper-active [role="dialog"],
 .dark.wallpaper-active .fixed .bg-white {
-  background-color: #1e293b !important;
-  background: #1e293b !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border-color: #334155 !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  background-color: #0c1427 !important;
+  background: #0c1427 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+  color: #f8fafc !important;
 }
 
-/* Ensure all inputs and textareas inside modals maintain correct solid backgrounds and text contrast */
+/* Ensure all inputs and textareas inside modals maintain dark navy glass backgrounds and high text contrast */
 .wallpaper-active .fixed select,
 .wallpaper-active .fixed textarea,
 .wallpaper-active .fixed input[type="date"],
 .wallpaper-active .fixed input[type="text"],
 .wallpaper-active .fixed input[type="number"],
-.wallpaper-active .fixed input[type="password"] {
-  background: white !important;
-  color: black !important;
-  border: 2px solid #d7ccc8 !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075) !important;
-}
-
+.wallpaper-active .fixed input[type="password"],
 .dark.wallpaper-active .fixed select,
 .dark.wallpaper-active .fixed textarea,
 .dark.wallpaper-active .fixed input[type="date"],
 .dark.wallpaper-active .fixed input[type="text"],
 .dark.wallpaper-active .fixed input[type="number"],
 .dark.wallpaper-active .fixed input[type="password"] {
-  background: #1e293b !important;
-  color: #f8fafc !important;
-  border: 2px solid #334155 !important;
+  background: #162035 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 0.75rem !important;
+}
+
+.wallpaper-active .fixed input::placeholder,
+.wallpaper-active .fixed textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.wallpaper-active .fixed input[type="date"]::-webkit-datetime-edit-text,
+.wallpaper-active .fixed input[type="date"]::-webkit-datetime-edit-month-field,
+.wallpaper-active .fixed input[type="date"]::-webkit-datetime-edit-day-field,
+.wallpaper-active .fixed input[type="date"]::-webkit-datetime-edit-year-field,
+.wallpaper-active .fixed input[type="date"]::-webkit-datetime-edit {
+  color: #ffffff !important;
+}
+
+.wallpaper-active .fixed input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) !important;
+  opacity: 0.8 !important;
+  cursor: pointer;
+}
+
+.wallpaper-active .fixed select option {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
 }
 
 /* Restores correct option styling inside modals */
@@ -1308,25 +1468,74 @@ main {
   font-weight: 900 !important;
 }
 
-/* ==================== SABI CALENDAR POPOVER CLEANUP ==================== */
-/* Prevents ERP table styling from leaking into the date picker calendar */
+/* ==================== SABI CALENDAR POPOVER CLEANUP & DARK MODE ==================== */
+.sabi-calendar-popover,
+.sabi-calendar-popover *,
+.sabi-calendar-popover [class*="rdp"],
+.sabi-calendar-popover table,
+.sabi-calendar-popover thead,
+.sabi-calendar-popover tbody,
+.sabi-calendar-popover tr,
 .sabi-calendar-popover th,
-.sabi-calendar-popover th span {
-  color: #475569 !important; /* Slate 600 */
-  font-weight: 750 !important;
-  font-size: 11px !important;
-  background: transparent !important;
+.sabi-calendar-popover td,
+.sabi-calendar-popover div {
   background-color: transparent !important;
-  border: none !important;
-  position: static !important;
-  box-shadow: none !important;
-  text-shadow: none !important;
+  background: transparent !important;
 }
 
-.sabi-calendar-popover table {
-  background: transparent !important;
-  background-color: transparent !important;
+.sabi-calendar-popover {
+  background-color: #0c1427 !important;
+  background: #0c1427 !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+  color: #ffffff !important;
+  border-radius: 1.25rem !important;
+}
+
+/* Day headers row container: Su Mo Tu We Th Fr Sa - Solid Black Box */
+.sabi-calendar-popover table thead,
+.sabi-calendar-popover table thead tr,
+.sabi-calendar-popover table thead th,
+.sabi-calendar-popover .rdp-head,
+.sabi-calendar-popover .rdp-head_row,
+.sabi-calendar-popover .rdp-head_cell,
+.sabi-calendar-popover [class*="head_row"],
+.sabi-calendar-popover [class*="head_cell"] {
+  background-color: #000000 !important;
+  background: #000000 !important;
+  box-shadow: none !important;
+}
+
+.sabi-calendar-popover thead,
+.sabi-calendar-popover thead tr,
+.sabi-calendar-popover tr.rdp-head_row,
+.sabi-calendar-popover [class*="head_row"] {
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 0.75rem !important;
+  padding: 6px 4px !important;
+  margin-bottom: 12px !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  overflow: hidden !important;
+}
+
+.sabi-calendar-popover th,
+.sabi-calendar-popover th *,
+.sabi-calendar-popover th span,
+.sabi-calendar-popover th abbr,
+.sabi-calendar-popover .rdp-head_cell,
+.sabi-calendar-popover [class*="head_cell"] {
+  color: #ef4444 !important; /* Bright High-Contrast Red Text */
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.05em !important;
   border: none !important;
+  border-color: transparent !important;
+  position: static !important;
+  opacity: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .sabi-calendar-popover tr,
@@ -1335,4 +1544,235 @@ main {
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+/* Month Caption (e.g. July 2026) */
+.sabi-calendar-popover [class*="caption_label"],
+.sabi-calendar-popover .rdp-caption_label {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  font-size: 15px !important;
+  letter-spacing: 0.025em !important;
+}
+
+/* Nav chevron buttons (< >) */
+.sabi-calendar-popover button[name="previous-month"],
+.sabi-calendar-popover button[name="next-month"],
+.sabi-calendar-popover [class*="nav_button"],
+.sabi-calendar-popover .rdp-nav_button,
+.sabi-calendar-popover .rdp-button_reset,
+.sabi-calendar-popover .rdp-button {
+  color: #ffffff !important;
+  background-color: #162035 !important;
+  background: #162035 !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 0.75rem !important;
+  opacity: 1 !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1) !important;
+}
+
+.sabi-calendar-popover button[name="previous-month"]:hover,
+.sabi-calendar-popover button[name="next-month"]:hover,
+.sabi-calendar-popover [class*="nav_button"]:hover,
+.sabi-calendar-popover .rdp-nav_button:hover,
+.sabi-calendar-popover .rdp-button_reset:hover,
+.sabi-calendar-popover .rdp-button:hover {
+  background-color: #1e293b !important;
+  background: #1e293b !important;
+  color: #fbbf24 !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+}
+
+.sabi-calendar-popover button[name="previous-month"] svg,
+.sabi-calendar-popover button[name="next-month"] svg,
+.sabi-calendar-popover [class*="nav_button"] svg,
+.sabi-calendar-popover .rdp-nav_button svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  stroke-width: 2.5 !important;
+}
+
+.sabi-calendar-popover button[name="previous-month"]:hover svg,
+.sabi-calendar-popover button[name="next-month"]:hover svg,
+.sabi-calendar-popover [class*="nav_button"]:hover svg,
+.sabi-calendar-popover .rdp-nav_button:hover svg {
+  color: #fbbf24 !important;
+  stroke: #fbbf24 !important;
+}
+
+/* Calendar Day Buttons (1, 2, 3... 31) */
+.sabi-calendar-popover button.rdp-day,
+.sabi-calendar-popover button[class*="day"],
+.sabi-calendar-popover td button {
+  color: #ffffff !important; /* Pure white */
+  font-weight: 800 !important;
+  font-size: 13px !important;
+  border-radius: 0.75rem !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.sabi-calendar-popover button.rdp-day:hover,
+.sabi-calendar-popover button[class*="day"]:hover,
+.sabi-calendar-popover td button:hover {
+  background-color: rgba(245, 158, 11, 0.25) !important;
+  background: rgba(245, 158, 11, 0.25) !important;
+  color: #fbbf24 !important;
+}
+
+/* Today's Date Button (e.g. 30) */
+.sabi-calendar-popover [class*="day_today"]:not([aria-selected="true"]),
+.sabi-calendar-popover .rdp-day_today:not([aria-selected="true"]) {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+  border: 2px solid #f59e0b !important;
+  font-weight: 900 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Outside Month Days */
+.sabi-calendar-popover [class*="day_outside"],
+.sabi-calendar-popover .rdp-day_outside {
+  color: #64748b !important;
+  opacity: 0.35 !important;
+}
+
+/* Selected Day (e.g. 22) */
+.sabi-calendar-popover [aria-selected="true"],
+.sabi-calendar-popover .rdp-day_selected,
+.sabi-calendar-popover [class*="day_selected"] {
+  background-color: #f59e0b !important;
+  background: #f59e0b !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.6) !important;
+}
+
+/* Custom Sleek Dark Blue Scrollbars across the platform */
+::-webkit-scrollbar {
+  width: 9px !important;
+  height: 9px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: #090f1e !important;
+  border-radius: 6px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b !important;
+  border: 2px solid #090f1e !important;
+  border-radius: 8px !important;
+  transition: background 0.2s ease !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6 !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: #090f1e !important;
+}
+
+/* Firefox Scrollbar rules */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: #1e293b #090f1e !important;
+}
+
+/* Custom scrollbar utility class */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(9, 15, 30, 0.8) !important;
+  border-radius: 4px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155 !important;
+  border-radius: 4px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6 !important;
+}
+
+/* ==================== INVENTORY VALUE CARDS DARK NAVY THEME ==================== */
+.current-inventory-value-card,
+.approximate-profit-card,
+div.current-inventory-value-card,
+div.approximate-profit-card,
+.wallpaper-active .current-inventory-value-card,
+.wallpaper-active .approximate-profit-card,
+.wallpaper-active div.current-inventory-value-card,
+.wallpaper-active div.approximate-profit-card {
+  background-color: #0d1527 !important;
+  background: #0d1527 !important;
+  color: #ffffff !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+}
+
+.current-inventory-value-card,
+.wallpaper-active .current-inventory-value-card {
+  border: 1.5px solid rgba(245, 158, 11, 0.4) !important;
+}
+
+.approximate-profit-card,
+.wallpaper-active .approximate-profit-card {
+  border: 1.5px solid rgba(16, 185, 129, 0.4) !important;
+}
+
+.current-inventory-value-card h3,
+div.current-inventory-value-card h3,
+.wallpaper-active .current-inventory-value-card h3 {
+  color: #fbbf24 !important; /* Vibrant Gold Amber */
+}
+
+.approximate-profit-card h3,
+div.approximate-profit-card h3,
+.wallpaper-active .approximate-profit-card h3 {
+  color: #34d399 !important; /* Vibrant Neon Emerald */
+}
+
+.current-inventory-value-card p,
+.approximate-profit-card p,
+div.current-inventory-value-card p,
+div.approximate-profit-card p,
+.wallpaper-active .current-inventory-value-card p,
+.wallpaper-active .approximate-profit-card p {
+  color: #cbd5e1 !important;
+}
+
+.current-inventory-value-card span,
+div.current-inventory-value-card span,
+.wallpaper-active .current-inventory-value-card span {
+  color: #fde047 !important;
+}
+
+.approximate-profit-card span,
+div.approximate-profit-card span,
+.wallpaper-active .approximate-profit-card span {
+  color: #6ee7b7 !important;
+}
+
+.current-inventory-value-card span.text-3xl,
+div.current-inventory-value-card span.text-3xl,
+.wallpaper-active .current-inventory-value-card span.text-3xl {
+  color: #fde047 !important; /* Glowing Gold Number */
+  text-shadow: 0 0 14px rgba(245, 158, 11, 0.6) !important;
+}
+
+.approximate-profit-card span.text-3xl,
+div.approximate-profit-card span.text-3xl,
+.wallpaper-active .approximate-profit-card span.text-3xl {
+  color: #6ee7b7 !important; /* Glowing Emerald Number */
+  text-shadow: 0 0 14px rgba(16, 185, 129, 0.6) !important;
 }

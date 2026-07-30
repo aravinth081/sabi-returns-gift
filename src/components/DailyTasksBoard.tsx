@@ -1459,11 +1459,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   const getStatusStyle = (status: DailyTaskCard['status']) => {
     switch (status) {
-      case 'Waiting for Image': return 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 border-amber-200';
-      case 'Image Edit Pending': return 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200';
-      case 'Order Completed': return 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border-emerald-200';
-      case 'Cancelled': return 'bg-gradient-to-r from-rose-50 to-red-50 text-rose-700 border-rose-200';
-      default: return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 border-slate-200';
+      case 'Waiting for Image': return 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.15)]';
+      case 'Image Edit Pending': return 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.15)]';
+      case 'Order Completed': return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.15)]';
+      case 'Cancelled': return 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.15)]';
+      default: return 'bg-slate-700/40 text-slate-300 border-slate-600/50';
     }
   };
 
@@ -1553,7 +1553,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   )}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-white border border-slate-200 text-slate-900 shadow-xl rounded-xl z-[1000] sabi-calendar-popover" align="end">
+              <PopoverContent className="w-auto p-0 bg-[#0c1427] border border-white/20 text-white shadow-2xl rounded-2xl z-[1000] sabi-calendar-popover backdrop-blur-xl" align="end">
                 <CalendarComponent
                   mode="single"
                   selected={selectedFilterDate ? new Date(selectedFilterDate + 'T00:00:00') : undefined}
@@ -1568,7 +1568,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                     }
                     setIsCalendarOpen(false);
                   }}
-                  className="rounded-xl border-none p-3 bg-white"
+                  className="rounded-2xl border-none p-3 bg-[#0c1427] text-white"
                   classNames={{
                     months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
                     month: "space-y-4",
@@ -1644,27 +1644,27 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   <span className="hidden sm:inline">Options</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-48 p-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+              <PopoverContent align="end" className="w-52 p-1.5 bg-slate-900/95 border border-white/20 rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl">
                 <button
                   onClick={() => { setIsMoreMenuOpen(false); handleImportClick(); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-100 hover:bg-blue-500/20 hover:text-blue-300 rounded-lg transition-all text-left group cursor-pointer"
                 >
-                  <Upload size={16} className="text-blue-500" />
-                  <span>📥 Import Excel</span>
+                  <Upload size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                  <span>Import Excel</span>
                 </button>
                 <button
                   onClick={() => { setIsMoreMenuOpen(false); handleExportExcel(); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors text-left border-t border-slate-100 mt-1 pt-2"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-100 hover:bg-emerald-500/20 hover:text-emerald-300 rounded-lg transition-all text-left border-t border-white/10 mt-1 pt-2.5 group cursor-pointer"
                 >
-                  <Download size={16} className="text-emerald-500" />
-                  <span>📤 Export Excel</span>
+                  <Download size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <span>Export Excel</span>
                 </button>
                 <button
                   onClick={() => { setIsMoreMenuOpen(false); setShowUploadHistoryModal(true); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors text-left border-t border-slate-100 mt-1 pt-2"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-slate-100 hover:bg-indigo-500/20 hover:text-indigo-300 rounded-lg transition-all text-left border-t border-white/10 mt-1 pt-2.5 group cursor-pointer"
                 >
-                  <History size={16} className="text-indigo-500" />
-                  <span>📥 Upload History</span>
+                  <History size={16} className="text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <span>Upload History</span>
                 </button>
               </PopoverContent>
             </Popover>
@@ -1983,8 +1983,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           card.status === 'Cancelled' ? '#ef4444' :
                           card.status === 'Order Completed' ? '#10b981' : '#64748b'
                         }`,
-                        background: '#ffffff',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        backdropFilter: 'blur(16px)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
                       }}
                       onClick={() => handleOpenDetailsModal(card, list.id)}
                     >
@@ -1999,7 +2001,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             onBlur={() => handleInputBlur(list.id, card.id, 'title', card.title)}
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="text-xs font-black text-slate-800 tracking-wide bg-transparent border-b border-transparent hover:border-slate-350 focus:border-blue-500 focus:bg-slate-50 px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
+                            className="text-xs font-black text-slate-100 tracking-wide bg-transparent border-b border-transparent hover:border-slate-500 focus:border-blue-400 focus:bg-slate-800/80 px-1 py-0.5 rounded focus:outline-none transition-all flex-1 truncate uppercase"
                             title="Click to edit title"
                           />
                           
@@ -2012,7 +2014,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               }}
                               onMouseDown={(e) => e.stopPropagation()}
                               className={`p-1.5 rounded transition-all cursor-pointer ${
-                                card.favorite ? 'text-red-500 bg-red-50' : 'text-slate-400 hover:text-red-500 hover:bg-red-50/50'
+                                card.favorite ? 'text-red-400 bg-red-500/20 border border-red-500/30' : 'text-slate-400 hover:text-red-400 hover:bg-white/10'
                               }`}
                               title={card.favorite ? "Unmark Favorite" : "Mark Favorite"}
                             >
@@ -2024,7 +2026,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDeleteCard(list.id, card.id); }}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-0.5 rounded transition-colors"
+                                className="text-slate-400 hover:text-red-400 hover:bg-red-500/20 p-0.5 rounded transition-colors"
                                 title="Delete card"
                               >
                                 <Trash size={12} />
@@ -2032,7 +2034,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCancelCard(list.id, card.id); }}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="text-slate-400 hover:text-amber-500 hover:bg-amber-50 p-0.5 rounded transition-colors"
+                                className="text-slate-400 hover:text-amber-400 hover:bg-amber-500/20 p-0.5 rounded transition-colors"
                                 title="Cancel card"
                               >
                                 <X size={12} className="stroke-[3]" />
@@ -2042,7 +2044,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         </div>
 
                         {/* Phone Number Input */}
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-300 font-semibold" onClick={(e) => e.stopPropagation()}>
                           <Phone size={10} className="text-blue-400 shrink-0" />
                           <input
                             type="text"
@@ -2051,7 +2053,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             onFocus={() => handleInputFocus(card.id, 'phoneNumber', card.phoneNumber)}
                             onBlur={() => handlePhoneBlur(list.id, card, originalFocusValue.current?.value || card.phoneNumber)}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-1 py-0.5 rounded text-[11px] font-semibold text-slate-700 focus:outline-none transition-all w-full select-all"
+                            className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-blue-400 focus:bg-slate-800/80 px-1 py-0.5 rounded text-[11px] font-semibold text-slate-200 focus:outline-none transition-all w-full select-all"
                             placeholder="Phone number"
                           />
                         </div>
@@ -2059,7 +2061,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         {/* Date & Count Row */}
                         <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
                           {/* Birthday Date Input */}
-                          <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium flex-1 min-w-0">
+                          <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium flex-1 min-w-0">
                             <CalendarIcon size={10} className="text-emerald-400 shrink-0" />
                             <input
                               type="date"
@@ -2068,14 +2070,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               onFocus={() => handleInputFocus(card.id, 'birthdayDate', card.birthdayDate)}
                               onBlur={() => handleInputBlur(list.id, card.id, 'birthdayDate', card.birthdayDate)}
                               onMouseDown={(e) => e.stopPropagation()}
-                              className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-0.5 py-0.5 rounded text-[10px] text-slate-600 focus:outline-none transition-all w-full cursor-pointer"
+                              className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-blue-400 focus:bg-slate-800/80 px-0.5 py-0.5 rounded text-[10px] text-slate-300 focus:outline-none transition-all w-full cursor-pointer"
                             />
                           </div>
 
                           {/* Count Input (Inline, editable) */}
-                          <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-600 shrink-0">
+                          <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-300 shrink-0">
                             <ShoppingBag size={10} className="text-purple-400 shrink-0" />
-                            <span className="text-slate-500 text-[10px]">Count:</span>
+                            <span className="text-slate-400 text-[10px]">Count:</span>
                             <input
                               type="number"
                               value={card.chocolateCount || ''}
@@ -2083,7 +2085,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               onFocus={() => handleInputFocus(card.id, 'chocolateCount', card.chocolateCount)}
                               onBlur={() => handleInputBlur(list.id, card.id, 'chocolateCount', card.chocolateCount)}
                               onMouseDown={(e) => e.stopPropagation()}
-                              className="w-10 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white px-0.5 py-0.5 rounded text-[11px] font-bold text-slate-800 focus:outline-none transition-all"
+                              className="w-10 bg-transparent border-b border-transparent hover:border-slate-600 focus:border-blue-400 focus:bg-slate-800/80 px-0.5 py-0.5 rounded text-[11px] font-bold text-slate-100 focus:outline-none transition-all"
                               placeholder="0"
                             />
                           </div>
@@ -2153,29 +2155,29 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
       {/* Card Details Modal popup */}
       {selectedCard && (
-        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setSelectedCard(null); setSelectedCardListId(null); }}>
+        <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setSelectedCard(null); setSelectedCardListId(null); }}>
           <div 
             className="w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
             style={{
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(20px)',
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(25px)',
               borderRadius: '1.5rem',
-              border: '1px solid rgba(255,255,255,0.3)',
-              boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 flex justify-between items-center" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', borderBottom: '1px solid #e2e8f0' }}>
+            <div className="px-6 py-5 flex justify-between items-center" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 bg-blue-500/10 rounded-lg">
-                  <ClipboardList className="text-blue-600" size={20} />
+                <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-500/30">
+                  <ClipboardList className="text-blue-400" size={20} />
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-800 uppercase tracking-wider">Card Detail Editor</h3>
+                <h3 className="text-lg font-extrabold text-white uppercase tracking-wider">Card Detail Editor</h3>
               </div>
               <button 
                 onClick={() => { setSelectedCard(null); setSelectedCardListId(null); }}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-xl transition-colors"
+                className="text-slate-400 hover:text-white hover:bg-white/10 p-2 rounded-xl transition-colors"
               >
                 <X size={20} />
               </button>
@@ -2184,79 +2186,79 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             {/* Modal Body */}
             <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh] text-sm">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Card Title</label>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Card Title</label>
                 <input
                   type="text"
                   value={selectedCard.title}
                   onChange={(e) => setSelectedCard({ ...selectedCard, title: e.target.value })}
-                  className="w-full bg-white border border-slate-200 focus:border-blue-400 rounded-xl px-3 py-2.5 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                  className="w-full bg-slate-900/80 border border-white/15 focus:border-blue-400 rounded-xl px-3 py-2.5 font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30"
                   placeholder="Card Title"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phone Number</label>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Phone Number</label>
                 <div className="relative">
                   <Phone className="absolute left-3.5 top-3 text-slate-400" size={16} />
                   <input
                     type="text"
                     value={selectedCard.phoneNumber}
                     onChange={(e) => setSelectedCard({ ...selectedCard, phoneNumber: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 focus:border-blue-400 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/30 select-all"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-900/80 border border-white/15 focus:border-blue-400 rounded-xl font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30 select-all"
                     placeholder="Phone Number"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Card Status</label>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Card Status</label>
                 <select
                   value={selectedCard.status}
                   onChange={(e) => setSelectedCard({ ...selectedCard, status: e.target.value as any })}
-                  className="w-full bg-white border border-slate-200 focus:border-blue-400 rounded-xl px-3 py-2.5 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/30 cursor-pointer"
+                  className="w-full bg-slate-900/80 border border-white/15 focus:border-blue-400 rounded-xl px-3 py-2.5 font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30 cursor-pointer"
                 >
-                  <option value="Waiting for Image">Waiting for Image</option>
-                  <option value="Image Edit Pending">Image Edit Pending</option>
-                  <option value="Order Completed">Order Completed</option>
-                  <option value="Cancelled">Cancelled</option>
+                  <option value="Waiting for Image" className="bg-slate-900 text-white">Waiting for Image</option>
+                  <option value="Image Edit Pending" className="bg-slate-900 text-white">Image Edit Pending</option>
+                  <option value="Order Completed" className="bg-slate-900 text-white">Order Completed</option>
+                  <option value="Cancelled" className="bg-slate-900 text-white">Cancelled</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Chocolate Count</label>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Chocolate Count</label>
                 <div className="relative">
                   <ShoppingBag className="absolute left-3.5 top-3 text-slate-400" size={16} />
                   <input
                     type="number"
                     value={selectedCard.chocolateCount}
                     onChange={(e) => setSelectedCard({ ...selectedCard, chocolateCount: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 focus:border-blue-400 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-900/80 border border-white/15 focus:border-blue-400 rounded-xl font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30"
                     placeholder="Chocolate Count"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Birthday Date</label>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Birthday Date</label>
                 <div className="relative">
                   <CalendarIcon className="absolute left-3.5 top-3 text-slate-400" size={16} />
                   <input
                     type="date"
                     value={selectedCard.birthdayDate}
                     onChange={(e) => setSelectedCard({ ...selectedCard, birthdayDate: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 focus:border-blue-400 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-900/80 border border-white/15 focus:border-blue-400 rounded-xl font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Comments</label>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Comments</label>
                 <div className="relative">
                   <MessageSquare className="absolute left-3.5 top-3 text-slate-400" size={16} />
                   <textarea
                     value={selectedCard.comments}
                     onChange={(e) => setSelectedCard({ ...selectedCard, comments: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 focus:border-blue-400 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-900/80 border border-white/15 focus:border-blue-400 rounded-xl font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30"
                     rows={3}
                     placeholder="Comments..."
                   />
@@ -2265,12 +2267,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 flex justify-between items-center shrink-0" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+            <div className="px-6 py-4 flex justify-between items-center shrink-0" style={{ background: '#0f172a', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
               <button
                 onClick={() => {
                   if (selectedCardListId) handleDeleteCard(selectedCardListId, selectedCard.id);
                 }}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-xl font-bold transition-all active:scale-95 text-xs"
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 hover:text-rose-200 border border-rose-500/30 rounded-xl font-bold transition-all active:scale-95 text-xs"
               >
                 <Trash2 size={14} /> Delete
               </button>
@@ -2278,13 +2280,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               <div className="flex gap-2">
                 <button
                   onClick={() => { setSelectedCard(null); setSelectedCardListId(null); }}
-                  className="px-4 py-2.5 font-bold hover:bg-slate-100 text-slate-600 rounded-xl transition-colors text-xs"
+                  className="px-4 py-2.5 font-bold hover:bg-white/10 text-slate-300 rounded-xl transition-colors text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdateCardDetails}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors shadow-md text-xs"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors shadow-md text-xs"
                 >
                   Save Changes
                 </button>
