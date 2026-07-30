@@ -139,6 +139,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   // Modals & Forms State
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isYesterdayAlertOpen, setIsYesterdayAlertOpen] = useState(false);
   const [leaveEmployee, setLeaveEmployee] = useState(selectedUser);
   const [leaveDate, setLeaveDate] = useState("");
   const [leaveRemark, setLeaveRemark] = useState("");
@@ -247,10 +248,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   // Today's date string YYYY-MM-DD
   const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
 
+  // Yesterday's date string YYYY-MM-DD
+  const yesterdayObj = new Date(todayObj);
+  yesterdayObj.setDate(todayObj.getDate() - 1);
+  const yesterdayStr = `${yesterdayObj.getFullYear()}-${String(yesterdayObj.getMonth() + 1).padStart(2, '0')}-${String(yesterdayObj.getDate()).padStart(2, '0')}`;
+
   // Today's record for selected employee
   const todayRecord = useMemo(() => {
     return userAttendanceRecords.find(r => r.date === todayStr);
   }, [userAttendanceRecords, todayStr]);
+
+  // Yesterday's record for selected employee
+  const yesterdayRecord = useMemo(() => {
+    return userAttendanceRecords.find(r => r.date === yesterdayStr);
+  }, [userAttendanceRecords, yesterdayStr]);
 
   // Navigate Months
   const prevMonth = () => {
@@ -262,18 +273,47 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   // --- ATTENDANCE ACTIONS ---
 
-  const handleLogIn = async () => {
-    if (todayRecord) {
-      if (todayRecord.status === "Leave") {
-        toast.error("Cannot Log In today: Leave is already applied for today.");
-        return;
-      }
-      if (todayRecord.loginTime !== "-") {
-        toast.info(`Already logged in today at ${todayRecord.loginTime}`);
-        return;
-      }
-    }
+  const handleMarkYesterdayPresent = async () => {
+    const yesterdayRec: AttendanceRecord = {
+      id: String(Date.now()),
+      employeeName: selectedUser,
+      date: yesterdayStr,
+      loginTime: "09:00 AM",
+      logoutTime: "06:00 PM",
+      workingHours: "9 hrs",
+      workingHoursNum: 9,
+      status: "Present",
+      remarks: "Marked Retroactively"
+    };
+    const updated = [...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === yesterdayStr)), yesterdayRec];
+    setAttendanceRecords(updated);
+    toast.success(`Yesterday (${yesterdayStr}) marked as Present!`);
+    try {
+      await addDoc(collection(db, "attendance"), yesterdayRec);
+    } catch (e) {}
+  };
 
+  const handleMarkYesterdayLeave = async () => {
+    const yesterdayRec: AttendanceRecord = {
+      id: String(Date.now()),
+      employeeName: selectedUser,
+      date: yesterdayStr,
+      loginTime: "-",
+      logoutTime: "-",
+      workingHours: "0 hrs",
+      workingHoursNum: 0,
+      status: "Leave",
+      remarks: "Leave Applied Retroactively"
+    };
+    const updated = [...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === yesterdayStr)), yesterdayRec];
+    setAttendanceRecords(updated);
+    toast.success(`Yesterday (${yesterdayStr}) marked as Leave!`);
+    try {
+      await addDoc(collection(db, "attendance"), yesterdayRec);
+    } catch (e) {}
+  };
+
+  const proceedTodayLogin = async () => {
     const now = new Date();
     const loginTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -298,6 +338,27 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     } catch (e) {
       console.log("Offline mode, saved locally");
     }
+  };
+
+  const handleLogIn = async () => {
+    if (todayRecord) {
+      if (todayRecord.status === "Leave") {
+        toast.error("Cannot Log In today: Leave is already applied for today.");
+        return;
+      }
+      if (todayRecord.loginTime !== "-") {
+        toast.info(`Already logged in today at ${todayRecord.loginTime}`);
+        return;
+      }
+    }
+
+    // Check if yesterday's attendance was marked
+    if (!yesterdayRecord || !yesterdayRecord.status) {
+      setIsYesterdayAlertOpen(true);
+      return;
+    }
+
+    await proceedTodayLogin();
   };
 
   const handleLogOut = async () => {
@@ -999,6 +1060,54 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ------------------- MODAL: YESTERDAY ATTENDANCE WARNING POPUP ------------------- */}
+      {isYesterdayAlertOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsYesterdayAlertOpen(false)}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-md p-6 border-2 border-amber-500/50 animate-in fade-in zoom-in duration-200 cursor-default text-center space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full mx-auto flex items-center justify-center border border-amber-500/40 shadow-inner">
+              <AlertCircle size={36} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-amber-400 uppercase tracking-wider">Yesterday's Attendance Pending!</h3>
+              <p className="text-xs font-bold text-slate-300 mt-2 leading-relaxed">
+                You haven't marked attendance for yesterday (<span className="text-amber-300 font-mono font-black">{yesterdayStr}</span>). Please mark yesterday's attendance before logging in for today.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 pt-2">
+              <button
+                onClick={async () => {
+                  await handleMarkYesterdayPresent();
+                  setIsYesterdayAlertOpen(false);
+                  proceedTodayLogin();
+                }}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={16} /> Mark Yesterday as Present & Log In Today
+              </button>
+
+              <button
+                onClick={async () => {
+                  await handleMarkYesterdayLeave();
+                  setIsYesterdayAlertOpen(false);
+                  proceedTodayLogin();
+                }}
+                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <XCircle size={16} /> Mark Yesterday as Leave & Log In Today
+              </button>
+
+              <button
+                onClick={() => setIsYesterdayAlertOpen(false)}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
