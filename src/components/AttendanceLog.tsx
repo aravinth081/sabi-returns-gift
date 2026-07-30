@@ -29,7 +29,7 @@ export interface EmployeeSalary {
   dailyAmount?: number; // for Special Bonus, Overtime, Manual Adjustments
 }
 
-const DEFAULT_EMPLOYEES = ["Aravinth", "Gayathiri", "Subash", "Kumar", "Suresh"];
+
 
 export default function AttendanceLog({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
   const { profile } = useAuth();
@@ -198,14 +198,45 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     return () => unsub();
   }, []);
 
-  // Sync unique employees list dynamically from registered attendance records
+  // Fetch Approved Employees from Firestore collection("employees")
+  const [approvedEmployees, setApprovedEmployees] = useState<string[]>([]);
+
   useEffect(() => {
-    const namesSet = new Set(DEFAULT_EMPLOYEES);
-    attendanceRecords.forEach(r => {
-      if (r.employeeName) namesSet.add(r.employeeName);
+    const unsub = onSnapshot(collection(db, "employees"), (snap) => {
+      const namesSet = new Set<string>();
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        // Only include registered employees approved by Admin (status === 'Approved')
+        if (data.status === "Approved") {
+          const empName = data.username || data.name || data.employeeName;
+          if (empName) {
+            namesSet.add(empName);
+          }
+        }
+      });
+      const namesList = Array.from(namesSet);
+      setApprovedEmployees(namesList);
+    }, (error) => {
+      console.log("Firestore employees snapshot error", error);
     });
-    setEmployeeOptions(Array.from(namesSet));
-  }, [attendanceRecords]);
+    return () => unsub();
+  }, []);
+
+  // Sync employeeOptions ONLY with registered and approved employees
+  useEffect(() => {
+    if (approvedEmployees.length > 0) {
+      setEmployeeOptions(approvedEmployees);
+      if (!approvedEmployees.includes(selectedUser)) {
+        if (currentLoggedInUser && approvedEmployees.includes(currentLoggedInUser)) {
+          setSelectedUser(currentLoggedInUser);
+        } else {
+          setSelectedUser(approvedEmployees[0]);
+        }
+      }
+    } else if (currentLoggedInUser) {
+      setEmployeeOptions([currentLoggedInUser]);
+    }
+  }, [approvedEmployees, currentLoggedInUser]);
 
   // Filter attendance records for current selected employee
   const userAttendanceRecords = useMemo(() => {
@@ -871,7 +902,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {DEFAULT_EMPLOYEES.map((emp) => {
+              {(employeeOptions.length > 0 ? employeeOptions : [currentLoggedInUser]).map((emp) => {
                 const sal = employeeSalaries[emp] || { employeeName: emp, monthlySalary: 0, hourlySalary: 0, dailyAmount: 0 };
                 const isEditing = editingSalaryUser === emp;
 
