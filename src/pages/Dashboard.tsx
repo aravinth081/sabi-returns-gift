@@ -228,7 +228,7 @@ const calculateOrderFinalCost = (
     chocs.forEach((c, idx) => {
       const key = c.toLowerCase();
       const qty = chocCounts[idx] || 0;
-      
+
       const purchasePricePerItem = managedChocPricesMap[key]?.wholesale || CHOCOLATE_PRICES_MAP[key]?.wholesale || 0;
       totalPurchase += purchasePricePerItem * qty;
 
@@ -342,11 +342,10 @@ const ChocolateSingleSelect = ({
             return (
               <div
                 key={index}
-                className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold select-none transition-colors border-b border-white/5 last:border-0 ${
-                  isSelected
+                className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold select-none transition-colors border-b border-white/5 last:border-0 ${isSelected
                     ? 'bg-amber-500/20 text-amber-300 font-extrabold'
                     : 'text-slate-200 hover:bg-amber-500/15 hover:text-amber-300'
-                }`}
+                  }`}
                 onClick={() => {
                   onChange(item);
                   setIsOpen(false);
@@ -609,7 +608,7 @@ export default function Dashboard() {
     }
   }, [profile?.username]);
   const [showWallpaperDropdown, setShowWallpaperDropdown] = useState(false);
-  const isWallpaperActive = 
+  const isWallpaperActive =
     (activeTab === 'dashboard1' && !!d1Wallpaper) ||
     (activeTab === 'dashboard2' && !!d2Wallpaper) ||
     (activeTab === 'inventories' && !!invWallpaper) ||
@@ -650,7 +649,7 @@ export default function Dashboard() {
   const notifications = useMemo(() => {
     const printList = boardLists.find(l => l.title.trim().toLowerCase() === 'forward to print');
     if (!printList || !printList.cards) return [];
-    
+
     return printList.cards.map((card: any) => ({
       id: card.id,
       cardTitle: card.title || card.phoneNumber,
@@ -675,26 +674,26 @@ export default function Dashboard() {
       const updatedLists = boardLists.map(l => ({ ...l, cards: [...l.cards] }));
       const printList = updatedLists.find(l => l.title.trim().toLowerCase() === 'forward to print');
       const completedList = updatedLists.find(l => l.title.trim().toLowerCase() === 'order completed');
-      
+
       if (printList && printList.cards.length > 0) {
         const cardsToMove = printList.cards.map((c: any) => ({
           ...c,
           status: 'Order Completed'
         }));
-        
+
         printList.cards = [];
-        
+
         if (completedList) {
           completedList.cards.push(...cardsToMove);
         } else {
           updatedLists[0].cards.push(...cardsToMove);
         }
-        
+
         await setDoc(boardDocRef, {
           lists: updatedLists,
           updatedAt: new Date().toISOString()
         }, { merge: true });
-        
+
         toast.success("All notifications cleared (moved to Order Completed)");
       }
     } catch (err) {
@@ -1436,7 +1435,7 @@ export default function Dashboard() {
       const labourCost = count * 1;
       const totalPurchase = purchasePricePerItem * count;
       const invFinalCost = stickerCost + labourCost + totalPurchase;
-      
+
       totalInvFinalCost += invFinalCost;
       const value = invFinalCost;
       return {
@@ -1993,7 +1992,7 @@ export default function Dashboard() {
       try {
         const selectedFireOrders = orders.filter(o => selectedOrders.includes(o.id));
         const deletedRecords: { originalFireId: string; originalOrderData: any; trashFireId: string }[] = [];
-        
+
         for (const order of selectedFireOrders) {
           try {
             const trashOrder = {
@@ -2010,7 +2009,7 @@ export default function Dashboard() {
             const trashFireId = trashRef.id;
 
             await deleteDoc(doc(db, "orders", originalFireId));
-            
+
             deletedRecords.push({
               originalFireId,
               originalOrderData,
@@ -2020,7 +2019,7 @@ export default function Dashboard() {
             console.error("Failed to copy bulk order to trash:", err);
           }
         }
-        
+
         // Track bulk deletion in undo stack
         if (deletedRecords.length > 0) {
           undoStackRef.current.push({
@@ -2049,7 +2048,7 @@ export default function Dashboard() {
           redoStackRef.current = [];
           toast.success(`Moved ${deletedRecords.length} orders to trash. Press Ctrl+Z to undo.`);
         }
-        
+
         setSelectedOrders([]);
       } catch (err) {
         console.error("Bulk delete failed:", err);
@@ -2215,7 +2214,7 @@ export default function Dashboard() {
     const today = new Date().toISOString().split('T')[0];
     const category = activeTab === 'dashboard2' ? 'product' : 'chocolate';
     const birthdayVal = n.birthdayDate ? parseDateToYYYYMMDD(n.birthdayDate) : "";
-    
+
     try {
       const notifyDocRef = doc(db, 'daily_tasks_board', 'notifications');
       const updated = notifications.map(notif => notif.id === n.id ? { ...notif, read: true } : notif);
@@ -2398,13 +2397,13 @@ export default function Dashboard() {
   const handleUndoActivity = async (log: any) => {
     const action = (log.action || '').toLowerCase();
     const actionStr = log.action || '';
-    
+
     try {
       // 1. UNDO DELETED ORDER
       if (action.startsWith('deleted order:')) {
         const parts = actionStr.replace(/Deleted Order:\s*/i, '').split(' (');
         const customerName = parts[0]?.trim();
-        
+
         const matchingTrash = trashOrders.find(t => t.name?.trim() === customerName);
         if (matchingTrash) {
           await handleRestoreTrashOrder(matchingTrash);
@@ -2415,12 +2414,12 @@ export default function Dashboard() {
         }
         return;
       }
-      
+
       // 2. UNDO ADDED NEW ORDER
       if (action.startsWith('added new order:')) {
         const parts = actionStr.replace(/Added New Order:\s*/i, '').split(' (');
         const customerName = parts[0]?.trim();
-        
+
         const matchingOrder = orders.find(o => o.name?.trim() === customerName);
         if (matchingOrder) {
           const trashOrder = {
@@ -2430,10 +2429,10 @@ export default function Dashboard() {
           };
           const trashFireId = matchingOrder.fireId;
           delete (trashOrder as any).fireId;
-          
+
           await addDoc(collection(db, "trash_orders"), trashOrder);
           await deleteDoc(doc(db, "orders", trashFireId));
-          
+
           toast.success(`Removed added order for "${customerName}" (moved to Trash)`);
           logActivity(`Undid Action: Removed Added Order for ${customerName}`, 'Platform History');
         } else {
@@ -2446,7 +2445,7 @@ export default function Dashboard() {
       if (action.startsWith('added new product:')) {
         const parts = actionStr.replace(/Added New Product:\s*/i, '').split(' (');
         const productName = parts[0]?.trim();
-        
+
         const matchingProd = customProducts.find(p => p.name?.trim() === productName);
         if (matchingProd) {
           await deleteDoc(doc(db, "products", matchingProd.fireId));
@@ -2461,18 +2460,18 @@ export default function Dashboard() {
       // 4. UNDO DELETED PRODUCT
       if (action.startsWith('deleted product:')) {
         const productName = actionStr.replace(/Deleted Product:\s*/i, '').trim();
-        
-        const prevLog = activityLogs.find(l => 
-          (l.action || '').toLowerCase().includes(productName.toLowerCase()) && 
+
+        const prevLog = activityLogs.find(l =>
+          (l.action || '').toLowerCase().includes(productName.toLowerCase()) &&
           (l.action || '').toLowerCase().includes('₹')
         );
-        
+
         let price = 0;
         if (prevLog) {
           const matchPrice = (prevLog.action || '').match(/₹([\d.]+)/);
           if (matchPrice) price = parseFloat(matchPrice[1]);
         }
-        
+
         if (price > 0) {
           await addDoc(collection(db, "products"), {
             name: productName,
@@ -2491,7 +2490,7 @@ export default function Dashboard() {
       if (action.startsWith('added chocolate:')) {
         const parts = actionStr.replace(/Added Chocolate:\s*/i, '').split(' (');
         const chocName = parts[0]?.trim();
-        
+
         const matchingChoc = managedChocolates.find(c => c.name?.trim() === chocName);
         if (matchingChoc) {
           await deleteDoc(doc(db, "managed_chocolates", matchingChoc.fireId));
@@ -2506,12 +2505,12 @@ export default function Dashboard() {
       // 6. UNDO DELETED CHOCOLATE
       if (action.startsWith('deleted chocolate:')) {
         const chocName = actionStr.replace(/Deleted Chocolate:\s*/i, '').trim();
-        
-        const prevLog = activityLogs.find(l => 
-          (l.action || '').toLowerCase().includes(chocName.toLowerCase()) && 
+
+        const prevLog = activityLogs.find(l =>
+          (l.action || '').toLowerCase().includes(chocName.toLowerCase()) &&
           (l.action || '').toLowerCase().includes('r:₹')
         );
-        
+
         let retail = 0;
         let wholesale = 0;
         if (prevLog) {
@@ -2521,7 +2520,7 @@ export default function Dashboard() {
             wholesale = parseFloat(matchPrices[2]);
           }
         }
-        
+
         if (retail > 0 && wholesale > 0) {
           await addDoc(collection(db, "managed_chocolates"), {
             name: chocName,
@@ -2536,7 +2535,7 @@ export default function Dashboard() {
         }
         return;
       }
-      
+
       toast.info("This action type cannot be automatically undone.");
     } catch (err) {
       console.error("Revert failed:", err);
@@ -2618,15 +2617,15 @@ export default function Dashboard() {
           }
         } else {
           // Filter logs starting with 'deleted'
-          const deleteLogs = activityLogs.filter(log => 
+          const deleteLogs = activityLogs.filter(log =>
             (log.action || '').toLowerCase().startsWith('deleted ')
           );
-          
+
           if (deleteLogs.length > 0) {
             // Sort by timestamp desc to find the most recent deletion log
             const sortedDeletes = [...deleteLogs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             const lastDeleteLog = sortedDeletes[0];
-            
+
             toast.loading("Undoing last deleted item...", { id: "global-undo" });
             try {
               await handleUndoActivity(lastDeleteLog);
@@ -2640,7 +2639,7 @@ export default function Dashboard() {
         }
       }
     };
-    
+
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [activityLogs, trashOrders, orders, customProducts, managedChocolates, activeTab]);
@@ -2791,20 +2790,20 @@ export default function Dashboard() {
         if (normInput) {
           const updatedLists = boardLists.map(l => ({ ...l, cards: [...l.cards] }));
           const printList = updatedLists.find(l => l.title.trim().toLowerCase() === 'forward to print');
-          
+
           if (printList && printList.cards && printList.cards.length > 0) {
             const matchingCards = printList.cards.filter((c: any) => normalizePhoneStr(c.phoneNumber) === normInput);
             if (matchingCards.length > 0) {
               // Remove matching cards from print list
               printList.cards = printList.cards.filter((c: any) => normalizePhoneStr(c.phoneNumber) !== normInput);
-              
+
               // Move them to completed list
               const completedList = updatedLists.find(l => l.title.trim().toLowerCase() === 'order completed');
               const cardsToMove = matchingCards.map((c: any) => ({
                 ...c,
                 status: 'Order Completed'
               }));
-              
+
               if (completedList) {
                 if (!completedList.cards) completedList.cards = [];
                 completedList.cards.push(...cardsToMove);
@@ -2812,7 +2811,7 @@ export default function Dashboard() {
                 if (!updatedLists[0].cards) updatedLists[0].cards = [];
                 updatedLists[0].cards.push(...cardsToMove);
               }
-              
+
               // Save updated board lists back to Firestore
               const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
               await setDoc(boardDocRef, {
@@ -3659,35 +3658,28 @@ export default function Dashboard() {
         className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500 relative"
         style={{
           backgroundImage: activeTab === 'daily_tasks' && dailyTasksWallpaper
-            ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                dailyTasksWallpaper.startsWith('data:image') || dailyTasksWallpaper.startsWith('http') ? `url(${dailyTasksWallpaper})` : dailyTasksWallpaper
-              }`
+            ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${dailyTasksWallpaper.startsWith('data:image') || dailyTasksWallpaper.startsWith('http') ? `url(${dailyTasksWallpaper})` : dailyTasksWallpaper
+            }`
             : activeTab === 'daily_tasks'
               ? 'linear-gradient(to bottom right, #0f172a, #1e3a5f, rgba(96, 165, 250, 0.3))'
               : activeTab === 'dashboard1' && d1Wallpaper
-                ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                    d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper
-                  }`
+                ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${d1Wallpaper.startsWith('data:image') || d1Wallpaper.startsWith('http') ? `url(${d1Wallpaper})` : d1Wallpaper
+                }`
                 : activeTab === 'dashboard2' && d2Wallpaper
-                  ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                      d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper
-                    }`
+                  ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${d2Wallpaper.startsWith('data:image') || d2Wallpaper.startsWith('http') ? `url(${d2Wallpaper})` : d2Wallpaper
+                  }`
                   : activeTab === 'inventories' && invWallpaper
-                    ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                        invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper
-                      }`
+                    ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${invWallpaper.startsWith('data:image') || invWallpaper.startsWith('http') ? `url(${invWallpaper})` : invWallpaper
+                    }`
                     : activeTab === 'tracking' && trackWallpaper
-                      ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                          trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper
-                        }`
+                      ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${trackWallpaper.startsWith('data:image') || trackWallpaper.startsWith('http') ? `url(${trackWallpaper})` : trackWallpaper
+                      }`
                       : activeTab === 'reports' && reportsWallpaper
-                        ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                            reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper
-                          }`
+                        ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${reportsWallpaper.startsWith('data:image') || reportsWallpaper.startsWith('http') ? `url(${reportsWallpaper})` : reportsWallpaper
+                        }`
                         : activeTab === 'attendance' && attendanceWallpaper
-                          ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${
-                              attendanceWallpaper.startsWith('data:image') || attendanceWallpaper.startsWith('http') ? `url(${attendanceWallpaper})` : attendanceWallpaper
-                            }`
+                          ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${attendanceWallpaper.startsWith('data:image') || attendanceWallpaper.startsWith('http') ? `url(${attendanceWallpaper})` : attendanceWallpaper
+                          }`
                           : 'linear-gradient(to bottom right, #080d19, #0d1527, #101c36)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -3763,11 +3755,10 @@ export default function Dashboard() {
           </header>
         )}
 
-        <div className={`flex-1 ${
-          (activeTab === 'dashboard1' || activeTab === 'dashboard2') 
-            ? 'overflow-y-auto lg:overflow-y-hidden lg:flex lg:flex-col lg:min-h-0' 
+        <div className={`flex-1 ${(activeTab === 'dashboard1' || activeTab === 'dashboard2')
+            ? 'overflow-y-auto lg:overflow-y-hidden lg:flex lg:flex-col lg:min-h-0'
             : 'overflow-y-auto'
-        } custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible`}>
+          } custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible`}>
 
           {activeTab === 'daily_tasks' && (
             <div className="w-full h-full animate-in fade-in duration-300">
@@ -3815,12 +3806,11 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div 
-                className={`p-4 rounded-[2rem] transition-all duration-500 ${
-                  isWallpaperActive 
-                    ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg' 
+              <div
+                className={`p-4 rounded-[2rem] transition-all duration-500 ${isWallpaperActive
+                    ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg'
                     : 'bg-gradient-to-br from-amber-700 to-amber-950 border-4 border-amber-600/50 shadow-[6px_6px_12px_rgba(0,0,0,0.3),-6px_-6px_12px_rgba(255,255,255,0.1)]'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center gap-3 mb-6">
                   <h2 className="text-3xl font-black text-white tracking-widest uppercase" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.5)" }}>Live Stock Balance</h2>
@@ -3836,22 +3826,19 @@ export default function Dashboard() {
                   {dynamicInventory.map((choc, i) => {
                     const bal = inventoryBalances[choc] || 0;
                     return (
-                      <div 
-                        key={i} 
-                        className={`p-3 rounded-xl text-center border transition-all duration-300 shrink-0 min-w-[100px] sm:min-w-[120px] flex-1 flex flex-col justify-center items-center transform hover:scale-105 transition-transform ${
-                          isWallpaperActive
+                      <div
+                        key={i}
+                        className={`p-3 rounded-xl text-center border transition-all duration-300 shrink-0 min-w-[100px] sm:min-w-[120px] flex-1 flex flex-col justify-center items-center transform hover:scale-105 transition-transform ${isWallpaperActive
                             ? 'bg-black/35 border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]'
                             : 'bg-[#fffdf7] border-transparent shadow-inner'
-                        }`}
+                          }`}
                       >
-                        <span className={`text-[11px] font-black uppercase leading-tight mb-2 h-8 flex items-center justify-center ${
-                          isWallpaperActive ? 'text-amber-200' : 'text-amber-900'
-                        }`}>{choc}</span>
-                        <span className={`text-2xl font-black ${
-                          bal < 0 
-                            ? 'text-rose-400' 
+                        <span className={`text-[11px] font-black uppercase leading-tight mb-2 h-8 flex items-center justify-center ${isWallpaperActive ? 'text-amber-200' : 'text-amber-900'
+                          }`}>{choc}</span>
+                        <span className={`text-2xl font-black ${bal < 0
+                            ? 'text-rose-400'
                             : (isWallpaperActive ? 'text-green-400 font-extrabold' : 'text-green-600')
-                        }`}>{bal}</span>
+                          }`}>{bal}</span>
                       </div>
                     )
                   })}
@@ -3912,7 +3899,7 @@ export default function Dashboard() {
 
                       {/* 🟢 DOUGHNUT CHART: INVENTORY VALUES COMPARISON */}
                       <div className="bg-white/90 dark:bg-slate-800/90 border border-[#d7ccc8] p-4 rounded-xl shadow-inner flex flex-col items-center">
-                        <p className="text-xs font-black text-[#8d6e63] uppercase tracking-wider mb-2 text-center">
+                        <p className="text-xs font-black text-[#5d4037] uppercase tracking-wider mb-2 text-center" style={{ color: '#5d4037' }}>
                           Inventory Value Comparison
                         </p>
                         <div className="w-full h-52">
@@ -3952,7 +3939,7 @@ export default function Dashboard() {
                               <Legend
                                 verticalAlign="bottom"
                                 height={36}
-                                formatter={(value) => <span className="text-xs font-extrabold text-[#3e2723]">{value}</span>}
+                                formatter={(value) => <span className="text-xs font-extrabold text-[#2c1810]" style={{ color: '#2c1810' }}>{value}</span>}
                               />
                             </PieChart>
                           </ResponsiveContainer>
@@ -4104,30 +4091,17 @@ export default function Dashboard() {
             >
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-1 lg:min-h-0">
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${
-                  showHeader 
-                    ? (activeTab === 'dashboard1' ? 'lg:grid-cols-5' : 'lg:grid-cols-6') 
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${showHeader
+                    ? (activeTab === 'dashboard2' ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
                     : 'hidden'
-                } gap-3 md:gap-4 mb-6 print:hidden mt-1`}>
+                  } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
-                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex justify-between items-start mb-3 relative z-10">
-                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Role Filter</p>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><User size={16} /></div>
-                    </div>
-                    <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
-                      <option value="All">All Roles</option>
-                      <option value="Others">Others</option>
-                      <option value="Self">Self</option>
-                    </select>
-                  </div>
-
-                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
                     <div className="flex justify-between items-start mb-1 relative z-10">
                       <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={16} /></div>
                     </div>
-                    <div className="flex items-center justify-between gap-2 relative z-10">
+                    <div className="flex items-center justify-between gap-2 relative z-10 mt-auto">
                       <h3 className="text-3xl font-black text-[#3e2723]">{filteredDashboardOrders.length}</h3>
                       <select
                         value={tableTypeFilter}
@@ -4142,12 +4116,12 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex justify-between items-start mb-3 relative z-10">
+                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
+                    <div className="flex justify-between items-start mb-2 relative z-10">
                       <p className="text-sm font-black text-[#c2410c] tracking-wide">Payment Filter</p>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 shadow-inner"><IndianRupee size={16} /></div>
                     </div>
-                    <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
+                    <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto">
                       <option value="All">All Payments</option>
                       <option value="Full Paid">Full Paid</option>
                       <option value="Partially Paid">Partially Paid</option>
@@ -4155,12 +4129,12 @@ export default function Dashboard() {
                     </select>
                   </div>
 
-                  <div className="relative bg-[#ebe6df] p-3 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex justify-between items-start mb-3 relative z-10">
+                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
+                    <div className="flex justify-between items-start mb-2 relative z-10">
                       <p className="text-sm font-black text-[#c2410c] tracking-wide">Delivery Filter</p>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner"><Package size={16} /></div>
                     </div>
-                    <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10">
+                    <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto">
                       <option value="All">All Deliveries</option>
                       <option value="Delivered">Delivered</option>
                       <option value="In Process">In Process</option>
@@ -4168,7 +4142,7 @@ export default function Dashboard() {
                   </div>
 
                   {activeTab === 'dashboard2' && (
-                    <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col hover:-translate-y-1 transition-all duration-300">
+                    <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
                       <div className="flex justify-between items-start mb-2 relative z-10 shrink-0">
                         <p className="text-sm font-black text-[#c2410c] tracking-wide">Product Listing</p>
                         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><Package size={16} /></div>
@@ -4192,7 +4166,7 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="relative bg-[#ebe6df] p-4 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
                     <div className="flex justify-between items-start w-full mb-1 relative z-10">
                       <div className="flex items-center gap-1 group relative">
                         <p className="text-[11px] font-black text-[#c2410c] tracking-wide leading-tight">Revenue <br />Filter</p>
@@ -4258,13 +4232,13 @@ export default function Dashboard() {
 
                 </div>
 
-                <div ref={screenshotTableRef} className={`bg-[#ebe6df] rounded-2xl shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 overflow-hidden flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active' : ''}`}>
-                  <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-amber-100 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#ebe6df]/95 backdrop-blur-sm shadow-sm'}`}>
+                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active' : ''}`}>
+                  <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-white/10 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#0d1527] backdrop-blur-sm shadow-sm'}`}>
 
 
                     <div className="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
                       <div className="flex items-center gap-3">
-                        <h2 className={`text-2xl font-bold text-amber-950 whitespace-nowrap hidden md:block`}>Order Records</h2>
+                        <h2 className={`text-2xl font-bold text-amber-400 whitespace-nowrap hidden md:block`}>Order Records</h2>
                         <button
                           onClick={() => {
                             const isAnyVisible = !hiddenCols.serialNo || !hiddenCols.role || !hiddenCols.orderDate || !hiddenCols.deliveryCharge || !hiddenCols.discount;
@@ -4339,6 +4313,22 @@ export default function Dashboard() {
                             className="pl-9 pr-4 py-2 bg-white border-2 border-amber-100 focus:border-amber-500 rounded-xl text-amber-950 font-bold placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-sm w-full shadow-sm h-9 md:h-10 transition-all duration-300"
                           />
                         </div>
+
+                        {/* 🟢 ROLE FILTER DROPDOWN */}
+                        <div className="relative shrink-0">
+                          <select
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
+                            className="h-9 md:h-10 pl-8 pr-7 bg-white border-2 border-amber-100 focus:border-amber-500 rounded-xl text-xs font-black text-amber-950 outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer shadow-sm appearance-none uppercase tracking-wider transition-all duration-300"
+                            title="Filter by Role"
+                          >
+                            <option value="All">All Roles</option>
+                            <option value="Self">Self</option>
+                            <option value="Others">Others</option>
+                          </select>
+                          <User size={14} strokeWidth={2.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                        </div>
                       </div>
                     </div>
 
@@ -4412,8 +4402,8 @@ export default function Dashboard() {
                           <Bell size={18} />
                           {notifications.filter(n => !n.read).length > 0 && (
                             <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
-                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border border-indigo-300 animate-pulse'
-                                : 'bg-rose-600'
+                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border border-indigo-300 animate-pulse'
+                              : 'bg-rose-600'
                               }`}>
                               {notifications.filter(n => !n.read).length}
                             </span>
@@ -4433,8 +4423,8 @@ export default function Dashboard() {
                                 <Bell size={14} className="text-amber-800" /> Notifications
                                 {notifications.filter(n => !n.read).length > 0 && (
                                   <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
-                                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
-                                      : 'bg-rose-600'
+                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
+                                    : 'bg-rose-600'
                                     }`}>
                                     {notifications.filter(n => !n.read).length}
                                   </span>
@@ -4552,12 +4542,12 @@ export default function Dashboard() {
                           </button>
                         </PopoverContent>
                       </Popover>
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileImport} 
-                        accept=".xlsx,.xls" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileImport}
+                        accept=".xlsx,.xls"
+                        className="hidden"
                       />
 
                       {activeTab === 'dashboard2' && (
@@ -4577,7 +4567,7 @@ export default function Dashboard() {
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
-                      <div 
+                      <div
                         style={{
                           background: 'linear-gradient(to right, #fdfbf7, #fdfbf7)', // Warm premium alabaster bg
                           padding: '16px 24px',
@@ -4932,7 +4922,7 @@ export default function Dashboard() {
                       </thead>
                       <tbody>
                         {(isScreenshotMode ? sortedDashboardOrders : paginatedOrders).length === 0 ? (
-                          <tr><td colSpan={20} className={`p-8 text-center text-amber-700 font-bold`}>No records found for the selected filters.</td></tr>
+                          <tr><td colSpan={20} className="p-8 text-center text-amber-400 font-extrabold text-sm tracking-wide bg-[#0d1527]">No records found for the selected filters.</td></tr>
                         ) : (
                           (isScreenshotMode ? sortedDashboardOrders : paginatedOrders).map((order) => {
                             const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
@@ -5066,14 +5056,14 @@ export default function Dashboard() {
                                   </td>
                                 ) : (
                                   <td className={`py-2.5 px-4 text-right align-middle`}>
-                                    <div className="font-bold text-amber-950 text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
+                                    <div className="font-bold text-white text-base print:text-black">₹{priceData.fullTotalPrice.toLocaleString()}</div>
                                     {order.paymentStatus === 'Pending' && (
-                                      <div className="text-[11px] font-bold text-red-600 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
+                                      <div className="text-[11px] font-extrabold text-rose-400 leading-tight mt-0.5">Pending: ₹{priceData.fullTotalPrice.toLocaleString()}</div>
                                     )}
                                     {order.paymentStatus === 'Partially Paid' && (
                                       <>
-                                        <div className="text-[11px] font-bold text-green-700 leading-tight mt-0.5">Paid: ₹{Number(order.advanceAmount || 0).toLocaleString()}</div>
-                                        <div className="text-[11px] font-bold text-red-600 leading-tight">Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}</div>
+                                        <div className="text-[11px] font-extrabold text-emerald-400 leading-tight mt-0.5">Paid: ₹{Number(order.advanceAmount || 0).toLocaleString()}</div>
+                                        <div className="text-[11px] font-extrabold text-amber-400 leading-tight">Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}</div>
                                       </>
                                     )}
                                   </td>
@@ -5083,16 +5073,16 @@ export default function Dashboard() {
                                   {isScreenshotMode ? (
                                     <div className="flex flex-col items-center">
                                       <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                        ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] payment-badge-full-paid'
+                                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 payment-badge-full-paid'
                                         : order.paymentStatus === 'Partially Paid'
-                                          ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] payment-badge-partially-paid'
-                                          : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] payment-badge-pending'
+                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 payment-badge-partially-paid'
+                                          : 'bg-rose-500/20 text-rose-300 border-rose-500/40 payment-badge-pending'
                                         }`}
                                       >
                                         {order.paymentStatus || 'Pending'}
                                       </span>
                                       {order.paymentStatus === 'Partially Paid' && (
-                                        <span className="text-[10px] font-extrabold text-[#d35400] mt-1 whitespace-nowrap">
+                                        <span className="text-[10px] font-extrabold text-amber-400 mt-1 whitespace-nowrap">
                                           Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}
                                         </span>
                                       )}
@@ -5103,22 +5093,22 @@ export default function Dashboard() {
                                         <select
                                           value={order.paymentStatus || "Pending"}
                                           onChange={(e) => handlePaymentStatusUpdate(order.id, order.fireId, e.target.value)}
-                                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                            ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf] hover:bg-[#d1fae5] focus:ring-2 focus:ring-[#34d399] payment-badge-full-paid'
+                                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 outline-none cursor-pointer transition-colors shadow-sm min-w-[125px] ${order.paymentStatus === 'Full Paid'
+                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 focus:ring-2 focus:ring-emerald-400 payment-badge-full-paid'
                                             : order.paymentStatus === 'Partially Paid'
-                                              ? 'bg-[#fff7ed] text-[#d35400] border-[#fdba74] hover:bg-[#ffedd5] focus:ring-2 focus:ring-[#fb923c] payment-badge-partially-paid'
-                                              : 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5] hover:bg-[#fecaca] focus:ring-2 focus:ring-[#f87171] payment-badge-pending'
+                                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 focus:ring-2 focus:ring-amber-400 payment-badge-partially-paid'
+                                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30 focus:ring-2 focus:ring-rose-400 payment-badge-pending'
                                             }`}
                                         >
-                                          <option value="Full Paid" className="font-bold text-[#047857] bg-white">Full Paid</option>
-                                          <option value="Partially Paid" className="font-bold text-[#d35400] bg-white">Partially Paid</option>
-                                          <option value="Pending" className="font-bold text-[#b91c1c] bg-white">Pending</option>
+                                          <option value="Full Paid" className="font-bold text-emerald-400 bg-[#0d1527]">Full Paid</option>
+                                          <option value="Partially Paid" className="font-bold text-amber-400 bg-[#0d1527]">Partially Paid</option>
+                                          <option value="Pending" className="font-bold text-rose-400 bg-[#0d1527]">Pending</option>
                                         </select>
                                       </div>
                                       <span className="hidden print:inline text-sm font-bold text-black">{order.paymentStatus || 'Pending'}</span>
-                                      
+
                                       {order.paymentStatus === 'Partially Paid' && (
-                                        <span className="text-[10px] font-extrabold text-[#d35400] whitespace-nowrap">
+                                        <span className="text-[10px] font-extrabold text-amber-400 whitespace-nowrap mt-0.5">
                                           Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}
                                         </span>
                                       )}
@@ -5132,13 +5122,13 @@ export default function Dashboard() {
                                       <select
                                         value={order.status}
                                         onChange={(e) => handleDeliveryStatusUpdate(order.id, order.fireId, e.target.value)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm ${order.status === 'Delivered'
-                                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 focus:ring-2 focus:ring-green-400 status-badge-delivered'
-                                          : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 focus:ring-2 focus:ring-amber-400 status-badge-in-process'
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors shadow-sm min-w-[115px] ${order.status === 'Delivered'
+                                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 focus:ring-2 focus:ring-emerald-400 status-badge-delivered'
+                                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 focus:ring-2 focus:ring-amber-400 status-badge-in-process'
                                           }`}
                                       >
-                                        <option value="Delivered" className="font-bold text-green-700">Delivered</option>
-                                        <option value="In Process" className="font-bold text-amber-700">In Process</option>
+                                        <option value="Delivered" className="font-bold text-emerald-400 bg-[#0d1527]">Delivered</option>
+                                        <option value="In Process" className="font-bold text-amber-400 bg-[#0d1527]">In Process</option>
                                       </select>
                                     </div>
                                     <span className="hidden print:inline text-sm font-bold text-black">{order.status}</span>
@@ -5191,9 +5181,9 @@ export default function Dashboard() {
                   </div>
 
                   {/* 🟢 STICKY PAGINATION FOOTER */}
-                  <div className={`${isScreenshotMode ? 'hidden' : 'sticky bottom-0 z-30 bg-[#ebe6df]/95 backdrop-blur-md border-t border-amber-200 p-4 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)]'} print:hidden`}>
-                    <div className="text-sm font-bold text-amber-800">
-                      Showing <span className="font-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black">{sortedDashboardOrders.length}</span> orders
+                  <div className={`${isScreenshotMode ? 'hidden' : 'sticky bottom-0 z-30 bg-[#0d1527] backdrop-blur-md border-t border-white/10 p-4 flex justify-between items-center shadow-2xl'} print:hidden`}>
+                    <div className="text-sm font-bold text-slate-300">
+                      Showing <span className="font-black text-amber-400">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black text-amber-400">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black text-amber-400">{sortedDashboardOrders.length}</span> orders
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -5203,13 +5193,13 @@ export default function Dashboard() {
                           setCurrentPage(prev => prev - 1);
                           tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
-                        className={`p-2 rounded-xl border-2 transition-all ${currentPage === 1 ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 shadow-sm'}`}
+                        className={`p-2 rounded-xl border transition-all ${currentPage === 1 ? 'bg-[#131c2e]/40 border-white/5 text-slate-600 cursor-not-allowed' : 'bg-[#131c2e] border-white/15 text-amber-400 hover:bg-[#18243b] active:scale-95 shadow-md'}`}
                       >
                         <ChevronLeft size={20} />
                       </button>
 
-                       {Math.ceil(sortedDashboardOrders.length / itemsPerPage) > 0 && (
-                        <div className="flex items-center gap-1 bg-white/50 p-1 rounded-xl border border-amber-100">
+                      {Math.ceil(sortedDashboardOrders.length / itemsPerPage) > 0 && (
+                        <div className="flex items-center gap-1 bg-[#131c2e] p-1 rounded-xl border border-white/10">
                           {Array.from({ length: Math.ceil(sortedDashboardOrders.length / itemsPerPage) }).map((_, i) => {
                             const pageNum = i + 1;
                             // Logic to show limited page numbers
@@ -5221,7 +5211,7 @@ export default function Dashboard() {
                                     setCurrentPage(pageNum);
                                     tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                                   }}
-                                  className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-white text-amber-800 hover:bg-amber-50'}`}
+                                  className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-500 text-slate-950 shadow-md scale-105' : 'bg-[#0d1527] text-slate-300 hover:bg-[#18243b]'}`}
                                 >
                                   {pageNum}
                                 </button>
@@ -5239,7 +5229,7 @@ export default function Dashboard() {
                           setCurrentPage(prev => prev + 1);
                           tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
-                        className={`p-2 rounded-xl border-2 transition-all ${currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 shadow-sm'}`}
+                        className={`p-2 rounded-xl border transition-all ${currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-[#131c2e]/40 border-white/5 text-slate-600 cursor-not-allowed' : 'bg-[#131c2e] border-white/15 text-amber-400 hover:bg-[#18243b] active:scale-95 shadow-md'}`}
                       >
                         <ChevronRight size={20} />
                       </button>
@@ -5319,12 +5309,11 @@ export default function Dashboard() {
 
               <div className="space-y-4 pb-10">
                 {trackingSearchResults.length === 0 ? (
-                  <div 
-                    className={`text-center py-10 rounded-2xl transition-all duration-300 ${
-                      isWallpaperActive
+                  <div
+                    className={`text-center py-10 rounded-2xl transition-all duration-300 ${isWallpaperActive
                         ? 'bg-black/45 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]'
                         : 'bg-white border border-amber-100 shadow-sm'
-                    }`}
+                      }`}
                   >
                     <p className={`font-bold tracking-wide ${isWallpaperActive ? 'text-white' : 'text-amber-700'}`}>
                       No tracking records found.
@@ -5810,8 +5799,8 @@ export default function Dashboard() {
                     <TrendingUp className="text-amber-400" /> {currentAdminReportDash === 'None' ? 'Detailed Cost Analytics' : `Admin Analytics (${currentAdminReportDash})`}
                   </h2>
                   <p className="text-xs font-bold text-slate-300 mt-1">
-                    {isInvAdmin 
-                      ? 'Sticker (Dynamic) | Labour (₹1) | Live stock balance mapped data.' 
+                    {isInvAdmin
+                      ? 'Sticker (Dynamic) | Labour (₹1) | Live stock balance mapped data.'
                       : 'Sticker (Dynamic) | Labour (₹1) | Order wise mapped data.'}
                   </p>
                 </div>
@@ -7166,8 +7155,8 @@ export default function Dashboard() {
                           <td className="p-3.5 border-r border-white/5">
                             <div className="flex flex-col gap-1 items-start">
                               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${order.deletedBy && (order.deletedBy.includes("Admin") || order.deletedBy === "Subash")
-                                  ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                                  : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                : "bg-purple-500/20 text-purple-300 border-purple-500/30"
                                 }`}>
                                 <User size={10} />
                                 {order.deletedBy || "Unknown"}
@@ -7181,8 +7170,8 @@ export default function Dashboard() {
                           </td>
                           <td className="p-3.5 text-center border-r border-white/5">
                             <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border ${isUrgent
-                                ? "bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse"
-                                : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                              ? "bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse"
+                              : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                               }`}>
                               {daysLabel}
                             </span>
@@ -7259,8 +7248,8 @@ export default function Dashboard() {
               <button
                 onClick={() => setHistoryTab('users')}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${historyTab === 'users'
-                    ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
-                    : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
+                  : 'text-slate-400 hover:text-slate-200'
                   }`}
               >
                 <User size={15} />
@@ -7272,8 +7261,8 @@ export default function Dashboard() {
               <button
                 onClick={() => setHistoryTab('activity')}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all ${historyTab === 'activity'
-                    ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
-                    : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-400'
+                  : 'text-slate-400 hover:text-slate-200'
                   }`}
               >
                 <Clock size={15} />
@@ -7324,8 +7313,8 @@ export default function Dashboard() {
                         <div
                           key={emp.fireId}
                           className={`flex items-center gap-4 rounded-2xl p-4 border transition-all ${isLive
-                              ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/10 border-emerald-700/30'
-                              : 'bg-slate-800/40 border-slate-700/40'
+                            ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/10 border-emerald-700/30'
+                            : 'bg-slate-800/40 border-slate-700/40'
                             }`}
                         >
                           <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 ${isLive ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-slate-700/50 border-slate-600/40'
@@ -7382,8 +7371,8 @@ export default function Dashboard() {
                         key={mod}
                         onClick={() => setHistoryModuleFilter(mod)}
                         className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${historyModuleFilter === mod
-                            ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50'
-                            : 'bg-slate-800/60 text-slate-400 border-slate-700/40 hover:text-slate-200'
+                          ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50'
+                          : 'bg-slate-800/60 text-slate-400 border-slate-700/40 hover:text-slate-200'
                           }`}
                       >
                         {mod === 'All' ? 'All'
@@ -7462,14 +7451,14 @@ export default function Dashboard() {
                                       actionLower.startsWith('deleted product:') ||
                                       actionLower.startsWith('added chocolate:') ||
                                       actionLower.startsWith('deleted chocolate:')) && (
-                                      <button
-                                        onClick={() => handleUndoActivity(log)}
-                                        className="p-1 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 font-bold text-[9px] uppercase border border-indigo-500/20 px-2 py-1 shadow-sm"
-                                        title="Undo/Revert Action"
-                                      >
-                                        <RotateCcw size={10} /> Undo
-                                      </button>
-                                    )}
+                                        <button
+                                          onClick={() => handleUndoActivity(log)}
+                                          className="p-1 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 font-bold text-[9px] uppercase border border-indigo-500/20 px-2 py-1 shadow-sm"
+                                          title="Undo/Revert Action"
+                                        >
+                                          <RotateCcw size={10} /> Undo
+                                        </button>
+                                      )}
                                     <button
                                       onClick={async () => {
                                         const logToDelete = { ...log };
@@ -8320,8 +8309,8 @@ export default function Dashboard() {
                     <div>
                       <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Payment Status</span>
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${historyDetailOrder.paymentStatus === 'Full Paid' ? 'bg-green-50 text-green-700 border-green-200' :
-                          historyDetailOrder.paymentStatus === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            'bg-red-50 text-red-700 border-red-200'
+                        historyDetailOrder.paymentStatus === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-red-50 text-red-700 border-red-200'
                         }`}>
                         {historyDetailOrder.paymentStatus || 'Pending'}
                       </span>
@@ -8329,7 +8318,7 @@ export default function Dashboard() {
                     <div>
                       <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider block">Dispatch Status</span>
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider mt-1 ${historyDetailOrder.status === 'Delivered' ? 'bg-green-50 text-green-700 border-green-200' :
-                          'bg-yellow-50 text-yellow-700 border-yellow-200'
+                        'bg-yellow-50 text-yellow-700 border-yellow-200'
                         }`}>
                         {historyDetailOrder.status || 'In Process'}
                       </span>

@@ -272,26 +272,7 @@ table tbody td:not(.fixed *):not(.sabi-calendar-popover *) {
   font-weight: 600 !important;
 }
 
-/* Sticky Actions column in tables */
-table thead th.sticky-actions-col:not(.fixed *) {
-  background-color: #151e36 !important;
-  background: #151e36 !important;
-}
-
-table tbody td.sticky-actions-col:not(.fixed *) {
-  background-color: #0e1628 !important;
-  background: #0e1628 !important;
-}
-
-table tbody tr:nth-child(even) td.sticky-actions-col:not(.fixed *) {
-  background-color: #111a30 !important;
-  background: #111a30 !important;
-}
-
-table tbody tr:hover td.sticky-actions-col:not(.fixed *) {
-  background-color: #182542 !important;
-  background: #182542 !important;
-}
+/* Actions column background - inherits from row */
 
 /* ==================== WALLPAPER ACTIVE GLASS THEME ==================== */
 /* Premium dark glassmorphism styling when a background wallpaper is active */
@@ -641,35 +622,25 @@ table thead th:not(.fixed *) {
   border-bottom: 1.5px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Sticky Actions Column Specific Styles */
+/* Actions Column Styles (non-sticky, scrolls with table) */
 table thead th.sticky-actions-col {
-  position: sticky !important;
-  right: 0 !important;
-  z-index: 30 !important;
-  background-color: #fef8f0 !important;
+  z-index: 2 !important;
+  background-color: inherit !important;
 }
 
 table tbody td.sticky-actions-col {
-  position: sticky !important;
-  right: 0 !important;
-  z-index: 20 !important;
-  background-color: #fffdfa !important;
+  z-index: 1 !important;
+  background-color: inherit !important;
 }
 
 .wallpaper-active table thead th.sticky-actions-col {
-  position: sticky !important;
-  right: 0 !important;
-  z-index: 30 !important;
-  background: rgba(43, 38, 94, 0.98) !important;
+  z-index: 2 !important;
+  background: inherit !important;
 }
 
 .wallpaper-active table tbody td.sticky-actions-col {
-  position: sticky !important;
-  right: 0 !important;
-  z-index: 20 !important;
-  background: rgba(28, 25, 68, 0.95) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
+  z-index: 1 !important;
+  background: inherit !important;
 }
 
 .wallpaper-active thead:not(.fixed *),
@@ -1776,3 +1747,50 @@ div.approximate-profit-card span.text-3xl,
   color: #6ee7b7 !important; /* Glowing Emerald Number */
   text-shadow: 0 0 14px rgba(16, 185, 129, 0.6) !important;
 }
+
+/* ==================== HIGH-CONTRAST RECHARTS LEGEND & LIGHT THEME TEXT FIX ==================== */
+/* Ensures text on white and light background cards is always 100% visible and crisp */
+.recharts-legend-item-text,
+.recharts-legend-item span,
+.wallpaper-active .recharts-legend-item-text,
+.wallpaper-active .recharts-legend-item span,
+.bg-white .recharts-legend-item-text,
+.bg-white\/90 .recharts-legend-item-text,
+.bg-white\/95 .recharts-legend-item-text,
+.bg-\[\#ebe6df\] .recharts-legend-item-text,
+.wallpaper-active .bg-white\/90 .recharts-legend-item-text,
+.wallpaper-active .bg-white\/90 span.text-\[\#2c1810\],
+.wallpaper-active .bg-white\/90 span.text-\[\#3e2723\],
+.wallpaper-active .bg-white\/95 span.text-\[\#2c1810\],
+.wallpaper-active .bg-white\/95 span.text-\[\#3e2723\] {
+  color: #2c1810 !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.wallpaper-active .bg-white\/90 p.text-\[\#5d4037\],
+.wallpaper-active .bg-white\/95 p.text-\[\#5d4037\],
+.wallpaper-active .bg-white\/90 p.text-\[\#8d6e63\],
+.wallpaper-active .bg-white\/95 p.text-\[\#8d6e63\] {
+  color: #5d4037 !important;
+  font-weight: 900 !important;
+  text-shadow: none !important;
+}
+
+/* ==================== SEAMLESS DARK BLUE TABLE & EMPTY CONTAINER ==================== */
+.order-records-table-container,
+.wallpaper-active .order-records-table-container {
+  background-color: #0d1527 !important;
+  background: #0d1527 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.wallpaper-active .order-records-table-container table,
+.wallpaper-active .order-records-table-container tbody,
+.wallpaper-active .order-records-table-container tr:not(:hover),
+.wallpaper-active .order-records-table-container td {
+  background-color: #0d1527 !important;
+}
+
+
