@@ -208,8 +208,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
         const data = docSnap.data();
         // Only include registered employees approved by Admin (status === 'Approved')
         if (data.status === "Approved") {
-          const empName = data.username || data.name || data.employeeName;
-          if (empName) {
+          const empName = (data.username || data.name || data.employeeName || "").trim();
+          const lower = empName.toLowerCase();
+          if (empName && !lower.includes("hello") && !lower.includes("test")) {
             namesSet.add(empName);
           }
         }
