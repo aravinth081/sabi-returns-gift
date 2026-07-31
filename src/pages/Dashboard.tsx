@@ -4636,7 +4636,7 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[1350px]' : 'min-w-[1600px]'}`}>
+                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[900px]' : 'min-w-[1100px]'}`}>
                       <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
                         <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
                           {!isScreenshotMode && showCheckboxes && (
