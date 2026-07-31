@@ -4580,22 +4580,22 @@ export default function Dashboard() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ textAlign: 'left' }}>
-                            <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#1e1b4b', margin: 0, padding: 0, textShadow: 'none', letterSpacing: '-0.025em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
+                            <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#1e1b4b', margin: 0, padding: 0, textShadow: 'none', letterSpacing: '-0.025em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
                               SABI Return Gifts
                             </h1>
-                            <p style={{ fontSize: '14px', fontWeight: 700, color: '#4f46e5', margin: '4px 0 0 0', textShadow: 'none' }}>
+                            <p style={{ fontSize: '17px', fontWeight: 700, color: '#4f46e5', margin: '4px 0 0 0', textShadow: 'none' }}>
                               Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}
                             </p>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1e1b4b', margin: 0, textShadow: 'none' }}>
+                            <p style={{ fontSize: '15px', fontWeight: 700, color: '#1e1b4b', margin: 0, textShadow: 'none' }}>
                               {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
                             <div style={{ display: 'flex', gap: '16px', marginTop: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
+                              <span style={{ fontSize: '15px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
                                 Orders: {filteredDashboardOrders.length}
                               </span>
-                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
+                              <span style={{ fontSize: '15px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
                                 Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}
                               </span>
                             </div>
