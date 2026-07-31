@@ -1190,10 +1190,10 @@ main {
   font-weight: 800 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  font-size: 13px !important; /* Increased font size */
+  font-size: 15px !important; /* Increased font size for readability */
   text-align: center !important; /* Center-align all table headers */
   border: 1px solid #cbd5e1 !important;
-  padding: 12px 16px !important; /* Improved spacing */
+  padding: 14px 18px !important; /* Improved spacing */
 }
 
 /* Alternating clean white/warm-stone rows */
@@ -1215,9 +1215,9 @@ main {
 .screenshot-mode-active td {
   color: #334155 !important; /* Elegant slate grey for secondary cell texts */
   font-weight: 700 !important;
-  font-size: 14px !important; /* Increased font size */
+  font-size: 16px !important; /* Increased font size for readability */
   text-align: center !important; /* Center-align all table cells */
-  padding: 12px 16px !important; /* Improved spacing */
+  padding: 14px 18px !important; /* Improved spacing */
   border: 1px solid #cbd5e1 !important;
 }
 
@@ -1228,16 +1228,40 @@ main {
 .screenshot-mode-active td.text-amber-950 {
   color: #0f172a !important; /* Deep charcoal for main text */
   font-weight: 800 !important;
+  font-size: 17px !important; /* Larger name text */
   text-align: center !important;
 }
 
-/* Total Price highlight text */
+/* Total Price / Pending Amount highlight text */
 .wallpaper-active .screenshot-mode-active td.text-base,
-.screenshot-mode-active td.text-base {
+.wallpaper-active .screenshot-mode-active td.text-lg,
+.screenshot-mode-active td.text-base,
+.screenshot-mode-active td.text-lg {
   color: #0f172a !important;
-  font-weight: 800 !important;
-  font-size: 16px !important; /* Increased font size */
+  font-weight: 900 !important;
+  font-size: 18px !important; /* Large and prominent */
   text-align: center !important;
+}
+
+/* Pending Amount: prominent styling */
+.wallpaper-active .screenshot-mode-active .screenshot-pending-amount,
+.screenshot-mode-active .screenshot-pending-amount {
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.wallpaper-active .screenshot-mode-active .screenshot-pending-value,
+.screenshot-mode-active .screenshot-pending-value {
+  color: #dc2626 !important; /* Bold red for pending amounts */
+  font-weight: 900 !important;
+  font-size: 18px !important;
+}
+
+.wallpaper-active .screenshot-mode-active .screenshot-pending-zero,
+.screenshot-mode-active .screenshot-pending-zero {
+  color: #16a34a !important; /* Green for zero pending (fully paid) */
+  font-weight: 900 !important;
+  font-size: 18px !important;
 }
 
 /* Pill status badges for payment */
@@ -1283,11 +1307,48 @@ main {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Chocolate badges inside table rows */
+/* Location badges for screenshot mode */
+.wallpaper-active .screenshot-mode-active .screenshot-location-badge,
+.screenshot-mode-active .screenshot-location-badge {
+  display: inline-block !important;
+  padding: 5px 16px !important;
+  border-radius: 9999px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  white-space: nowrap !important;
+}
+
+.wallpaper-active .screenshot-mode-active .screenshot-location-chennai,
+.screenshot-mode-active .screenshot-location-chennai {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1.5px solid #6ee7b7 !important;
+}
+
+.wallpaper-active .screenshot-mode-active .screenshot-location-kerala,
+.screenshot-mode-active .screenshot-location-kerala {
+  background-color: #f5f3ff !important;
+  color: #5b21b6 !important;
+  border: 1.5px solid #c4b5fd !important;
+}
+
+.wallpaper-active .screenshot-mode-active .screenshot-location-empty,
+.screenshot-mode-active .screenshot-location-empty {
+  background-color: transparent !important;
+  color: #94a3b8 !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: 16px !important;
+}
+
+/* Chocolate badges inside table rows — WHITE text for dark-header contrast */
 .wallpaper-active .screenshot-mode-active .chocolate-badge,
 .screenshot-mode-active .chocolate-badge {
-  color: #1e40af !important;
-  font-size: 13px !important;
+  color: #ffffff !important;
+  font-size: 15px !important;
   font-weight: 900 !important;
 }
 

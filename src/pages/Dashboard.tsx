@@ -4866,28 +4866,30 @@ export default function Dashboard() {
                             </th>
                           )}
 
-                          {/* 🟢 TOTAL AMOUNT HEADER */}
+                          {/* 🟢 PENDING AMOUNT HEADER (Screenshot) / TOTAL AMOUNT HEADER (Normal) */}
                           <th className="py-3 px-4 font-bold text-center align-top min-w-[120px]">
-                            <span className="whitespace-nowrap">Total Amount</span>
+                            <span className="whitespace-nowrap">{isScreenshotMode ? 'Pending Amount' : 'Total Amount'}</span>
                           </th>
 
-                          {/* 🟢 PAYMENT STATUS HEADER */}
+                          {/* 🟢 LOCATION HEADER (Screenshot) / PAYMENT STATUS HEADER (Normal) */}
                           <th className="py-3 px-4 font-bold text-center align-top min-w-[140px]">
                             <div className="flex items-center justify-center gap-1 group">
-                              <span>Payment Status</span>
-                              <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Payment Status">
-                                <ChevronDown size={14} className={paymentFilter !== 'All' ? 'text-amber-800 font-bold' : 'text-amber-400'} />
-                                <select
-                                  value={paymentFilter}
-                                  onChange={(e) => setPaymentFilter(e.target.value as any)}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                >
-                                  <option value="All">All Payments</option>
-                                  <option value="Full Paid">Paid (Full)</option>
-                                  <option value="Partially Paid">Partial</option>
-                                  <option value="Pending">Pending</option>
-                                </select>
-                              </div>
+                              <span>{isScreenshotMode ? 'Location' : 'Payment Status'}</span>
+                              {!isScreenshotMode && (
+                                <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Payment Status">
+                                  <ChevronDown size={14} className={paymentFilter !== 'All' ? 'text-amber-800 font-bold' : 'text-amber-400'} />
+                                  <select
+                                    value={paymentFilter}
+                                    onChange={(e) => setPaymentFilter(e.target.value as any)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                  >
+                                    <option value="All">All Payments</option>
+                                    <option value="Full Paid">Paid (Full)</option>
+                                    <option value="Partially Paid">Partial</option>
+                                    <option value="Pending">Pending</option>
+                                  </select>
+                                </div>
+                              )}
                             </div>
                           </th>
                           {!isScreenshotMode && (
@@ -5053,8 +5055,18 @@ export default function Dashboard() {
 
 
                                 {isScreenshotMode ? (
-                                  <td className="py-2.5 px-4 text-right align-middle font-bold text-amber-950 text-base">
-                                    ₹{priceData.fullTotalPrice.toLocaleString()}
+                                  /* 📸 Screenshot: Show PENDING AMOUNT only */
+                                  <td className="py-2.5 px-4 text-center align-middle font-bold text-amber-950 text-lg screenshot-pending-amount">
+                                    {(() => {
+                                      const pendingAmt = order.paymentStatus === 'Full Paid'
+                                        ? 0
+                                        : order.paymentStatus === 'Partially Paid'
+                                          ? Math.max(0, priceData.fullTotalPrice - Number(order.advanceAmount || 0))
+                                          : priceData.fullTotalPrice;
+                                      return pendingAmt > 0
+                                        ? <span className="screenshot-pending-value">₹{pendingAmt.toLocaleString()}</span>
+                                        : <span className="screenshot-pending-zero">₹0</span>;
+                                    })()}
                                   </td>
                                 ) : (
                                   <td className={`py-2.5 px-4 text-right align-middle`}>
@@ -5073,21 +5085,20 @@ export default function Dashboard() {
 
                                 <td className="py-2.5 px-4 text-center align-middle">
                                   {isScreenshotMode ? (
+                                    /* 📸 Screenshot: Show LOCATION (Chennai/Kerala only, hide Others) */
                                     <div className="flex flex-col items-center">
-                                      <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-colors shadow-sm ${order.paymentStatus === 'Full Paid'
-                                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 payment-badge-full-paid'
-                                        : order.paymentStatus === 'Partially Paid'
-                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 payment-badge-partially-paid'
-                                          : 'bg-rose-500/20 text-rose-300 border-rose-500/40 payment-badge-pending'
-                                        }`}
-                                      >
-                                        {order.paymentStatus || 'Pending'}
-                                      </span>
-                                      {order.paymentStatus === 'Partially Paid' && (
-                                        <span className="text-[10px] font-extrabold text-amber-400 mt-1 whitespace-nowrap">
-                                          Pending: ₹{(priceData.fullTotalPrice - Number(order.advanceAmount || 0)).toLocaleString()}
-                                        </span>
-                                      )}
+                                      {(() => {
+                                        const loc = String((order as any).location || '').toLowerCase();
+                                        const isChennai = (order as any).isChennai === true || loc === 'chennai';
+                                        const isKerala = loc === 'kerala';
+                                        if (isChennai) {
+                                          return <span className="screenshot-location-badge screenshot-location-chennai">Chennai</span>;
+                                        } else if (isKerala) {
+                                          return <span className="screenshot-location-badge screenshot-location-kerala">Kerala</span>;
+                                        } else {
+                                          return <span className="screenshot-location-badge screenshot-location-empty">—</span>;
+                                        }
+                                      })()}
                                     </div>
                                   ) : (
                                     <div className="flex flex-col items-center gap-1">
