@@ -1344,6 +1344,13 @@ main {
   border: 1.5px solid #c4b5fd !important;
 }
 
+.wallpaper-active .screenshot-mode-active .screenshot-location-others,
+.screenshot-mode-active .screenshot-location-others {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1.5px solid #cbd5e1 !important;
+}
+
 .wallpaper-active .screenshot-mode-active .screenshot-location-empty,
 .screenshot-mode-active .screenshot-location-empty {
   background-color: transparent !important;

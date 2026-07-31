@@ -5084,23 +5084,28 @@ export default function Dashboard() {
                                 )}
 
                                 <td className="py-2.5 px-4 text-center align-middle">
-                                  {isScreenshotMode ? (
-                                    /* 📸 Screenshot: Show LOCATION (Chennai/Kerala only, hide Others) */
-                                    <div className="flex flex-col items-center">
-                                      {(() => {
-                                        const loc = String((order as any).location || '').toLowerCase();
-                                        const isChennai = (order as any).isChennai === true || loc === 'chennai';
-                                        const isKerala = loc === 'kerala';
-                                        if (isChennai) {
-                                          return <span className="screenshot-location-badge screenshot-location-chennai">Chennai</span>;
-                                        } else if (isKerala) {
-                                          return <span className="screenshot-location-badge screenshot-location-kerala">Kerala</span>;
-                                        } else {
-                                          return <span className="screenshot-location-badge screenshot-location-empty">—</span>;
-                                        }
-                                      })()}
-                                    </div>
-                                  ) : (
+                                    {isScreenshotMode ? (
+                                      /* 📸 Screenshot: Show exact LOCATION specified in the order */
+                                      <div className="flex flex-col items-center">
+                                        {(() => {
+                                          const rawLoc = String((order as any).location || '').trim();
+                                          const locLower = rawLoc.toLowerCase();
+                                          const isChennai = (order as any).isChennai === true || locLower === 'chennai';
+                                          const isKerala = locLower === 'kerala';
+                                          if (isChennai) {
+                                            return <span className="screenshot-location-badge screenshot-location-chennai">Chennai</span>;
+                                          } else if (isKerala) {
+                                            return <span className="screenshot-location-badge screenshot-location-kerala">Kerala</span>;
+                                          } else if (rawLoc) {
+                                            return <span className="screenshot-location-badge screenshot-location-others">{rawLoc}</span>;
+                                          } else if ((order as any).address) {
+                                            return <span className="screenshot-location-badge screenshot-location-others">{String((order as any).address).trim()}</span>;
+                                          } else {
+                                            return <span className="screenshot-location-badge screenshot-location-empty">—</span>;
+                                          }
+                                        })()}
+                                      </div>
+                                    ) : (
                                     <div className="flex flex-col items-center gap-1">
                                       <div className="print:hidden">
                                         <select
