@@ -97,14 +97,28 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
         });
         canvas.toBlob(async (blob) => {
           if (blob) {
+            let copied = false;
             try {
-              const item = new ClipboardItem({ "image/png": blob });
-              await navigator.clipboard.write([item]);
-              setIsCopied(true);
-              setTimeout(() => setIsCopied(false), 2000);
+              if (navigator.clipboard && window.ClipboardItem) {
+                const item = new ClipboardItem({ "image/png": blob });
+                await navigator.clipboard.write([item]);
+                copied = true;
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000);
+              }
             } catch (err) {
-              console.error(err);
-              alert("Browser block clipboad. Use Download.");
+              console.warn("Clipboard blocked by browser, executing automatic download:", err);
+            }
+
+            if (!copied) {
+              try {
+                const link = document.createElement("a");
+                link.download = `Invoice_${getInvoiceNumber()}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+              } catch (dlErr) {
+                console.error("Download fallback error:", dlErr);
+              }
             }
           }
         }, "image/png");

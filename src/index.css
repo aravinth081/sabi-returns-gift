@@ -1091,17 +1091,19 @@ main {
 }
 
 /* ==================== SCREENSHOT MODE CONTRAST OVERRIDES ==================== */
-/* Decouples screenshot area from general wallpaper-active translucency and white-text styles */
+/* High contrast luxury dark theme for screenshot mode and table export */
 .wallpaper-active .screenshot-mode-active,
 .screenshot-mode-active {
-  background-color: #fdfbf7 !important; /* Premium warm alabaster background */
-  background: #fdfbf7 !important;
-  color: #1e1b4b !important; /* High contrast deep navy/indigo text */
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-  border: 1px solid #cbd5e1 !important;
+  background-color: #0b0f19 !important;
+  background: #0b0f19 !important;
+  color: #ffffff !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   height: auto !important;
   max-height: none !important;
   min-height: 0 !important;
+  min-width: 1350px !important; /* Force wide landscape breadth format */
+  width: 100% !important;
   flex: none !important;
 }
 
@@ -1112,34 +1114,10 @@ main {
   flex: none !important;
 }
 
-/* Force high contrast dark text for all readable elements inside screenshot mode */
-.wallpaper-active .screenshot-mode-active h1,
-.wallpaper-active .screenshot-mode-active h2,
-.wallpaper-active .screenshot-mode-active h3,
-.wallpaper-active .screenshot-mode-active h4,
-.wallpaper-active .screenshot-mode-active p,
-.wallpaper-active .screenshot-mode-active span,
-.wallpaper-active .screenshot-mode-active div,
-.wallpaper-active .screenshot-mode-active td,
-.wallpaper-active .screenshot-mode-active th,
-.wallpaper-active .screenshot-mode-active *,
-.screenshot-mode-active h1,
-.screenshot-mode-active h2,
-.screenshot-mode-active h3,
-.screenshot-mode-active h4,
-.screenshot-mode-active p,
-.screenshot-mode-active span,
-.screenshot-mode-active div,
-.screenshot-mode-active td,
-.screenshot-mode-active th {
-  color: #1e1b4b !important; /* Deep Navy for maximum legibility and elegance */
-  text-shadow: none !important;
-}
-
-/* Premium Header styling */
+/* Premium Header styling inside screenshot mode */
 .wallpaper-active .screenshot-mode-active h1,
 .screenshot-mode-active h1 {
-  color: #1e1b4b !important;
+  color: #ffffff !important;
   font-family: 'Outfit', 'Inter', sans-serif !important;
   font-weight: 900 !important;
   letter-spacing: -0.025em !important;
@@ -1147,225 +1125,174 @@ main {
 
 .wallpaper-active .screenshot-mode-active p.text-amber-700,
 .screenshot-mode-active p.text-amber-700 {
-  color: #4f46e5 !important; /* Indigo accent for subtitle */
-  font-weight: 700 !important;
+  color: #fbbf24 !important; /* Golden Amber accent for subtitle */
+  font-weight: 800 !important;
 }
 
 /* Statistics container inside screenshot header */
 .wallpaper-active .screenshot-mode-active span.text-amber-900,
 .screenshot-mode-active span.text-amber-900 {
-  color: #1e1b4b !important;
+  color: #ffffff !important;
   font-weight: 800 !important;
 }
 
 .wallpaper-active .screenshot-mode-active span.text-green-700,
 .screenshot-mode-active span.text-green-700 {
-  color: #047857 !important; /* Rich green for revenue */
+  color: #34d399 !important; /* Vivid green for revenue */
   font-weight: 900 !important;
 }
 
-/* Table layout */
+/* Table layout inside screenshot mode */
 .wallpaper-active .screenshot-mode-active table,
 .screenshot-mode-active table {
-  background-color: #ffffff !important;
+  background-color: #0b0f19 !important;
+  background: #0b0f19 !important;
   border-collapse: collapse !important;
   border-spacing: 0 !important;
   width: 100% !important;
-  border: 1px solid #cbd5e1 !important;
+  min-width: 1350px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Premium Table Header: Dark Indigo/Slate background with clean white lettering */
+/* Table Header: Dark Slate Navy with Golden Amber lettering */
 .wallpaper-active .screenshot-mode-active thead tr,
 .screenshot-mode-active thead tr {
-  background-color: #1e1b4b !important; /* Deep Navy */
-  background: #1e1b4b !important;
-  color: #ffffff !important;
+  background-color: #131c2e !important;
+  background: #131c2e !important;
+  color: #fbbf24 !important;
 }
 
 .wallpaper-active .screenshot-mode-active thead th,
 .wallpaper-active .screenshot-mode-active thead th span,
 .screenshot-mode-active thead th,
 .screenshot-mode-active thead th span {
-  color: #ffffff !important;
-  font-weight: 800 !important;
+  color: #fbbf24 !important;
+  font-weight: 900 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  font-size: 13px !important;
+  letter-spacing: 0.06em !important;
+  font-size: 14px !important;
   text-align: center !important;
   vertical-align: middle !important;
   white-space: nowrap !important;
-  border: 1px solid #cbd5e1 !important;
-  padding: 10px 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding: 12px 18px !important;
 }
 
-/* Alternating clean white/warm-stone rows */
+/* Table rows inside screenshot mode */
 .wallpaper-active .screenshot-mode-active tbody tr,
 .screenshot-mode-active tbody tr {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  color: #1e1b4b !important;
+  background-color: #0d1527 !important;
+  background: #0d1527 !important;
+  color: #ffffff !important;
 }
 
 .wallpaper-active .screenshot-mode-active tbody tr:nth-child(even),
 .screenshot-mode-active tbody tr:nth-child(even) {
-  background-color: #f8fafc !important;
-  background: #f8fafc !important;
+  background-color: #111a30 !important;
+  background: #111a30 !important;
 }
 
-/* TD content spacing and styling */
+/* Table Cell General Styling */
 .wallpaper-active .screenshot-mode-active td,
 .screenshot-mode-active td {
-  color: #334155 !important;
+  color: #f8fafc !important;
   font-weight: 700 !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   text-align: center !important;
   vertical-align: middle !important;
-  padding: 8px 12px !important;
-  border: 1px solid #cbd5e1 !important;
-  line-height: 1.3 !important;
+  padding: 10px 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  line-height: 1.4 !important;
 }
 
-/* Primary text highlights inside rows (such as Customer name) */
+/* Name Column: Bright White Bold */
 .wallpaper-active .screenshot-mode-active td:first-child,
 .screenshot-mode-active td:first-child,
 .wallpaper-active .screenshot-mode-active td.text-amber-950,
 .screenshot-mode-active td.text-amber-950 {
-  color: #0f172a !important;
-  font-weight: 800 !important;
-  font-size: 14px !important;
-  text-align: center !important;
-  white-space: nowrap !important;
-}
-
-/* Total Price / Pending Amount highlight text */
-.wallpaper-active .screenshot-mode-active td.text-base,
-.wallpaper-active .screenshot-mode-active td.text-lg,
-.screenshot-mode-active td.text-base,
-.screenshot-mode-active td.text-lg {
-  color: #0f172a !important;
+  color: #ffffff !important;
   font-weight: 900 !important;
-  font-size: 14px !important;
-  text-align: center !important;
+  font-size: 15px !important;
+  text-align: left !important;
   white-space: nowrap !important;
+  padding-left: 20px !important;
 }
 
-/* Pending Amount: prominent styling */
+/* Total Price / Pending Amount Column */
 .wallpaper-active .screenshot-mode-active .screenshot-pending-amount,
 .screenshot-mode-active .screenshot-pending-amount {
-  font-size: 14px !important;
+  font-size: 15px !important;
   font-weight: 900 !important;
   white-space: nowrap !important;
 }
 
 .wallpaper-active .screenshot-mode-active .screenshot-pending-value,
 .screenshot-mode-active .screenshot-pending-value {
-  color: #dc2626 !important;
+  color: #f87171 !important; /* Bright Neon Red */
   font-weight: 900 !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   white-space: nowrap !important;
 }
 
 .wallpaper-active .screenshot-mode-active .screenshot-pending-zero,
 .screenshot-mode-active .screenshot-pending-zero {
-  color: #16a34a !important;
+  color: #34d399 !important; /* Bright Neon Green */
   font-weight: 900 !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   white-space: nowrap !important;
 }
 
-/* Pill status badges for payment */
-.wallpaper-active .screenshot-mode-active .payment-badge-full-paid,
-.screenshot-mode-active .payment-badge-full-paid {
-  background-color: #ecfdf5 !important;
-  color: #065f46 !important;
-  border: 1px solid #a7f3d0 !important;
-  border-radius: 9999px !important;
-  padding: 4px 10px !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.025em !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-
-.wallpaper-active .screenshot-mode-active .payment-badge-partially-paid,
-.screenshot-mode-active .payment-badge-partially-paid {
-  background-color: #fff7ed !important;
-  color: #c2410c !important;
-  border: 1px solid #ffedd5 !important;
-  border-radius: 9999px !important;
-  padding: 4px 10px !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.025em !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-
-.wallpaper-active .screenshot-mode-active .payment-badge-pending,
-.screenshot-mode-active .payment-badge-pending {
-  background-color: #fef2f2 !important;
-  color: #991b1b !important;
-  border: 1px solid #fee2e2 !important;
-  border-radius: 9999px !important;
-  padding: 4px 10px !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.025em !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Location badges for screenshot mode */
-.wallpaper-active .screenshot-mode-active .screenshot-location-badge,
-.screenshot-mode-active .screenshot-location-badge {
-  display: inline-block !important;
-  padding: 3px 12px !important;
-  border-radius: 9999px !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
+/* Location Column - Clean, Crisp, High-Contrast Bold Plain Text */
+.screenshot-location-text {
+  font-size: 14px !important;
+  font-weight: 900 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.04em !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
   white-space: nowrap !important;
-}
-
-.wallpaper-active .screenshot-mode-active .screenshot-location-chennai,
-.screenshot-mode-active .screenshot-location-chennai {
-  background-color: #ecfdf5 !important;
-  color: #065f46 !important;
-  border: 1.5px solid #6ee7b7 !important;
-}
-
-.wallpaper-active .screenshot-mode-active .screenshot-location-kerala,
-.screenshot-mode-active .screenshot-location-kerala {
-  background-color: #f5f3ff !important;
-  color: #5b21b6 !important;
-  border: 1.5px solid #c4b5fd !important;
-}
-
-.wallpaper-active .screenshot-mode-active .screenshot-location-others,
-.screenshot-mode-active .screenshot-location-others {
-  background-color: #f1f5f9 !important;
-  color: #334155 !important;
-  border: 1.5px solid #cbd5e1 !important;
-}
-
-.wallpaper-active .screenshot-mode-active .screenshot-location-empty,
-.screenshot-mode-active .screenshot-location-empty {
-  background-color: transparent !important;
-  color: #94a3b8 !important;
+  display: inline-block !important;
+  text-align: center !important;
+  background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  font-size: 13px !important;
+  padding: 0 !important;
 }
 
-/* Chocolate badges inside table rows — WHITE text for dark-header contrast */
-.wallpaper-active .screenshot-mode-active .chocolate-badge,
+.screenshot-location-chennai,
+.wallpaper-active .screenshot-location-chennai {
+  color: #34d399 !important; /* Vivid Emerald Green Plain Text */
+  font-weight: 900 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+}
+
+.screenshot-location-kerala,
+.wallpaper-active .screenshot-location-kerala {
+  color: #c084fc !important; /* Vivid Purple Plain Text */
+  font-weight: 900 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+}
+
+.screenshot-location-others,
+.wallpaper-active .screenshot-location-others {
+  color: #38bdf8 !important; /* Vivid Sky Blue Plain Text */
+  font-weight: 900 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+}
+
+.screenshot-location-empty,
+.wallpaper-active .screenshot-location-empty {
+  color: #64748b !important;
+  font-weight: 700 !important;
+  font-size: 15px !important;
+}
+
+/* Chocolate badges inside table rows — Vivid Bright Gold text */
+.chocolate-badge,
+.wallpaper-active .chocolate-badge,
 .screenshot-mode-active .chocolate-badge {
-  color: #ffffff !important;
-  font-size: 13px !important;
-  font-weight: 800 !important;
+  color: #fde047 !important; /* Bright Gold Yellow */
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
 }
 
 /* ==================== RECHARTS TOOLTIP CONTRAST FIX ==================== */

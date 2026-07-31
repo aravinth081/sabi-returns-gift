@@ -3170,13 +3170,28 @@ export default function Dashboard() {
 
         canvas.toBlob(async (blob) => {
           if (blob) {
+            let copied = false;
             try {
-              const item = new ClipboardItem({ "image/png": blob });
-              await navigator.clipboard.write([item]);
-              alert("✅ Receipt Copied to Clipboard!");
+              if (navigator.clipboard && window.ClipboardItem) {
+                const item = new ClipboardItem({ "image/png": blob });
+                await navigator.clipboard.write([item]);
+                copied = true;
+                toast.success("✅ Receipt Copied to Clipboard!");
+              }
             } catch (clipboardErr) {
-              console.error("Clipboard copy failed: ", clipboardErr);
-              alert("❌ Failed to copy image. Please check browser permissions.");
+              console.warn("Clipboard copy failed, fallback to automatic download:", clipboardErr);
+            }
+
+            if (!copied) {
+              try {
+                const link = document.createElement("a");
+                link.download = `Receipt_${Date.now()}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                toast.success("✅ Receipt downloaded as PNG image!");
+              } catch (dlErr) {
+                toast.error("Failed to copy or download receipt image.");
+              }
             }
           }
         }, "image/png");
@@ -3203,20 +3218,21 @@ export default function Dashboard() {
     }
   };
 
-  // 📸 SCREENSHOT MODE: Show only Name, Dispatch Date, Chocolate Name, Count, Total Price, Payment Status → capture → copy to clipboard
+  // 📸 SCREENSHOT MODE: Show only Name, Dispatch Date, Chocolate Name, Count, Total Price, Payment Status → capture → copy to clipboard or download
   const handleScreenshotCapture = async () => {
     setIsScreenshotMode(true);
+    toast.info("📸 Capturing screenshot...");
 
-    // Wait 2 seconds for the UI to render with only the selected columns
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Fast 500ms delay for quick capture
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const element = screenshotTableRef.current;
     if (element) {
       try {
         const html2canvas = (await import("html2canvas")).default;
         const canvas = await html2canvas(element, {
-          backgroundColor: "#ffffff",
-          scale: 3,
+          backgroundColor: "#0b0f19",
+          scale: 2,
           useCORS: true,
           logging: false,
           allowTaint: true
@@ -3224,13 +3240,29 @@ export default function Dashboard() {
 
         canvas.toBlob(async (blob) => {
           if (blob) {
+            let copied = false;
             try {
-              const item = new ClipboardItem({ "image/png": blob });
-              await navigator.clipboard.write([item]);
-              alert("✅ Table Screenshot Copied to Clipboard!");
+              if (navigator.clipboard && window.ClipboardItem) {
+                const item = new ClipboardItem({ "image/png": blob });
+                await navigator.clipboard.write([item]);
+                copied = true;
+                toast.success("✅ Table Screenshot Copied to Clipboard!");
+              }
             } catch (clipboardErr) {
-              console.error("Clipboard copy failed: ", clipboardErr);
-              alert("❌ Failed to copy image. Please check browser permissions.");
+              console.warn("Clipboard copy failed, fallback to automatic download:", clipboardErr);
+            }
+
+            if (!copied) {
+              try {
+                const link = document.createElement("a");
+                link.download = `Sabi_Order_Records_${new Date().toISOString().slice(0, 10)}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                toast.success("✅ Table Screenshot downloaded as PNG image!");
+              } catch (dlErr) {
+                console.error("Download fallback error:", dlErr);
+                toast.error("Failed to copy or download screenshot.");
+              }
             }
           }
           setIsScreenshotMode(false);
@@ -3250,7 +3282,7 @@ export default function Dashboard() {
     return (
       <div className="flex flex-wrap gap-x-1 gap-y-0.5 justify-center items-center text-center">
         {items.map((c, i) => (
-          <span key={i} className="chocolate-badge text-amber-950 text-sm font-black whitespace-nowrap">
+          <span key={i} className="chocolate-badge text-amber-300 font-extrabold text-sm whitespace-nowrap drop-shadow-sm">
             {c}{i < items.length - 1 ? ',' : ''}
           </span>
         ))}
@@ -4571,31 +4603,31 @@ export default function Dashboard() {
                     {isScreenshotMode && (
                       <div
                         style={{
-                          background: 'linear-gradient(to right, #fdfbf7, #fdfbf7)', // Warm premium alabaster bg
+                          background: 'linear-gradient(to right, #0b0f19, #0d1527)',
                           padding: '16px 24px',
-                          borderBottom: '2px solid #cbd5e1', // Slate border
+                          borderBottom: '2px solid rgba(255, 255, 255, 0.15)',
                           display: 'block',
                           width: '100%',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ textAlign: 'left' }}>
-                            <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#1e1b4b', margin: 0, padding: 0, textShadow: 'none', letterSpacing: '-0.025em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
+                            <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#ffffff', margin: 0, padding: 0, textShadow: 'none', letterSpacing: '-0.025em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
                               SABI Return Gifts
                             </h1>
-                            <p style={{ fontSize: '13px', fontWeight: 700, color: '#4f46e5', margin: '2px 0 0 0', textShadow: 'none' }}>
+                            <p style={{ fontSize: '14px', fontWeight: 800, color: '#fbbf24', margin: '3px 0 0 0', textShadow: 'none' }}>
                               Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}
                             </p>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1e1b4b', margin: 0, textShadow: 'none' }}>
+                            <p style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff', margin: 0, textShadow: 'none' }}>
                               {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
-                            <div style={{ display: 'flex', gap: '14px', marginTop: '2px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 900, color: '#fef08a', textShadow: 'none' }}>
                                 Orders: {filteredDashboardOrders.length}
                               </span>
-                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e1b4b', textShadow: 'none' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 900, color: '#fef08a', textShadow: 'none' }}>
                                 Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}
                               </span>
                             </div>
@@ -4604,7 +4636,7 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-0' : 'min-w-[1450px]'}`}>
+                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[1350px]' : 'min-w-[1600px]'}`}>
                       <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
                         <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
                           {!isScreenshotMode && showCheckboxes && (
@@ -5085,26 +5117,46 @@ export default function Dashboard() {
 
                                 <td className="py-2.5 px-4 text-center align-middle">
                                     {isScreenshotMode ? (
-                                      /* 📸 Screenshot: Show exact LOCATION specified in the order */
-                                      <div className="flex flex-col items-center">
-                                        {(() => {
-                                          const rawLoc = String((order as any).location || '').trim();
-                                          const locLower = rawLoc.toLowerCase();
-                                          const isChennai = (order as any).isChennai === true || locLower === 'chennai';
-                                          const isKerala = locLower === 'kerala';
-                                          if (isChennai) {
-                                            return <span className="screenshot-location-badge screenshot-location-chennai">Chennai</span>;
-                                          } else if (isKerala) {
-                                            return <span className="screenshot-location-badge screenshot-location-kerala">Kerala</span>;
-                                          } else if (rawLoc) {
-                                            return <span className="screenshot-location-badge screenshot-location-others">{rawLoc}</span>;
-                                          } else if ((order as any).address) {
-                                            return <span className="screenshot-location-badge screenshot-location-others">{String((order as any).address).trim()}</span>;
-                                          } else {
-                                            return <span className="screenshot-location-badge screenshot-location-empty">—</span>;
-                                          }
-                                        })()}
-                                      </div>
+                                       /* 📸 Screenshot: Show exact LOCATION specified in the order as plain text */
+                                       <div className="flex flex-col items-center">
+                                         {(() => {
+                                           const rawLoc = String((order as any).location || '').trim();
+                                           const addrStr = String((order as any).address || '').trim();
+                                           const remStr = String((order as any).remarks || (order as any).comments || '').trim();
+                                           const combined = `${rawLoc} ${addrStr} ${remStr}`.trim();
+                                           const lower = combined.toLowerCase();
+
+                                           if ((order as any).isChennai === true || lower.includes('chennai') || lower.includes('madras')) {
+                                             return <span className="screenshot-location-text screenshot-location-chennai font-bold">Chennai</span>;
+                                           }
+                                           if (lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
+                                             return <span className="screenshot-location-text screenshot-location-kerala font-bold">Kerala</span>;
+                                           }
+
+                                           const knownCities = [
+                                             'Madurai', 'Coimbatore', 'Trichy', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 
+                                             'Erode', 'Vellore', 'Thanjavur', 'Tuticorin', 'Thoothukudi', 'Nagercoil', 
+                                             'Kanyakumari', 'Dindigul', 'Karur', 'Cuddalore', 'Kanchipuram', 'Tiruppur', 
+                                             'Hosur', 'Puducherry', 'Pondicherry', 'Karaikal', 'Ramanathapuram', 'Ramnad', 
+                                             'Virudhunagar', 'Sivakasi', 'Tenkasi', 'Namakkal', 'Villupuram'
+                                           ];
+
+                                           for (const city of knownCities) {
+                                             if (lower.includes(city.toLowerCase())) {
+                                               return <span className="screenshot-location-text screenshot-location-others font-bold">{city}</span>;
+                                             }
+                                           }
+
+                                           if (rawLoc) {
+                                             return <span className="screenshot-location-text screenshot-location-others font-bold">{rawLoc}</span>;
+                                           }
+                                           if (addrStr) {
+                                             const shortAddr = addrStr.length > 15 ? `${addrStr.substring(0, 15)}...` : addrStr;
+                                             return <span className="screenshot-location-text screenshot-location-others font-bold">{shortAddr}</span>;
+                                           }
+                                           return <span className="screenshot-location-text screenshot-location-empty font-bold">—</span>;
+                                         })()}
+                                       </div>
                                     ) : (
                                     <div className="flex flex-col items-center gap-1">
                                       <div className="print:hidden">
