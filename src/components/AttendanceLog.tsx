@@ -34,7 +34,7 @@ export interface EmployeeSalary {
 export default function AttendanceLog({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
   const { profile } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'employee' | 'admin'>('employee');
-  const activeUser = profile?.username || localStorage.getItem('loggedInName') || "";
+  const activeUser = localStorage.getItem('loggedInName') || profile?.username || "";
   const currentLoggedInUser = activeUser || "Gayathiri";
 
   // Helper to retrieve user-specific or global wallpaper

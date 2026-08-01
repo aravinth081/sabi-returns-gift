@@ -369,7 +369,7 @@ export default function Dashboard() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loggedInName, setLoggedInName] = useState(() => profile?.username || localStorage.getItem('loggedInName') || "");
+  const [loggedInName, setLoggedInName] = useState(() => localStorage.getItem('loggedInName') || profile?.username || "");
   const [role, setRole] = useState<'Admin' | 'Employee'>(() => (localStorage.getItem('role') as any) || 'Admin');
   const [employeeId, setEmployeeId] = useState(() => localStorage.getItem('employeeId') || "");
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
@@ -599,11 +599,16 @@ export default function Dashboard() {
   const [trackWallpaper, setTrackWallpaper] = useState(() => localStorage.getItem('sabi_wallpaper_tracking') || "");
 
   // Sync loggedInName and attendance wallpaper when authenticated profile changes
+  // Only use Supabase profile.username as fallback if no loggedInName was set by the employee login flow
   useEffect(() => {
     if (profile?.username) {
-      setLoggedInName(profile.username);
-      localStorage.setItem('loggedInName', profile.username);
-      const userWp = localStorage.getItem(`sabi_wallpaper_attendance_${profile.username}`) || localStorage.getItem('sabi_wallpaper_attendance') || "";
+      const existingName = localStorage.getItem('loggedInName');
+      if (!existingName) {
+        setLoggedInName(profile.username);
+        localStorage.setItem('loggedInName', profile.username);
+      }
+      const activeUser = existingName || profile.username;
+      const userWp = localStorage.getItem(`sabi_wallpaper_attendance_${activeUser}`) || localStorage.getItem('sabi_wallpaper_attendance') || "";
       setAttendanceWallpaper(userWp);
     }
   }, [profile?.username]);
