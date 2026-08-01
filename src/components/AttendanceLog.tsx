@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import { db } from "@/firebase";
 import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 export interface AttendanceRecord {
   id: string;
@@ -228,15 +231,15 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   useEffect(() => {
     if (approvedEmployees.length > 0) {
       setEmployeeOptions(approvedEmployees);
-      if (!approvedEmployees.includes(selectedUser)) {
-        if (currentLoggedInUser && approvedEmployees.includes(currentLoggedInUser)) {
-          setSelectedUser(currentLoggedInUser);
-        } else {
-          setSelectedUser(approvedEmployees[0]);
-        }
+      const caseMatch = approvedEmployees.find(emp => emp.toLowerCase() === currentLoggedInUser.toLowerCase());
+      if (caseMatch) {
+        setSelectedUser(caseMatch);
+      } else if (currentLoggedInUser) {
+        setSelectedUser(currentLoggedInUser);
       }
     } else if (currentLoggedInUser) {
       setEmployeeOptions([currentLoggedInUser]);
+      setSelectedUser(currentLoggedInUser);
     }
   }, [approvedEmployees, currentLoggedInUser]);
 
@@ -1163,14 +1166,31 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
               <div>
                 <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Leave Date</label>
-                <input
-                  type="date"
-                  required
-                  value={leaveDate}
-                  onChange={e => setLeaveDate(e.target.value)}
-                  style={{ backgroundColor: '#162035', color: '#ffffff' }}
-                  className="w-full p-3 border border-white/20 rounded-xl font-bold text-white bg-[#162035] outline-none focus:border-amber-400 text-xs cursor-pointer"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between p-3 border border-white/20 rounded-xl font-bold text-white bg-[#162035] outline-none hover:border-amber-400 text-xs cursor-pointer"
+                    >
+                      <span className={leaveDate ? "text-amber-300 font-mono font-black" : "text-slate-400"}>
+                        {leaveDate ? format(new Date(leaveDate), "dd MMM yyyy") : "Select Leave Date..."}
+                      </span>
+                      <CalendarIcon size={16} className="text-amber-400" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="sabi-calendar-popover p-2 border border-white/20 bg-[#090e1a] text-white shadow-2xl rounded-2xl w-auto z-[100]" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={leaveDate ? new Date(leaveDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          setLeaveDate(format(date, "yyyy-MM-dd"));
+                        }
+                      }}
+                      className="rounded-xl border-none"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>

@@ -17,7 +17,7 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -420,6 +420,70 @@ export default function Dashboard() {
   const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
   const [chocolateRows, setChocolateRows] = useState<{ chocolate: string; count: string }[]>([{ chocolate: "", count: "" }]);
+
+  // --- MONTHLY TARGET STATE & COMPUTATION ---
+  const [targetMonthKey, setTargetMonthKey] = useState<string>(() => format(new Date(), "yyyy-MM"));
+  const [monthlyTarget, setMonthlyTarget] = useState<number>(() => {
+    const currentKey = format(new Date(), "yyyy-MM");
+    const saved = localStorage.getItem(`sabi_monthly_target_${currentKey}`);
+    return saved ? Number(saved) : 5000;
+  });
+  const [isEditingTarget, setIsEditingTarget] = useState<boolean>(false);
+  const [targetInput, setTargetInput] = useState<string>("");
+
+  useEffect(() => {
+    const unsubTarget = onSnapshot(doc(db, "monthly_targets", targetMonthKey), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.targetGoal !== undefined) {
+          setMonthlyTarget(Number(data.targetGoal));
+          localStorage.setItem(`sabi_monthly_target_${targetMonthKey}`, String(data.targetGoal));
+        }
+      } else {
+        const saved = localStorage.getItem(`sabi_monthly_target_${targetMonthKey}`);
+        setMonthlyTarget(saved ? Number(saved) : 5000);
+      }
+    });
+    return () => unsubTarget();
+  }, [targetMonthKey]);
+
+  const handleSaveTarget = async () => {
+    const val = Number(targetInput);
+    if (!isNaN(val) && val >= 0) {
+      setMonthlyTarget(val);
+      localStorage.setItem(`sabi_monthly_target_${targetMonthKey}`, String(val));
+      setIsEditingTarget(false);
+      try {
+        await setDoc(doc(db, "monthly_targets", targetMonthKey), { targetGoal: val, updatedAt: new Date().toISOString() }, { merge: true });
+        toast.success(`Monthly target set to ${val.toLocaleString()}`);
+      } catch (e) {
+        console.error("Error saving target:", e);
+      }
+    }
+  };
+
+  const selectedMonthItems = useMemo(() => {
+    return orders.reduce((sum, order) => {
+      if (order.status === "Cancelled") return sum;
+      const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
+      if (!targetDateStr) return sum;
+      if (targetDateStr.startsWith(targetMonthKey)) {
+        const counts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        return sum + counts.reduce((s, val) => s + val, 0);
+      }
+      return sum;
+    }, 0);
+  }, [orders, targetMonthKey]);
+
+  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthItems / monthlyTarget) * 100)) : 0;
+  const currentMonthKey = format(new Date(), "yyyy-MM");
+  const isMonthPast = targetMonthKey < currentMonthKey;
+  const isMonthCurrent = targetMonthKey === currentMonthKey;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const isMonthEnd = isMonthPast || (isMonthCurrent && now.getDate() >= daysInMonth);
+  const isTargetCompleted = selectedMonthItems >= monthlyTarget && monthlyTarget > 0;
+  const isTargetFailed = isMonthEnd && selectedMonthItems < monthlyTarget;
 
   useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
@@ -4155,28 +4219,236 @@ export default function Dashboard() {
                   </div>
                   )}
 
-                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
-                    <div className="flex justify-between items-start mb-2 relative z-10">
-                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Payment Filter</p>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 shadow-inner"><IndianRupee size={16} /></div>
+                  <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px] overflow-hidden group">
+                    {/* Animated Liquid Wave Filling Background */}
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 transition-all duration-700 ease-out z-0 pointer-events-none rounded-b-[1.3rem] overflow-hidden"
+                      style={{ height: `${Math.max(12, targetPercentage)}%` }}
+                    >
+                      <div className="relative w-full h-full bg-gradient-to-t from-blue-700/80 via-cyan-600/60 to-blue-500/40 backdrop-blur-[2px]">
+                        <svg className="absolute -top-4 left-0 w-[200%] h-6 fill-cyan-300/80 liquid-wave-layer-1" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                          <path d="M0,0 C150,90 350,-40 500,40 C650,120 900,-20 1200,40 L1200,120 L0,120 Z"></path>
+                        </svg>
+                        <svg className="absolute -top-3 left-0 w-[200%] h-6 fill-emerald-300/60 liquid-wave-layer-2" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                          <path d="M0,0 C200,70 400,-30 600,50 C800,110 1000,-10 1200,30 L1200,120 L0,120 Z"></path>
+                        </svg>
+                      </div>
                     </div>
-                    <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-blue-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto">
-                      <option value="All">All Payments</option>
-                      <option value="Full Paid">Full Paid</option>
-                      <option value="Partially Paid">Partially Paid</option>
-                      <option value="Pending">Pending</option>
-                    </select>
+
+                    {/* Card Header: Title + Month/Year Picker + Target Edit Trigger */}
+                    <div className="flex justify-between items-center mb-1 relative z-10">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-black text-amber-400 tracking-wide uppercase drop-shadow-sm">Targets</p>
+                        
+                        {/* Month & Year Editable Picker Badge */}
+                        <div className="relative">
+                          <input
+                            type="month"
+                            value={targetMonthKey}
+                            onChange={(e) => {
+                              if (e.target.value) setTargetMonthKey(e.target.value);
+                            }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                            title="Click to Change Month & Year"
+                          />
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 text-xs font-black text-amber-300 bg-slate-900/90 hover:bg-slate-900 px-2.5 py-1 rounded-xl border border-amber-400/50 shadow-md cursor-pointer transition-all hover:scale-105"
+                          >
+                            <span>{format(new Date(targetMonthKey + "-01"), "MMM yyyy")}</span>
+                            <Pencil size={11} className="text-amber-400 ml-0.5" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1">
+                        {!isEditingTarget ? (
+                          <button
+                            onClick={() => {
+                              setTargetInput(String(monthlyTarget));
+                              setIsEditingTarget(true);
+                            }}
+                            className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 flex items-center justify-center transition-all cursor-pointer border border-amber-400/40 shadow-md"
+                            title="Edit Target Goal Quantity"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-amber-400 shadow-xl z-30">
+                            <input
+                              type="number"
+                              value={targetInput}
+                              onChange={(e) => setTargetInput(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveTarget()}
+                              className="w-16 px-1.5 py-0.5 text-xs font-black text-amber-300 outline-none bg-slate-800 rounded-lg border border-white/20"
+                              placeholder="Target..."
+                              autoFocus
+                            />
+                            <button
+                              onClick={handleSaveTarget}
+                              className="bg-emerald-500 hover:bg-emerald-600 text-white p-1 rounded-md text-[10px] font-black cursor-pointer"
+                              title="Save Target Goal"
+                            >
+                              <Check size={12} strokeWidth={3} />
+                            </button>
+                            <button
+                              onClick={() => setIsEditingTarget(false)}
+                              className="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1 rounded-md text-[10px] cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        )}
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-500 text-white shadow-lg border border-blue-300/40">
+                          <Target size={16} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle: Live Progress Count with High Contrast */}
+                    <div className="relative z-10 my-1">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-3xl font-black text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] font-mono">
+                          {selectedMonthItems.toLocaleString()}
+                        </span>
+                        <span className="text-sm font-black text-amber-300 tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+                          / {monthlyTarget.toLocaleString()} Pcs
+                        </span>
+                      </div>
+                      
+                      {/* Progress Fill Bar */}
+                      <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden mt-1.5 p-0.5 border border-white/20 shadow-inner">
+                        <div 
+                          className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]"
+                          style={{ width: `${targetPercentage}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Footer: Dynamic Status Badges (Success / Failed / In Progress) */}
+                    <div className="relative z-10 mt-auto pt-1 flex items-center justify-between">
+                      <span className="text-xs font-black text-cyan-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] font-mono">
+                        {targetPercentage}% Achieved
+                      </span>
+
+                      {isTargetCompleted ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.8)] flex items-center gap-1 animate-pulse border border-emerald-300">
+                          🎉 Target Completed Success
+                        </span>
+                      ) : isTargetFailed ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-600 text-white shadow-lg flex items-center gap-1 border border-rose-300">
+                          ❌ Target Failed
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-400 text-slate-950 shadow-md flex items-center gap-1 border border-amber-300">
+                          🚀 In Progress
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
-                    <div className="flex justify-between items-start mb-2 relative z-10">
-                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Delivery Filter</p>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner"><Package size={16} /></div>
+                    <div className="flex justify-between items-start mb-1 relative z-10">
+                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Chocolates</p>
+                      <div className="flex items-center gap-1.5">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-inner ${
+                                dateFilter.from || dateFilter.to
+                                  ? 'bg-amber-600 text-white ring-2 ring-amber-400'
+                                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                              }`}
+                              title="Filter by Date Range (From - To)"
+                            >
+                              <Calendar size={15} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="sabi-calendar-popover p-3.5 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto z-50" align="end">
+                            <div className="flex flex-col gap-3 min-w-[260px]">
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                                <p className="text-xs font-black text-amber-400 tracking-wide uppercase">Select Date Range</p>
+                                {(dateFilter.from || dateFilter.to) && (
+                                  <button
+                                    onClick={() => setDateFilter({ from: "", to: "" })}
+                                    className="text-[10px] text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer"
+                                  >
+                                    Clear Filter
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-300 font-bold">From:</span>
+                                  <input
+                                    type="date"
+                                    value={dateFilter.from}
+                                    onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
+                                    className="bg-slate-800 border border-white/20 rounded-lg px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-300 font-bold">To:</span>
+                                  <input
+                                    type="date"
+                                    value={dateFilter.to}
+                                    onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
+                                    className="bg-slate-800 border border-white/20 rounded-lg px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="border-t border-white/10 pt-2 flex justify-center">
+                                <CalendarComponent
+                                  mode="single"
+                                  selected={dateFilter.from ? new Date(dateFilter.from) : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const formatted = format(date, "yyyy-MM-dd");
+                                      if (!dateFilter.from || (dateFilter.from && dateFilter.to)) {
+                                        setDateFilter({ from: formatted, to: "" });
+                                      } else {
+                                        if (new Date(formatted) < new Date(dateFilter.from)) {
+                                          setDateFilter({ from: formatted, to: dateFilter.from });
+                                        } else {
+                                          setDateFilter({ ...dateFilter, to: formatted });
+                                        }
+                                      }
+                                    }
+                                  }}
+                                  className="rounded-xl border-none p-0 scale-90"
+                                />
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner">
+                          <Package size={16} />
+                        </div>
+                      </div>
                     </div>
-                    <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value as any)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto">
-                      <option value="All">All Deliveries</option>
-                      <option value="Delivered">Delivered</option>
-                      <option value="In Process">In Process</option>
+
+                    <div className="flex items-baseline justify-between relative z-10 mb-1">
+                      <p className="text-2xl font-black text-amber-950">
+                        {chocFilter
+                          ? (topChocolates.find(([name]) => name === chocFilter)?.[1] || 0)
+                          : totalItems}
+                      </p>
+                      {(dateFilter.from || dateFilter.to) && (
+                        <span className="text-[9px] font-extrabold text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded-md truncate max-w-[120px]" title={`${dateFilter.from || 'Start'} - ${dateFilter.to || 'End'}`}>
+                          📅 {dateFilter.from || 'Start'} - {dateFilter.to || 'End'}
+                        </span>
+                      )}
+                    </div>
+
+                    <select value={chocFilter} onChange={(e) => setChocFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto">
+                      <option value="">All Chocolates</option>
+                      {uniqueChocolates.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
                     </select>
                   </div>
 
