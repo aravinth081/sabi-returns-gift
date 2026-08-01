@@ -462,28 +462,7 @@ export default function Dashboard() {
     }
   };
 
-  const selectedMonthItems = useMemo(() => {
-    return orders.reduce((sum, order) => {
-      if (order.status === "Cancelled") return sum;
-      const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
-      if (!targetDateStr) return sum;
-      if (targetDateStr.startsWith(targetMonthKey)) {
-        const counts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
-        return sum + counts.reduce((s, val) => s + val, 0);
-      }
-      return sum;
-    }, 0);
-  }, [orders, targetMonthKey]);
 
-  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthItems / monthlyTarget) * 100)) : 0;
-  const currentMonthKey = format(new Date(), "yyyy-MM");
-  const isMonthPast = targetMonthKey < currentMonthKey;
-  const isMonthCurrent = targetMonthKey === currentMonthKey;
-  const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const isMonthEnd = isMonthPast || (isMonthCurrent && now.getDate() >= daysInMonth);
-  const isTargetCompleted = selectedMonthItems >= monthlyTarget && monthlyTarget > 0;
-  const isTargetFailed = isMonthEnd && selectedMonthItems < monthlyTarget;
 
   useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
@@ -1030,6 +1009,43 @@ export default function Dashboard() {
   const setLocationFilter = activeTab === 'dashboard2' ? setD2LocationFilter : setD1LocationFilter;
   const roleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
   const setRoleFilter = activeTab === 'dashboard2' ? setD2RoleFilter : setD1RoleFilter;
+
+  const selectedMonthItems = useMemo(() => {
+    const curTableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
+    const curRoleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
+
+    return orders.reduce((sum, order) => {
+      if (order.status === "Cancelled") return sum;
+
+      const isProduct = order.category === 'product';
+      const categoryMatch = activeTab === 'dashboard2' ? isProduct : !isProduct;
+      if (!categoryMatch) return sum;
+
+      const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
+      if (!typeMatch) return sum;
+
+      const roleMatch = curRoleFilter === 'All' || order.role === curRoleFilter;
+      if (!roleMatch) return sum;
+
+      const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
+      if (!targetDateStr) return sum;
+      if (targetDateStr.startsWith(targetMonthKey)) {
+        const counts = String(order.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        return sum + counts.reduce((s, val) => s + val, 0);
+      }
+      return sum;
+    }, 0);
+  }, [orders, targetMonthKey, activeTab, d1TableTypeFilter, d2TableTypeFilter, d1RoleFilter, d2RoleFilter]);
+
+  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthItems / monthlyTarget) * 100)) : 0;
+  const currentMonthKey = format(new Date(), "yyyy-MM");
+  const isMonthPast = targetMonthKey < currentMonthKey;
+  const isMonthCurrent = targetMonthKey === currentMonthKey;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const isMonthEnd = isMonthPast || (isMonthCurrent && now.getDate() >= daysInMonth);
+  const isTargetCompleted = selectedMonthItems >= monthlyTarget && monthlyTarget > 0;
+  const isTargetFailed = isMonthEnd && selectedMonthItems < monthlyTarget;
 
   // Wrapper helpers for cost analytics states depending on Reports vs Inventories settings
   const isInvAdmin = (activeTab as any) === 'inventories_admin_panel';

@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/firebase";
-import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -21,7 +21,7 @@ export interface AttendanceRecord {
   logoutTime: string; // e.g. "05:45 PM"
   workingHours: string; // e.g. "8.5 hrs"
   workingHoursNum: number; // e.g. 8.5
-  status: "Present" | "Leave" | "Half Day";
+  status: "Present" | "Leave" | "Half Day" | "Late Attendance";
   remarks: string;
 }
 
@@ -142,7 +142,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   // Modals & Forms State
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
-  const [isYesterdayAlertOpen, setIsYesterdayAlertOpen] = useState(false);
+  const [selectedDateAction, setSelectedDateAction] = useState<{ dayStr: string; displayDate: string } | null>(null);
   const [leaveEmployee, setLeaveEmployee] = useState(selectedUser);
   const [leaveDate, setLeaveDate] = useState("");
   const [leaveRemark, setLeaveRemark] = useState("");
@@ -276,44 +276,123 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   // --- ATTENDANCE ACTIONS ---
 
-  const handleMarkYesterdayPresent = async () => {
-    const yesterdayRec: AttendanceRecord = {
-      id: String(Date.now()),
+  // Handle Date Actions from Calendar Click
+  const handleActionMarkLate = async (targetDate: string) => {
+    const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const newRecord: AttendanceRecord = {
+      id: existing?.id || String(Date.now()),
+      fireId: existing?.fireId,
       employeeName: selectedUser,
-      date: yesterdayStr,
-      loginTime: "09:00 AM",
+      date: targetDate,
+      loginTime: "10:30 AM",
       logoutTime: "06:00 PM",
-      workingHours: "9 hrs",
-      workingHoursNum: 9,
-      status: "Present",
-      remarks: "Marked Retroactively"
+      workingHours: "7.5 hrs",
+      workingHoursNum: 7.5,
+      status: "Late Attendance",
+      remarks: "Late Attendance Marked"
     };
-    const updated = [...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === yesterdayStr)), yesterdayRec];
+
+    const updated = [
+      ...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate)),
+      newRecord
+    ];
     setAttendanceRecords(updated);
-    toast.success(`Yesterday (${yesterdayStr}) marked as Present!`);
+    setSelectedDateAction(null);
+    toast.success(`Marked Late Attendance for ${selectedUser} on ${targetDate}!`);
+
     try {
-      await addDoc(collection(db, "attendance"), yesterdayRec);
-    } catch (e) {}
+      if (existing?.fireId) {
+        await updateDoc(doc(db, "attendance", existing.fireId), newRecord as any);
+      } else {
+        await addDoc(collection(db, "attendance"), newRecord);
+      }
+    } catch (e) {
+      console.log("Offline mode");
+    }
   };
 
-  const handleMarkYesterdayLeave = async () => {
-    const yesterdayRec: AttendanceRecord = {
-      id: String(Date.now()),
+  const handleActionApplyLeave = async (targetDate: string) => {
+    const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const newRecord: AttendanceRecord = {
+      id: existing?.id || String(Date.now()),
+      fireId: existing?.fireId,
       employeeName: selectedUser,
-      date: yesterdayStr,
+      date: targetDate,
       loginTime: "-",
       logoutTime: "-",
       workingHours: "0 hrs",
       workingHoursNum: 0,
       status: "Leave",
-      remarks: "Leave Applied Retroactively"
+      remarks: "Leave Applied"
     };
-    const updated = [...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === yesterdayStr)), yesterdayRec];
+
+    const updated = [
+      ...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate)),
+      newRecord
+    ];
     setAttendanceRecords(updated);
-    toast.success(`Yesterday (${yesterdayStr}) marked as Leave!`);
+    setSelectedDateAction(null);
+    toast.success(`Applied Leave for ${selectedUser} on ${targetDate}!`);
+
     try {
-      await addDoc(collection(db, "attendance"), yesterdayRec);
-    } catch (e) {}
+      if (existing?.fireId) {
+        await updateDoc(doc(db, "attendance", existing.fireId), newRecord as any);
+      } else {
+        await addDoc(collection(db, "attendance"), newRecord);
+      }
+    } catch (e) {
+      console.log("Offline mode");
+    }
+  };
+
+  const handleActionUnmark = async (targetDate: string) => {
+    const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const updated = attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate));
+    setAttendanceRecords(updated);
+    setSelectedDateAction(null);
+    toast.success(`Unmarked attendance for ${selectedUser} on ${targetDate}!`);
+
+    try {
+      if (existing?.fireId) {
+        await deleteDoc(doc(db, "attendance", existing.fireId));
+      }
+    } catch (e) {
+      console.log("Offline mode");
+    }
+  };
+
+  const handleActionMarkPresent = async (targetDate: string) => {
+    const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const newRecord: AttendanceRecord = {
+      id: existing?.id || String(Date.now()),
+      fireId: existing?.fireId,
+      employeeName: selectedUser,
+      date: targetDate,
+      loginTime: "09:00 AM",
+      logoutTime: "06:00 PM",
+      workingHours: "9 hrs",
+      workingHoursNum: 9,
+      status: "Present",
+      remarks: "Marked Present"
+    };
+
+    const updated = [
+      ...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate)),
+      newRecord
+    ];
+    setAttendanceRecords(updated);
+    setSelectedDateAction(null);
+    toast.success(`Marked Present for ${selectedUser} on ${targetDate}!`);
+
+    try {
+      if (existing?.fireId) {
+        await updateDoc(doc(db, "attendance", existing.fireId), newRecord as any);
+      } else {
+        await addDoc(collection(db, "attendance"), newRecord);
+      }
+    } catch (e) {
+      console.log("Offline mode");
+    }
   };
 
   const proceedTodayLogin = async () => {
@@ -353,12 +432,6 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
         toast.info(`Already logged in today at ${todayRecord.loginTime}`);
         return;
       }
-    }
-
-    // Check if yesterday's attendance was marked
-    if (!yesterdayRecord || !yesterdayRecord.status) {
-      setIsYesterdayAlertOpen(true);
-      return;
     }
 
     await proceedTodayLogin();
@@ -758,21 +831,30 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                 const rec = userAttendanceRecords.find(r => r.date === dayStr);
                 const isToday = dayStr === todayStr;
 
-                let bgClasses = "bg-[#0f172a] border-white/15 text-white hover:border-amber-400/50";
+                let bgClasses = "bg-[#0f172a] border-white/15 text-white hover:border-amber-400 cursor-pointer shadow-sm hover:scale-[1.02]";
                 if (rec?.status === "Present") {
-                  // Green for Logged In Present
-                  bgClasses = "bg-emerald-600 text-white border-emerald-400 shadow-lg";
+                  bgClasses = "bg-emerald-600 text-white border-emerald-400 shadow-lg cursor-pointer hover:scale-[1.02]";
+                } else if (rec?.status === "Late Attendance") {
+                  bgClasses = "bg-amber-600 text-white border-amber-400 shadow-lg cursor-pointer hover:scale-[1.02]";
                 } else if (rec?.status === "Leave") {
-                  // Red for Leave
-                  bgClasses = "bg-rose-600 text-white border-rose-400 shadow-lg";
+                  bgClasses = "bg-rose-600 text-white border-rose-400 shadow-lg cursor-pointer hover:scale-[1.02]";
+                } else if (rec?.status === "Half Day") {
+                  bgClasses = "bg-cyan-600 text-white border-cyan-400 shadow-lg cursor-pointer hover:scale-[1.02]";
                 }
 
                 return (
                   <div
                     key={d}
-                    className={`h-20 md:h-24 p-2 rounded-2xl border-2 flex flex-col justify-between transition-all relative ${bgClasses} ${
+                    onClick={() => {
+                      setSelectedDateAction({
+                        dayStr,
+                        displayDate: `${d} ${monthNames[month]} ${year}`
+                      });
+                    }}
+                    className={`h-20 md:h-24 p-2 rounded-2xl border-2 flex flex-col justify-between transition-all relative group ${bgClasses} ${
                       isToday ? "ring-4 ring-amber-400 ring-offset-2 ring-offset-[#131c2e] font-black" : ""
                     }`}
+                    title={`Click to manage attendance for ${d} ${monthNames[month]} ${year}`}
                   >
                     <div className="flex justify-between items-start">
                       <span className={`text-xs md:text-sm font-black ${isToday ? "text-amber-300 underline decoration-amber-400 decoration-2" : "text-white"}`}>
@@ -792,13 +874,24 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                           <div>Hrs: {rec.workingHoursNum || rec.workingHours}</div>
                         </div>
                       )}
+                      {rec?.status === "Late Attendance" && (
+                        <div className="text-amber-100">
+                          <div className="font-black text-[11px] uppercase tracking-wide">LATE</div>
+                          <div>In: {rec.loginTime || "10:30 AM"}</div>
+                        </div>
+                      )}
                       {rec?.status === "Leave" && (
                         <div className="uppercase font-black tracking-wider text-[11px] text-center text-rose-100 mt-2">
                           LEAVE
                         </div>
                       )}
+                      {rec?.status === "Half Day" && (
+                        <div className="uppercase font-black tracking-wider text-[11px] text-center text-cyan-100 mt-2">
+                          HALF DAY
+                        </div>
+                      )}
                       {!rec && (
-                        <div className="text-slate-300 font-extrabold text-[10px] text-center mt-2 tracking-wide uppercase">Regular Day</div>
+                        <div className="text-slate-300 font-extrabold text-[10px] text-center mt-2 tracking-wide uppercase group-hover:text-amber-300">Click to Mark</div>
                       )}
                     </div>
                   </div>
@@ -813,12 +906,16 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                 <span>Green = Logged In (Present)</span>
               </div>
               <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded-md bg-amber-500 inline-block shadow-sm"></span>
+                <span>Orange = Late Attendance</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <span className="w-4 h-4 rounded-md bg-rose-500 inline-block shadow-sm"></span>
                 <span>Red = Applied Leave</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-4 h-4 rounded-md bg-[#0f172a] border border-white/30 inline-block"></span>
-                <span className="text-white">Default = Working Day</span>
+                <span className="text-white">Default = Working Day (Click to Mark)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-4 h-4 rounded-md bg-[#0f172a] ring-2 ring-amber-400 inline-block"></span>
@@ -1074,50 +1171,87 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
         </div>
       )}
 
-      {/* ------------------- MODAL: YESTERDAY ATTENDANCE WARNING POPUP ------------------- */}
-      {isYesterdayAlertOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsYesterdayAlertOpen(false)}>
-          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-md p-6 border-2 border-amber-500/50 animate-in fade-in zoom-in duration-200 cursor-default text-center space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full mx-auto flex items-center justify-center border border-amber-500/40 shadow-inner">
-              <AlertCircle size={36} strokeWidth={2.5} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-amber-400 uppercase tracking-wider">Yesterday's Attendance Pending!</h3>
-              <p className="text-xs font-bold text-slate-300 mt-2 leading-relaxed">
-                You haven't marked attendance for yesterday (<span className="text-amber-300 font-mono font-black">{yesterdayStr}</span>). Please mark yesterday's attendance before logging in for today.
-              </p>
+      {/* ------------------- MODAL: DATE CLICK ATTENDANCE ACTION POPUP ------------------- */}
+      {selectedDateAction && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-150"
+          onClick={() => setSelectedDateAction(null)}
+        >
+          <div
+            style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
+            className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-md p-6 border-2 border-amber-500/50 animate-in zoom-in-95 duration-200 cursor-default space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-white/10 pb-3">
+              <div>
+                <div className="flex items-center gap-2 text-amber-400 font-black text-lg">
+                  <CalendarIcon size={20} />
+                  <span>{selectedDateAction.displayDate}</span>
+                </div>
+                <p className="text-xs font-bold text-slate-300 mt-1">
+                  Employee: <span className="text-amber-300 font-extrabold">{selectedUser}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedDateAction(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-full cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5 pt-2">
+            {/* Current Status Banner */}
+            <div className="bg-[#131c2e] p-3 rounded-2xl border border-white/10 flex items-center justify-between text-xs font-extrabold">
+              <span className="text-slate-400">Current Status:</span>
+              {(() => {
+                const currentRec = userAttendanceRecords.find(r => r.date === selectedDateAction.dayStr);
+                if (!currentRec) return <span className="bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-lg">Not Marked</span>;
+                if (currentRec.status === "Present") return <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg">Present ({currentRec.loginTime})</span>;
+                if (currentRec.status === "Late Attendance") return <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg">Late Attendance</span>;
+                if (currentRec.status === "Leave") return <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg">Leave</span>;
+                return <span className="bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-lg">{currentRec.status}</span>;
+              })()}
+            </div>
+
+            {/* Action Options */}
+            <div className="grid grid-cols-1 gap-3 pt-1">
               <button
-                onClick={async () => {
-                  await handleMarkYesterdayPresent();
-                  setIsYesterdayAlertOpen(false);
-                  proceedTodayLogin();
-                }}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                onClick={() => handleActionMarkLate(selectedDateAction.dayStr)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black text-xs md:text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2.5 hover:scale-[1.02]"
               >
-                <CheckCircle2 size={16} /> Mark Yesterday as Present & Log In Today
+                <Clock size={18} /> Mark Late Attendance
               </button>
 
               <button
-                onClick={async () => {
-                  await handleMarkYesterdayLeave();
-                  setIsYesterdayAlertOpen(false);
-                  proceedTodayLogin();
-                }}
-                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                onClick={() => handleActionApplyLeave(selectedDateAction.dayStr)}
+                className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs md:text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2.5 hover:scale-[1.02]"
               >
-                <XCircle size={16} /> Mark Yesterday as Leave & Log In Today
+                <XCircle size={18} /> Apply Leave
               </button>
 
               <button
-                onClick={() => setIsYesterdayAlertOpen(false)}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+                onClick={() => handleActionUnmark(selectedDateAction.dayStr)}
+                className="w-full py-3 px-4 bg-slate-700 hover:bg-slate-600 text-slate-100 font-black text-xs md:text-sm uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 hover:scale-[1.02]"
               >
-                Cancel
+                <AlertCircle size={18} /> Unmark Attendance
+              </button>
+
+              <button
+                onClick={() => handleActionMarkPresent(selectedDateAction.dayStr)}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs md:text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2.5 hover:scale-[1.02]"
+              >
+                <CheckCircle2 size={18} /> Mark Present
               </button>
             </div>
+
+            <button
+              onClick={() => setSelectedDateAction(null)}
+              className="w-full py-1 text-slate-400 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
