@@ -1117,6 +1117,7 @@ main {
   width: 100% !important;
   margin: 0 auto !important;
   flex: none !important;
+  overflow: visible !important;
 }
 
 .screenshot-mode-active div {
@@ -1124,6 +1125,7 @@ main {
   max-height: none !important;
   min-height: 0 !important;
   flex: none !important;
+  overflow: visible !important;
 }
 
 /* Premium Header styling inside screenshot mode */

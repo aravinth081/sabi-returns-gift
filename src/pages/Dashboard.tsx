@@ -3367,8 +3367,23 @@ export default function Dashboard() {
     setIsScreenshotMode(true);
     toast.info("📸 Capturing screenshot...");
 
-    // Fast 500ms delay for quick capture
+    // Store previous scroll positions
+    const container = tableContainerRef.current;
+    const prevContainerScrollTop = container ? container.scrollTop : 0;
+    const prevWindowY = window.scrollY;
+
+    // Reset scroll positions to top so html2canvas starts rendering from Row 1
+    if (container) container.scrollTop = 0;
+    if (screenshotTableRef.current) screenshotTableRef.current.scrollTop = 0;
+    window.scrollTo(0, 0);
+
+    // Fast 500ms delay for DOM update & layout reflow
     await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Ensure scroll position is strictly at top right before capturing
+    if (container) container.scrollTop = 0;
+    if (screenshotTableRef.current) screenshotTableRef.current.scrollTop = 0;
+    window.scrollTo(0, 0);
 
     const element = screenshotTableRef.current;
     if (element) {
@@ -3379,7 +3394,11 @@ export default function Dashboard() {
           scale: 2,
           useCORS: true,
           logging: false,
-          allowTaint: true
+          allowTaint: true,
+          scrollY: -window.scrollY,
+          scrollX: -window.scrollX,
+          windowWidth: element.scrollWidth,
+          windowHeight: element.scrollHeight,
         });
 
         canvas.toBlob(async (blob) => {
@@ -3410,13 +3429,20 @@ export default function Dashboard() {
             }
           }
           setIsScreenshotMode(false);
+          // Restore original scroll positions
+          if (container) container.scrollTop = prevContainerScrollTop;
+          window.scrollTo(0, prevWindowY);
         }, "image/png");
       } catch (error) {
         console.error("Error generating screenshot:", error);
         setIsScreenshotMode(false);
+        if (container) container.scrollTop = prevContainerScrollTop;
+        window.scrollTo(0, prevWindowY);
       }
     } else {
       setIsScreenshotMode(false);
+      if (container) container.scrollTop = prevContainerScrollTop;
+      window.scrollTo(0, prevWindowY);
     }
   };
 
@@ -5000,10 +5026,14 @@ export default function Dashboard() {
                             </p>
                             <div style={{ display: 'flex', gap: '16px', marginTop: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
                               <span style={{ fontSize: '13px', fontWeight: 900, color: '#fef08a', textShadow: 'none' }}>
-                                Orders: {filteredDashboardOrders.length}
+                                Orders: {(isScreenshotMode ? sortedDashboardOrders : filteredDashboardOrders).length}
                               </span>
                               <span style={{ fontSize: '13px', fontWeight: 900, color: '#fef08a', textShadow: 'none' }}>
-                                Items: {filteredDashboardOrders.reduce((s, o) => s + Number(o.count || 0), 0)}
+                                Items: {(isScreenshotMode ? sortedDashboardOrders : filteredDashboardOrders).reduce((s, o) => {
+                                  const cntStr = String(o.count || '0');
+                                  const sum = cntStr.split(',').reduce((acc, c) => acc + (parseFloat(c.trim()) || 0), 0);
+                                  return s + sum;
+                                }, 0)}
                               </span>
                             </div>
                           </div>
