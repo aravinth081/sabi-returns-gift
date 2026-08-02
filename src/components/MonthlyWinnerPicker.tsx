@@ -949,7 +949,7 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
 
               {/* Glowing metallic Winner Card */}
               <div 
-                className="w-full max-w-[260px] p-5 rounded-[2rem] border-2 border-amber-400/40 relative overflow-hidden flex flex-col items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.6)] space-y-3.5"
+                className="w-full max-w-[320px] p-5 rounded-[2rem] border-2 border-amber-400/40 relative overflow-hidden flex flex-col items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.6)] space-y-3.5"
                 style={{
                   background: 'linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(217,119,6,0.05) 100%)',
                   backdropFilter: 'blur(30px)',
@@ -960,9 +960,9 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
                 <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 via-amber-400 to-yellow-500 border border-amber-200/50 flex items-center justify-center text-[9px] font-black text-amber-950 shadow-md animate-[spin_6s_linear_infinite]">₹</div>
                 <div className="absolute -bottom-3 -right-3 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 via-amber-400 to-yellow-500 border border-amber-200/50 flex items-center justify-center text-[9px] font-black text-amber-950 shadow-md animate-[spin_5s_linear_infinite_reverse]">₹</div>
 
-                <div className="space-y-1 text-center">
+                <div className="space-y-1 text-center w-full">
                   <span className="inline-block text-[8px] font-black px-2.5 py-0.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-950 rounded-full uppercase tracking-widest shadow-md">Winner Details</span>
-                  <p className="text-lg font-black bg-gradient-to-r from-white to-amber-100 bg-clip-text text-transparent uppercase tracking-wide truncate max-w-[210px] pt-1">{winner?.name}</p>
+                  <p className="text-lg font-black bg-gradient-to-r from-white to-amber-100 bg-clip-text text-transparent uppercase tracking-wide break-words max-w-[280px] mx-auto pt-1">{winner?.name}</p>
                   <p className="text-xs text-amber-300 font-bold tracking-widest flex items-center justify-center gap-1">
                     <Phone size={10} className="text-amber-400" />
                     {winner?.phone || 'No Contact'}

@@ -375,6 +375,15 @@ export default function Dashboard() {
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<any>(null);
   const [headerActionOpen, setHeaderActionOpen] = useState(false);
+  const [showAmounts, setShowAmounts] = useState<boolean>(false);
+
+  const maskAmount = (val: string | number) => {
+    if (showAmounts) {
+      if (typeof val === 'number') return `₹${val.toLocaleString()}`;
+      return String(val).startsWith('₹') ? val : `₹${val}`;
+    }
+    return '₹••••••';
+  };
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [adminDateType, setAdminDateType] = useState<string>('Dispatch Date');
@@ -1009,6 +1018,56 @@ export default function Dashboard() {
   const setLocationFilter = activeTab === 'dashboard2' ? setD2LocationFilter : setD1LocationFilter;
   const roleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
   const setRoleFilter = activeTab === 'dashboard2' ? setD2RoleFilter : setD1RoleFilter;
+
+  const isAnyFilterActive = useMemo(() => {
+    return (
+      paymentFilter !== 'All' ||
+      deliveryFilter !== 'All' ||
+      orderStatusFilter !== 'All' ||
+      tableTypeFilter !== 'All' ||
+      Boolean(dateFilter.from || dateFilter.to) ||
+      countFilter !== 'All' ||
+      chocFilter !== '' ||
+      locationFilter !== 'All' ||
+      roleFilter !== 'All' ||
+      Boolean(dashboardSearch)
+    );
+  }, [
+    paymentFilter,
+    deliveryFilter,
+    orderStatusFilter,
+    tableTypeFilter,
+    dateFilter,
+    countFilter,
+    chocFilter,
+    locationFilter,
+    roleFilter,
+    dashboardSearch,
+  ]);
+
+  const handleClearAllFilters = () => {
+    setD1PaymentFilter('All');
+    setD2PaymentFilter('All');
+    setD1DeliveryFilter('All');
+    setD2DeliveryFilter('All');
+    setD1OrderStatusFilter('All');
+    setD2OrderStatusFilter('All');
+    setD1TableTypeFilter('All');
+    setD2TableTypeFilter('All');
+    setD1DateFilter({ from: '', to: '' });
+    setD2DateFilter({ from: '', to: '' });
+    setD1CountFilter('All');
+    setD2CountFilter('All');
+    setD1ChocFilter('');
+    setD2ChocFilter('');
+    setD1LocationFilter('All');
+    setD2LocationFilter('All');
+    setD1RoleFilter('All');
+    setD2RoleFilter('All');
+    setD1DashboardSearch('');
+    setD2DashboardSearch('');
+    toast.success('All active filters reset to default');
+  };
 
   const selectedMonthItems = useMemo(() => {
     const curTableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
@@ -4512,13 +4571,23 @@ export default function Dashboard() {
                             <option value="Dispatch Date">Dispatch Date</option>
                           </select>
                         </div>
+
+                        {/* 🟢 EYE ICON TOGGLE FOR MONETARY VALUES */}
+                        <button
+                          type="button"
+                          onClick={() => setShowAmounts(!showAmounts)}
+                          className="ml-1 p-1 rounded-lg bg-white/80 hover:bg-white text-[#c2410c] hover:text-[#9a3412] transition-all cursor-pointer shadow-sm border border-amber-300/60 flex items-center justify-center shrink-0"
+                          title={showAmounts ? "Hide monetary amounts" : "Show monetary amounts"}
+                        >
+                          {showAmounts ? <Eye size={13} /> : <EyeOff size={13} />}
+                        </button>
                       </div>
 
                       <div className="text-right">
                         <div className="text-[10px] font-black text-green-800 uppercase tracking-tighter">Revenue</div>
-                        <h3 className="text-lg font-black text-green-700 leading-tight">₹{displayRevenue.toLocaleString()}</h3>
+                        <h3 className="text-lg font-black text-green-700 leading-tight">{maskAmount(displayRevenue)}</h3>
                         <div className="text-[9px] font-black text-rose-700 uppercase tracking-tighter mt-0.5">Pending Amount</div>
-                        <h4 className="text-sm font-black text-rose-600 leading-tight">₹{displayPendingAmount.toLocaleString()}</h4>
+                        <h4 className="text-sm font-black text-rose-600 leading-tight">{maskAmount(displayPendingAmount)}</h4>
                       </div>
                     </div>
 
@@ -4656,6 +4725,19 @@ export default function Dashboard() {
                           <User size={14} strokeWidth={2.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
                           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
                         </div>
+
+                        {/* 🟢 PROMINENT CLEAR ALL FILTERS BUTTON */}
+                        {isAnyFilterActive && (
+                          <button
+                            type="button"
+                            onClick={handleClearAllFilters}
+                            className="h-9 md:h-10 px-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer animate-in fade-in zoom-in duration-200 shrink-0 border border-rose-400/40 uppercase tracking-wider"
+                            title="Reset all active filters to default state"
+                          >
+                            <RotateCcw size={14} strokeWidth={2.5} />
+                            <span>Clear All Filters</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -5941,7 +6023,7 @@ export default function Dashboard() {
                               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-black font-black flex items-center justify-center text-xs shadow-md">
                                 #{index + 1}
                               </div>
-                              <span className="font-extrabold text-white text-base truncate max-w-[240px]">{name}</span>
+                              <span className="font-extrabold text-white text-base break-words max-w-[320px]" title={name}>{name}</span>
                             </div>
                             <span className="font-black text-amber-300 bg-amber-500/15 px-3.5 py-1.5 rounded-xl border border-amber-500/30 text-xs shadow-sm">
                               {count} Items Sold
@@ -6354,7 +6436,7 @@ export default function Dashboard() {
                                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-black font-black flex items-center justify-center text-xs shadow-md">
                                   #{index + 1}
                                 </div>
-                                <span className="font-extrabold text-white text-base truncate max-w-[240px]">{name}</span>
+                                <span className="font-extrabold text-white text-base break-words max-w-[320px]" title={name}>{name}</span>
                               </div>
                               <span className="font-black text-amber-300 bg-amber-500/15 px-3.5 py-1.5 rounded-xl border border-amber-500/30 text-xs shadow-sm">
                                 {count} Items Sold
@@ -7400,7 +7482,7 @@ export default function Dashboard() {
                   <div className="flex-1 pt-2">
                     <h3 className="text-base font-extrabold text-black tracking-wide mb-3">Shipping Label</h3>
                     <p className="font-extrabold text-[15px] mb-1 text-black">Shipping To:</p>
-                    <p className="text-[15px] text-black tracking-wide">{shippingOrder.name}</p>
+                    <p className="text-[15px] font-black text-black tracking-wide break-words max-w-[360px] leading-snug">{shippingOrder.name}</p>
                     <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {formatPhoneNumber(shippingOrder.phone)}</p>
                   </div>
                   <div className="flex-shrink-0 ml-4">
@@ -8462,7 +8544,7 @@ export default function Dashboard() {
                       <tr key={order.fireId} className={`border-b border-white/5 text-sm transition-colors ${idx % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#131c2e]'} hover:bg-[#18243b]`}>
                         <td className="p-3.5 text-xs font-extrabold text-slate-300 border-r border-white/5">{order.orderDate || order.functionDate}</td>
                         <td className="p-3.5 text-xs font-black text-amber-300 font-mono border-r border-white/5">{getSerial(order.id)}</td>
-                        <td className="p-3.5 text-sm font-extrabold text-white border-r border-white/5 max-w-[200px] truncate" title={order.name}>{order.name}</td>
+                        <td className="p-3.5 text-sm font-extrabold text-white border-r border-white/5 break-words min-w-[140px] max-w-[280px]" title={order.name}>{order.name}</td>
                         <td className="p-3.5 text-sm font-black text-center text-amber-300 font-mono border-r border-white/5">{order.count}</td>
                         <td className="p-3.5 text-sm font-mono font-black text-right text-emerald-300 border-r border-white/5">₹{priceInfo.fullRevenue.toLocaleString()}</td>
                         <td className="p-3.5 text-sm font-mono font-black text-right text-rose-400 border-r border-white/5">₹{Math.round(costInfo.finalCost).toLocaleString()}</td>

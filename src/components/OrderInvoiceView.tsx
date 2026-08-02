@@ -182,14 +182,14 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
           <div className="flex flex-col items-end ml-auto">
             <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-3 text-right">ORIGINAL FOR RECIPIENT</p>
-            <div className="w-[160px] h-[160px] bg-white rounded-full overflow-hidden flex items-center justify-center">
+            <div className="w-[160px] h-[160px] bg-white rounded-full overflow-hidden flex items-center justify-center p-1 border border-gray-100 shadow-sm">
               <img
                 src={`/sabi-logo.png?v=${refreshKey}`}
                 alt="Logo"
                 style={{
-                  width: '160px',
-                  height: '160px',
-                  objectFit: 'cover'
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
                 }}
                 className="block rounded-full"
                 crossOrigin="anonymous"
@@ -208,7 +208,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
         {/* Customer Details */}
         <div className="mb-6">
           <p className="font-bold text-gray-500 mb-1">Customer Details:</p>
-          <p className="font-black text-lg leading-none mb-1">{order.name}</p>
+          <p className="font-black text-lg leading-snug mb-1 break-words max-w-[600px]">{order.name}</p>
           <p className="font-bold">Ph: {formatPhoneNumber(order.phone)}</p>
         </div>
 
