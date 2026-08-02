@@ -3370,19 +3370,33 @@ export default function Dashboard() {
     // Store previous scroll positions
     const container = tableContainerRef.current;
     const prevContainerScrollTop = container ? container.scrollTop : 0;
+    const prevContainerScrollLeft = container ? container.scrollLeft : 0;
     const prevWindowY = window.scrollY;
+    const prevWindowX = window.scrollX;
 
-    // Reset scroll positions to top so html2canvas starts rendering from Row 1
-    if (container) container.scrollTop = 0;
-    if (screenshotTableRef.current) screenshotTableRef.current.scrollTop = 0;
+    // Reset ALL scroll positions to top-left (0, 0) so Row 1 and Column 1 (NAME) are never scrolled off/cut off
+    if (container) {
+      container.scrollTop = 0;
+      container.scrollLeft = 0;
+    }
+    if (screenshotTableRef.current) {
+      screenshotTableRef.current.scrollTop = 0;
+      screenshotTableRef.current.scrollLeft = 0;
+    }
     window.scrollTo(0, 0);
 
     // Fast 500ms delay for DOM update & layout reflow
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Ensure scroll position is strictly at top right before capturing
-    if (container) container.scrollTop = 0;
-    if (screenshotTableRef.current) screenshotTableRef.current.scrollTop = 0;
+    // Ensure scroll position is strictly at top-left (0, 0) right before capturing
+    if (container) {
+      container.scrollTop = 0;
+      container.scrollLeft = 0;
+    }
+    if (screenshotTableRef.current) {
+      screenshotTableRef.current.scrollTop = 0;
+      screenshotTableRef.current.scrollLeft = 0;
+    }
     window.scrollTo(0, 0);
 
     const element = screenshotTableRef.current;
@@ -3395,9 +3409,9 @@ export default function Dashboard() {
           useCORS: true,
           logging: false,
           allowTaint: true,
-          scrollY: -window.scrollY,
-          scrollX: -window.scrollX,
-          windowWidth: element.scrollWidth,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: Math.max(element.scrollWidth, 950),
           windowHeight: element.scrollHeight,
         });
 
@@ -3430,19 +3444,28 @@ export default function Dashboard() {
           }
           setIsScreenshotMode(false);
           // Restore original scroll positions
-          if (container) container.scrollTop = prevContainerScrollTop;
-          window.scrollTo(0, prevWindowY);
+          if (container) {
+            container.scrollTop = prevContainerScrollTop;
+            container.scrollLeft = prevContainerScrollLeft;
+          }
+          window.scrollTo(prevWindowX, prevWindowY);
         }, "image/png");
       } catch (error) {
         console.error("Error generating screenshot:", error);
         setIsScreenshotMode(false);
-        if (container) container.scrollTop = prevContainerScrollTop;
-        window.scrollTo(0, prevWindowY);
+        if (container) {
+          container.scrollTop = prevContainerScrollTop;
+          container.scrollLeft = prevContainerScrollLeft;
+        }
+        window.scrollTo(prevWindowX, prevWindowY);
       }
     } else {
       setIsScreenshotMode(false);
-      if (container) container.scrollTop = prevContainerScrollTop;
-      window.scrollTo(0, prevWindowY);
+      if (container) {
+        container.scrollTop = prevContainerScrollTop;
+        container.scrollLeft = prevContainerScrollLeft;
+      }
+      window.scrollTo(prevWindowX, prevWindowY);
     }
   };
 

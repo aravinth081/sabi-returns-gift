@@ -1192,6 +1192,12 @@ main {
   padding: 10px 14px !important;
 }
 
+.wallpaper-active .screenshot-mode-active thead th:first-child,
+.screenshot-mode-active thead th:first-child {
+  text-align: left !important;
+  padding-left: 20px !important;
+}
+
 /* Table rows inside screenshot mode */
 .wallpaper-active .screenshot-mode-active tbody tr,
 .screenshot-mode-active tbody tr {
