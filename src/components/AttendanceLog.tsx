@@ -32,6 +32,24 @@ export interface EmployeeSalary {
   dailyAmount?: number; // for Special Bonus, Overtime, Manual Adjustments
 }
 
+// Normalize employee name for robust matching (e.g. Gayathri.s, Gayathri S, Gayathri, kavi, kavilaya)
+export const normalizeEmpName = (name: string) => {
+  if (!name) return "";
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+};
+
+export const isSameEmployee = (name1: string, name2: string) => {
+  if (!name1 || !name2) return false;
+  const n1 = normalizeEmpName(name1);
+  const n2 = normalizeEmpName(name2);
+  if (!n1 || !n2) return false;
+  if (n1 === n2) return true;
+  if (n1.startsWith(n2) || n2.startsWith(n1)) return true;
+  if (n1.includes(n2) || n2.includes(n1)) return true;
+  if (n1.length >= 5 && n2.length >= 5 && n1.slice(0, 5) === n2.slice(0, 5)) return true;
+  return false;
+};
+
 
 
 export default function AttendanceLog({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
@@ -227,25 +245,45 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     return () => unsub();
   }, []);
 
-  // Sync employeeOptions ONLY with registered and approved employees
+  // Sync employeeOptions with approved employees AND employees from attendance records
   useEffect(() => {
-    if (approvedEmployees.length > 0) {
-      setEmployeeOptions(approvedEmployees);
-      const caseMatch = approvedEmployees.find(emp => emp.toLowerCase() === currentLoggedInUser.toLowerCase());
-      if (caseMatch) {
-        setSelectedUser(caseMatch);
-      } else if (currentLoggedInUser) {
-        setSelectedUser(currentLoggedInUser);
+    const namesSet = new Set<string>();
+    
+    // Add approved employees
+    approvedEmployees.forEach(emp => {
+      if (emp) namesSet.add(emp);
+    });
+
+    // Add employees from existing attendance records
+    attendanceRecords.forEach(rec => {
+      if (rec.employeeName && !rec.employeeName.toLowerCase().includes("hello") && !rec.employeeName.toLowerCase().includes("test")) {
+        const existing = Array.from(namesSet).find(e => isSameEmployee(e, rec.employeeName));
+        if (!existing) {
+          namesSet.add(rec.employeeName);
+        }
       }
-    } else if (currentLoggedInUser) {
-      setEmployeeOptions([currentLoggedInUser]);
-      setSelectedUser(currentLoggedInUser);
+    });
+
+    if (currentLoggedInUser) {
+      const existing = Array.from(namesSet).find(e => isSameEmployee(e, currentLoggedInUser));
+      if (!existing) {
+        namesSet.add(currentLoggedInUser);
+      }
     }
-  }, [approvedEmployees, currentLoggedInUser]);
+
+    const allOptions = Array.from(namesSet);
+    if (allOptions.length > 0) {
+      setEmployeeOptions(allOptions);
+      const match = allOptions.find(emp => isSameEmployee(emp, selectedUser || currentLoggedInUser));
+      if (match && match !== selectedUser) {
+        setSelectedUser(match);
+      }
+    }
+  }, [approvedEmployees, attendanceRecords, currentLoggedInUser]);
 
   // Filter attendance records for current selected employee
   const userAttendanceRecords = useMemo(() => {
-    return attendanceRecords.filter(r => r.employeeName.toLowerCase() === selectedUser.toLowerCase());
+    return attendanceRecords.filter(r => isSameEmployee(r.employeeName, selectedUser));
   }, [attendanceRecords, selectedUser]);
 
   // Today's date string YYYY-MM-DD
@@ -278,6 +316,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   // Handle Date Actions from Calendar Click
   const handleActionMarkLate = async (targetDate: string) => {
+    if (targetDate > todayStr) {
+      toast.error("Cannot mark attendance for future date: This is tomorrow's / future attendance!", {
+        style: {
+          backgroundColor: '#991b1b',
+          color: '#ffffff',
+          border: '2px solid #f87171',
+          fontWeight: '900',
+          fontSize: '13px',
+          boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.5)'
+        },
+        duration: 4000
+      });
+      return;
+    }
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
     const newRecord: AttendanceRecord = {
       id: existing?.id || String(Date.now()),
@@ -293,7 +345,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = [
-      ...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate)),
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
       newRecord
     ];
     setAttendanceRecords(updated);
@@ -312,6 +364,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   };
 
   const handleActionApplyLeave = async (targetDate: string) => {
+    if (targetDate > todayStr) {
+      toast.error("Cannot mark attendance for future date: This is tomorrow's / future attendance!", {
+        style: {
+          backgroundColor: '#991b1b',
+          color: '#ffffff',
+          border: '2px solid #f87171',
+          fontWeight: '900',
+          fontSize: '13px',
+          boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.5)'
+        },
+        duration: 4000
+      });
+      return;
+    }
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
     const newRecord: AttendanceRecord = {
       id: existing?.id || String(Date.now()),
@@ -327,7 +393,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = [
-      ...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate)),
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
       newRecord
     ];
     setAttendanceRecords(updated);
@@ -347,7 +413,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
   const handleActionUnmark = async (targetDate: string) => {
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
-    const updated = attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate));
+    const updated = attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate));
     setAttendanceRecords(updated);
     setSelectedDateAction(null);
     toast.success(`Unmarked attendance for ${selectedUser} on ${targetDate}!`);
@@ -377,7 +443,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = [
-      ...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === targetDate)),
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
       newRecord
     ];
     setAttendanceRecords(updated);
@@ -411,7 +477,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       remarks: "Logged In"
     };
 
-    const updated = [...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === todayStr)), newRecord];
+    const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === todayStr)), newRecord];
     setAttendanceRecords(updated);
     toast.success(`Logged In successfully at ${loginTimeStr}! Marked as Present.`);
 
@@ -488,7 +554,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = attendanceRecords.map(r => 
-      (r.employeeName.toLowerCase() === selectedUser.toLowerCase() && r.date === todayStr) ? updatedRecord : r
+      (isSameEmployee(r.employeeName, selectedUser) && r.date === todayStr) ? updatedRecord : r
     );
 
     setAttendanceRecords(updated);
@@ -512,7 +578,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     const targetUser = leaveEmployee.trim() || selectedUser;
 
     // Check if record exists
-    const existing = attendanceRecords.find(r => r.employeeName.toLowerCase() === targetUser.toLowerCase() && r.date === leaveDate);
+    const existing = attendanceRecords.find(r => isSameEmployee(r.employeeName, targetUser) && r.date === leaveDate);
     if (existing && existing.status === "Present") {
       toast.error(`Cannot apply leave: Already logged in as Present on ${leaveDate}`);
       return;
@@ -530,7 +596,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       remarks: leaveRemark || "Leave Applied"
     };
 
-    const updated = [...attendanceRecords.filter(r => !(r.employeeName.toLowerCase() === targetUser.toLowerCase() && r.date === leaveDate)), leaveRecord];
+    const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, targetUser) && r.date === leaveDate)), leaveRecord];
     setAttendanceRecords(updated);
     setIsLeaveModalOpen(false);
     toast.success(`Leave applied for ${targetUser} on ${leaveDate}! Date marked in Red.`);
@@ -830,9 +896,12 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                 const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const rec = userAttendanceRecords.find(r => r.date === dayStr);
                 const isToday = dayStr === todayStr;
+                const isFuture = dayStr > todayStr;
 
                 let bgClasses = "bg-[#0f172a] border-white/15 text-white hover:border-amber-400 cursor-pointer shadow-sm hover:scale-[1.02]";
-                if (rec?.status === "Present") {
+                if (isFuture) {
+                  bgClasses = "bg-[#0a0f1d] border-white/10 text-slate-400 cursor-pointer hover:border-rose-500/50 shadow-sm";
+                } else if (rec?.status === "Present") {
                   bgClasses = "bg-emerald-600 text-white border-emerald-400 shadow-lg cursor-pointer hover:scale-[1.02]";
                 } else if (rec?.status === "Late Attendance") {
                   bgClasses = "bg-amber-600 text-white border-amber-400 shadow-lg cursor-pointer hover:scale-[1.02]";
@@ -846,6 +915,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                   <div
                     key={d}
                     onClick={() => {
+                      if (isFuture) {
+                        toast.error("Cannot mark attendance for future date: This is tomorrow's / future attendance!", {
+                          style: {
+                            backgroundColor: '#991b1b',
+                            color: '#ffffff',
+                            border: '2px solid #f87171',
+                            fontWeight: '900',
+                            fontSize: '13px',
+                            boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.5)'
+                          },
+                          duration: 4000
+                        });
+                        return;
+                      }
                       setSelectedDateAction({
                         dayStr,
                         displayDate: `${d} ${monthNames[month]} ${year}`
@@ -854,10 +937,10 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                     className={`h-20 md:h-24 p-2 rounded-2xl border-2 flex flex-col justify-between transition-all relative group ${bgClasses} ${
                       isToday ? "ring-4 ring-amber-400 ring-offset-2 ring-offset-[#131c2e] font-black" : ""
                     }`}
-                    title={`Click to manage attendance for ${d} ${monthNames[month]} ${year}`}
+                    title={isFuture ? "Tomorrow's / Future Attendance" : `Click to manage attendance for ${d} ${monthNames[month]} ${year}`}
                   >
                     <div className="flex justify-between items-start">
-                      <span className={`text-xs md:text-sm font-black ${isToday ? "text-amber-300 underline decoration-amber-400 decoration-2" : "text-white"}`}>
+                      <span className={`text-xs md:text-sm font-black ${isToday ? "text-amber-300 underline decoration-amber-400 decoration-2" : isFuture ? "text-slate-400" : "text-white"}`}>
                         {d}
                       </span>
                       {isToday && (
@@ -891,7 +974,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                         </div>
                       )}
                       {!rec && (
-                        <div className="text-slate-300 font-extrabold text-[10px] text-center mt-2 tracking-wide uppercase group-hover:text-amber-300">Click to Mark</div>
+                        <div className={`font-extrabold text-[10px] text-center mt-2 tracking-wide uppercase ${isFuture ? 'text-slate-400 group-hover:text-rose-400' : 'text-slate-300 group-hover:text-amber-300'}`}>Click to Mark</div>
                       )}
                     </div>
                   </div>
@@ -1073,7 +1156,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(employeeOptions.length > 0 ? employeeOptions : [currentLoggedInUser]).map((emp) => {
-                const sal = employeeSalaries[emp] || { employeeName: emp, monthlySalary: 0, hourlySalary: 0, dailyAmount: 0 };
+                const sal = employeeSalaries[emp] || Object.values(employeeSalaries).find(s => isSameEmployee(s.employeeName, emp)) || { employeeName: emp, monthlySalary: 0, hourlySalary: 0, dailyAmount: 0 };
                 const isEditing = editingSalaryUser === emp;
 
                 return (

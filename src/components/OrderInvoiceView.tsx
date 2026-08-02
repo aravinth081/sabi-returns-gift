@@ -129,10 +129,27 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
   };
 
   const getInvoiceNumber = () => {
-    const rawId = order.serialNo || order.serialNumber || order.orderId || order.fireId || order.id || "001";
-    let id = String(rawId).toUpperCase();
-    if (id.length > 15) id = id.slice(-5);
-    return id.startsWith("INV-") ? id : `INV-${id}`;
+    let numVal: number | null = null;
+    
+    if (typeof order.serialNo === 'number') numVal = order.serialNo;
+    else if (typeof order.id === 'number') numVal = order.id;
+    else if (typeof order.orderId === 'number') numVal = order.orderId;
+    
+    if (numVal === null) {
+      const rawStr = String(order.serialNo || order.serialNumber || order.orderId || order.id || "");
+      const digits = rawStr.replace(/\D/g, '');
+      if (digits) {
+        numVal = parseInt(digits, 10);
+      }
+    }
+
+    if (numVal !== null && !isNaN(numVal) && numVal > 0) {
+      return `SR${String(numVal).padStart(4, '0')}`;
+    }
+
+    const rawId = String(order.serialNo || order.serialNumber || order.orderId || order.id || "1").toUpperCase();
+    const cleanId = rawId.replace(/^INV-|^SR-?/, '');
+    return `SR${cleanId.padStart(4, '0')}`;
   };
 
   const invoiceNumber = getInvoiceNumber();
@@ -184,7 +201,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
             <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-3 text-right">ORIGINAL FOR RECIPIENT</p>
             <div className="w-[160px] h-[160px] bg-white rounded-full overflow-hidden flex items-center justify-center p-1 border border-gray-100 shadow-sm">
               <img
-                src={`/sabi-logo.png?v=${refreshKey}`}
+                src={`/sabi-logo-red.png?v=${refreshKey}`}
                 alt="Logo"
                 style={{
                   width: '100%',
@@ -200,7 +217,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
 
         {/* Meta Row */}
         <div className="flex justify-between items-center mb-8 border-y border-gray-100 py-3 font-bold text-[13px]">
-          <div>Invoice #: <span className="font-black">{invoiceNumber}</span></div>
+          <div>Invoice No: <span className="font-black">{invoiceNumber}</span></div>
           <div>Invoice Date: <span className="font-black">{currentDate}</span></div>
           <div>Due Date: <span className="font-black">{currentDate}</span></div>
         </div>

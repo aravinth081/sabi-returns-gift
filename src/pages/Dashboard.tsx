@@ -1418,6 +1418,8 @@ export default function Dashboard() {
   const setHiddenCols = activeTab === 'dashboard2' ? setHiddenColsD2 : setHiddenColsD1;
 
   const [isScreenshotMode, setIsScreenshotMode] = useState(false);
+  const [screenshotChunkOrders, setScreenshotChunkOrders] = useState<any[]>([]);
+  const [screenshotPageInfo, setScreenshotPageInfo] = useState({ page: 1, totalPages: 1, startNum: 1, endNum: 1, totalOrders: 0 });
   const [isDashMoreMenuOpen, setIsDashMoreMenuOpen] = useState(false);
   const screenshotTableRef = useRef<HTMLDivElement>(null);
 
@@ -3362,10 +3364,20 @@ export default function Dashboard() {
     }
   };
 
-  // 📸 SCREENSHOT MODE: Show only Name, Dispatch Date, Chocolate Name, Count, Total Price, Payment Status → capture → copy to clipboard or download
+  // 📸 SCREENSHOT MODE: Multi-page chunked export (Max 20 orders per image page)
   const handleScreenshotCapture = async () => {
+    const allOrdersToExport = sortedDashboardOrders;
+    if (allOrdersToExport.length === 0) {
+      toast.error("No orders to capture!");
+      return;
+    }
+
     setIsScreenshotMode(true);
-    toast.info("📸 Capturing screenshot...");
+
+    const CHUNK_SIZE = 20; // Compact vertical height (~20 orders per page)
+    const totalPages = Math.ceil(allOrdersToExport.length / CHUNK_SIZE);
+    
+    toast.info(`📸 Exporting ${totalPages} Screenshot Image(s)...`);
 
     // Store previous scroll positions
     const container = tableContainerRef.current;
@@ -3374,7 +3386,6 @@ export default function Dashboard() {
     const prevWindowY = window.scrollY;
     const prevWindowX = window.scrollX;
 
-    // Reset ALL scroll positions to top-left (0, 0) so Row 1 and Column 1 (NAME) are never scrolled off/cut off
     if (container) {
       container.scrollTop = 0;
       container.scrollLeft = 0;
@@ -3385,82 +3396,109 @@ export default function Dashboard() {
     }
     window.scrollTo(0, 0);
 
-    // Fast 500ms delay for DOM update & layout reflow
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const capturedBlobs: { blob: Blob; fileName: string; dataUrl: string }[] = [];
 
-    // Ensure scroll position is strictly at top-left (0, 0) right before capturing
-    if (container) {
-      container.scrollTop = 0;
-      container.scrollLeft = 0;
-    }
-    if (screenshotTableRef.current) {
-      screenshotTableRef.current.scrollTop = 0;
-      screenshotTableRef.current.scrollLeft = 0;
-    }
-    window.scrollTo(0, 0);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
 
-    const element = screenshotTableRef.current;
-    if (element) {
-      try {
-        const html2canvas = (await import("html2canvas")).default;
-        const canvas = await html2canvas(element, {
-          backgroundColor: "#0b0f19",
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          allowTaint: true,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: Math.max(element.scrollWidth, 950),
-          windowHeight: element.scrollHeight,
+      for (let p = 0; p < totalPages; p++) {
+        const startIdx = p * CHUNK_SIZE;
+        const endIdx = Math.min((p + 1) * CHUNK_SIZE, allOrdersToExport.length);
+        const chunk = allOrdersToExport.slice(startIdx, endIdx);
+
+        setScreenshotChunkOrders(chunk);
+        setScreenshotPageInfo({
+          page: p + 1,
+          totalPages,
+          startNum: startIdx + 1,
+          endNum: endIdx,
+          totalOrders: allOrdersToExport.length
         });
 
-        canvas.toBlob(async (blob) => {
-          if (blob) {
-            let copied = false;
-            try {
-              if (navigator.clipboard && window.ClipboardItem) {
-                const item = new ClipboardItem({ "image/png": blob });
-                await navigator.clipboard.write([item]);
-                copied = true;
-                toast.success("✅ Table Screenshot Copied to Clipboard!");
-              }
-            } catch (clipboardErr) {
-              console.warn("Clipboard copy failed, fallback to automatic download:", clipboardErr);
-            }
+        // Fast delay for DOM update & layout reflow
+        await new Promise(resolve => setTimeout(resolve, 400));
 
-            if (!copied) {
-              try {
-                const link = document.createElement("a");
-                link.download = `Sabi_Order_Records_${new Date().toISOString().slice(0, 10)}.png`;
-                link.href = canvas.toDataURL("image/png");
-                link.click();
-                toast.success("✅ Table Screenshot downloaded as PNG image!");
-              } catch (dlErr) {
-                console.error("Download fallback error:", dlErr);
-                toast.error("Failed to copy or download screenshot.");
-              }
-            }
-          }
-          setIsScreenshotMode(false);
-          // Restore original scroll positions
-          if (container) {
-            container.scrollTop = prevContainerScrollTop;
-            container.scrollLeft = prevContainerScrollLeft;
-          }
-          window.scrollTo(prevWindowX, prevWindowY);
-        }, "image/png");
-      } catch (error) {
-        console.error("Error generating screenshot:", error);
-        setIsScreenshotMode(false);
         if (container) {
-          container.scrollTop = prevContainerScrollTop;
-          container.scrollLeft = prevContainerScrollLeft;
+          container.scrollTop = 0;
+          container.scrollLeft = 0;
         }
-        window.scrollTo(prevWindowX, prevWindowY);
+        if (screenshotTableRef.current) {
+          screenshotTableRef.current.scrollTop = 0;
+          screenshotTableRef.current.scrollLeft = 0;
+        }
+        window.scrollTo(0, 0);
+
+        const element = screenshotTableRef.current;
+        if (element) {
+          const canvas = await html2canvas(element, {
+            backgroundColor: "#0d1527",
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            allowTaint: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: Math.max(element.scrollWidth, 1200),
+            windowHeight: element.scrollHeight,
+          });
+
+          const dateStr = new Date().toISOString().slice(0, 10);
+          const fileName = totalPages > 1 
+            ? `Sabi_Order_Records_${dateStr}_Part${p + 1}_of_${totalPages}.png`
+            : `Sabi_Order_Records_${dateStr}.png`;
+
+          const dataUrl = canvas.toDataURL("image/png");
+
+          await new Promise<void>((res) => {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                capturedBlobs.push({ blob, fileName, dataUrl });
+              }
+              res();
+            }, "image/png");
+          });
+        }
       }
-    } else {
+
+      // Download / Copy all captured page images
+      if (capturedBlobs.length > 0) {
+        let clipboardCopied = false;
+        try {
+          if (navigator.clipboard && window.ClipboardItem) {
+            const clipboardItems = capturedBlobs.map(b => new ClipboardItem({ "image/png": b.blob }));
+            await navigator.clipboard.write(clipboardItems);
+            clipboardCopied = true;
+          }
+        } catch (clipErr) {
+          console.warn("Clipboard write fallback:", clipErr);
+        }
+
+        // Trigger automatic downloads for each captured page image with 350ms delay
+        for (let bIdx = 0; bIdx < capturedBlobs.length; bIdx++) {
+          const item = capturedBlobs[bIdx];
+          const link = document.createElement("a");
+          link.download = item.fileName;
+          link.href = item.dataUrl;
+          link.click();
+          if (capturedBlobs.length > 1) {
+            await new Promise(res => setTimeout(res, 350));
+          }
+        }
+
+        if (capturedBlobs.length > 1) {
+          toast.success(`✅ Downloaded ${capturedBlobs.length} Separate Screenshot Images (${allOrdersToExport.length} Orders total)!`);
+        } else if (clipboardCopied) {
+          toast.success("✅ Table Screenshot Copied to Clipboard & Downloaded!");
+        } else {
+          toast.success("✅ Table Screenshot downloaded as PNG image!");
+        }
+      }
+    } catch (error) {
+      console.error("Error capturing multi-page screenshot:", error);
+      toast.error("Failed to generate screenshot.");
+    } finally {
       setIsScreenshotMode(false);
+      setScreenshotChunkOrders([]);
       if (container) {
         container.scrollTop = prevContainerScrollTop;
         container.scrollLeft = prevContainerScrollLeft;
@@ -4677,7 +4715,7 @@ export default function Dashboard() {
 
                 </div>
 
-                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 print:border-none print:shadow-none mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active' : ''}`}>
+                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active w-[1100px] min-w-[1100px] p-5 rounded-none shadow-none border-none overflow-visible' : 'rounded-2xl shadow-2xl border border-white/10 overflow-hidden'}`}>
                   <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-white/10 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#0d1527] backdrop-blur-sm shadow-sm'}`}>
 
 
@@ -4702,7 +4740,7 @@ export default function Dashboard() {
                             }`}
                           title={(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? "Show all columns" : "Hide all columns"}
                         >
-                          {(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.deliveryCharge && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+                          {(hiddenCols.serialNo && hiddenCols.role && hiddenCols.orderDate && hiddenCols.discount) ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
                         </button>
                         <button
                           onClick={handleScreenshotCapture}
@@ -5021,7 +5059,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div ref={tableContainerRef} className={`w-full shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none' : 'flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
+                  <div ref={tableContainerRef} className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none w-[1100px] min-w-[1100px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
@@ -5029,30 +5067,31 @@ export default function Dashboard() {
                         style={{
                           background: 'linear-gradient(to right, #0b0f19, #0d1527)',
                           padding: '16px 24px',
-                          borderBottom: '2px solid rgba(255, 255, 255, 0.15)',
+                          borderBottom: '2px solid rgba(251, 191, 36, 0.4)',
                           display: 'block',
                           width: '100%',
+                          marginBottom: '10px'
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ textAlign: 'left' }}>
-                            <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#ffffff', margin: 0, padding: 0, textShadow: 'none', letterSpacing: '-0.025em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
-                              SABI Return Gifts
+                          <div>
+                            <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#fbbf24', margin: 0, padding: 0, letterSpacing: '0.02em', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
+                              SABI RETURN GIFTS {screenshotPageInfo.totalPages > 1 ? `• Part ${screenshotPageInfo.page} of ${screenshotPageInfo.totalPages}` : ''}
                             </h1>
-                            <p style={{ fontSize: '14px', fontWeight: 800, color: '#fbbf24', margin: '3px 0 0 0', textShadow: 'none' }}>
-                              Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'}
+                            <p style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff', margin: '3px 0 0 0' }}>
+                              Order Records • {activeTab === 'dashboard2' ? 'Products' : 'Chocolates'} {screenshotPageInfo.totalPages > 1 ? `(Orders ${screenshotPageInfo.startNum}-${screenshotPageInfo.endNum} of ${screenshotPageInfo.totalOrders})` : ''}
                             </p>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff', margin: 0, textShadow: 'none' }}>
+                            <p style={{ fontSize: '13px', fontWeight: 800, color: '#fbbf24', margin: 0 }}>
                               {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
                             <div style={{ display: 'flex', gap: '16px', marginTop: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 900, color: '#fef08a', textShadow: 'none' }}>
-                                Orders: {(isScreenshotMode ? sortedDashboardOrders : filteredDashboardOrders).length}
+                              <span style={{ fontSize: '13px', fontWeight: 900, color: '#ffffff' }}>
+                                Page Orders: {screenshotChunkOrders.length}
                               </span>
-                              <span style={{ fontSize: '13px', fontWeight: 900, color: '#fef08a', textShadow: 'none' }}>
-                                Items: {(isScreenshotMode ? sortedDashboardOrders : filteredDashboardOrders).reduce((s, o) => {
+                              <span style={{ fontSize: '13px', fontWeight: 900, color: '#ffffff' }}>
+                                Items: {screenshotChunkOrders.reduce((s, o) => {
                                   const cntStr = String(o.count || '0');
                                   const sum = cntStr.split(',').reduce((acc, c) => acc + (parseFloat(c.trim()) || 0), 0);
                                   return s + sum;
@@ -5064,9 +5103,19 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[900px]' : 'min-w-[1100px]'}`}>
-                      <thead className={`${isScreenshotMode ? 'static bg-amber-50' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
-                        <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
+                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[1060px] w-[1060px]' : 'min-w-[1100px]'}`}>
+                      <thead className={`${isScreenshotMode ? 'static bg-amber-400' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
+                        {isScreenshotMode ? (
+                          <tr className="text-xs border-b-2 uppercase tracking-wider bg-amber-400 text-black font-black border-amber-500">
+                            <th className="py-3 pl-5 pr-2 font-black align-top w-[230px] min-w-[230px] text-left text-black">CUSTOMER NAME</th>
+                            <th className="py-3 px-2 font-black align-top w-[120px] min-w-[120px] text-left text-black">DISPATCH DATE</th>
+                            <th className="py-3 px-2 font-black align-top text-center w-[250px] min-w-[250px] text-black">{activeTab === 'dashboard2' ? 'PRODUCT NAME' : 'CHOCOLATE NAME'}</th>
+                            <th className="py-3 px-2 font-black align-top text-center w-[80px] min-w-[80px] text-black">COUNT</th>
+                            <th className="py-3 px-2 font-black align-top text-center w-[170px] min-w-[170px] text-black">PENDING AMOUNT</th>
+                            <th className="py-3 px-2 font-black align-top text-center w-[170px] min-w-[170px] text-black">LOCATION</th>
+                          </tr>
+                        ) : (
+                          <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
                           {!isScreenshotMode && showCheckboxes && (
                             <th className="py-3 px-4 w-12 text-center print:hidden align-top">
                               <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} className="w-4 h-4 cursor-pointer accent-amber-600 rounded" />
@@ -5142,7 +5191,9 @@ export default function Dashboard() {
                               </div>
                             </th>
                           )}
-                          <th className="py-3 px-4 font-bold align-top">Name</th>
+                          <th className={`py-3 px-4 font-bold align-top ${isScreenshotMode ? 'min-w-[200px] text-amber-950 font-black' : ''}`}>
+                            {isScreenshotMode ? 'Customer Name' : 'Name'}
+                          </th>
                           {!isScreenshotMode && <th className="py-3 px-4 font-bold align-top">Contact Number</th>}
 
                           {!isScreenshotMode && (
@@ -5383,15 +5434,75 @@ export default function Dashboard() {
                             </th>
                           )}
                         </tr>
+                        )}
                       </thead>
                       <tbody>
-                        {(isScreenshotMode ? sortedDashboardOrders : paginatedOrders).length === 0 ? (
+                        {(isScreenshotMode ? screenshotChunkOrders : paginatedOrders).length === 0 ? (
                           <tr><td colSpan={20} className="p-8 text-center text-amber-400 font-extrabold text-sm tracking-wide bg-[#0d1527]">No records found for the selected filters.</td></tr>
                         ) : (
-                          (isScreenshotMode ? sortedDashboardOrders : paginatedOrders).map((order) => {
+                          (isScreenshotMode ? screenshotChunkOrders : paginatedOrders).map((order, idx) => {
                             const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
                             const isSelected = selectedOrders.includes(order.id);
 
+                            if (isScreenshotMode) {
+                              const pendingAmt = order.paymentStatus === 'Full Paid'
+                                ? 0
+                                : order.paymentStatus === 'Partially Paid'
+                                  ? Math.max(0, priceData.fullTotalPrice - Number(order.advanceAmount || 0))
+                                  : priceData.fullTotalPrice;
+                              return (
+                                <tr key={order.fireId || order.id} className={`border-b border-white/10 ${idx % 2 === 0 ? 'bg-[#0d1527]' : 'bg-[#121c33]'}`}>
+                                  <td className="py-2.5 pl-5 pr-2 font-extrabold text-amber-300 text-xs align-middle w-[230px] min-w-[230px] whitespace-nowrap">{order.name}</td>
+                                  <td className="py-2.5 px-2 font-bold text-white text-xs align-middle w-[120px] min-w-[120px] whitespace-nowrap">{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
+                                  <td className="py-2.5 px-2 align-middle text-center w-[250px] min-w-[250px] text-xs">{renderChocolateBadges(order.chocolate)}</td>
+                                  <td className="py-2.5 px-2 text-center font-bold text-amber-200 text-xs align-middle w-[80px] min-w-[80px]">{order.count}</td>
+                                  <td className="py-2.5 px-2 text-center align-middle font-black text-xs screenshot-pending-amount w-[170px] min-w-[170px]">
+                                    {pendingAmt > 0 ? <span className="text-rose-400 font-bold text-xs">₹{pendingAmt.toLocaleString()}</span> : <span className="text-emerald-400 font-bold text-xs">₹0</span>}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center align-middle font-bold text-slate-100 text-xs w-[170px] min-w-[170px]">
+                                    <div className="flex flex-col items-center">
+                                      {(() => {
+                                        const rawLoc = String((order as any).location || '').trim();
+                                        const addrStr = String((order as any).address || '').trim();
+                                        const remStr = String((order as any).remarks || (order as any).comments || '').trim();
+                                        const combined = `${rawLoc} ${addrStr} ${remStr}`.trim();
+                                        const lower = combined.toLowerCase();
+
+                                        if ((order as any).isChennai === true || lower.includes('chennai') || lower.includes('madras')) {
+                                          return <span className="screenshot-location-text screenshot-location-chennai font-bold">Chennai</span>;
+                                        }
+                                        if (lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
+                                          return <span className="screenshot-location-text screenshot-location-kerala font-bold">Kerala</span>;
+                                        }
+
+                                        const knownCities = [
+                                          'Madurai', 'Coimbatore', 'Trichy', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 
+                                          'Erode', 'Vellore', 'Thanjavur', 'Tuticorin', 'Thoothukudi', 'Nagercoil', 
+                                          'Kanyakumari', 'Dindigul', 'Karur', 'Cuddalore', 'Kanchipuram', 'Tiruppur', 
+                                          'Hosur', 'Puducherry', 'Pondicherry', 'Karaikal', 'Ramanathapuram', 'Ramnad', 
+                                          'Virudhunagar', 'Sivakasi', 'Tenkasi', 'Namakkal', 'Villupuram'
+                                        ];
+
+                                        for (const city of knownCities) {
+                                          if (lower.includes(city.toLowerCase())) {
+                                            return <span className="screenshot-location-text screenshot-location-others font-bold">{city}</span>;
+                                          }
+                                        }
+
+                                        if (rawLoc) {
+                                          return <span className="screenshot-location-text screenshot-location-others font-bold">{rawLoc}</span>;
+                                        }
+                                        if (addrStr) {
+                                          const shortAddr = addrStr.length > 15 ? `${addrStr.substring(0, 15)}...` : addrStr;
+                                          return <span className="screenshot-location-text screenshot-location-others font-bold">{shortAddr}</span>;
+                                        }
+                                        return <span className="screenshot-location-text screenshot-location-empty font-bold">—</span>;
+                                      })()}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
 
                             return (
                               <tr key={order.fireId || order.id} className={`border-b transition-colors border-amber-50 hover:bg-orange-50/50 print:border-gray-200 ${isSelected ? 'bg-amber-50/80 print:bg-transparent' : ''}`}>
@@ -5436,7 +5547,7 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                <td className={`py-2.5 px-4 font-bold text-amber-950 print:text-black align-middle`}>{order.name}</td>
+                                <td className={`py-2.5 px-4 font-bold align-middle ${isScreenshotMode ? 'text-white font-extrabold text-sm min-w-[200px]' : 'text-amber-950 print:text-black'}`}>{order.name}</td>
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{formatPhoneNumber(order.phone)}</td>}
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
                                 <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
@@ -7539,7 +7650,9 @@ export default function Dashboard() {
                     <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {formatPhoneNumber(shippingOrder.phone)}</p>
                   </div>
                   <div className="flex-shrink-0 ml-4">
-                    <img src={"/sabi-logo.png"} alt="Logo" className="w-44 h-44 object-contain" crossOrigin="anonymous" onError={(e) => (e.currentTarget.style.display = "none")} />
+                    <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-md border border-amber-900/30 bg-[#0f0e0f] flex items-center justify-center">
+                      <img src="/sabi-logo.png" alt="Logo" className="w-full h-full object-cover rounded-2xl" crossOrigin="anonymous" onError={(e) => (e.currentTarget.style.display = "none")} />
+                    </div>
                   </div>
                 </div>
 
