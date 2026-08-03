@@ -281,6 +281,41 @@ const formatToDisplayDate = (dateStr: any) => {
   return String(dateStr);
 };
 
+const renderScreenshotLocation = (order: any) => {
+  const rawLoc = String(order.location || '').trim();
+  const addrStr = String(order.address || '').trim();
+  const remStr = String(order.remarks || order.comments || '').trim();
+  const combined = `${rawLoc} ${addrStr} ${remStr}`.trim();
+  const lower = combined.toLowerCase();
+
+  if (order.isChennai === true || rawLoc.toLowerCase() === 'chennai' || lower.includes('chennai') || lower.includes('madras')) {
+    return <span className="screenshot-location-text screenshot-location-chennai font-bold">Chennai</span>;
+  }
+  if (rawLoc.toLowerCase() === 'kerala' || lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
+    return <span className="screenshot-location-text screenshot-location-kerala font-bold">Kerala</span>;
+  }
+
+  const knownCities = [
+    'Madurai', 'Coimbatore', 'Trichy', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 
+    'Erode', 'Vellore', 'Thanjavur', 'Tuticorin', 'Thoothukudi', 'Nagercoil', 
+    'Kanyakumari', 'Dindigul', 'Karur', 'Cuddalore', 'Kanchipuram', 'Tiruppur', 
+    'Hosur', 'Puducherry', 'Pondicherry', 'Karaikal', 'Ramanathapuram', 'Ramnad', 
+    'Virudhunagar', 'Sivakasi', 'Tenkasi', 'Namakkal', 'Villupuram'
+  ];
+
+  for (const city of knownCities) {
+    if (lower.includes(city.toLowerCase())) {
+      return <span className="screenshot-location-text screenshot-location-others font-bold">{city}</span>;
+    }
+  }
+
+  if (rawLoc && rawLoc.toLowerCase() !== 'others') {
+    return <span className="screenshot-location-text screenshot-location-others font-bold">{rawLoc}</span>;
+  }
+
+  return <span className="screenshot-location-text screenshot-location-empty font-bold">—</span>;
+};
+
 const PREDEFINED_CHOCOLATES = [
   "10 rs 5 Star", "10 rs Kitkat", "10 rs Dairy Milk", "5 rs Peanut Candy",
   "5 rs 5 Star", "5 rs Dairy Milk", "2 rs Dairymilk Shots", "5 rs Milky Bar",
@@ -4715,7 +4750,7 @@ export default function Dashboard() {
 
                 </div>
 
-                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active w-[1100px] min-w-[1100px] p-5 rounded-none shadow-none border-none overflow-visible' : 'rounded-2xl shadow-2xl border border-white/10 overflow-hidden'}`}>
+                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white flex flex-col lg:flex-1 lg:min-h-0 print:h-auto print:min-h-0 mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active w-[1180px] min-w-[1180px] p-5 rounded-none shadow-none border-none overflow-visible' : 'rounded-2xl shadow-2xl border border-white/10 overflow-hidden'}`}>
                   <div className={`p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-4 border-white/10 print:hidden ${isScreenshotMode ? 'hidden' : 'sticky top-0 z-30 bg-[#0d1527] backdrop-blur-sm shadow-sm'}`}>
 
 
@@ -5059,7 +5094,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div ref={tableContainerRef} className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none w-[1100px] min-w-[1100px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
+                  <div ref={tableContainerRef} className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
@@ -5103,16 +5138,16 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[1060px] w-[1060px]' : 'min-w-[1100px]'}`}>
+                    <table className={`w-full text-left border-separate border-spacing-0 print:min-w-0 print:w-full relative ${isScreenshotMode ? 'min-w-[1140px] w-[1140px]' : 'min-w-[1100px]'}`}>
                       <thead className={`${isScreenshotMode ? 'static bg-amber-400' : 'sticky top-0 z-20 shadow-md bg-amber-50/95 backdrop-blur-sm'} print:static`}>
                         {isScreenshotMode ? (
                           <tr className="text-xs border-b-2 uppercase tracking-wider bg-amber-400 text-black font-black border-amber-500">
-                            <th className="py-3 pl-5 pr-2 font-black align-top w-[230px] min-w-[230px] text-left text-black">CUSTOMER NAME</th>
+                            <th className="py-3 pl-5 pr-2 font-black align-top w-[220px] min-w-[220px] text-left text-black">CUSTOMER NAME</th>
                             <th className="py-3 px-2 font-black align-top w-[120px] min-w-[120px] text-left text-black">DISPATCH DATE</th>
-                            <th className="py-3 px-2 font-black align-top text-center w-[250px] min-w-[250px] text-black">{activeTab === 'dashboard2' ? 'PRODUCT NAME' : 'CHOCOLATE NAME'}</th>
+                            <th className="py-3 px-2 font-black align-top text-center w-[240px] min-w-[240px] text-black">{activeTab === 'dashboard2' ? 'PRODUCT NAME' : 'CHOCOLATE NAME'}</th>
                             <th className="py-3 px-2 font-black align-top text-center w-[80px] min-w-[80px] text-black">COUNT</th>
                             <th className="py-3 px-2 font-black align-top text-center w-[170px] min-w-[170px] text-black">PENDING AMOUNT</th>
-                            <th className="py-3 px-2 font-black align-top text-center w-[170px] min-w-[170px] text-black">LOCATION</th>
+                            <th className="py-3 px-2 font-black align-top text-center w-[150px] min-w-[150px] text-black">LOCATION</th>
                           </tr>
                         ) : (
                           <tr className={`text-xs border-b uppercase tracking-wider bg-amber-50 text-amber-800 border-amber-200 print:bg-gray-100 print:text-black`}>
@@ -5194,6 +5229,11 @@ export default function Dashboard() {
                           <th className={`py-3 px-4 font-bold align-top ${isScreenshotMode ? 'min-w-[200px] text-amber-950 font-black' : ''}`}>
                             {isScreenshotMode ? 'Customer Name' : 'Name'}
                           </th>
+                          {!isScreenshotMode && (
+                            <th className="py-3 px-4 font-bold text-center align-top min-w-[120px]">
+                              Location
+                            </th>
+                          )}
                           {!isScreenshotMode && <th className="py-3 px-4 font-bold align-top">Contact Number</th>}
 
                           {!isScreenshotMode && (
@@ -5452,52 +5492,16 @@ export default function Dashboard() {
                                   : priceData.fullTotalPrice;
                               return (
                                 <tr key={order.fireId || order.id} className={`border-b border-white/10 ${idx % 2 === 0 ? 'bg-[#0d1527]' : 'bg-[#121c33]'}`}>
-                                  <td className="py-2.5 pl-5 pr-2 font-extrabold text-amber-300 text-xs align-middle w-[230px] min-w-[230px] whitespace-nowrap">{order.name}</td>
+                                  <td className="py-2.5 pl-5 pr-2 font-extrabold text-amber-300 text-xs align-middle w-[220px] min-w-[220px] whitespace-nowrap">{order.name}</td>
                                   <td className="py-2.5 px-2 font-bold text-white text-xs align-middle w-[120px] min-w-[120px] whitespace-nowrap">{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
-                                  <td className="py-2.5 px-2 align-middle text-center w-[250px] min-w-[250px] text-xs">{renderChocolateBadges(order.chocolate)}</td>
+                                  <td className="py-2.5 px-2 align-middle text-center w-[240px] min-w-[240px] text-xs">{renderChocolateBadges(order.chocolate)}</td>
                                   <td className="py-2.5 px-2 text-center font-bold text-amber-200 text-xs align-middle w-[80px] min-w-[80px]">{order.count}</td>
                                   <td className="py-2.5 px-2 text-center align-middle font-black text-xs screenshot-pending-amount w-[170px] min-w-[170px]">
                                     {pendingAmt > 0 ? <span className="text-rose-400 font-bold text-xs">₹{pendingAmt.toLocaleString()}</span> : <span className="text-emerald-400 font-bold text-xs">₹0</span>}
                                   </td>
-                                  <td className="py-2.5 px-2 text-center align-middle font-bold text-slate-100 text-xs w-[170px] min-w-[170px]">
-                                    <div className="flex flex-col items-center">
-                                      {(() => {
-                                        const rawLoc = String((order as any).location || '').trim();
-                                        const addrStr = String((order as any).address || '').trim();
-                                        const remStr = String((order as any).remarks || (order as any).comments || '').trim();
-                                        const combined = `${rawLoc} ${addrStr} ${remStr}`.trim();
-                                        const lower = combined.toLowerCase();
-
-                                        if ((order as any).isChennai === true || lower.includes('chennai') || lower.includes('madras')) {
-                                          return <span className="screenshot-location-text screenshot-location-chennai font-bold">Chennai</span>;
-                                        }
-                                        if (lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
-                                          return <span className="screenshot-location-text screenshot-location-kerala font-bold">Kerala</span>;
-                                        }
-
-                                        const knownCities = [
-                                          'Madurai', 'Coimbatore', 'Trichy', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 
-                                          'Erode', 'Vellore', 'Thanjavur', 'Tuticorin', 'Thoothukudi', 'Nagercoil', 
-                                          'Kanyakumari', 'Dindigul', 'Karur', 'Cuddalore', 'Kanchipuram', 'Tiruppur', 
-                                          'Hosur', 'Puducherry', 'Pondicherry', 'Karaikal', 'Ramanathapuram', 'Ramnad', 
-                                          'Virudhunagar', 'Sivakasi', 'Tenkasi', 'Namakkal', 'Villupuram'
-                                        ];
-
-                                        for (const city of knownCities) {
-                                          if (lower.includes(city.toLowerCase())) {
-                                            return <span className="screenshot-location-text screenshot-location-others font-bold">{city}</span>;
-                                          }
-                                        }
-
-                                        if (rawLoc) {
-                                          return <span className="screenshot-location-text screenshot-location-others font-bold">{rawLoc}</span>;
-                                        }
-                                        if (addrStr) {
-                                          const shortAddr = addrStr.length > 15 ? `${addrStr.substring(0, 15)}...` : addrStr;
-                                          return <span className="screenshot-location-text screenshot-location-others font-bold">{shortAddr}</span>;
-                                        }
-                                        return <span className="screenshot-location-text screenshot-location-empty font-bold">—</span>;
-                                      })()}
+                                  <td className="py-2.5 px-2 text-center align-middle font-bold text-slate-100 text-xs w-[150px] min-w-[150px]">
+                                    <div className="flex flex-col items-center justify-center">
+                                      {renderScreenshotLocation(order)}
                                     </div>
                                   </td>
                                 </tr>
@@ -5547,7 +5551,50 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                <td className={`py-2.5 px-4 font-bold align-middle ${isScreenshotMode ? 'text-white font-extrabold text-sm min-w-[200px]' : 'text-amber-950 print:text-black'}`}>{order.name}</td>
+                                <td className={`py-2.5 px-4 font-bold align-middle ${isScreenshotMode ? 'text-white font-extrabold text-sm min-w-[200px]' : order.orderType === 'Thaaru' ? 'font-extrabold print:text-black' : 'text-amber-950 print:text-black'}`}>
+                                  <span className={order.orderType === 'Thaaru' ? 'text-[#38bdf8] font-black' : ''} title={order.orderType === 'Thaaru' ? 'Thaaru Order' : ''}>{order.name}</span>
+                                </td>
+
+                                {!isScreenshotMode && (
+                                  <td className="py-2.5 px-4 text-center align-middle">
+                                    {(() => {
+                                      const rawLoc = String((order as any).location || '').trim();
+                                      const addrStr = String((order as any).address || '').trim();
+                                      const remStr = String((order as any).remarks || (order as any).comments || '').trim();
+                                      const combined = `${rawLoc} ${addrStr} ${remStr}`.trim();
+                                      const lower = combined.toLowerCase();
+
+                                      if ((order as any).isChennai === true || rawLoc.toLowerCase() === 'chennai' || lower.includes('chennai') || lower.includes('madras')) {
+                                        return <span className="font-extrabold text-emerald-400">Chennai</span>;
+                                      }
+
+                                      if (rawLoc.toLowerCase() === 'kerala' || lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
+                                        return <span className="font-extrabold text-purple-400">Kerala</span>;
+                                      }
+
+                                      const knownCities = [
+                                        'Madurai', 'Coimbatore', 'Trichy', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 
+                                        'Erode', 'Vellore', 'Thanjavur', 'Tuticorin', 'Thoothukudi', 'Nagercoil', 
+                                        'Kanyakumari', 'Dindigul', 'Karur', 'Cuddalore', 'Kanchipuram', 'Tiruppur', 
+                                        'Hosur', 'Puducherry', 'Pondicherry', 'Karaikal', 'Ramanathapuram', 'Ramnad', 
+                                        'Virudhunagar', 'Sivakasi', 'Tenkasi', 'Namakkal', 'Villupuram'
+                                      ];
+
+                                      for (const city of knownCities) {
+                                        if (lower.includes(city.toLowerCase())) {
+                                          return <span className="font-extrabold text-sky-400">{city}</span>;
+                                        }
+                                      }
+
+                                      if (rawLoc && rawLoc.toLowerCase() !== 'others') {
+                                        return <span className="font-extrabold text-slate-200">{rawLoc}</span>;
+                                      }
+
+                                      return <span className="text-slate-400 font-bold text-sm">—</span>;
+                                    })()}
+                                  </td>
+                                )}
+
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{formatPhoneNumber(order.phone)}</td>}
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
                                 <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
