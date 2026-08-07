@@ -644,7 +644,16 @@ export default function Dashboard() {
       }
     });
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); };
+    const unsubIgnoredDups = onSnapshot(doc(db, 'app_settings', 'ignored_duplicates'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (Array.isArray(data.phoneNumbers)) {
+          setIgnoredDuplicatePhones(data.phoneNumbers);
+        }
+      }
+    });
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -1028,23 +1037,20 @@ export default function Dashboard() {
   const [d2LocationFilter, setD2LocationFilter] = useState<string>('All');
   const [d2RoleFilter, setD2RoleFilter] = useState<string>('All');
 
-  // Ignored duplicate contact numbers persistence
-  const [ignoredDuplicatePhones, setIgnoredDuplicatePhones] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('sabi_ignored_duplicate_phones');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Ignored duplicate contact numbers synced via Firestore database
+  const [ignoredDuplicatePhones, setIgnoredDuplicatePhones] = useState<string[]>([]);
 
-  useEffect(() => {
+  const updateIgnoredDuplicatesInDB = async (newList: string[]) => {
     try {
-      localStorage.setItem('sabi_ignored_duplicate_phones', JSON.stringify(ignoredDuplicatePhones));
+      await setDoc(doc(db, 'app_settings', 'ignored_duplicates'), {
+        phoneNumbers: newList,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
     } catch (err) {
-      console.error('Failed to persist ignored duplicate phones:', err);
+      console.error("Failed to sync ignored duplicate phone numbers to database:", err);
+      toast.error("Failed to update database");
     }
-  }, [ignoredDuplicatePhones]);
+  };
 
   // Compute duplicate contact numbers map for Dashboard 1 (chocolates)
   const duplicatePhoneCounts = useMemo(() => {
@@ -1085,30 +1091,38 @@ export default function Dashboard() {
 
   const handleIgnoreDuplicatePhone = (phoneKey: string) => {
     if (!ignoredDuplicatePhones.includes(phoneKey)) {
-      setIgnoredDuplicatePhones(prev => [...prev, phoneKey]);
+      const newList = [...ignoredDuplicatePhones, phoneKey];
+      setIgnoredDuplicatePhones(newList);
+      updateIgnoredDuplicatesInDB(newList);
       toast.success(`Ignored duplicate contact number (${formatPhoneNumber(phoneKey)})`);
     }
   };
 
   const handleToggleIgnoreDuplicatePhone = (phoneKey: string) => {
+    let newList: string[];
     if (ignoredDuplicatePhones.includes(phoneKey)) {
-      setIgnoredDuplicatePhones(prev => prev.filter(p => p !== phoneKey));
+      newList = ignoredDuplicatePhones.filter(p => p !== phoneKey);
       toast.info(`Restored duplicate warning for ${formatPhoneNumber(phoneKey)}`);
     } else {
-      setIgnoredDuplicatePhones(prev => [...prev, phoneKey]);
+      newList = [...ignoredDuplicatePhones, phoneKey];
       toast.success(`Ignored duplicate contact number (${formatPhoneNumber(phoneKey)})`);
     }
+    setIgnoredDuplicatePhones(newList);
+    updateIgnoredDuplicatesInDB(newList);
   };
 
   const handleIgnoreAllDuplicates = () => {
     const activeKeys = Object.keys(activeDuplicatePhonesMap);
     if (activeKeys.length === 0) return;
-    setIgnoredDuplicatePhones(prev => Array.from(new Set([...prev, ...activeKeys])));
+    const newList = Array.from(new Set([...ignoredDuplicatePhones, ...activeKeys]));
+    setIgnoredDuplicatePhones(newList);
+    updateIgnoredDuplicatesInDB(newList);
     toast.success(`Ignored ${activeKeys.length} duplicate contact number(s)`);
   };
 
   const handleResetIgnoredDuplicates = () => {
     setIgnoredDuplicatePhones([]);
+    updateIgnoredDuplicatesInDB([]);
     toast.info("Reset all ignored duplicate contact numbers");
   };
 
