@@ -76,6 +76,15 @@ const CHOCOLATE_PRICES_MAP: Record<string, { retail: number; wholesale: number }
   "gems": { retail: 10, wholesale: 8 },
 };
 
+const normalizePhone = (phoneStr: any) => {
+  if (!phoneStr) return "";
+  const cleaned = String(phoneStr).replace(/\D/g, "");
+  if (cleaned.length > 10 && cleaned.startsWith("91")) {
+    return cleaned.slice(-10);
+  }
+  return cleaned;
+};
+
 const CHOCOLATE_PURCHASE_MAP: Record<string, number> = {
   "10 rs 5 star": 9.5,
   "10 rs kitkat": 9.5,
@@ -992,6 +1001,7 @@ export default function Dashboard() {
   const [d1DeliveryFilter, setD1DeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
   const [d1OrderStatusFilter, setD1OrderStatusFilter] = useState<string>('All');
   const [d1TableTypeFilter, setD1TableTypeFilter] = useState<string>('All');
+  const [d1DuplicateFilter, setD1DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
   const [d1RevenueDateType, setD1RevenueDateType] = useState<string>('Dispatch Date');
   const [d1DateFilter, setD1DateFilter] = useState({ from: "", to: "" });
   const [d1CountFilter, setD1CountFilter] = useState<string>('All');
@@ -1007,6 +1017,7 @@ export default function Dashboard() {
   const [d2DeliveryFilter, setD2DeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
   const [d2OrderStatusFilter, setD2OrderStatusFilter] = useState<string>('All');
   const [d2TableTypeFilter, setD2TableTypeFilter] = useState<string>('All');
+  const [d2DuplicateFilter, setD2DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
   const [d2RevenueDateType, setD2RevenueDateType] = useState<string>('Dispatch Date');
   const [d2DateFilter, setD2DateFilter] = useState({ from: "", to: "" });
   const [d2CountFilter, setD2CountFilter] = useState<string>('All');
@@ -1016,6 +1027,90 @@ export default function Dashboard() {
   const [d2ChocFilter, setD2ChocFilter] = useState<string>('');
   const [d2LocationFilter, setD2LocationFilter] = useState<string>('All');
   const [d2RoleFilter, setD2RoleFilter] = useState<string>('All');
+
+  // Ignored duplicate contact numbers persistence
+  const [ignoredDuplicatePhones, setIgnoredDuplicatePhones] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_ignored_duplicate_phones');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sabi_ignored_duplicate_phones', JSON.stringify(ignoredDuplicatePhones));
+    } catch (err) {
+      console.error('Failed to persist ignored duplicate phones:', err);
+    }
+  }, [ignoredDuplicatePhones]);
+
+  // Compute duplicate contact numbers map for Dashboard 1 (chocolates)
+  const duplicatePhoneCounts = useMemo(() => {
+    const phoneMap: Record<string, { count: number; orders: any[] }> = {};
+    const d1Orders = orders.filter(o => o.category !== 'product');
+
+    for (const order of d1Orders) {
+      const rawPhone = order.phone;
+      const phoneKey = normalizePhone(rawPhone);
+      if (!phoneKey || phoneKey.length < 5 || phoneKey === "0000000000") continue;
+
+      if (!phoneMap[phoneKey]) {
+        phoneMap[phoneKey] = { count: 0, orders: [] };
+      }
+      phoneMap[phoneKey].count += 1;
+      phoneMap[phoneKey].orders.push(order);
+    }
+
+    return phoneMap;
+  }, [orders]);
+
+  // Active duplicate phone numbers (excluding ignored ones)
+  const activeDuplicatePhonesMap = useMemo(() => {
+    const duplicates: Record<string, { count: number; orders: any[]; rawPhone: string }> = {};
+
+    Object.entries(duplicatePhoneCounts).forEach(([phoneKey, data]) => {
+      if (data.count > 1 && !ignoredDuplicatePhones.includes(phoneKey)) {
+        duplicates[phoneKey] = {
+          count: data.count,
+          orders: data.orders,
+          rawPhone: data.orders[0]?.phone || phoneKey
+        };
+      }
+    });
+
+    return duplicates;
+  }, [duplicatePhoneCounts, ignoredDuplicatePhones]);
+
+  const handleIgnoreDuplicatePhone = (phoneKey: string) => {
+    if (!ignoredDuplicatePhones.includes(phoneKey)) {
+      setIgnoredDuplicatePhones(prev => [...prev, phoneKey]);
+      toast.success(`Ignored duplicate contact number (${formatPhoneNumber(phoneKey)})`);
+    }
+  };
+
+  const handleToggleIgnoreDuplicatePhone = (phoneKey: string) => {
+    if (ignoredDuplicatePhones.includes(phoneKey)) {
+      setIgnoredDuplicatePhones(prev => prev.filter(p => p !== phoneKey));
+      toast.info(`Restored duplicate warning for ${formatPhoneNumber(phoneKey)}`);
+    } else {
+      setIgnoredDuplicatePhones(prev => [...prev, phoneKey]);
+      toast.success(`Ignored duplicate contact number (${formatPhoneNumber(phoneKey)})`);
+    }
+  };
+
+  const handleIgnoreAllDuplicates = () => {
+    const activeKeys = Object.keys(activeDuplicatePhonesMap);
+    if (activeKeys.length === 0) return;
+    setIgnoredDuplicatePhones(prev => Array.from(new Set([...prev, ...activeKeys])));
+    toast.success(`Ignored ${activeKeys.length} duplicate contact number(s)`);
+  };
+
+  const handleResetIgnoredDuplicates = () => {
+    setIgnoredDuplicatePhones([]);
+    toast.info("Reset all ignored duplicate contact numbers");
+  };
 
   // Tracking filters
   const [trkSearch, setTrkSearch] = useState("");
@@ -1035,6 +1130,8 @@ export default function Dashboard() {
   const setOrderStatusFilter = activeTab === 'dashboard2' ? setD2OrderStatusFilter : setD1OrderStatusFilter;
   const tableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
   const setTableTypeFilter = activeTab === 'dashboard2' ? setD2TableTypeFilter : setD1TableTypeFilter;
+  const duplicateFilter = activeTab === 'dashboard2' ? d2DuplicateFilter : d1DuplicateFilter;
+  const setDuplicateFilter = activeTab === 'dashboard2' ? setD2DuplicateFilter : setD1DuplicateFilter;
   const revenueDateType = activeTab === 'dashboard2' ? d2RevenueDateType : d1RevenueDateType;
   const setRevenueDateType = activeTab === 'dashboard2' ? setD2RevenueDateType : setD1RevenueDateType;
   const dateFilter = activeTab === 'dashboard2' ? d2DateFilter : d1DateFilter;
@@ -1060,6 +1157,7 @@ export default function Dashboard() {
       deliveryFilter !== 'All' ||
       orderStatusFilter !== 'All' ||
       tableTypeFilter !== 'All' ||
+      duplicateFilter !== 'All' ||
       Boolean(dateFilter.from || dateFilter.to) ||
       countFilter !== 'All' ||
       chocFilter !== '' ||
@@ -1072,6 +1170,7 @@ export default function Dashboard() {
     deliveryFilter,
     orderStatusFilter,
     tableTypeFilter,
+    duplicateFilter,
     dateFilter,
     countFilter,
     chocFilter,
@@ -1089,6 +1188,8 @@ export default function Dashboard() {
     setD2OrderStatusFilter('All');
     setD1TableTypeFilter('All');
     setD2TableTypeFilter('All');
+    setD1DuplicateFilter('All');
+    setD2DuplicateFilter('All');
     setD1DateFilter({ from: '', to: '' });
     setD2DateFilter({ from: '', to: '' });
     setD1CountFilter('All');
@@ -1700,6 +1801,7 @@ export default function Dashboard() {
     const curChocFilter = activeTab === 'dashboard2' ? d2ChocFilter : d1ChocFilter;
     const curLocationFilter = activeTab === 'dashboard2' ? d2LocationFilter : d1LocationFilter;
     const curRoleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
+    const curDuplicateFilter = activeTab === 'dashboard2' ? d2DuplicateFilter : d1DuplicateFilter;
 
     return orders.filter(order => {
       const pMatch = curPaymentFilter === 'All' || order.paymentStatus === curPaymentFilter;
@@ -1776,9 +1878,20 @@ export default function Dashboard() {
         roleMatch = order.role === curRoleFilter;
       }
 
-      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && locationMatch && roleMatch;
+      let duplicateMatch = true;
+      if (curDuplicateFilter !== 'All') {
+        const phoneKey = normalizePhone(order.phone);
+        const isDup = phoneKey && duplicatePhoneCounts[phoneKey] && duplicatePhoneCounts[phoneKey].count > 1;
+        if (curDuplicateFilter === 'Duplicates Only') {
+          duplicateMatch = Boolean(isDup);
+        } else if (curDuplicateFilter === 'Non-Duplicates') {
+          duplicateMatch = !isDup;
+        }
+      }
+
+      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && locationMatch && roleMatch && duplicateMatch;
     });
-  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1LocationFilter, d1RoleFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2LocationFilter, d2RoleFilter]);
+  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts]);
 
   const { totalOrders, deliveredCount, inProcessCount, totalItems, topChocolates, totalRevenue, totalDeliveryCharge, totalPendingAmount } = useMemo(() => {
     const total = filteredDashboardOrders.length;
@@ -4848,6 +4961,30 @@ export default function Dashboard() {
                           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
                         </div>
 
+                        {/* 🟢 DUPLICATE CONTACT FILTER DROPDOWN (Dashboard 1) */}
+                        {activeTab === 'dashboard1' && (
+                          <div className="relative shrink-0">
+                            <select
+                              value={d1DuplicateFilter}
+                              onChange={(e) => setD1DuplicateFilter(e.target.value as any)}
+                              className={`h-9 md:h-10 pl-8 pr-7 border-2 rounded-xl text-xs font-black outline-none focus:ring-2 cursor-pointer shadow-sm appearance-none uppercase tracking-wider transition-all duration-300 ${
+                                d1DuplicateFilter === 'Duplicates Only'
+                                  ? 'bg-amber-600 text-white border-amber-700 focus:ring-amber-500/40 shadow-amber-600/30'
+                                  : 'bg-white border-amber-100 text-amber-950 focus:border-amber-500 focus:ring-amber-500/20'
+                              }`}
+                              title="Filter by Duplicate Contact Numbers"
+                            >
+                              <option value="All">All Contacts</option>
+                              <option value="Duplicates Only">
+                                ⚠️ Duplicates ({Object.keys(activeDuplicatePhonesMap).length})
+                              </option>
+                              <option value="Non-Duplicates">Non-Duplicates</option>
+                            </select>
+                            <Bell size={14} strokeWidth={2.5} className={`absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${d1DuplicateFilter === 'Duplicates Only' ? 'text-white' : 'text-amber-700'}`} />
+                            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${d1DuplicateFilter === 'Duplicates Only' ? 'text-white' : 'text-amber-700'}`} />
+                          </div>
+                        )}
+
                         {/* 🟢 PROMINENT CLEAR ALL FILTERS BUTTON */}
                         {isAnyFilterActive && (
                           <button
@@ -4931,19 +5068,19 @@ export default function Dashboard() {
                           title="Notifications"
                         >
                           <Bell size={18} />
-                          {notifications.filter(n => !n.read).length > 0 && (
-                            <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border border-indigo-300 animate-pulse'
+                          {(notifications.filter(n => !n.read).length + (activeTab === 'dashboard1' ? Object.keys(activeDuplicatePhonesMap).length : 0)) > 0 && (
+                            <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md ${Object.keys(activeDuplicatePhonesMap).length > 0 || orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
+                              ? 'bg-gradient-to-r from-amber-600 to-rose-600 border border-amber-300 animate-pulse'
                               : 'bg-rose-600'
                               }`}>
-                              {notifications.filter(n => !n.read).length}
+                              {notifications.filter(n => !n.read).length + (activeTab === 'dashboard1' ? Object.keys(activeDuplicatePhonesMap).length : 0)}
                             </span>
                           )}
                         </button>
 
                         {showNotificationDropdown && (
                           <div
-                            className="absolute right-0 top-full mt-2 z-[100] w-80 rounded-2xl shadow-2xl border border-white/15 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
+                            className="absolute right-0 top-full mt-2 z-[100] w-84 sm:w-96 rounded-2xl shadow-2xl border border-white/15 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200 notification-container-ref"
                             style={{
                               background: '#0d1527',
                               backdropFilter: 'blur(20px)',
@@ -4952,12 +5089,12 @@ export default function Dashboard() {
                             <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex justify-between items-center shrink-0">
                               <span className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
                                 <Bell size={14} className="text-amber-400" /> Notifications
-                                {notifications.filter(n => !n.read).length > 0 && (
-                                  <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${orders.some(o => o.orderStatus === 'forward to print (paid)' || o.orderStatus?.toLowerCase() === 'forward to print')
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse'
+                                {(notifications.filter(n => !n.read).length + (activeTab === 'dashboard1' ? Object.keys(activeDuplicatePhonesMap).length : 0)) > 0 && (
+                                  <span className={`px-2 py-0.5 text-[9px] rounded-full font-black text-white ${Object.keys(activeDuplicatePhonesMap).length > 0
+                                    ? 'bg-amber-600 animate-pulse'
                                     : 'bg-rose-600'
                                     }`}>
-                                    {notifications.filter(n => !n.read).length}
+                                    {notifications.filter(n => !n.read).length + (activeTab === 'dashboard1' ? Object.keys(activeDuplicatePhonesMap).length : 0)}
                                   </span>
                                 )}
                               </span>
@@ -4972,10 +5109,64 @@ export default function Dashboard() {
                                 <Plus size={11} /> Add Order
                               </button>
                             </div>
+
+                            {/* ⚠️ DUPLICATE CONTACT NUMBERS NOTIFICATION SECTION */}
+                            {activeTab === 'dashboard1' && Object.keys(activeDuplicatePhonesMap).length > 0 && (
+                              <div className="p-3 bg-amber-950/70 border-b border-amber-500/30">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                                    ⚠️ {Object.keys(activeDuplicatePhonesMap).length} Duplicate Contact Number{Object.keys(activeDuplicatePhonesMap).length > 1 ? 's' : ''}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => {
+                                        setD1DuplicateFilter('Duplicates Only');
+                                        setShowNotificationDropdown(false);
+                                      }}
+                                      className="text-[10px] font-bold text-amber-100 hover:text-white bg-amber-600 hover:bg-amber-700 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                                    >
+                                      Filter Table
+                                    </button>
+                                    <button
+                                      onClick={handleIgnoreAllDuplicates}
+                                      className="text-[10px] font-bold text-slate-200 hover:text-white bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                                      title="Ignore all duplicate numbers"
+                                    >
+                                      Ignore All
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                                  {Object.entries(activeDuplicatePhonesMap).map(([phoneKey, data]) => (
+                                    <div key={phoneKey} className="bg-slate-900/90 p-2 rounded-lg border border-amber-500/20 text-xs flex items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="text-slate-200 font-bold font-mono text-[11px] truncate">{formatPhoneNumber(data.rawPhone)}</p>
+                                        <p className="text-[10px] text-amber-400 font-medium truncate">
+                                          {data.count} Orders ({data.orders.map(o => o.name).filter(Boolean).join(', ')})
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleIgnoreDuplicatePhone(phoneKey);
+                                          }}
+                                          className="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 text-slate-200 hover:text-rose-200 rounded text-[10px] font-bold border border-slate-700 transition-colors cursor-pointer"
+                                          title="Ignore this duplicate number"
+                                        >
+                                          Ignore
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="max-h-64 overflow-y-auto divide-y divide-white/10">
                               {notifications.length === 0 ? (
                                 <div className="p-4 text-center text-xs text-slate-400 font-medium italic">
-                                  No notifications yet
+                                  No task notifications yet
                                 </div>
                               ) : (
                                 notifications.map((n) => (
@@ -5025,20 +5216,35 @@ export default function Dashboard() {
                                 ))
                               )}
                             </div>
-                            {notifications.length > 0 && (
+                            {(notifications.length > 0 || ignoredDuplicatePhones.length > 0) && (
                               <div className="px-4 py-2 border-t border-white/10 bg-white/5 flex justify-between items-center shrink-0">
-                                <button
-                                  onClick={markAllNotificationsAsRead}
-                                  className="text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                                >
-                                  Mark all read
-                                </button>
-                                <button
-                                  onClick={clearAllNotifications}
-                                  className="text-[11px] font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
-                                >
-                                  Clear all
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  {notifications.length > 0 && (
+                                    <>
+                                      <button
+                                        onClick={markAllNotificationsAsRead}
+                                        className="text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                                      >
+                                        Mark all read
+                                      </button>
+                                      <button
+                                        onClick={clearAllNotifications}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                      >
+                                        Clear all
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                                {ignoredDuplicatePhones.length > 0 && (
+                                  <button
+                                    onClick={handleResetIgnoredDuplicates}
+                                    className="text-[11px] font-bold text-slate-400 hover:text-amber-300 transition-colors cursor-pointer"
+                                    title="Clear ignored duplicate phone list"
+                                  >
+                                    Reset {ignoredDuplicatePhones.length} Ignored
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -5134,6 +5340,45 @@ export default function Dashboard() {
                               </span>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ⚠️ DUPLICATE CONTACT NUMBERS TOP BANNER */}
+                    {activeTab === 'dashboard1' && Object.keys(activeDuplicatePhonesMap).length > 0 && d1DuplicateFilter === 'All' && !isScreenshotMode && (
+                      <div className="mb-4 p-3 bg-gradient-to-r from-amber-950/30 via-orange-950/20 to-amber-950/30 border border-amber-500/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/30">
+                            <Bell size={18} className="animate-bounce text-amber-400" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-amber-200 flex items-center gap-2">
+                              <span>⚠️ Duplicate Contact Numbers Found</span>
+                              <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black shadow-sm">
+                                {Object.keys(activeDuplicatePhonesMap).length} Duplicate{Object.keys(activeDuplicatePhonesMap).length > 1 ? 's' : ''}
+                              </span>
+                            </p>
+                            <p className="text-[11px] font-medium text-amber-300/80">
+                              Multiple orders have been placed using the same phone number. You can filter them or mark as ignored.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setD1DuplicateFilter('Duplicates Only')}
+                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer border border-amber-400/30"
+                          >
+                            <Filter size={13} />
+                            <span>Filter Duplicates</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleIgnoreAllDuplicates}
+                            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-amber-200 border border-amber-400/30 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          >
+                            Ignore All
+                          </button>
                         </div>
                       </div>
                     )}
@@ -5234,7 +5479,27 @@ export default function Dashboard() {
                               Location
                             </th>
                           )}
-                          {!isScreenshotMode && <th className="py-3 px-4 font-bold align-top">Contact Number</th>}
+                          {!isScreenshotMode && (
+                            <th className="py-3 px-4 font-bold align-top">
+                              <div className="flex items-center gap-1 group">
+                                <span>Contact Number</span>
+                                {activeTab === 'dashboard1' && (
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter Duplicates">
+                                    <ChevronDown size={14} className={d1DuplicateFilter !== 'All' ? 'text-amber-800 font-bold' : 'text-amber-400'} />
+                                    <select
+                                      value={d1DuplicateFilter}
+                                      onChange={(e) => setD1DuplicateFilter(e.target.value as any)}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                    >
+                                      <option value="All">All Contacts</option>
+                                      <option value="Duplicates Only">Duplicates Only ({Object.keys(activeDuplicatePhonesMap).length})</option>
+                                      <option value="Non-Duplicates">Non-Duplicates</option>
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            </th>
+                          )}
 
                           {!isScreenshotMode && (
                             <th className="py-3 px-4 font-bold align-top min-w-[140px]">
@@ -5595,7 +5860,88 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{formatPhoneNumber(order.phone)}</td>}
+                                {!isScreenshotMode && (
+                                  <td className="py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{formatPhoneNumber(order.phone)}</span>
+                                      {activeTab === 'dashboard1' && (() => {
+                                        const phoneKey = normalizePhone(order.phone);
+                                        if (!phoneKey || !duplicatePhoneCounts[phoneKey] || duplicatePhoneCounts[phoneKey].count <= 1) return null;
+
+                                        const isIgnored = ignoredDuplicatePhones.includes(phoneKey);
+                                        const dupCount = duplicatePhoneCounts[phoneKey].count;
+
+                                        return (
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <button
+                                                type="button"
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black transition-all shadow-sm border cursor-pointer ${
+                                                  isIgnored
+                                                    ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                                                    : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 animate-pulse'
+                                                }`}
+                                                title={isIgnored ? "Duplicate ignored" : `${dupCount} orders found with this phone number`}
+                                              >
+                                                <span>{isIgnored ? '⚪ Ignored' : `⚠️ Duplicate (${dupCount})`}</span>
+                                                <ChevronDown size={10} />
+                                              </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent align="start" className="w-60 p-3 bg-slate-900 text-white border border-white/20 shadow-2xl rounded-xl text-xs z-[150]">
+                                              <div className="pb-2 mb-2 border-b border-white/10">
+                                                <div className="flex items-center justify-between">
+                                                  <span className="font-extrabold text-amber-400 text-xs flex items-center gap-1">
+                                                    {isIgnored ? '⚪ Ignored Duplicate' : '⚠️ Duplicate Contact'}
+                                                  </span>
+                                                  <span className="bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0.5 rounded font-black">
+                                                    {dupCount} Orders
+                                                  </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-300 font-mono mt-0.5">
+                                                  {formatPhoneNumber(order.phone)}
+                                                </p>
+                                                <div className="text-[10px] text-slate-400 mt-1 max-h-16 overflow-y-auto custom-scrollbar">
+                                                  Orders by: {duplicatePhoneCounts[phoneKey].orders.map(o => o.name).filter(Boolean).join(', ')}
+                                                </div>
+                                              </div>
+                                              <div className="space-y-1">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleToggleIgnoreDuplicatePhone(phoneKey)}
+                                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                                                >
+                                                  <span>{isIgnored ? '✅ Restore Warning' : '🚫 Ignore Duplicate'}</span>
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setD1DuplicateFilter('Duplicates Only');
+                                                    setD1DashboardSearch(formatPhoneNumber(order.phone));
+                                                  }}
+                                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-bold flex items-center gap-2 transition-colors text-amber-300 cursor-pointer"
+                                                >
+                                                  <Search size={12} />
+                                                  <span>View All {dupCount} Orders</span>
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const cleanDigits = phoneKey.replace(/\D/g, '');
+                                                    window.open(`https://wa.me/91${cleanDigits}`, '_blank');
+                                                  }}
+                                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-bold flex items-center gap-2 transition-colors text-emerald-400 cursor-pointer"
+                                                >
+                                                  <MessageCircle size={12} />
+                                                  <span>WhatsApp Customer</span>
+                                                </button>
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
+                                        );
+                                      })()}
+                                    </div>
+                                  </td>
+                                )}
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
                                 <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
 
