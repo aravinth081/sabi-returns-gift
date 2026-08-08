@@ -178,6 +178,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const [adminMonthFilter, setAdminMonthFilter] = useState(`${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}`);
   const [adminDateFilter, setAdminDateFilter] = useState("");
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>("All");
+  const [adminDuplicateFilter, setAdminDuplicateFilter] = useState<string>("All");
 
   // Fetch Attendance Records from Firestore
   useEffect(() => {
@@ -676,7 +677,16 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
   }, [currentMonthRecords]);
 
-  // Admin filtered records with smart precedence and sorting
+  const duplicateAttendanceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    attendanceRecords.forEach(r => {
+      const key = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return map;
+  }, [attendanceRecords]);
+
+  // Admin filtered records with duplicate filter and chronological date sorting
   const adminFilteredRecords = useMemo(() => {
     return attendanceRecords.filter(r => {
       const searchLower = adminSearch.trim().toLowerCase();
@@ -691,9 +701,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       
       const matchesStatus = adminStatusFilter === "All" || r.status === adminStatusFilter;
 
-      return matchesSearch && matchesDate && matchesMonth && matchesStatus;
-    }).sort((a, b) => b.date.localeCompare(a.date));
-  }, [attendanceRecords, adminSearch, adminMonthFilter, adminDateFilter, adminStatusFilter]);
+      const dupKey = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+      const isDup = (duplicateAttendanceMap.get(dupKey) || 0) > 1;
+      const matchesDuplicate = 
+        adminDuplicateFilter === "All" ||
+        (adminDuplicateFilter === "Duplicates Only" && isDup) ||
+        (adminDuplicateFilter === "Unique Only" && !isDup);
+
+      return matchesSearch && matchesDate && matchesMonth && matchesStatus && matchesDuplicate;
+    }).sort((a, b) => {
+      const dateComp = b.date.localeCompare(a.date);
+      if (dateComp !== 0) return dateComp;
+      return a.employeeName.localeCompare(b.employeeName);
+    });
+  }, [attendanceRecords, adminSearch, adminMonthFilter, adminDateFilter, adminStatusFilter, adminDuplicateFilter, duplicateAttendanceMap]);
 
   return (
     <div className="space-y-6 font-sans text-white pb-12">
@@ -1020,7 +1041,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
               <Filter className="text-amber-400" size={22} /> Admin Attendance Panel
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
               {/* Filter by Employee Dropdown */}
               <div>
                 <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Filter by Employee</label>
@@ -1075,6 +1096,21 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                   <option value="Leave">Leave Only</option>
                 </select>
               </div>
+
+              {/* Duplicate Filter */}
+              <div>
+                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Duplicate Filter</label>
+                <select
+                  value={adminDuplicateFilter}
+                  onChange={e => setAdminDuplicateFilter(e.target.value)}
+                  style={{ backgroundColor: '#162035', color: '#fbbf24' }}
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl text-xs font-extrabold text-amber-400 bg-[#162035] outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="All">All Records</option>
+                  <option value="Duplicates Only">Duplicates Only</option>
+                  <option value="Unique Only">Unique Records Only</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1084,9 +1120,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
               <h3 className="font-black text-sm text-amber-400 uppercase tracking-wider">
                 All Employee Attendance Records ({adminFilteredRecords.length})
               </h3>
-              {(adminSearch || adminDateFilter || adminMonthFilter || adminStatusFilter !== "All") && (
+              {(adminSearch || adminDateFilter || adminMonthFilter || adminStatusFilter !== "All" || adminDuplicateFilter !== "All") && (
                 <button
-                  onClick={() => { setAdminSearch(""); setAdminDateFilter(""); setAdminMonthFilter(""); setAdminStatusFilter("All"); }}
+                  onClick={() => { setAdminSearch(""); setAdminDateFilter(""); setAdminMonthFilter(""); setAdminStatusFilter("All"); setAdminDuplicateFilter("All"); }}
                   className="text-xs text-rose-400 font-extrabold hover:underline cursor-pointer"
                 >
                   Clear Filters
@@ -1094,17 +1130,17 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
               )}
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
+            <div className="overflow-x-auto overflow-y-auto max-h-[420px] custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 uppercase font-black tracking-wider border-b border-amber-500/30">
-                    <th className="p-3.5 border-r border-white/10">Employee Name</th>
-                    <th className="p-3.5 border-r border-white/10">Date</th>
-                    <th className="p-3.5 border-r border-white/10">Login Time</th>
-                    <th className="p-3.5 border-r border-white/10">Logout Time</th>
-                    <th className="p-3.5 border-r border-white/10">Working Hours</th>
-                    <th className="p-3.5 border-r border-white/10">Leave Status</th>
-                    <th className="p-3.5 text-right">Total Hours</th>
+                <thead className="sticky top-0 z-10">
+                  <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 uppercase font-black tracking-wider border-b border-amber-500/30 shadow-sm">
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Employee Name</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Date</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Login Time</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Logout Time</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Working Hours</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Leave Status</th>
+                    <th className="p-3.5 text-right bg-[#162035]">Total Hours</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1445,9 +1481,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       {/* ------------------- MODAL: MONTHLY HISTORY POPUP (EYE ICON CLICK) ------------------- */}
       {isHistoryModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setIsHistoryModalOpen(false)}>
-          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20 animate-in fade-in zoom-in duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden border border-white/20 animate-in fade-in zoom-in duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
             
-            {/* Header */}
+            {/* Header - Fixed */}
             <div style={{ backgroundColor: '#131c2e' }} className="p-6 bg-[#131c2e] border-b border-white/15 text-white flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-xl font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
@@ -1465,17 +1501,17 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
               </button>
             </div>
 
-            {/* Attendance Table */}
-            <div className="flex-1 overflow-y-auto p-6 bg-[#090e1a] custom-scrollbar">
+            {/* Attendance Table Container - Contained Scrollable with sticky header */}
+            <div className="flex-1 overflow-y-auto max-h-[400px] p-6 bg-[#090e1a] custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 uppercase font-black border-b border-amber-500/30">
-                    <th className="p-3.5 border-r border-white/10">Date</th>
-                    <th className="p-3.5 border-r border-white/10">Login Time</th>
-                    <th className="p-3.5 border-r border-white/10">Logout Time</th>
-                    <th className="p-3.5 border-r border-white/10">Working Hours</th>
-                    <th className="p-3.5 border-r border-white/10">Leave Status</th>
-                    <th className="p-3.5">Remarks</th>
+                <thead className="sticky top-0 z-10">
+                  <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 uppercase font-black border-b border-amber-500/30 shadow-sm">
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Date</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Login Time</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Logout Time</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Working Hours</th>
+                    <th className="p-3.5 border-r border-white/10 bg-[#162035]">Leave Status</th>
+                    <th className="p-3.5 bg-[#162035]">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>

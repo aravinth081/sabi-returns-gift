@@ -465,8 +465,9 @@ export default function Dashboard() {
 
   const [customProducts, setCustomProducts] = useState<any[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
-  const [newProductForm, setNewProductForm] = useState({ name: "", price: "" });
+  const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "" });
   const [editProductId, setEditProductId] = useState<string | null>(null);
+  const [continuousVisibleCount, setContinuousVisibleCount] = useState(10);
 
   const [managedChocolates, setManagedChocolates] = useState<any[]>([]);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
@@ -1177,6 +1178,8 @@ export default function Dashboard() {
       chocFilter !== '' ||
       locationFilter !== 'All' ||
       roleFilter !== 'All' ||
+      deliveryDates.length > 0 ||
+      functionDates.length > 0 ||
       Boolean(dashboardSearch)
     );
   }, [
@@ -1190,6 +1193,8 @@ export default function Dashboard() {
     chocFilter,
     locationFilter,
     roleFilter,
+    deliveryDates,
+    functionDates,
     dashboardSearch,
   ]);
 
@@ -1214,6 +1219,10 @@ export default function Dashboard() {
     setD2LocationFilter('All');
     setD1RoleFilter('All');
     setD2RoleFilter('All');
+    setD1DeliveryDates([]);
+    setD2DeliveryDates([]);
+    setD1FunctionDates([]);
+    setD2FunctionDates([]);
     setD1DashboardSearch('');
     setD2DashboardSearch('');
     toast.success('All active filters reset to default');
@@ -2166,12 +2175,13 @@ export default function Dashboard() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
+    setContinuousVisibleCount(itemsPerPage);
   }, [filteredDashboardOrders, activeTab]);
 
   const paginatedOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return sortedDashboardOrders.slice(startIndex, startIndex + itemsPerPage);
-  }, [sortedDashboardOrders, currentPage, itemsPerPage]);
+    return sortedDashboardOrders.slice(startIndex, startIndex + continuousVisibleCount);
+  }, [sortedDashboardOrders, currentPage, itemsPerPage, continuousVisibleCount]);
 
   const reportData = useMemo(() => {
     let filtered = orders;
@@ -3190,28 +3200,38 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.price) return;
     try {
+      const dataToSave = {
+        name: newProductForm.name,
+        price: Number(newProductForm.price),
+        sellingPrice: Number(newProductForm.price),
+        wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
+        createdAt: new Date().toISOString()
+      };
+
       if (editProductId) {
         await updateDoc(doc(db, "products", editProductId), {
           name: newProductForm.name,
-          price: Number(newProductForm.price)
-        });
-        logActivity(`Edited Product: ${newProductForm.name} (₹${newProductForm.price})`, 'Products');
-      } else {
-        await addDoc(collection(db, "products"), {
-          name: newProductForm.name,
           price: Number(newProductForm.price),
-          createdAt: new Date().toISOString()
+          sellingPrice: Number(newProductForm.price),
+          wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0
         });
-        logActivity(`Added New Product: ${newProductForm.name} (₹${newProductForm.price})`, 'Products');
+        logActivity(`Edited Listing: ${newProductForm.name} (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
+      } else {
+        await addDoc(collection(db, "products"), dataToSave);
+        logActivity(`Added New Listing: ${newProductForm.name} (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       }
       setIsAddProductModalOpen(false);
-      setNewProductForm({ name: "", price: "" });
+      setNewProductForm({ name: "", wholesalePrice: "", price: "" });
       setEditProductId(null);
     } catch (err) { console.error("Error saving product:", err); }
   };
 
   const handleEditProductClick = (prod: any) => {
-    setNewProductForm({ name: prod.name, price: String(prod.price) });
+    setNewProductForm({ 
+      name: prod.name, 
+      wholesalePrice: String(prod.wholesalePrice !== undefined && prod.wholesalePrice !== null ? prod.wholesalePrice : ""), 
+      price: String(prod.price ?? prod.sellingPrice ?? "") 
+    });
     setEditProductId(prod.fireId);
     setIsAddProductModalOpen(true);
   };
@@ -4779,17 +4799,25 @@ export default function Dashboard() {
                   {activeTab === 'dashboard2' && (
                     <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
                       <div className="flex justify-between items-start mb-2 relative z-10 shrink-0">
-                        <p className="text-sm font-black text-[#c2410c] tracking-wide">Product Listing</p>
+                        <p className="text-sm font-black text-[#c2410c] tracking-wide">Production Listing</p>
                         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><Package size={16} /></div>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 relative z-10 text-xs font-bold max-h-[75px]">
+                      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-1.5 relative z-10 text-xs font-bold max-h-[75px] mb-2">
                         {customProducts.length === 0 ? (
                           <p className="text-amber-700/60 text-center mt-2 italic">No products added.</p>
                         ) : (
                           customProducts.map(prod => (
                             <div key={prod.fireId} className="flex justify-between items-center bg-slate-900/80 hover:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-white/20 shadow-md transition-all">
-                              <span className="text-white font-extrabold text-xs truncate flex-1 pr-2 tracking-wide" title={prod.name}>{prod.name} - ₹{prod.price}</span>
+                              <div className="flex-1 pr-2 truncate">
+                                <span className="text-white font-extrabold text-xs block truncate" title={prod.name}>{prod.name}</span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[10px] text-emerald-300 font-bold">S: ₹{prod.price ?? prod.sellingPrice}</span>
+                                  {prod.wholesalePrice !== undefined && prod.wholesalePrice !== null && prod.wholesalePrice !== "" && (
+                                    <span className="text-[10px] text-blue-300 font-bold">W: ₹{prod.wholesalePrice}</span>
+                                  )}
+                                </div>
+                              </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <button onClick={() => handleEditProductClick(prod)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 p-1 rounded-lg transition-colors cursor-pointer" title="Edit"><Pencil size={13} /></button>
                                 <button onClick={() => handleDeleteProductClick(prod.fireId)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1 rounded-lg transition-colors cursor-pointer" title="Delete"><Trash2 size={13} /></button>
@@ -4798,6 +4826,21 @@ export default function Dashboard() {
                           ))
                         )}
                       </div>
+
+                      {/* Dropdown similar to Chocolate dropdown in Dashboard 1 */}
+                      <select 
+                        value={d2ChocFilter} 
+                        onChange={(e) => setD2ChocFilter(e.target.value)} 
+                        className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto"
+                      >
+                        <option value="">All Products</option>
+                        {Array.from(new Set([
+                          ...customProducts.map(p => p.name).filter(Boolean),
+                          ...uniqueChocolates
+                        ])).map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
                     </div>
                   )}
 
@@ -5302,8 +5345,15 @@ export default function Dashboard() {
                       />
 
                       {activeTab === 'dashboard2' && (
-                        <button onClick={() => setIsAddProductModalOpen(true)} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700`}>
-                          <Plus size={18} /> Add Product
+                        <button 
+                          onClick={() => {
+                            setEditProductId(null);
+                            setNewProductForm({ name: "", wholesalePrice: "", price: "" });
+                            setIsAddProductModalOpen(true);
+                          }} 
+                          className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-black rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700 uppercase tracking-wider cursor-pointer"
+                        >
+                          <Plus size={18} /> NEW LISTING
                         </button>
                       )}
 
@@ -5314,7 +5364,20 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div ref={tableContainerRef} className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}>
+                  <div 
+                    ref={tableContainerRef} 
+                    onScroll={(e) => {
+                      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                      if (scrollHeight - scrollTop - clientHeight < 150) {
+                        const startIndex = (currentPage - 1) * itemsPerPage;
+                        const remaining = sortedDashboardOrders.length - startIndex;
+                        if (continuousVisibleCount < remaining) {
+                          setContinuousVisibleCount(prev => Math.min(prev + 10, remaining));
+                        }
+                      }
+                    }}
+                    className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}
+                  >
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
                     {isScreenshotMode && (
@@ -5876,8 +5939,8 @@ export default function Dashboard() {
 
                                 {!isScreenshotMode && (
                                   <td className="py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span>{formatPhoneNumber(order.phone)}</span>
+                                    <div className="flex flex-col items-start gap-1">
+                                      <span className="font-extrabold text-white text-sm tracking-wide">{formatPhoneNumber(order.phone)}</span>
                                       {activeTab === 'dashboard1' && (() => {
                                         const phoneKey = normalizePhone(order.phone);
                                         if (!phoneKey || !duplicatePhoneCounts[phoneKey] || duplicatePhoneCounts[phoneKey].count <= 1) return null;
@@ -5890,15 +5953,17 @@ export default function Dashboard() {
                                             <PopoverTrigger asChild>
                                               <button
                                                 type="button"
-                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black transition-all shadow-sm border cursor-pointer ${
+                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-black tracking-wide transition-all shadow-md border cursor-pointer ${
                                                   isIgnored
-                                                    ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
-                                                    : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 animate-pulse'
+                                                    ? 'bg-slate-800 text-slate-100 border-slate-600 hover:bg-slate-700 hover:text-white'
+                                                    : 'bg-amber-400 text-slate-950 border-amber-300 hover:bg-amber-300 animate-pulse'
                                                 }`}
                                                 title={isIgnored ? "Duplicate ignored" : `${dupCount} orders found with this phone number`}
                                               >
-                                                <span>{isIgnored ? '⚪ Ignored' : `⚠️ Duplicate (${dupCount})`}</span>
-                                                <ChevronDown size={10} />
+                                                <span className={isIgnored ? "text-slate-100 font-black" : "text-slate-950 font-black"}>
+                                                  {isIgnored ? '⚪ Ignored' : `⚠️ Duplicate (${dupCount})`}
+                                                </span>
+                                                <ChevronDown size={11} className={isIgnored ? "text-slate-300" : "text-slate-950"} />
                                               </button>
                                             </PopoverTrigger>
                                             <PopoverContent align="start" className="w-60 p-3 bg-slate-900 text-white border border-white/20 shadow-2xl rounded-xl text-xs z-[150]">
@@ -5922,7 +5987,7 @@ export default function Dashboard() {
                                                 <button
                                                   type="button"
                                                   onClick={() => handleToggleIgnoreDuplicatePhone(phoneKey)}
-                                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                                                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer text-white"
                                                 >
                                                   <span>{isIgnored ? '✅ Restore Warning' : '🚫 Ignore Duplicate'}</span>
                                                 </button>
@@ -6199,17 +6264,18 @@ export default function Dashboard() {
                   {/* 🟢 STICKY PAGINATION FOOTER */}
                   <div className={`${isScreenshotMode ? 'hidden' : 'sticky bottom-0 z-30 bg-[#0d1527] backdrop-blur-md border-t border-white/10 p-4 flex justify-between items-center shadow-2xl'} print:hidden`}>
                     <div className="text-sm font-bold text-slate-300">
-                      Showing <span className="font-black text-amber-400">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black text-amber-400">{Math.min(currentPage * itemsPerPage, sortedDashboardOrders.length)}</span> of <span className="font-black text-amber-400">{sortedDashboardOrders.length}</span> orders
+                      Showing <span className="font-black text-amber-400">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-black text-amber-400">{Math.min((currentPage - 1) * itemsPerPage + continuousVisibleCount, sortedDashboardOrders.length)}</span> of <span className="font-black text-amber-400">{sortedDashboardOrders.length}</span> orders
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         disabled={currentPage === 1}
                         onClick={() => {
-                          setCurrentPage(prev => prev - 1);
+                          setCurrentPage(prev => Math.max(1, prev - 1));
+                          setContinuousVisibleCount(itemsPerPage);
                           tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
-                        className={`p-2 rounded-xl border transition-all ${currentPage === 1 ? 'bg-[#131c2e]/40 border-white/5 text-slate-600 cursor-not-allowed' : 'bg-[#131c2e] border-white/15 text-amber-400 hover:bg-[#18243b] active:scale-95 shadow-md'}`}
+                        className={`p-2 rounded-xl border transition-all ${currentPage === 1 ? 'bg-[#131c2e]/40 border-white/5 text-slate-600 cursor-not-allowed' : 'bg-[#131c2e] border-white/15 text-amber-400 hover:bg-[#18243b] active:scale-95 shadow-md cursor-pointer'}`}
                       >
                         <ChevronLeft size={20} />
                       </button>
@@ -6225,9 +6291,10 @@ export default function Dashboard() {
                                   key={pageNum}
                                   onClick={() => {
                                     setCurrentPage(pageNum);
+                                    setContinuousVisibleCount(itemsPerPage);
                                     tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                                   }}
-                                  className={`w-10 h-10 rounded-lg font-black transition-all ${currentPage === pageNum ? 'bg-amber-500 text-slate-950 shadow-md scale-105' : 'bg-[#0d1527] text-slate-300 hover:bg-[#18243b]'}`}
+                                  className={`w-10 h-10 rounded-lg font-black transition-all cursor-pointer ${currentPage === pageNum ? 'bg-amber-500 text-slate-950 shadow-md scale-105' : 'bg-[#0d1527] text-slate-300 hover:bg-[#18243b]'}`}
                                 >
                                   {pageNum}
                                 </button>
@@ -6243,9 +6310,10 @@ export default function Dashboard() {
                         disabled={currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage)}
                         onClick={() => {
                           setCurrentPage(prev => prev + 1);
+                          setContinuousVisibleCount(itemsPerPage);
                           tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
-                        className={`p-2 rounded-xl border transition-all ${currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-[#131c2e]/40 border-white/5 text-slate-600 cursor-not-allowed' : 'bg-[#131c2e] border-white/15 text-amber-400 hover:bg-[#18243b] active:scale-95 shadow-md'}`}
+                        className={`p-2 rounded-xl border transition-all ${currentPage >= Math.ceil(sortedDashboardOrders.length / itemsPerPage) ? 'bg-[#131c2e]/40 border-white/5 text-slate-600 cursor-not-allowed' : 'bg-[#131c2e] border-white/15 text-amber-400 hover:bg-[#18243b] active:scale-95 shadow-md cursor-pointer'}`}
                       >
                         <ChevronRight size={20} />
                       </button>
@@ -7131,25 +7199,31 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* 🟢 NEW PRODUCT MODAL */}
+      {/* 🟢 NEW LISTING / NEW PRODUCT MODAL */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", price: "" }); }}>
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); }}>
           <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-8 bg-[#0c1427] border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-2xl font-black mb-6 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
-              {editProductId ? "Edit Product" : "Add New Product"}
+              {editProductId ? "Edit Listing" : "Add New Listing"}
             </h2>
             <form onSubmit={handleAddCustomProduct} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Product Name</label>
-                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Enter Product Name" />
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Item Name</label>
+                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Enter Item Name (e.g. Munch)" />
               </div>
-              <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Price (₹)</label>
-                <input required type="number" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Enter Price" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Wholesale Price</label>
+                  <input required type="number" step="any" value={newProductForm.wholesalePrice} onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Wholesale Price" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Selling Price</label>
+                  <input required type="number" step="any" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Selling Price" />
+                </div>
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", price: "" }); }} className="flex-1 px-4 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all">Save</button>
+                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); }} className="flex-1 px-4 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer">{editProductId ? "Update Listing" : "Save Listing"}</button>
               </div>
             </form>
           </div>
