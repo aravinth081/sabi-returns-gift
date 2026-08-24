@@ -4141,7 +4141,7 @@ export default function Dashboard() {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'scroll'
+          backgroundAttachment: 'fixed'
         }}
       >
 

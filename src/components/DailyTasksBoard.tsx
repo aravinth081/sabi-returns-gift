@@ -145,6 +145,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     return 'sheet-aug';
   });
 
+  // Wallpaper State
+  const [wallpaper, setWallpaper] = useState<string>(() => {
+    try {
+      return localStorage.getItem('sabi_daily_tasks_wallpaper') || "";
+    } catch (e) {
+      return "";
+    }
+  });
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
@@ -186,18 +195,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     future: []
   });
 
-  // Wallpaper State
-  const [wallpaper, setWallpaper] = useState<string>(() => {
-    try {
-      return localStorage.getItem('sabi_daily_tasks_wallpaper') || "";
-    } catch (e) {
-      return "";
-    }
-  });
-
-  const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
   const isSyncingFromRemoteRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
   const cellInputRef = useRef<HTMLInputElement>(null);
   const headerInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -242,7 +242,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
   }, [sheets, pushHistory]);
 
-  // Firestore Real-time Listener
+  // Firestore Real-time Listener for Sheets
   useEffect(() => {
     try {
       const sheetDocRef = doc(db, 'daily_tasks_board', 'sheet_data');
@@ -1019,7 +1019,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           return rowObj;
         });
 
-        // Ensure minimum 25 rows with blank pads if needed
         const finalRows = [...importedRows];
         while (finalRows.length < 25) {
           finalRows.push(createEmptyRow(finalRows.length + 1));
@@ -1066,21 +1065,21 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const getStatusBadgeStyle = (statusVal: string) => {
     const s = (statusVal || '').trim();
     if (s === 'Waiting for Image') {
-      return 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10 font-bold';
+      return 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm shadow-amber-500/10 font-bold';
     }
     if (s === 'Image Received') {
-      return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10 font-bold';
+      return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm shadow-emerald-500/10 font-bold';
     }
     if (s === 'Cancel' || s === 'Cancelled') {
-      return 'bg-rose-500/15 text-rose-300 border border-rose-500/40 shadow-sm shadow-rose-500/10 font-bold';
+      return 'bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-sm shadow-rose-500/10 font-bold';
     }
     if (s === 'In Progress') {
-      return 'bg-sky-500/15 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10 font-bold';
+      return 'bg-sky-500/20 text-sky-300 border border-sky-500/50 shadow-sm shadow-sky-500/10 font-bold';
     }
     if (s === 'Completed') {
-      return 'bg-purple-500/15 text-purple-300 border border-purple-500/40 shadow-sm shadow-purple-500/10 font-bold';
+      return 'bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-sm shadow-purple-500/10 font-bold';
     }
-    return 'bg-slate-800/60 text-slate-300 border border-slate-700/60 font-medium';
+    return 'bg-slate-800/80 text-slate-300 border border-slate-700 font-medium';
   };
 
   // Status Icon mapping
@@ -1147,7 +1146,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
           setWallpaper(compressedBase64);
           try {
             localStorage.setItem('sabi_daily_tasks_wallpaper', compressedBase64);
@@ -1200,19 +1199,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   };
 
   return (
-    <div 
-      className={`w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans text-slate-100 transition-all duration-300 ${
-        wallpaper ? 'wallpaper-active' : ''
-      }`}
-      style={wallpaper ? {
-        backgroundImage: `linear-gradient(rgba(8, 14, 30, 0.75), rgba(8, 14, 30, 0.75)), url(${wallpaper})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        borderRadius: '1rem',
-        padding: '0.5rem'
-      } : undefined}
-    >
+    <div className={`w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans text-slate-100 transition-all duration-300 ${
+      wallpaper ? 'wallpaper-active' : ''
+    }`}>
       {/* Hidden File Input for Wallpaper Upload */}
       <input 
         type="file" 
@@ -1231,7 +1220,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       />
 
       {/* TOP CONTROL PANEL / HERO BAR */}
-      <div className="bg-[#090f23]/95 backdrop-blur-2xl border border-cyan-500/25 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300">
+      <div className={`rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300 ${
+        wallpaper 
+          ? 'bg-slate-950/65 backdrop-blur-2xl border border-white/20 shadow-2xl' 
+          : 'bg-[#090f23]/95 backdrop-blur-2xl border border-cyan-500/25'
+      }`}>
         {/* Subtle Ambient Radial Lighting */}
         <div className="absolute -top-32 -left-32 w-72 h-72 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-32 -right-32 w-72 h-72 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
@@ -1268,8 +1261,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <div className="flex items-center gap-1">
               <button 
                 onClick={() => wallpaperFileInputRef.current?.click()}
-                className={`bg-[#101935] hover:bg-[#162247] border rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm transition-all text-left group cursor-pointer ${
-                  wallpaper ? 'border-cyan-400/60 ring-2 ring-cyan-400/20 text-cyan-300' : 'border-slate-800 hover:border-cyan-500/40 text-slate-300'
+                className={`border rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm transition-all text-left group cursor-pointer ${
+                  wallpaper 
+                    ? 'bg-slate-900/70 backdrop-blur-md border-cyan-400/60 ring-2 ring-cyan-400/20 text-cyan-300 hover:bg-slate-800/80' 
+                    : 'bg-[#101935] hover:bg-[#162247] border-slate-800 text-slate-300'
                 }`}
                 title={wallpaper ? "Click to change background wallpaper" : "Click to choose background wallpaper"}
               >
@@ -1285,7 +1280,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               {wallpaper && (
                 <button 
                   onClick={handleRemoveWallpaper}
-                  className="p-2 rounded-xl bg-[#101935] hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition-all active:scale-95 shadow-sm cursor-pointer"
+                  className="p-2 rounded-xl bg-slate-900/70 backdrop-blur-md hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/40 transition-all active:scale-95 shadow-sm cursor-pointer"
                   title="Remove Background Wallpaper"
                 >
                   <X className="w-4 h-4" />
@@ -1299,9 +1294,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 setStatusFilter('All');
                 setCurrentPage(1);
               }}
-              className={`bg-[#101935] hover:bg-[#162247] border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'All' ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-slate-800 hover:border-slate-700'
-              }`}
+              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
+                statusFilter === 'All' 
+                  ? 'border-cyan-400 ring-2 ring-cyan-400/30' 
+                  : (wallpaper ? 'border-white/15 hover:border-white/30' : 'border-slate-800 hover:border-slate-700')
+              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
               title="Click to show all rows"
             >
               <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -1319,9 +1316,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 setStatusFilter(statusFilter === 'Waiting for Image' ? 'All' : 'Waiting for Image');
                 setCurrentPage(1);
               }}
-              className={`bg-[#101935] hover:bg-[#162247] border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'Waiting for Image' ? 'border-amber-400 ring-2 ring-amber-400/40 bg-amber-950/20' : 'border-amber-500/30 hover:border-amber-400/60'
-              }`}
+              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
+                statusFilter === 'Waiting for Image' 
+                  ? 'border-amber-400 ring-2 ring-amber-400/40 bg-amber-950/40' 
+                  : 'border-amber-500/40 hover:border-amber-400/70'
+              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
               title="Click to filter by Waiting for Image"
             >
               <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400">
@@ -1342,9 +1341,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 setStatusFilter(statusFilter === 'Image Received' ? 'All' : 'Image Received');
                 setCurrentPage(1);
               }}
-              className={`bg-[#101935] hover:bg-[#162247] border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'Image Received' ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/20' : 'border-emerald-500/30 hover:border-emerald-400/60'
-              }`}
+              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
+                statusFilter === 'Image Received' 
+                  ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/40' 
+                  : 'border-emerald-500/40 hover:border-emerald-400/70'
+              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
               title="Click to filter by Image Received"
             >
               <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400">
@@ -1362,9 +1363,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 setStatusFilter(statusFilter === 'Cancel' ? 'All' : 'Cancel');
                 setCurrentPage(1);
               }}
-              className={`bg-[#101935] hover:bg-[#162247] border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'Cancel' ? 'border-rose-400 ring-2 ring-rose-400/40 bg-rose-950/20' : 'border-rose-500/30 hover:border-rose-400/60'
-              }`}
+              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
+                statusFilter === 'Cancel' 
+                  ? 'border-rose-400 ring-2 ring-rose-400/40 bg-rose-950/40' 
+                  : 'border-rose-500/40 hover:border-rose-400/70'
+              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
               title="Click to filter by Cancelled"
             >
               <div className="p-1.5 rounded-lg bg-rose-500/15 text-rose-400">
@@ -1378,7 +1381,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
             {/* Total Quantity if exists */}
             {summaryStats.totalQuantity > 0 && (
-              <div className="bg-[#101935] border border-blue-500/30 rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm">
+              <div className={`border border-blue-500/40 rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm ${
+                wallpaper ? 'bg-slate-900/70 backdrop-blur-md' : 'bg-[#101935]'
+              }`}>
                 <div className="p-1.5 rounded-lg bg-blue-500/15 text-blue-400">
                   <Hash className="w-4 h-4" />
                 </div>
@@ -1392,7 +1397,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
 
         {/* TOOLBAR & SEARCH SECTION */}
-        <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="mt-4 pt-4 border-t border-white/10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Search Box & Quick Status Filter Chips */}
           <div className="flex flex-1 items-center gap-2 flex-wrap">
             {/* Search Input */}
@@ -1407,7 +1412,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   setCurrentPage(1);
                 }}
                 placeholder="Search anything (phone, comments, date, count...)"
-                className="w-full bg-[#101935] text-slate-100 placeholder-slate-500 text-xs sm:text-sm pl-10 pr-16 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all shadow-inner"
+                className={`w-full text-slate-100 placeholder-slate-400 text-xs sm:text-sm pl-10 pr-16 py-2 rounded-xl border focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all shadow-inner ${
+                  wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20' : 'bg-[#101935] border-slate-700'
+                }`}
               />
               <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                 {searchQuery ? (
@@ -1434,7 +1441,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="bg-[#101935] text-slate-200 text-xs sm:text-sm px-3.5 py-2 rounded-xl border border-slate-700 hover:border-slate-600 focus:outline-none focus:border-cyan-400 cursor-pointer font-medium shadow-sm transition-colors"
+                className={`text-slate-200 text-xs sm:text-sm px-3.5 py-2 rounded-xl border focus:outline-none focus:border-cyan-400 cursor-pointer font-medium shadow-sm transition-colors ${
+                  wallpaper ? 'bg-slate-900/75 backdrop-blur-md border-white/20 hover:border-white/30' : 'bg-[#101935] border-slate-700 hover:border-slate-600'
+                }`}
               >
                 <option value="All">All Statuses ({summaryStats.totalRows})</option>
                 <option value="Waiting for Image">Waiting for Image ({summaryStats.waitingCount})</option>
@@ -1449,7 +1458,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Undo / Redo */}
-            <div className="flex items-center bg-[#101935] rounded-xl border border-slate-700 p-0.5 shadow-sm">
+            <div className={`flex items-center rounded-xl border p-0.5 shadow-sm ${
+              wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20' : 'bg-[#101935] border-slate-700'
+            }`}>
               <button 
                 onClick={handleUndo}
                 title="Undo (Ctrl+Z)"
@@ -1469,7 +1480,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             {/* Add Row Button */}
             <button 
               onClick={() => handleAddRow()}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all active:scale-95 border border-cyan-300/30"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all active:scale-95 border border-cyan-300/30 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Add Row</span>
@@ -1479,13 +1490,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <Popover open={isAddColumnOpen} onOpenChange={setIsAddColumnOpen}>
               <PopoverTrigger asChild>
                 <button 
-                  className="flex items-center gap-1.5 px-3 py-2 bg-[#101935] hover:bg-[#172346] text-cyan-300 border border-cyan-500/30 text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm"
+                  className={`flex items-center gap-1.5 px-3 py-2 text-cyan-300 border text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer ${
+                    wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#172346] border-cyan-500/30'
+                  }`}
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>Add Column</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 bg-[#0d162d] border border-cyan-500/30 text-slate-100 p-4 rounded-xl shadow-2xl z-50">
+              <PopoverContent className="w-80 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-4 rounded-xl shadow-2xl z-50">
                 <div className="space-y-3">
                   <h3 className="font-bold text-sm text-cyan-300 flex items-center gap-1.5">
                     <PlusCircle className="w-4 h-4" /> Add New Column
@@ -1538,14 +1551,16 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <Popover>
               <PopoverTrigger asChild>
                 <button 
-                  className="flex items-center gap-1.5 px-3 py-2 bg-[#101935] hover:bg-[#172346] text-emerald-400 border border-emerald-500/30 text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm"
+                  className={`flex items-center gap-1.5 px-3 py-2 text-emerald-400 border text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer ${
+                    wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#172346] border-emerald-500/30'
+                  }`}
                   title="Export options"
                 >
                   <Download className="w-4 h-4" />
                   <span>Export</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 bg-[#0d162d] border border-emerald-500/30 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+              <PopoverContent className="w-56 bg-[#0d162d]/95 backdrop-blur-2xl border border-emerald-500/30 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
                 <div className="space-y-1 text-xs">
                   <div className="px-2 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                     Export Sheet Data
@@ -1579,7 +1594,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => fileInputRef.current?.click()}
               title="Import Excel file (.xlsx, .csv)"
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#101935] hover:bg-[#172346] text-indigo-300 border border-indigo-500/30 text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm"
+              className={`flex items-center gap-1.5 px-3 py-2 text-indigo-300 border text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer ${
+                wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#172346] border-indigo-500/30'
+              }`}
             >
               <Upload className="w-4 h-4" />
               <span>Import</span>
@@ -1589,13 +1606,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <Popover open={isShortcutsOpen} onOpenChange={setIsShortcutsOpen}>
               <PopoverTrigger asChild>
                 <button 
-                  className="p-2 bg-[#101935] hover:bg-[#172346] text-slate-400 hover:text-cyan-300 border border-slate-700 rounded-xl transition-colors shadow-sm"
+                  className={`p-2 border rounded-xl transition-colors shadow-sm cursor-pointer ${
+                    wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 text-slate-300 hover:text-cyan-300' : 'bg-[#101935] hover:bg-[#172346] text-slate-400 hover:text-cyan-300 border-slate-700'
+                  }`}
                   title="Keyboard Shortcuts (?)"
                 >
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 bg-[#0d162d] border border-cyan-500/30 text-slate-100 p-4 rounded-xl shadow-2xl z-50">
+              <PopoverContent className="w-80 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/30 text-slate-100 p-4 rounded-xl shadow-2xl z-50">
                 <div className="space-y-2.5 text-xs">
                   <h3 className="font-bold text-sm text-cyan-300 flex items-center gap-1.5 pb-1 border-b border-slate-800">
                     <HelpCircle className="w-4 h-4" /> Keyboard Shortcuts
@@ -1635,7 +1654,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
       {/* SEARCH / FILTER ACTIVE INDICATOR BANNER */}
       {(searchQuery.trim() || statusFilter !== 'All') && (
-        <div className="bg-cyan-950/40 border border-cyan-500/30 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs sm:text-sm text-cyan-300 shadow-lg">
+        <div className="bg-cyan-950/50 backdrop-blur-xl border border-cyan-500/40 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs sm:text-sm text-cyan-300 shadow-lg">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-cyan-400" />
             <span>
@@ -1657,33 +1676,55 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       )}
 
       {/* EXCEL SPREADSHEET MAIN CONTAINER */}
-      <div className="bg-[#090f23] border border-slate-800 rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative">
+      <div className={`rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all duration-300 ${
+        wallpaper 
+          ? 'bg-slate-950/65 backdrop-blur-2xl border border-white/20 shadow-2xl' 
+          : 'bg-[#090f23] border border-slate-800'
+      }`}>
         {/* SPREADSHEET TABLE GRID (Scrollable) */}
-        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar border-b border-slate-800 max-h-[620px] min-h-[440px]">
+        <div className={`overflow-x-auto overflow-y-auto flex-1 custom-scrollbar border-b max-h-[620px] min-h-[440px] ${
+          wallpaper ? 'border-white/10' : 'border-slate-800'
+        }`}>
           <table className="w-full border-collapse text-left text-xs sm:text-sm select-none">
             {/* TABLE HEADER */}
             <thead className="sticky top-0 z-20 shadow-md">
               {/* Top Row: Monospace Excel Column Letters (A, B, C, D...) */}
-              <tr className="bg-[#060b18] text-slate-500 font-mono text-[10px] uppercase border-b border-slate-800">
-                <th className="w-12 text-center py-1.5 border-r border-slate-800/80 bg-[#050813]">
+              <tr className={`font-mono text-[10px] uppercase border-b ${
+                wallpaper 
+                  ? 'bg-slate-950/85 backdrop-blur-md border-white/10 text-slate-400' 
+                  : 'bg-[#060b18] border-slate-800 text-slate-500'
+              }`}>
+                <th className={`w-12 text-center py-1.5 border-r ${
+                  wallpaper ? 'border-white/10 bg-slate-950/90' : 'border-slate-800/80 bg-[#050813]'
+                }`}>
                   #
                 </th>
                 {currentSheet.columns.map((col, idx) => (
                   <th 
                     key={`letter-${col.id}`} 
-                    className="py-1.5 px-3 border-r border-slate-800/80 text-center tracking-wider"
+                    className={`py-1.5 px-3 border-r text-center tracking-wider ${
+                      wallpaper ? 'border-white/10' : 'border-slate-800/80'
+                    }`}
                     style={{ width: col.width ? `${col.width}px` : 'auto' }}
                   >
                     {getColumnLetter(idx)}
                   </th>
                 ))}
-                <th className="w-16 text-center py-1.5 bg-[#050813]">Actions</th>
+                <th className={`w-16 text-center py-1.5 ${
+                  wallpaper ? 'bg-slate-950/90' : 'bg-[#050813]'
+                }`}>Actions</th>
               </tr>
 
               {/* Main Header Row */}
-              <tr className="bg-gradient-to-r from-slate-900 via-[#0d1630] to-slate-900 text-slate-100 font-bold tracking-tight border-b-2 border-cyan-500/40">
+              <tr className={`font-bold tracking-tight border-b-2 ${
+                wallpaper 
+                  ? 'bg-slate-900/90 backdrop-blur-md border-cyan-500/50 text-white' 
+                  : 'bg-gradient-to-r from-slate-900 via-[#0d1630] to-slate-900 text-slate-100 border-cyan-500/40'
+              }`}>
                 {/* Checkbox select all */}
-                <th className="w-12 py-3 px-2 text-center border-r border-slate-800 bg-[#070d1e]">
+                <th className={`w-12 py-3 px-2 text-center border-r ${
+                  wallpaper ? 'border-white/10 bg-slate-950/90' : 'border-slate-800 bg-[#070d1e]'
+                }`}>
                   <div className="flex items-center justify-center">
                     <input 
                       type="checkbox"
@@ -1705,7 +1746,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   return (
                     <th 
                       key={col.id}
-                      className="py-2.5 px-3 border-r border-slate-800 text-slate-200 font-bold group relative"
+                      className={`py-2.5 px-3 border-r font-bold group relative ${
+                        wallpaper ? 'border-white/10 text-slate-100' : 'border-slate-800 text-slate-200'
+                      }`}
                       style={{ width: col.width ? `${col.width}px` : 'auto' }}
                     >
                       {isEditing ? (
@@ -1758,7 +1801,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 <MoreHorizontal className="w-3.5 h-3.5 text-slate-300" />
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-48 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+                            <PopoverContent className="w-48 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
                               <div className="space-y-0.5 text-xs">
                                 <button 
                                   onClick={() => startEditingHeader(col)}
@@ -1801,14 +1844,16 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 })}
 
                 {/* Header Action spacer */}
-                <th className="w-16 py-2.5 px-2 text-center bg-[#070d1e] text-slate-400 font-bold">
+                <th className={`w-16 py-2.5 px-2 text-center font-bold ${
+                  wallpaper ? 'bg-slate-950/90 text-slate-300' : 'bg-[#070d1e] text-slate-400'
+                }`}>
                   Edit
                 </th>
               </tr>
             </thead>
 
             {/* TABLE BODY (Rows & Cells) */}
-            <tbody className="divide-y divide-slate-800/60 bg-[#091024]">
+            <tbody className={`divide-y ${wallpaper ? 'divide-white/10 bg-transparent' : 'divide-slate-800/60 bg-[#091024]'}`}>
               {paginatedRows.length === 0 ? (
                 <tr>
                   <td 
@@ -1816,7 +1861,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                     className="text-center py-16 text-slate-400"
                   >
                     <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-[#121c38] flex items-center justify-center text-slate-500 border border-slate-800">
+                      <div className="w-12 h-12 rounded-2xl bg-[#121c38]/80 backdrop-blur-md flex items-center justify-center text-slate-500 border border-slate-800">
                         <FileSpreadsheet className="w-6 h-6" />
                       </div>
                       <p className="font-semibold text-sm text-slate-300">No records found matching your filters</p>
@@ -1839,14 +1884,19 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       key={row.id}
                       className={`group transition-colors ${
                         isRowSelected 
-                          ? 'bg-cyan-950/35 border-l-4 border-l-cyan-400' 
-                          : rowIdx % 2 === 0 
-                            ? 'bg-[#090f23] hover:bg-[#121d3f]' 
-                            : 'bg-[#060b1b] hover:bg-[#121d3f]'
+                          ? 'bg-cyan-950/55 border-l-4 border-l-cyan-400' 
+                          : (wallpaper 
+                              ? (rowIdx % 2 === 0 ? 'bg-slate-950/40 hover:bg-slate-900/70' : 'bg-slate-900/30 hover:bg-slate-900/70')
+                              : (rowIdx % 2 === 0 ? 'bg-[#090f23] hover:bg-[#121d3f]' : 'bg-[#060b1b] hover:bg-[#121d3f]')
+                            )
                       }`}
                     >
                       {/* Row Index & Checkbox */}
-                      <td className="w-12 py-2 px-2 text-center border-r border-slate-800/80 text-slate-400 font-mono text-xs bg-[#050917]/80 group-hover:bg-[#0c142c]">
+                      <td className={`w-12 py-2 px-2 text-center border-r font-mono text-xs ${
+                        wallpaper 
+                          ? 'border-white/10 bg-slate-950/50 group-hover:bg-slate-900/70' 
+                          : 'border-slate-800/80 bg-[#050917]/80 group-hover:bg-[#0c142c]'
+                      }`}>
                         <div className="flex items-center justify-center gap-1.5">
                           <input 
                             type="checkbox"
@@ -1860,7 +1910,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             }}
                             className="w-3.5 h-3.5 rounded text-cyan-500 bg-[#121d3d] border-slate-700 focus:ring-0 cursor-pointer"
                           />
-                          <span className="text-[11px] font-bold text-slate-500 group-hover:text-slate-300">{globalRowIndex}</span>
+                          <span className="text-[11px] font-bold text-slate-400 group-hover:text-slate-200">{globalRowIndex}</span>
                         </div>
                       </td>
 
@@ -1878,8 +1928,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               tabIndex={0}
                               onFocus={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                               onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                              className={`py-1.5 px-3 border-r border-slate-800/80 relative transition-all ${
-                                isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/30' : ''
+                              className={`py-1.5 px-3 border-r relative transition-all ${
+                                wallpaper ? 'border-white/10' : 'border-slate-800/80'
+                              } ${
+                                isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/40' : ''
                               }`}
                             >
                               <Popover>
@@ -1894,14 +1946,16 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                         <span>{cellValue}</span>
                                       </span>
                                     ) : (
-                                      <span className="text-slate-600 border border-dashed border-slate-700/60 hover:border-slate-500 px-2 py-0.5 rounded-full text-xs flex items-center gap-1 hover:text-slate-400 transition-colors">
+                                      <span className={`border border-dashed px-2 py-0.5 rounded-full text-xs flex items-center gap-1 transition-colors ${
+                                        wallpaper ? 'text-slate-400 border-white/20 hover:border-white/40' : 'text-slate-600 border-slate-700/60 hover:border-slate-500 hover:text-slate-400'
+                                      }`}>
                                         <Plus className="w-3 h-3" /> Set Status
                                       </span>
                                     )}
                                     <MoreHorizontal className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
                                   </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-56 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+                                <PopoverContent className="w-56 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
                                   <div className="space-y-1 text-xs">
                                     <div className="px-2 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                       Select Status
@@ -1949,10 +2003,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                             onDoubleClick={() => startEditingCell(row.id, col.id, cellValue)}
                             onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                            className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all ${
+                            className={`py-2 px-3 border-r text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all ${
+                              wallpaper ? 'border-white/10 hover:bg-slate-800/40' : 'border-slate-800/80 hover:bg-[#142144]'
+                            } ${
                               isCellSelected 
-                                ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/30 z-10' 
-                                : 'hover:bg-[#142144]'
+                                ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/40 z-10' 
+                                : ''
                             }`}
                           >
                             {isCellEditing ? (
@@ -1972,7 +2028,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                     {cellValue}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-600/40 select-none">&mdash;</span>
+                                  <span className="text-slate-500/40 select-none">&mdash;</span>
                                 )}
 
                                 {/* Phone number quick action shortcut */}
@@ -2013,7 +2069,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       })}
 
                       {/* Row Action Menu */}
-                      <td className="w-16 py-1.5 px-2 text-center bg-[#050917]/60 group-hover:bg-[#0c142c]">
+                      <td className={`w-16 py-1.5 px-2 text-center ${
+                        wallpaper ? 'bg-slate-950/50' : 'bg-[#050917]/60 group-hover:bg-[#0c142c]'
+                      }`}>
                         <Popover>
                           <PopoverTrigger asChild>
                             <button 
@@ -2023,7 +2081,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               <MoreHorizontal className="w-4 h-4" />
                             </button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-48 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+                          <PopoverContent className="w-48 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
                             <div className="space-y-0.5 text-xs">
                               <button 
                                 onClick={() => handleAddRow(globalRowIndex)}
@@ -2077,7 +2135,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   Set Status
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-48 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+              <PopoverContent className="w-48 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
                 <div className="space-y-1 text-xs">
                   {['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'].map(opt => (
                     <button 
@@ -2117,7 +2175,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         )}
 
         {/* BOTTOM PAGINATION BAR */}
-        <div className="bg-[#060b18] px-4 py-2.5 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-300">
+        <div className={`px-4 py-2.5 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-300 ${
+          wallpaper 
+            ? 'bg-slate-950/75 backdrop-blur-xl border-white/10' 
+            : 'bg-[#060b18] border-slate-800/80'
+        }`}>
           {/* Row Counter info & Page Size Selector */}
           <div className="flex items-center gap-3">
             <span className="text-slate-400 font-medium">
@@ -2134,7 +2196,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="bg-[#101935] text-slate-200 text-xs px-2 py-1 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-400 cursor-pointer"
+                className={`text-slate-200 text-xs px-2 py-1 rounded-lg border focus:outline-none focus:border-cyan-400 cursor-pointer ${
+                  wallpaper ? 'bg-slate-900/80 border-white/20' : 'bg-[#101935] border-slate-700'
+                }`}
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -2150,7 +2214,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg bg-[#101935] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className={`p-1.5 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${
+                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
+              }`}
               title="First Page"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -2160,7 +2226,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#101935] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold text-xs"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold text-xs ${
+                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
+              }`}
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>Back</span>
@@ -2180,7 +2248,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         className={`min-w-[30px] h-7 rounded-lg font-bold text-xs transition-all ${
                           currentPage === pageNum 
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20' 
-                            : 'bg-[#101935] text-slate-300 hover:bg-slate-800 border border-slate-700'
+                            : (wallpaper ? 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-white/20' : 'bg-[#101935] text-slate-300 hover:bg-slate-800 border border-slate-700')
                         }`}
                       >
                         {pageNum}
@@ -2194,7 +2262,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#101935] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold text-xs"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold text-xs ${
+                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
+              }`}
             >
               <span>Next</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -2204,7 +2274,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg bg-[#101935] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className={`p-1.5 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${
+                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
+              }`}
               title="Last Page"
             >
               <ChevronsRight className="w-4 h-4" />
@@ -2213,13 +2285,19 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
 
         {/* BOTTOM MULTI-SHEET TABS BAR */}
-        <div className="bg-[#050813] px-4 py-2 border-t border-slate-800/90 flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar">
+        <div className={`px-4 py-2 border-t flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar ${
+          wallpaper 
+            ? 'bg-slate-950/85 backdrop-blur-xl border-white/10' 
+            : 'bg-[#050813] border-slate-800/90'
+        }`}>
           <div className="flex items-center gap-1.5">
             {/* Add New Sheet (+) Button */}
             <button 
               onClick={handleAddSheet}
               title="Add New Sheet"
-              className="p-2 rounded-xl bg-[#101935] hover:bg-cyan-500/20 text-cyan-400 border border-slate-800 hover:border-cyan-500/40 transition-all flex items-center justify-center active:scale-95 shadow-sm"
+              className={`p-2 rounded-xl text-cyan-400 border transition-all flex items-center justify-center active:scale-95 shadow-sm cursor-pointer ${
+                wallpaper ? 'bg-slate-900/80 hover:bg-cyan-500/20 border-white/20 hover:border-cyan-500/40' : 'bg-[#101935] hover:bg-cyan-500/20 border-slate-800 hover:border-cyan-500/40'
+              }`}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -2234,8 +2312,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   key={sheet.id}
                   className={`group relative flex items-center rounded-xl transition-all ${
                     isActive 
-                      ? 'bg-gradient-to-r from-blue-600/30 to-cyan-500/30 border border-cyan-400 text-white font-extrabold shadow-lg shadow-cyan-950/50 ring-1 ring-cyan-400/40' 
-                      : 'bg-[#0f172e] hover:bg-[#162244] border border-slate-800 text-slate-400 hover:text-slate-200 font-semibold'
+                      ? (wallpaper 
+                          ? 'bg-cyan-500/30 border border-cyan-400 text-white font-extrabold shadow-lg shadow-cyan-950/50 ring-1 ring-cyan-400/50' 
+                          : 'bg-gradient-to-r from-blue-600/30 to-cyan-500/30 border border-cyan-400 text-white font-extrabold shadow-lg shadow-cyan-950/50 ring-1 ring-cyan-400/40'
+                        )
+                      : (wallpaper 
+                          ? 'bg-slate-900/60 hover:bg-slate-800/80 border border-white/10 text-slate-300 font-semibold' 
+                          : 'bg-[#0f172e] hover:bg-[#162244] border border-slate-800 text-slate-400 hover:text-slate-200 font-semibold'
+                        )
                   }`}
                 >
                   {isRenaming ? (
@@ -2289,7 +2373,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           <MoreHorizontal className="w-3.5 h-3.5" />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-40 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
+                      <PopoverContent className="w-40 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
                         <div className="space-y-0.5 text-xs">
                           <button 
                             onClick={() => {
@@ -2343,8 +2427,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             })}
           </div>
 
-          <div className="text-[11px] text-slate-500 whitespace-nowrap hidden md:flex items-center gap-2">
-            <span>Double-click to edit cell &bull; Tab/Enter to navigate &bull; Press <kbd className="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400 font-mono">?</kbd> for help</span>
+          <div className="text-[11px] text-slate-400 whitespace-nowrap hidden md:flex items-center gap-2">
+            <span>Double-click to edit cell &bull; Tab/Enter to navigate &bull; Press <kbd className="px-1 py-0.5 bg-slate-800/80 border border-white/15 rounded text-slate-300 font-mono">?</kbd> for help</span>
           </div>
         </div>
       </div>
