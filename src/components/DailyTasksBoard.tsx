@@ -1258,30 +1258,33 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           {/* Interactive Quick Metrics Bar (Click to filter!) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Wallpaper Selector Button on the LEFT side of Total Rows */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button 
                 onClick={() => wallpaperFileInputRef.current?.click()}
-                className={`border rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm transition-all text-left group cursor-pointer ${
+                className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left group cursor-pointer ${
                   wallpaper 
-                    ? 'bg-slate-900/70 backdrop-blur-md border-cyan-400/60 ring-2 ring-cyan-400/20 text-cyan-300 hover:bg-slate-800/80' 
-                    : 'bg-[#101935] hover:bg-[#162247] border-slate-800 text-slate-300'
+                    ? 'bg-gradient-to-br from-cyan-950/80 to-blue-950/80 border-cyan-400 ring-2 ring-cyan-400/30 text-cyan-200 hover:border-cyan-300' 
+                    : 'bg-[#101935] hover:bg-[#18264d] border-cyan-500/40 hover:border-cyan-400 text-slate-200'
                 }`}
-                title={wallpaper ? "Click to change background wallpaper" : "Click to choose background wallpaper"}
+                title={wallpaper ? "Click to change Daily Tasks background wallpaper" : "Click to select and set Daily Tasks background wallpaper"}
               >
-                <div className="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 group-hover:scale-105 transition-transform">
+                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:scale-110 transition-transform">
                   <ImageIcon className="w-4 h-4" />
                 </div>
-                <div className="hidden sm:block">
+                <div>
                   <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Wallpaper</div>
-                  <div className="text-xs font-extrabold text-cyan-400">{wallpaper ? 'Active' : 'Set Image'}</div>
+                  <div className="text-xs font-extrabold text-cyan-400 flex items-center gap-1">
+                    <span>{wallpaper ? 'Active' : 'Set Image'}</span>
+                    {wallpaper && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />}
+                  </div>
                 </div>
               </button>
 
               {wallpaper && (
                 <button 
                   onClick={handleRemoveWallpaper}
-                  className="p-2 rounded-xl bg-slate-900/70 backdrop-blur-md hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/40 transition-all active:scale-95 shadow-sm cursor-pointer"
-                  title="Remove Background Wallpaper"
+                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/40 transition-all active:scale-95 shadow-sm cursor-pointer"
+                  title="Remove Wallpaper"
                 >
                   <X className="w-4 h-4" />
                 </button>
