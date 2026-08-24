@@ -7,7 +7,8 @@ import {
   RotateCw, Filter, MoreHorizontal, Copy, Calendar, Eye,
   Sparkles, CheckCircle2, Clock, AlertTriangle, XCircle, Hash,
   Layers, PlusCircle, MoveHorizontal, CheckSquare, Square,
-  MessageCircle, Phone, HelpCircle, FileText, ArrowRight, CornerDownLeft
+  MessageCircle, Phone, HelpCircle, FileText, ArrowRight, CornerDownLeft,
+  Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -185,6 +186,16 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     future: []
   });
 
+  // Wallpaper State
+  const [wallpaper, setWallpaper] = useState<string>(() => {
+    try {
+      return localStorage.getItem('sabi_daily_tasks_wallpaper') || "";
+    } catch (e) {
+      return "";
+    }
+  });
+
+  const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
   const isSyncingFromRemoteRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cellInputRef = useRef<HTMLInputElement>(null);
@@ -254,6 +265,43 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     } catch (e) {
       console.warn('Could not set up Firestore listener:', e);
     }
+  }, []);
+
+  // Firestore Wallpaper Real-time Listener & Local Storage Sync
+  useEffect(() => {
+    try {
+      const wpDocRef = doc(db, 'daily_tasks_board', 'wallpaper_settings');
+      const unsubscribe = onSnapshot(wpDocRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data && typeof data.wallpaper === 'string') {
+            setWallpaper(data.wallpaper);
+            try {
+              if (data.wallpaper) {
+                localStorage.setItem('sabi_daily_tasks_wallpaper', data.wallpaper);
+              } else {
+                localStorage.removeItem('sabi_daily_tasks_wallpaper');
+              }
+            } catch (e) {}
+            if (onWallpaperChange) onWallpaperChange();
+          }
+        }
+      }, (error) => {
+        console.warn('Firestore wallpaper listener note:', error);
+      });
+      return () => unsubscribe();
+    } catch (e) {}
+  }, [onWallpaperChange]);
+
+  useEffect(() => {
+    const handleWpEvent = () => {
+      const wp = localStorage.getItem('sabi_daily_tasks_wallpaper') || "";
+      setWallpaper(wp);
+    };
+    window.addEventListener('sabi-daily-tasks-wallpaper-changed', handleWpEvent);
+    return () => {
+      window.removeEventListener('sabi-daily-tasks-wallpaper-changed', handleWpEvent);
+    };
   }, []);
 
   // Keyboard Shortcuts for Undo/Redo & Custom Events from Dashboard
@@ -1067,8 +1115,112 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     window.open(`https://wa.me/${fullNumber}`, '_blank');
   };
 
+  // Wallpaper Upload Handler
+  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          setWallpaper(compressedBase64);
+          try {
+            localStorage.setItem('sabi_daily_tasks_wallpaper', compressedBase64);
+          } catch (err) {
+            console.warn('LocalStorage wallpaper save warning:', err);
+          }
+
+          // Sync to Firestore so it stays permanent across devices
+          try {
+            const wpDocRef = doc(db, 'daily_tasks_board', 'wallpaper_settings');
+            setDoc(wpDocRef, {
+              wallpaper: compressedBase64,
+              updatedAt: new Date().toISOString()
+            }, { merge: true }).catch(err => console.warn('Firestore wallpaper note:', err));
+          } catch (err) {}
+
+          if (onWallpaperChange) {
+            onWallpaperChange();
+          }
+          window.dispatchEvent(new Event('sabi-daily-tasks-wallpaper-changed'));
+          toast.success("Daily tasks wallpaper updated successfully!");
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    if (wallpaperFileInputRef.current) wallpaperFileInputRef.current.value = '';
+  };
+
+  // Remove Wallpaper Handler
+  const handleRemoveWallpaper = () => {
+    setWallpaper('');
+    try {
+      localStorage.removeItem('sabi_daily_tasks_wallpaper');
+    } catch (e) {}
+
+    try {
+      const wpDocRef = doc(db, 'daily_tasks_board', 'wallpaper_settings');
+      setDoc(wpDocRef, {
+        wallpaper: '',
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => console.warn('Firestore wallpaper clear note:', err));
+    } catch (err) {}
+
+    if (onWallpaperChange) {
+      onWallpaperChange();
+    }
+    window.dispatchEvent(new Event('sabi-daily-tasks-wallpaper-changed'));
+    toast.success("Wallpaper removed");
+  };
+
   return (
-    <div className="w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans text-slate-100">
+    <div 
+      className={`w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans text-slate-100 transition-all duration-300 ${
+        wallpaper ? 'wallpaper-active' : ''
+      }`}
+      style={wallpaper ? {
+        backgroundImage: `linear-gradient(rgba(8, 14, 30, 0.75), rgba(8, 14, 30, 0.75)), url(${wallpaper})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        borderRadius: '1rem',
+        padding: '0.5rem'
+      } : undefined}
+    >
+      {/* Hidden File Input for Wallpaper Upload */}
+      <input 
+        type="file" 
+        ref={wallpaperFileInputRef} 
+        onChange={handleWallpaperUpload} 
+        accept="image/*" 
+        className="hidden" 
+      />
       {/* Hidden File Input for Excel Import */}
       <input 
         type="file" 
@@ -1112,6 +1264,35 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
           {/* Interactive Quick Metrics Bar (Click to filter!) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {/* Wallpaper Selector Button on the LEFT side of Total Rows */}
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => wallpaperFileInputRef.current?.click()}
+                className={`bg-[#101935] hover:bg-[#162247] border rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm transition-all text-left group cursor-pointer ${
+                  wallpaper ? 'border-cyan-400/60 ring-2 ring-cyan-400/20 text-cyan-300' : 'border-slate-800 hover:border-cyan-500/40 text-slate-300'
+                }`}
+                title={wallpaper ? "Click to change background wallpaper" : "Click to choose background wallpaper"}
+              >
+                <div className="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 group-hover:scale-105 transition-transform">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Wallpaper</div>
+                  <div className="text-xs font-extrabold text-cyan-400">{wallpaper ? 'Active' : 'Set Image'}</div>
+                </div>
+              </button>
+
+              {wallpaper && (
+                <button 
+                  onClick={handleRemoveWallpaper}
+                  className="p-2 rounded-xl bg-[#101935] hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition-all active:scale-95 shadow-sm cursor-pointer"
+                  title="Remove Background Wallpaper"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
             {/* Total Rows Card */}
             <button 
               onClick={() => {
