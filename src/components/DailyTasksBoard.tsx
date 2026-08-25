@@ -457,6 +457,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [editingHeaderColId, setEditingHeaderColId] = useState<string | null>(null);
   const [headerEditTitle, setHeaderEditTitle] = useState<string>('');
 
+  // Dropdown Popover Cell State
+  const [openDropdownCell, setOpenDropdownCell] = useState<{ rowId: string; colId: string } | null>(null);
+
   // Add Column Modal / Popover
   const [isAddColumnOpen, setIsAddColumnOpen] = useState<boolean>(false);
   const [newColumnName, setNewColumnName] = useState<string>('');
@@ -776,6 +779,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       return { ...sheet, rows: updatedRows };
     });
     saveSheets(updatedSheets);
+    setOpenDropdownCell(null);
     if (newStatus) {
       toast.success(`Updated to "${newStatus}"`);
     } else {
@@ -1031,14 +1035,18 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   // Auto-scroll and DOM focus on selected cell
   useEffect(() => {
-    if (selectedCell && !editingCell) {
+    if (selectedCell && !editingCell && !openDropdownCell && !datePickerCell) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.closest('[data-radix-popper-content-wrapper]') || activeEl.closest('[role="dialog"]'))) {
+        return;
+      }
       const cellEl = document.querySelector(`[data-cell-id="${selectedCell.rowId}-${selectedCell.colId}"]`) as HTMLElement;
-      if (cellEl) {
+      if (cellEl && cellEl !== activeEl) {
         cellEl.focus({ preventScroll: true });
         cellEl.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
       }
     }
-  }, [selectedCell, editingCell]);
+  }, [selectedCell, editingCell, openDropdownCell, datePickerCell]);
 
   // Add Row Handler
   const handleAddRow = (insertAtIndex?: number) => {
@@ -1964,49 +1972,81 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             ? col.options
                             : ['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'];
 
+                          const isDropdownOpen = openDropdownCell?.rowId === row.id && openDropdownCell?.colId === col.id;
+
                           return (
                             <td 
                               key={`${row.id}-${col.id}`}
                               data-cell-id={`${row.id}-${col.id}`}
                               tabIndex={0}
-                              onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
+                              onClick={() => {
+                                setSelectedCell({ rowId: row.id, colId: col.id });
+                              }}
                               onFocus={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                               onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
                               className={`py-1.5 px-3 border-r border-slate-800/80 relative transition-all cursor-pointer ${
                                 isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/30' : ''
                               }`}
                             >
-                              <Popover>
+                              <Popover 
+                                open={isDropdownOpen}
+                                onOpenChange={(open) => {
+                                  if (open) {
+                                    setSelectedCell({ rowId: row.id, colId: col.id });
+                                    setOpenDropdownCell({ rowId: row.id, colId: col.id });
+                                  } else {
+                                    setOpenDropdownCell(null);
+                                  }
+                                }}
+                              >
                                 <PopoverTrigger asChild>
                                   <div 
                                     className="cursor-pointer flex items-center justify-between w-full min-h-[22px]"
-                                    onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedCell({ rowId: row.id, colId: col.id });
+                                      setOpenDropdownCell(prev => (prev?.rowId === row.id && prev?.colId === col.id ? null : { rowId: row.id, colId: col.id }));
+                                    }}
                                   >
                                     {cellValue ? (
                                       <span className={`status-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold transition-transform group-hover:scale-[1.02] ${getDropdownOptionBadgeStyle(cellValue)}`}>
                                         {cellValue}
                                       </span>
                                     ) : (
-                                      <span className="text-slate-600 italic text-xs flex items-center gap-1 hover:text-slate-400">
+                                      <span className="text-slate-500/80 italic text-xs flex items-center gap-1 hover:text-slate-300">
                                         <Plus className="w-3 h-3" /> Select {col.label.toLowerCase()}
                                       </span>
                                     )}
-                                    <ChevronDown className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1 shrink-0" />
+                                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100 transition-opacity ml-1 shrink-0" />
                                   </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 bg-[#0d162d] border-2 border-indigo-500/40 text-slate-100 p-2 rounded-xl shadow-2xl z-50 backdrop-blur-xl">
+                                <PopoverContent 
+                                  className="w-64 bg-[#0d162d] border-2 border-indigo-500/40 text-slate-100 p-2.5 rounded-xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+                                  align="start"
+                                  sideOffset={6}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <div className="space-y-2 text-xs">
                                     <div className="flex items-center justify-between px-1 border-b border-slate-700/60 pb-1.5">
                                       <span className="text-[11px] text-cyan-300 font-bold uppercase tracking-wider flex items-center gap-1">
                                         <Tag className="w-3 h-3 text-cyan-400" /> {col.label}
                                       </span>
-                                      <button 
-                                        onClick={() => setIsHeaderManagerOpen(true)}
-                                        className="text-[10px] text-indigo-300 hover:text-white flex items-center gap-0.5 hover:underline"
-                                        title="Configure options in Header Manager"
-                                      >
-                                        <Settings className="w-2.5 h-2.5" /> Setup
-                                      </button>
+                                      <div className="flex items-center gap-1.5">
+                                        <button 
+                                          onClick={() => setIsHeaderManagerOpen(true)}
+                                          className="text-[10px] text-indigo-300 hover:text-white flex items-center gap-0.5 hover:underline mr-1"
+                                          title="Configure options in Header Manager"
+                                        >
+                                          <Settings className="w-2.5 h-2.5" /> Setup
+                                        </button>
+                                        <button 
+                                          onClick={() => setOpenDropdownCell(null)}
+                                          className="p-0.5 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                          title="Close (Esc)"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                     </div>
 
                                     {/* Options list */}
@@ -2052,13 +2092,19 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                       </div>
                                     </div>
 
-                                    {/* Clear button */}
-                                    <div className="border-t border-slate-700/60 pt-1 flex justify-end">
+                                    {/* Bottom controls: Clear & Cancel */}
+                                    <div className="border-t border-slate-700/60 pt-1.5 flex items-center justify-between">
                                       <button 
                                         onClick={() => handleCellStatusChange(row.id, col.id, '')}
                                         className="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 px-2 py-0.5 rounded flex items-center gap-1 text-[11px]"
                                       >
-                                        <X className="w-3 h-3" /> Clear Selection
+                                        <Trash2 className="w-3 h-3" /> Clear
+                                      </button>
+                                      <button 
+                                        onClick={() => setOpenDropdownCell(null)}
+                                        className="px-2.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-[11px] font-semibold border border-slate-700"
+                                      >
+                                        Cancel
                                       </button>
                                     </div>
                                   </div>
