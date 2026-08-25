@@ -3894,12 +3894,14 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#5e3827] via-[#2d1b14] to-[#1a0f0b] opacity-80"></div>
         <div className="relative z-10 w-full max-w-sm bg-[#fffdf7] rounded-[2rem] shadow-2xl p-8 border-4 border-[#e8dccb]">
           <div className="flex flex-col items-center mb-8">
-            <div className="flex gap-2 text-[#7c4d36] mb-4">
+            <div className="flex gap-2 text-[#7c4d36] mb-4" style={{ color: '#7c4d36' }}>
               <User size={32} />
               <User size={40} className="relative -top-2" />
               <User size={32} />
             </div>
-            <h2 className="text-2xl font-black text-[#8b5a3e] tracking-widest uppercase">Login</h2>
+            <h2 className="text-2xl font-black text-[#4a2c1d] tracking-widest uppercase" style={{ color: '#4a2c1d' }}>
+              Login
+            </h2>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -3914,7 +3916,7 @@ export default function Dashboard() {
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-16 pr-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner"
+                className="w-full pl-16 pr-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60"
               />
             </div>
 
@@ -3927,26 +3929,36 @@ export default function Dashboard() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-16 pr-12 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner"
+                className="w-full pl-16 pr-12 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60"
               />
               <div
                 className="absolute right-4 text-[#8b5a3e] cursor-pointer hover:text-[#4a2c1d]"
                 onClick={() => setShowPassword(!showPassword)}
+                style={{ color: '#8b5a3e' }}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </div>
             </div>
 
-            <button type="submit" className="w-full h-14 mt-4 bg-[#3e2316] hover:bg-[#2d1b14] text-amber-100 font-black text-xl rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] transition-colors tracking-widest border-b-4 border-[#1a0f0b] active:border-b-0 active:translate-y-1">
+            <button type="submit" className="w-full h-14 mt-4 bg-[#3e2316] hover:bg-[#2d1b14] text-amber-100 font-black text-xl rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] transition-colors tracking-widest border-b-4 border-[#1a0f0b] active:border-b-0 active:translate-y-1 cursor-pointer">
               Login
             </button>
 
             <div className="flex items-center justify-between pt-2 px-2">
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="remember" className="w-5 h-5 rounded bg-[#4a2c1d] border-none accent-[#4a2c1d] cursor-pointer" />
-                <label htmlFor="remember" className="text-sm font-bold text-[#8b5a3e] cursor-pointer">Remember me?</label>
+                <label htmlFor="remember" className="text-sm font-bold text-[#4a2c1d] cursor-pointer" style={{ color: '#4a2c1d' }}>
+                  Remember me?
+                </label>
               </div>
-              <button type="button" onClick={() => setShowRegisterModal(true)} className="text-sm font-black text-[#8b5a3e] underline hover:text-[#4a2c1d]">Register</button>
+              <button 
+                type="button" 
+                onClick={() => setShowRegisterModal(true)} 
+                className="text-sm font-black text-[#4a2c1d] underline hover:text-[#7c4d36]"
+                style={{ color: '#4a2c1d' }}
+              >
+                Register
+              </button>
             </div>
           </form>
         </div>
@@ -3955,18 +3967,20 @@ export default function Dashboard() {
           <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
             <div className="bg-[#fffdf7] rounded-[2rem] shadow-2xl w-full max-w-sm border-4 border-[#e8dccb] p-8 relative">
               <button type="button" onClick={() => setShowRegisterModal(false)} className="absolute top-4 right-4 text-[#7c4d36] hover:text-[#4a2c1d]"><X size={24} /></button>
-              <h2 className="text-2xl font-black text-[#8b5a3e] tracking-widest uppercase text-center mb-6">Register</h2>
+              <h2 className="text-2xl font-black text-[#4a2c1d] tracking-widest uppercase text-center mb-6" style={{ color: '#4a2c1d' }}>
+                Register
+              </h2>
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="relative flex items-center">
-                  <input type="text" placeholder="Full Name" required value={regData.name} onChange={(e) => setRegData({ ...regData, name: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner" />
+                  <input type="text" placeholder="Full Name" required value={regData.name} onChange={(e) => setRegData({ ...regData, name: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60" />
                 </div>
                 <div className="relative flex items-center">
-                  <input type="text" placeholder="Username" required value={regData.username} onChange={(e) => setRegData({ ...regData, username: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner" />
+                  <input type="text" placeholder="Username" required value={regData.username} onChange={(e) => setRegData({ ...regData, username: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60" />
                 </div>
                 <div className="relative flex items-center">
-                  <input type="password" placeholder="Password" required value={regData.password} onChange={(e) => setRegData({ ...regData, password: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner" />
+                  <input type="password" placeholder="Password" required value={regData.password} onChange={(e) => setRegData({ ...regData, password: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60" />
                 </div>
-                <button type="submit" className="w-full h-14 mt-4 bg-[#3e2316] hover:bg-[#2d1b14] text-amber-100 font-black text-xl rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] transition-colors tracking-widest border-b-4 border-[#1a0f0b]">
+                <button type="submit" className="w-full h-14 mt-4 bg-[#3e2316] hover:bg-[#2d1b14] text-amber-100 font-black text-xl rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] transition-colors tracking-widest border-b-4 border-[#1a0f0b] cursor-pointer">
                   Create Account
                 </button>
               </form>
