@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Lock, Sparkles, Shield, UserPlus, Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Register = () => {
@@ -34,10 +38,10 @@ const Register = () => {
 
     setIsLoading(true);
     try {
-      const email = `${username.toLowerCase()}@sabireturngifts.local`;
+      const email = `${username.toLowerCase()}@chatapp.local`;
       await signUp(email, password, username, aadhaar);
       toast({ title: "Account created!", description: "You can now sign in." });
-      navigate("/dashboard");
+      navigate("/chat");
     } catch (err: any) {
       toast({ title: "Registration failed", description: err.message, variant: "destructive" });
     } finally {
@@ -46,168 +50,55 @@ const Register = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#071333] relative overflow-x-hidden p-4 select-none">
-      {/* Deep Royal Blue Radial Ambient Glow Backdrop */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1d357a] via-[#09163d] to-[#04091c] pointer-events-none" />
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/15 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-600/15 rounded-full blur-[100px] pointer-events-none" />
-
-      {/* Top-Left Back to Home Pill Button */}
-      <div className="absolute top-4 left-4 z-20">
-        <Link 
-          to="/"
-          className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs flex items-center gap-1.5 backdrop-blur-md border border-white/15 shadow-sm transition-all"
-        >
-          <Home size={14} />
-          <span>Back to Home</span>
-        </Link>
-      </div>
-
-      <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center my-auto py-6">
-        {/* TOP CARD: Floating Brand Header Box */}
-        <div className="w-full bg-[#182a5c]/85 backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-5 shadow-2xl mb-4 relative overflow-hidden">
-          <div className="flex items-center gap-3.5 w-full">
-            {/* Golden Logo in clean rounded box */}
-            <div className="w-20 sm:w-24 h-16 sm:h-18 rounded-2xl bg-black/60 border border-amber-400/40 p-1 flex items-center justify-center shadow-lg overflow-hidden shrink-0">
-              <img 
-                src="/sabi-gold-logo.png" 
-                alt="Sabi Return Gifts" 
-                className="w-full h-full object-contain filter drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]" 
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
+            <MessageCircle className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <CardTitle className="text-2xl">Create Account</CardTitle>
+          <CardDescription>Join the conversation</CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Choose a username" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="aadhaar">Aadhaar Number</Label>
+              <Input
+                id="aadhaar"
+                value={aadhaar}
+                onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                placeholder="12-digit Aadhaar number"
+                maxLength={12}
+                required
               />
+              {aadhaar.length > 0 && !validateAadhaar(aadhaar) && (
+                <p className="text-xs text-destructive">Must be exactly 12 digits</p>
+              )}
             </div>
-
-            {/* Brand Title & Info */}
-            <div className="flex-1 text-left min-w-0">
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/25 text-amber-300 font-extrabold text-[10px] uppercase tracking-wider mb-0.5 border border-amber-400/30">
-                <Sparkles className="w-2.5 h-2.5 text-amber-400" /> SABI
-              </div>
-              <h1 className="text-base sm:text-lg font-black text-white tracking-tight uppercase leading-tight truncate">
-                Sabi Return Gifts
-              </h1>
-              <p className="text-[11px] sm:text-xs text-amber-300 font-bold mt-0.5 truncate">
-                Special Return Gifts & Billing Portal
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" required />
             </div>
-          </div>
-
-          {/* Authorized Portal Badge */}
-          <div className="w-full mt-3 pt-2.5 border-t border-white/15 flex items-center justify-center">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 border border-white/15 text-[11px] font-bold">
-              <Shield className="w-3.5 h-3.5 text-amber-400" /> Authorized Staff & Admin Portal
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required />
             </div>
-          </div>
-        </div>
-
-        {/* BOTTOM CARD: Crisp White Register Card */}
-        <div className="w-full bg-white text-slate-900 rounded-3xl shadow-2xl p-7 sm:p-8 border border-slate-100 relative">
-          <div className="mb-5 text-left">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Create Account
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-              Fill in your details to register as a staff member
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Creating account..." : "Create Account"}
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link to="/login" className="text-primary hover:underline">Sign In</Link>
             </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-3.5 text-left">
-            <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider pl-0.5">
-                Username
-              </label>
-              <div className="relative flex items-center bg-[#f0f4fa] border border-slate-200/80 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-600/20 rounded-xl transition-all shadow-xs h-11 px-3.5">
-                <User className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
-                <input
-                  id="username"
-                  type="text"
-                  placeholder="Choose a username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full h-full bg-transparent text-slate-900 placeholder-slate-400 font-semibold outline-none text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider pl-0.5">
-                Aadhaar Number
-              </label>
-              <div className="relative flex items-center bg-[#f0f4fa] border border-slate-200/80 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-600/20 rounded-xl transition-all shadow-xs h-11 px-3.5">
-                <Shield className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
-                <input
-                  id="aadhaar"
-                  type="text"
-                  placeholder="12-digit Aadhaar number"
-                  value={aadhaar}
-                  onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, "").slice(0, 12))}
-                  maxLength={12}
-                  className="w-full h-full bg-transparent text-slate-900 placeholder-slate-400 font-semibold outline-none text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider pl-0.5">
-                Password
-              </label>
-              <div className="relative flex items-center bg-[#f0f4fa] border border-slate-200/80 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-600/20 rounded-xl transition-all shadow-xs h-11 px-3.5">
-                <Lock className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="At least 6 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-full bg-transparent text-slate-900 placeholder-slate-400 font-semibold outline-none text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider pl-0.5">
-                Confirm Password
-              </label>
-              <div className="relative flex items-center bg-[#f0f4fa] border border-slate-200/80 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-600/20 rounded-xl transition-all shadow-xs h-11 px-3.5">
-                <Lock className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Re-enter password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full h-full bg-transparent text-slate-900 placeholder-slate-400 font-semibold outline-none text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-12 mt-4 bg-[#142354] hover:bg-[#1b2f70] active:bg-[#0f1a3d] text-white font-black text-base rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
-            >
-              <UserPlus className="w-4 h-4 text-white" />
-              <span>{isLoading ? "Creating..." : "Create Account"}</span>
-            </button>
-
-            <div className="text-center pt-2">
-              <p className="text-xs text-slate-600 font-medium">
-                Already have an account?{" "}
-                <Link to="/login" className="font-bold text-[#142354] hover:underline">
-                  Sign In
-                </Link>
-              </p>
-            </div>
-          </form>
-        </div>
-
-        {/* Bottom Footer Info */}
-        <div className="mt-4 text-center text-xs text-blue-200/60 font-medium">
-          Sabi Return Gifts • Special Return Gifts & Chocolates Portal
-        </div>
-      </div>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 };
