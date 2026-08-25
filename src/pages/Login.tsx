@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Sparkles, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
@@ -27,75 +27,89 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#070b16] relative overflow-hidden p-4 select-none">
-      {/* Subtle ambient glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_rgba(245,158,11,0.08)_0%,_rgba(7,11,22,0.95)_70%)] pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="flex min-h-screen items-center justify-center bg-[#05070e] relative overflow-hidden p-4 select-none">
+      {/* Luxury ambient radial glows */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-600/15 via-[#0b1020] to-[#03050a] pointer-events-none" />
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-yellow-600/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Login Glass Card */}
-      <div className="relative z-10 w-full max-w-[420px] bg-[#0d1424]/85 backdrop-blur-2xl rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_1px_rgba(255,255,255,0.15)] p-8 sm:p-9 border border-slate-700/60 overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400/80 to-transparent" />
+      <div className="relative z-10 w-full max-w-md bg-[#0c1326]/90 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(245,158,11,0.12)] p-7 sm:p-9 border border-amber-500/30 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
 
-        {/* Logo Header (Clean & Unboxed) */}
+        {/* Sabi Return Gifts Logo Header - Royal Gold Circular Medallion */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="relative mb-2 flex items-center justify-center">
-            <div className="absolute -inset-2 bg-amber-500/15 rounded-full blur-xl pointer-events-none" />
-            <img 
-              src="/sabi-gold-logo.png" 
-              alt="Sabi Return Gifts" 
-              className="relative z-10 w-48 sm:w-56 h-auto max-h-28 object-contain drop-shadow-[0_4px_16px_rgba(245,158,11,0.3)]"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
+          <div className="relative group mb-3">
+            <div className="absolute -inset-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-full blur-md opacity-60 group-hover:opacity-90 transition duration-500 animate-pulse" />
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1 bg-gradient-to-tr from-amber-600 via-yellow-300 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.5)] flex items-center justify-center">
+              <div className="w-full h-full rounded-full bg-[#050914] border-2 border-amber-400/80 overflow-hidden flex items-center justify-center p-1.5 shadow-inner relative">
+                <img 
+                  src="/sabi-gold-logo.png" 
+                  alt="Sabi Return Gifts" 
+                  className="w-full h-full object-cover scale-110 rounded-full filter drop-shadow-[0_2px_10px_rgba(245,158,11,0.6)]"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 font-medium tracking-wide">
-            Welcome back to Sabi Return Gifts
-          </p>
+
+          <h1 className="text-xl sm:text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-yellow-300 to-amber-200 drop-shadow-md">
+            Sabi Return Gifts
+          </h1>
+          
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold tracking-widest uppercase mt-1">
+            <Sparkles className="w-3 h-3 text-amber-400" /> Member Login
+          </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 tracking-wide block">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">
               Username
             </label>
-            <div className="relative flex items-center group">
-              <User className="absolute left-3.5 w-4 h-4 text-slate-400 group-focus-within:text-amber-400 transition-colors pointer-events-none" />
+            <div className="relative flex items-center bg-[#070c18]/90 border border-slate-700/80 hover:border-amber-500/50 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 rounded-2xl transition-all shadow-inner overflow-hidden">
+              <div className="w-12 h-13 bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center text-amber-400 border-r border-amber-500/20 shrink-0">
+                <User size={20} />
+              </div>
               <input
                 id="username"
                 type="text"
-                placeholder="Enter username"
+                placeholder="Enter your username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 h-12 bg-slate-950/70 border border-slate-700/70 focus:border-amber-400/80 focus:bg-slate-950/90 focus:ring-2 focus:ring-amber-400/20 rounded-xl text-white placeholder-slate-500 font-medium text-sm transition-all duration-200 outline-none shadow-inner"
+                className="w-full px-4 h-13 bg-transparent text-white placeholder-slate-500 font-semibold outline-none text-sm"
                 required
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 tracking-wide block">
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">
               Password
             </label>
-            <div className="relative flex items-center group">
-              <Lock className="absolute left-3.5 w-4 h-4 text-slate-400 group-focus-within:text-amber-400 transition-colors pointer-events-none" />
+            <div className="relative flex items-center bg-[#070c18]/90 border border-slate-700/80 hover:border-amber-500/50 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 rounded-2xl transition-all shadow-inner overflow-hidden">
+              <div className="w-12 h-13 bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center text-amber-400 border-r border-amber-500/20 shrink-0">
+                <Lock size={18} />
+              </div>
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 h-12 bg-slate-950/70 border border-slate-700/70 focus:border-amber-400/80 focus:bg-slate-950/90 focus:ring-2 focus:ring-amber-400/20 rounded-xl text-white placeholder-slate-500 font-medium text-sm transition-all duration-200 outline-none shadow-inner"
+                className="w-full pl-4 pr-11 h-13 bg-transparent text-white placeholder-slate-500 font-semibold outline-none text-sm"
                 required
               />
               <button
                 type="button"
-                className="absolute right-3 text-slate-400 hover:text-white p-1 transition-colors"
+                className="absolute right-3.5 text-slate-400 hover:text-amber-300 p-1 transition-colors"
                 onClick={() => setShowPassword(!showPassword)}
                 title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
@@ -103,16 +117,16 @@ const Login = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-12 mt-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:via-yellow-300 hover:to-amber-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg shadow-amber-500/20 hover:shadow-amber-500/35 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-200 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer border border-amber-200/40 disabled:opacity-50"
+            className="w-full h-13 mt-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:via-yellow-400 hover:to-amber-500 text-slate-950 font-black text-base rounded-2xl shadow-[0_10px_25px_rgba(245,158,11,0.35)] transition-all duration-300 tracking-wider uppercase flex items-center justify-center gap-2 active:scale-[0.98] border border-amber-300/40 cursor-pointer disabled:opacity-50"
           >
             <span>{isLoading ? "Signing in..." : "Sign In"}</span>
-            <ArrowRight className="w-4 h-4" />
+            <Sparkles className="w-4 h-4 text-slate-950" />
           </button>
 
           <div className="text-center pt-2">
             <p className="text-xs text-slate-400">
               Don't have an account?{" "}
-              <Link to="/register" className="font-bold text-amber-400 hover:text-amber-300 hover:underline">
+              <Link to="/register" className="font-bold text-amber-400 hover:text-amber-300 underline underline-offset-4">
                 Register
               </Link>
             </p>
