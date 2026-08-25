@@ -3892,14 +3892,14 @@ export default function Dashboard() {
     return (
       <div className="flex h-screen items-center justify-center bg-[#2d1b14] relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#5e3827] via-[#2d1b14] to-[#1a0f0b] opacity-80"></div>
-        <div className="relative z-10 w-full max-w-sm bg-[#fffdf7] rounded-[2rem] shadow-2xl p-8 border-4 border-[#e8dccb]">
+        <div className="login-card relative z-10 w-full max-w-sm bg-[#fffdf7] rounded-[2rem] shadow-2xl p-8 border-4 border-[#e8dccb]">
           <div className="flex flex-col items-center mb-8">
             <div className="flex gap-2 text-[#7c4d36] mb-4" style={{ color: '#7c4d36' }}>
               <User size={32} />
               <User size={40} className="relative -top-2" />
               <User size={32} />
             </div>
-            <h2 className="text-2xl font-black text-[#4a2c1d] tracking-widest uppercase" style={{ color: '#4a2c1d' }}>
+            <h2 className="login-title text-2xl font-black text-[#4a2c1d] tracking-widest uppercase" style={{ color: '#4a2c1d' }}>
               Login
             </h2>
           </div>

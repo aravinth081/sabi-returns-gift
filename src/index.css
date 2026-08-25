@@ -576,20 +576,29 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Text overrides inside dark cards (scoped to not affect fixed modals/overlays) */
-.wallpaper-active .text-amber-950:not(.fixed *),
-.wallpaper-active .text-amber-900:not(.fixed *),
-.wallpaper-active .text-slate-800:not(.fixed *),
-.wallpaper-active .text-gray-800:not(.fixed *),
-.wallpaper-active .text-\[\#3e2723\]:not(.fixed *),
-.wallpaper-active .text-\[\#c2410c\]:not(.fixed *),
-.wallpaper-active .text-\[\#5d4037\]:not(.fixed *),
-.wallpaper-active h1:not(.fixed *),
-.wallpaper-active h2:not(.fixed *),
-.wallpaper-active h3:not(.fixed *),
-.wallpaper-active h4:not(.fixed *) {
+/* Text overrides inside dark cards (scoped to not affect fixed modals/overlays or login card) */
+.wallpaper-active .text-amber-950:not(.login-card *):not(.fixed *),
+.wallpaper-active .text-amber-900:not(.login-card *):not(.fixed *),
+.wallpaper-active .text-slate-800:not(.login-card *):not(.fixed *),
+.wallpaper-active .text-gray-800:not(.login-card *):not(.fixed *),
+.wallpaper-active .text-\[\#3e2723\]:not(.login-card *):not(.fixed *),
+.wallpaper-active .text-\[\#c2410c\]:not(.login-card *):not(.fixed *),
+.wallpaper-active .text-\[\#5d4037\]:not(.login-card *):not(.fixed *),
+.wallpaper-active h1:not(.login-card *):not(.fixed *),
+.wallpaper-active h2:not(.login-card *):not(.login-title):not(.fixed *),
+.wallpaper-active h3:not(.login-card *):not(.fixed *),
+.wallpaper-active h4:not(.login-card *):not(.fixed *) {
   color: #f8fafc !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Explicit high-contrast styling for Login & Register cards */
+.login-title,
+.login-card h2,
+.login-card label,
+.login-card .login-text {
+  color: #4a2c1d !important;
+  text-shadow: none !important;
 }
 
 .wallpaper-active .text-amber-800:not(.fixed *),
