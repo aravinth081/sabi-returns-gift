@@ -17,7 +17,7 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Sparkles, UserPlus
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Sparkles, UserPlus, ArrowRight
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -3890,95 +3890,82 @@ export default function Dashboard() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#05070e] relative overflow-hidden p-4 select-none">
-        {/* Luxury ambient radial glows and decorative backdrop lights */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-600/15 via-[#0b1020] to-[#03050a] pointer-events-none" />
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-yellow-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="flex min-h-screen items-center justify-center bg-[#070b16] relative overflow-hidden p-4 select-none">
+        {/* Subtle Luxury Ambient Glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_rgba(245,158,11,0.08)_0%,_rgba(7,11,22,0.95)_70%)] pointer-events-none" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
 
         {/* Main Login Glass Card */}
-        <div className="relative z-10 w-full max-w-md bg-[#0c1326]/90 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(245,158,11,0.12)] p-7 sm:p-9 border border-amber-500/30 overflow-hidden">
-          {/* Top golden accent shimmer line */}
-          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+        <div className="relative z-10 w-full max-w-[420px] bg-[#0d1424]/85 backdrop-blur-2xl rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_1px_rgba(255,255,255,0.15)] p-8 sm:p-9 border border-slate-700/60 overflow-hidden">
+          {/* Subtle Top Accent Glow Line */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400/80 to-transparent" />
 
-          {/* Sabi Return Gifts Logo Header */}
+          {/* Sabi Return Gifts Logo Header (Clean & Unboxed) */}
           <div className="flex flex-col items-center text-center mb-6">
-            <div className="relative group mb-3">
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 rounded-2xl blur-md opacity-40 group-hover:opacity-75 transition duration-500" />
-              <div className="relative w-44 sm:w-52 h-24 rounded-2xl overflow-hidden border border-amber-400/40 bg-black/60 shadow-xl flex items-center justify-center p-2">
-                <img 
-                  src="/sabi-gold-logo.png" 
-                  alt="Sabi Return Gifts" 
-                  className="w-full h-full object-contain filter drop-shadow-[0_2px_10px_rgba(245,158,11,0.4)]"
-                  onError={(e) => {
-                    // Fallback to text logo if image fails
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
+            <div className="relative mb-2 flex items-center justify-center">
+              <div className="absolute -inset-2 bg-amber-500/15 rounded-full blur-xl pointer-events-none" />
+              <img 
+                src="/sabi-gold-logo.png" 
+                alt="Sabi Return Gifts" 
+                className="relative z-10 w-48 sm:w-56 h-auto max-h-28 object-contain drop-shadow-[0_4px_16px_rgba(245,158,11,0.3)]"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
             </div>
-
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-bold tracking-widest uppercase mb-1">
-              <Sparkles className="w-3 h-3 text-amber-400" /> Portal Login
-            </div>
-            <p className="text-xs text-slate-400 font-medium">
-              Order Management & Operations System
+            <p className="text-xs text-slate-400 font-medium tracking-wide">
+              Order Management & Staff Portal
             </p>
           </div>
 
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             {loginError && (
-              <div className="text-rose-300 text-center text-xs sm:text-sm font-bold bg-rose-950/50 border border-rose-500/40 p-2.5 rounded-xl shadow-sm animate-in fade-in">
+              <div className="text-rose-300 text-center text-xs font-semibold bg-rose-950/60 border border-rose-500/30 p-2.5 rounded-xl shadow-sm animate-in fade-in">
                 {loginError}
               </div>
             )}
 
             {/* Username Input */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 tracking-wide block">
                 Username
               </label>
-              <div className="relative flex items-center bg-[#070c18]/90 border border-slate-700/80 hover:border-amber-500/50 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 rounded-2xl transition-all shadow-inner overflow-hidden">
-                <div className="w-12 h-13 bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center text-amber-400 border-r border-amber-500/20 shrink-0">
-                  <User size={20} />
-                </div>
+              <div className="relative flex items-center group">
+                <User className="absolute left-3.5 w-4 h-4 text-slate-400 group-focus-within:text-amber-400 transition-colors pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 h-13 bg-transparent text-white placeholder-slate-500 font-semibold outline-none text-sm"
+                  className="w-full pl-10 pr-4 h-12 bg-slate-950/70 border border-slate-700/70 focus:border-amber-400/80 focus:bg-slate-950/90 focus:ring-2 focus:ring-amber-400/20 rounded-xl text-white placeholder-slate-500 font-medium text-sm transition-all duration-200 outline-none shadow-inner"
                   required
                 />
               </div>
             </div>
 
             {/* Password Input */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 tracking-wide block">
                 Password
               </label>
-              <div className="relative flex items-center bg-[#070c18]/90 border border-slate-700/80 hover:border-amber-500/50 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 rounded-2xl transition-all shadow-inner overflow-hidden">
-                <div className="w-12 h-13 bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center text-amber-400 border-r border-amber-500/20 shrink-0">
-                  <Lock size={18} />
-                </div>
+              <div className="relative flex items-center group">
+                <Lock className="absolute left-3.5 w-4 h-4 text-slate-400 group-focus-within:text-amber-400 transition-colors pointer-events-none" />
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-4 pr-11 h-13 bg-transparent text-white placeholder-slate-500 font-semibold outline-none text-sm"
+                  className="w-full pl-10 pr-10 h-12 bg-slate-950/70 border border-slate-700/70 focus:border-amber-400/80 focus:bg-slate-950/90 focus:ring-2 focus:ring-amber-400/20 rounded-xl text-white placeholder-slate-500 font-medium text-sm transition-all duration-200 outline-none shadow-inner"
                   required
                 />
                 <button
                   type="button"
-                  className="absolute right-3.5 text-slate-400 hover:text-amber-300 p-1 transition-colors"
+                  className="absolute right-3 text-slate-400 hover:text-white p-1 transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
                   title={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
@@ -3986,28 +3973,26 @@ export default function Dashboard() {
             {/* Submit Button */}
             <button 
               type="submit" 
-              className="w-full h-13 mt-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:via-yellow-400 hover:to-amber-500 text-slate-950 font-black text-base rounded-2xl shadow-[0_10px_25px_rgba(245,158,11,0.35)] transition-all duration-300 tracking-wider uppercase flex items-center justify-center gap-2 active:scale-[0.98] border border-amber-300/40 cursor-pointer"
+              className="w-full h-12 mt-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:via-yellow-300 hover:to-amber-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg shadow-amber-500/20 hover:shadow-amber-500/35 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-200 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer border border-amber-200/40"
             >
               <span>Sign In</span>
-              <Sparkles className="w-4 h-4 text-slate-950" />
+              <ArrowRight className="w-4 h-4" />
             </button>
 
             {/* Remember me and Register link */}
             <div className="flex items-center justify-between pt-1 px-1 text-xs">
-              <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-slate-400 hover:text-slate-300 cursor-pointer font-medium">
                 <input 
                   type="checkbox" 
                   id="remember" 
                   className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-amber-400 cursor-pointer accent-amber-500" 
                 />
-                <label htmlFor="remember" className="font-semibold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                  Remember me
-                </label>
-              </div>
+                Remember me
+              </label>
               <button 
                 type="button" 
                 onClick={() => setShowRegisterModal(true)} 
-                className="font-bold text-amber-400 hover:text-amber-300 underline underline-offset-4 transition-colors"
+                className="font-bold text-amber-400 hover:text-amber-300 hover:underline transition-colors"
               >
                 Register
               </button>
@@ -4017,67 +4002,67 @@ export default function Dashboard() {
 
         {/* Register Modal */}
         {showRegisterModal && (
-          <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
-            <div className="bg-[#0c1326] rounded-[2rem] shadow-2xl w-full max-w-md border border-amber-500/40 p-7 sm:p-8 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+          <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="bg-[#0d1424] rounded-3xl shadow-2xl w-full max-w-md border border-slate-700/80 p-7 sm:p-8 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
               
               <button 
                 type="button" 
                 onClick={() => setShowRegisterModal(false)} 
                 className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
 
               <div className="flex flex-col items-center text-center mb-5">
                 <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2">
                   <UserPlus className="w-5 h-5" />
                 </div>
-                <h2 className="text-xl font-black text-white tracking-wide uppercase">
+                <h2 className="text-lg font-bold text-white tracking-wide uppercase">
                   Create Account
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Fill in your details to register as a staff member
+                  Register as a new team member
                 </p>
               </div>
 
-              <form onSubmit={handleRegister} className="space-y-3.5">
+              <form onSubmit={handleRegister} className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">Full Name</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Full Name</label>
                   <input 
                     type="text" 
-                    placeholder="Enter your full name" 
+                    placeholder="Enter full name" 
                     required 
                     value={regData.name} 
                     onChange={(e) => setRegData({ ...regData, name: e.target.value })} 
-                    className="w-full px-4 h-12 bg-[#070c18] border border-slate-700/80 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 rounded-xl text-white font-semibold outline-none text-sm shadow-inner" 
+                    className="w-full px-3.5 h-11 bg-slate-950/70 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 rounded-xl text-white font-medium outline-none text-sm shadow-inner" 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">Username</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Username</label>
                   <input 
                     type="text" 
                     placeholder="Choose a username" 
                     required 
                     value={regData.username} 
                     onChange={(e) => setRegData({ ...regData, username: e.target.value })} 
-                    className="w-full px-4 h-12 bg-[#070c18] border border-slate-700/80 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 rounded-xl text-white font-semibold outline-none text-sm shadow-inner" 
+                    className="w-full px-3.5 h-11 bg-slate-950/70 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 rounded-xl text-white font-medium outline-none text-sm shadow-inner" 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-amber-200/90 uppercase tracking-wider pl-1">Password</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Password</label>
                   <input 
                     type="password" 
                     placeholder="Create a strong password" 
                     required 
                     value={regData.password} 
                     onChange={(e) => setRegData({ ...regData, password: e.target.value })} 
-                    className="w-full px-4 h-12 bg-[#070c18] border border-slate-700/80 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 rounded-xl text-white font-semibold outline-none text-sm shadow-inner" 
+                    className="w-full px-3.5 h-11 bg-slate-950/70 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 rounded-xl text-white font-medium outline-none text-sm shadow-inner" 
                   />
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full h-12 mt-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:via-yellow-400 hover:to-amber-500 text-slate-950 font-black text-base rounded-xl shadow-lg transition-all tracking-wider uppercase border border-amber-300/40 cursor-pointer"
+                  className="w-full h-11 mt-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:via-yellow-300 hover:to-amber-400 text-slate-950 font-bold text-sm rounded-xl shadow-md transition-all tracking-wider uppercase border border-amber-200/40 cursor-pointer"
                 >
                   Create Account
                 </button>
