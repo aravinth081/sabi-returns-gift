@@ -4,14 +4,22 @@ import {
   Plus, X, Upload, Pencil, Trash2, Search, Download, 
   ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight, Check, FileSpreadsheet, RotateCcw,
-  RotateCw, Filter, MoreHorizontal, Copy, Calendar, Eye,
+  RotateCw, Filter, MoreHorizontal, Copy, Calendar as CalendarIcon, Eye,
   Sparkles, CheckCircle2, Clock, AlertTriangle, XCircle, Hash,
   Layers, PlusCircle, MoveHorizontal, CheckSquare, Square,
-  MessageCircle, Phone, HelpCircle, FileText, ArrowRight, CornerDownLeft,
-  Image as ImageIcon
+  SlidersHorizontal, ListPlus, Tag, Settings, ArrowLeft, ArrowRight,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription 
+} from '@/components/ui/dialog';
+import { Calendar as CalendarUI } from '@/components/ui/calendar';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -37,25 +45,26 @@ export interface SheetData {
 }
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
-  { id: 'date', label: 'Date', width: 130, type: 'text' },
-  { id: 'contactNumber', label: 'Contact Number', width: 180, type: 'text' },
-  { id: 'count', label: 'Count', width: 110, type: 'text' },
-  { id: 'birthday', label: 'Birthday', width: 140, type: 'text' },
-  { id: 'dispatch', label: 'Dispatch', width: 130, type: 'text' },
-  { id: 'comments', label: 'Comments', width: 230, type: 'text' },
+  { id: 'date', label: 'Date', width: 130, type: 'date' },
+  { id: 'contactNumber', label: 'Contact Number', width: 170, type: 'text' },
+  { id: 'count', label: 'Count', width: 100, type: 'text' },
+  { id: 'birthday', label: 'Birthday', width: 140, type: 'date' },
+  { id: 'dispatch', label: 'Dispatch', width: 130, type: 'date' },
+  { id: 'comments', label: 'Comments', width: 220, type: 'text' },
   { 
     id: 'status', 
     label: 'Status', 
-    width: 210, 
+    width: 200, 
     type: 'select', 
     options: ['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'] 
   },
   { id: 'cancelReason', label: 'Cancel Reason', width: 200, type: 'text' },
 ];
 
-const createEmptyRow = (index: number, defaultDate: string = ''): SheetRow => ({
+// Generate empty rows up to 25 for full initial page
+const createEmptyRow = (index: number): SheetRow => ({
   id: `row-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 6)}`,
-  date: defaultDate,
+  date: '',
   contactNumber: '',
   count: '',
   birthday: '',
@@ -67,14 +76,8 @@ const createEmptyRow = (index: number, defaultDate: string = ''): SheetRow => ({
 
 const generateInitialRows = (totalCount: number = 25): SheetRow[] => {
   const result: SheetRow[] = [];
-  const today = new Date();
-  const day = String(today.getDate()).padStart(2, '0');
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const year = today.getFullYear();
-  const formattedDate = `${day}.${month}.${year}`;
-
   for (let i = 0; i < totalCount; i++) {
-    result.push(createEmptyRow(i + 1, formattedDate));
+    result.push(createEmptyRow(i + 1));
   }
   return result;
 };
@@ -113,6 +116,7 @@ const DEFAULT_SHEETS: SheetData[] = [
 ];
 
 const LOCAL_STORAGE_KEY = 'sabi_daily_tasks_excel_sheets_v3';
+const PAGE_SIZE = 25;
 
 export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChange?: () => void } = {}) {
   // Sheets State
@@ -145,18 +149,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     return 'sheet-aug';
   });
 
-  // Wallpaper State
-  const [wallpaper, setWallpaper] = useState<string>(() => {
-    try {
-      return localStorage.getItem('sabi_daily_tasks_wallpaper') || "";
-    } catch (e) {
-      return "";
-    }
-  });
-
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(25);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -170,6 +164,240 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null);
   const [cellEditValue, setCellEditValue] = useState<string>('');
 
+  // Date Suggestion / Picker State
+  const [datePickerCell, setDatePickerCell] = useState<{ rowId: string; colId: string } | null>(null);
+  const [datePreferredFormat, setDatePreferredFormat] = useState<'dot' | 'dash' | 'text'>('dot');
+
+  // Header & Dropdown Manager Modal State
+  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState<boolean>(false);
+  const [headerManagerTab, setHeaderManagerTab] = useState<'add' | 'manage'>('add');
+
+  // New Header Form State
+  const [newColLabel, setNewColLabel] = useState<string>('');
+  const [newColType, setNewColType] = useState<'text' | 'number' | 'date' | 'select'>('select');
+  const [newColWidth, setNewColWidth] = useState<number>(160);
+  const [newColOptions, setNewColOptions] = useState<string[]>(['Waiting for Image', 'Image Received', 'In Progress', 'Completed', 'Cancel']);
+  const [newColOptionInput, setNewColOptionInput] = useState<string>('');
+
+  // Quick Option Input for Existing Columns
+  const [quickOptionInputs, setQuickOptionInputs] = useState<Record<string, string>>({});
+
+  // Preset Templates for Quick Dropdown Setup
+  const DROPDOWN_PRESETS = [
+    {
+      name: 'Order Status',
+      options: ['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed']
+    },
+    {
+      name: 'Payment Status',
+      options: ['Unpaid', 'Advance Paid', 'Full Paid', 'Pending', 'Refunded']
+    },
+    {
+      name: 'Courier Partner',
+      options: ['ST Courier', 'Professional Courier', 'DTDC', 'Speed Post', 'Hand Delivery']
+    },
+    {
+      name: 'Priority / Urgency',
+      options: ['Normal', 'High Priority', 'Urgent', 'VIP']
+    },
+    {
+      name: 'Approval / Yes-No',
+      options: ['Yes', 'No', 'Pending']
+    }
+  ];
+
+  // Dynamic Dropdown Option Badge Style Helper
+  const getDropdownOptionBadgeStyle = (optionVal: string) => {
+    const s = (optionVal || '').trim().toLowerCase();
+    
+    if (s === 'waiting for image' || s.includes('waiting') || s.includes('pending') || s.includes('advance') || s.includes('unpaid')) {
+      return 'bg-[#ffedd5] text-[#c2410c] dark:bg-[#7c2d12]/50 dark:text-[#fdba74] border border-orange-300 dark:border-orange-600/60 shadow-sm font-semibold';
+    }
+    if (s === 'image received' || s.includes('received') || s.includes('full paid') || s.includes('paid') || s.includes('yes') || s.includes('completed') || s.includes('delivered') || s.includes('success')) {
+      return 'bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/50 dark:text-[#86efac] border border-emerald-300 dark:border-emerald-600/60 shadow-sm font-semibold';
+    }
+    if (s === 'cancel' || s.includes('cancel') || s.includes('refund') || s.includes('no') || s.includes('rejected') || s.includes('urgent') || s.includes('vip')) {
+      return 'bg-[#ffe4e6] text-[#be123c] dark:bg-[#881337]/60 dark:text-[#fda4af] border border-rose-300 dark:border-rose-600/60 shadow-sm font-semibold';
+    }
+    if (s === 'in progress' || s.includes('progress') || s.includes('courier') || s.includes('dtdc') || s.includes('st courier') || s.includes('speed post')) {
+      return 'bg-[#e0f2fe] text-[#0369a1] dark:bg-[#0c4a6e]/50 dark:text-[#7dd3fc] border border-sky-300 dark:border-sky-600/60 shadow-sm font-semibold';
+    }
+    if (s.includes('high') || s.includes('medium') || s.includes('priority')) {
+      return 'bg-[#fef3c7] text-[#b45309] dark:bg-[#78350f]/50 dark:text-[#fcd34d] border border-amber-300 dark:border-amber-600/60 shadow-sm font-semibold';
+    }
+    return 'bg-[#f3e8ff] text-[#7e22ce] dark:bg-[#3b0764]/50 dark:text-[#d8b4fe] border border-purple-300 dark:border-purple-600/60 shadow-sm font-semibold';
+  };
+
+  // Add Option to New Column Form
+  const handleAddNewColOption = (opt?: string) => {
+    const val = (opt || newColOptionInput).trim();
+    if (!val) return;
+    if (newColOptions.includes(val)) {
+      toast.info(`Option "${val}" is already in the list`);
+      return;
+    }
+    setNewColOptions(prev => [...prev, val]);
+    setNewColOptionInput('');
+  };
+
+  const handleRemoveNewColOption = (index: number) => {
+    setNewColOptions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Create New Header / Column
+  const handleCreateHeader = () => {
+    if (!newColLabel.trim()) {
+      toast.error('Please enter a column title');
+      return;
+    }
+
+    const colKey = `col_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const newCol: ColumnDef = {
+      id: colKey,
+      label: newColLabel.trim(),
+      width: newColWidth || 160,
+      type: newColType,
+      options: newColType === 'select' ? (newColOptions.length > 0 ? newColOptions : ['Option 1', 'Option 2']) : undefined
+    };
+
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      return {
+        ...sheet,
+        columns: [...sheet.columns, newCol]
+      };
+    });
+
+    saveSheets(updatedSheets);
+    setNewColLabel('');
+    setNewColOptions(['Option 1', 'Option 2', 'Option 3']);
+    setIsHeaderManagerOpen(false);
+    toast.success(`Column "${newCol.label}" created successfully`);
+  };
+
+  // Add Option to an Existing Column
+  const handleAddOptionToExistingColumn = (colId: string, customVal?: string) => {
+    const val = (customVal || quickOptionInputs[colId] || '').trim();
+    if (!val) return;
+
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      const updatedCols = sheet.columns.map(col => {
+        if (col.id !== colId) return col;
+        const currentOpts = col.options || ['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'];
+        if (currentOpts.includes(val)) {
+          toast.info(`Option "${val}" already exists in ${col.label}`);
+          return col;
+        }
+        return {
+          ...col,
+          type: 'select' as const,
+          options: [...currentOpts, val]
+        };
+      });
+      return { ...sheet, columns: updatedCols };
+    });
+
+    saveSheets(updatedSheets);
+    setQuickOptionInputs(prev => ({ ...prev, [colId]: '' }));
+    toast.success(`Added "${val}" to column options`);
+  };
+
+  // Remove Option from Existing Column
+  const handleRemoveOptionFromExistingColumn = (colId: string, optionIndex: number) => {
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      const updatedCols = sheet.columns.map(col => {
+        if (col.id !== colId) return col;
+        const currentOpts = col.options || [];
+        return {
+          ...col,
+          options: currentOpts.filter((_, idx) => idx !== optionIndex)
+        };
+      });
+      return { ...sheet, columns: updatedCols };
+    });
+
+    saveSheets(updatedSheets);
+    toast.success('Option removed');
+  };
+
+  // Reorder Column (Move Left / Right)
+  const handleMoveColumn = (colId: string, direction: 'left' | 'right') => {
+    const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
+    if (colIndex === -1) return;
+    if (direction === 'left' && colIndex === 0) return;
+    if (direction === 'right' && colIndex === currentSheet.columns.length - 1) return;
+
+    const targetIndex = direction === 'left' ? colIndex - 1 : colIndex + 1;
+    const newColumns = [...currentSheet.columns];
+    const [movedCol] = newColumns.splice(colIndex, 1);
+    newColumns.splice(targetIndex, 0, movedCol);
+
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      return { ...sheet, columns: newColumns };
+    });
+
+    saveSheets(updatedSheets);
+    toast.success(`Moved column "${movedCol.label}"`);
+  };
+
+  // Date Formatting Utilities
+  const formatDateToString = (d: Date, formatType: 'dot' | 'dash' | 'text' = 'dot'): string => {
+    if (!d || isNaN(d.getTime())) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    if (formatType === 'dash') {
+      return `${day}-${month}-${year}`;
+    }
+    if (formatType === 'text') {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day} ${monthNames[d.getMonth()]} ${year}`;
+    }
+    return `${day}.${month}.${year}`;
+  };
+
+  const getTodayFormatted = (formatType: 'dot' | 'dash' | 'text' = 'dot'): string => {
+    return formatDateToString(new Date(), formatType);
+  };
+
+  const getOffsetDateFormatted = (days: number, formatType: 'dot' | 'dash' | 'text' = 'dot'): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return formatDateToString(d, formatType);
+  };
+
+  const parseCellDateToDate = (val: any): Date | undefined => {
+    if (!val) return undefined;
+    const str = String(val).trim();
+
+    // Match DD.MM.YYYY
+    if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
+      const [d, m, y] = str.split('.').map(Number);
+      const date = new Date(y, m - 1, d);
+      if (!isNaN(date.getTime())) return date;
+    }
+    // Match DD-MM-YYYY
+    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(str)) {
+      const [d, m, y] = str.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      if (!isNaN(date.getTime())) return date;
+    }
+    // Match YYYY-MM-DD
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)) {
+      const [y, m, d] = str.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      if (!isNaN(date.getTime())) return date;
+    }
+    // Standard parse
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed;
+    return undefined;
+  };
+
   // Column Header Editing
   const [editingHeaderColId, setEditingHeaderColId] = useState<string | null>(null);
   const [headerEditTitle, setHeaderEditTitle] = useState<string>('');
@@ -179,15 +407,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [newColumnName, setNewColumnName] = useState<string>('');
   const [newColumnType, setNewColumnType] = useState<'text' | 'number' | 'date' | 'select'>('text');
 
-  // Shortcuts Dialog State
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
-
   // Sheet Tab Renaming
   const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
   const [sheetRenameValue, setSheetRenameValue] = useState<string>('');
-
-  // Sort State
-  const [sortState, setSortState] = useState<{ colId: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Undo / Redo History
   const historyRef = useRef<{ past: SheetData[][]; future: SheetData[][] }>({
@@ -197,10 +419,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   const isSyncingFromRemoteRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
   const cellInputRef = useRef<HTMLInputElement>(null);
   const headerInputRef = useRef<HTMLInputElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Active Sheet Object
   const currentSheet = useMemo(() => {
@@ -242,7 +462,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
   }, [sheets, pushHistory]);
 
-  // Firestore Real-time Listener for Sheets
+  // Firestore Real-time Listener
   useEffect(() => {
     try {
       const sheetDocRef = doc(db, 'daily_tasks_board', 'sheet_data');
@@ -265,43 +485,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     } catch (e) {
       console.warn('Could not set up Firestore listener:', e);
     }
-  }, []);
-
-  // Firestore Wallpaper Real-time Listener & Local Storage Sync
-  useEffect(() => {
-    try {
-      const wpDocRef = doc(db, 'daily_tasks_board', 'wallpaper_settings');
-      const unsubscribe = onSnapshot(wpDocRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          if (data && typeof data.wallpaper === 'string') {
-            setWallpaper(data.wallpaper);
-            try {
-              if (data.wallpaper) {
-                localStorage.setItem('sabi_daily_tasks_wallpaper', data.wallpaper);
-              } else {
-                localStorage.removeItem('sabi_daily_tasks_wallpaper');
-              }
-            } catch (e) {}
-            if (onWallpaperChange) onWallpaperChange();
-          }
-        }
-      }, (error) => {
-        console.warn('Firestore wallpaper listener note:', error);
-      });
-      return () => unsubscribe();
-    } catch (e) {}
-  }, [onWallpaperChange]);
-
-  useEffect(() => {
-    const handleWpEvent = () => {
-      const wp = localStorage.getItem('sabi_daily_tasks_wallpaper') || "";
-      setWallpaper(wp);
-    };
-    window.addEventListener('sabi-daily-tasks-wallpaper-changed', handleWpEvent);
-    return () => {
-      window.removeEventListener('sabi-daily-tasks-wallpaper-changed', handleWpEvent);
-    };
   }, []);
 
   // Keyboard Shortcuts for Undo/Redo & Custom Events from Dashboard
@@ -349,12 +532,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       } else if (isCtrlOrCmd && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         handleRedo();
-      } else if (e.key === '/' && !editingCell && !editingHeaderColId && document.activeElement?.tagName !== 'INPUT') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (e.key === '?' && !editingCell && !editingHeaderColId && document.activeElement?.tagName !== 'INPUT') {
-        e.preventDefault();
-        setIsShortcutsOpen(prev => !prev);
       }
     };
 
@@ -364,7 +541,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       window.removeEventListener('sabi-daily-tasks-redo', onRedoEvent);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [handleUndo, handleRedo, editingCell, editingHeaderColId]);
+  }, [handleUndo, handleRedo]);
 
   // Focus cell input when editing starts
   useEffect(() => {
@@ -382,44 +559,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
   }, [editingHeaderColId]);
 
-  // Summary Metrics
-  const summaryStats = useMemo(() => {
-    const allRows = currentSheet?.rows || [];
-    const filledRows = allRows.filter(r => 
-      (r.contactNumber && r.contactNumber.trim()) || 
-      (r.comments && r.comments.trim()) || 
-      (r.count && r.count.trim()) || 
-      (r.status && r.status.trim())
-    );
-
-    const waitingCount = allRows.filter(r => r.status === 'Waiting for Image').length;
-    const receivedCount = allRows.filter(r => r.status === 'Image Received').length;
-    const cancelCount = allRows.filter(r => r.status === 'Cancel' || r.status === 'Cancelled').length;
-    const inProgressCount = allRows.filter(r => r.status === 'In Progress').length;
-    const completedCount = allRows.filter(r => r.status === 'Completed').length;
-
-    let totalQuantity = 0;
-    allRows.forEach(r => {
-      const val = parseInt(String(r.count || '').replace(/\D/g, ''), 10);
-      if (!isNaN(val)) totalQuantity += val;
-    });
-
-    return {
-      totalRows: allRows.length,
-      filledRows: filledRows.length,
-      waitingCount,
-      receivedCount,
-      cancelCount,
-      inProgressCount,
-      completedCount,
-      totalQuantity
-    };
-  }, [currentSheet]);
-
-  // Filtered, Searched & Sorted Rows
+  // Filtered and Searched Rows
   const filteredRows = useMemo(() => {
     if (!currentSheet || !currentSheet.rows) return [];
-    let rows = [...currentSheet.rows];
+    let rows = currentSheet.rows;
 
     // Search query across all fields
     if (searchQuery.trim()) {
@@ -437,23 +580,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       rows = rows.filter(row => row.status === statusFilter);
     }
 
-    // Sorting
-    if (sortState) {
-      rows.sort((a, b) => {
-        const valA = String(a[sortState.colId] || '');
-        const valB = String(b[sortState.colId] || '');
-        return sortState.direction === 'asc' 
-          ? valA.localeCompare(valB, undefined, { numeric: true }) 
-          : valB.localeCompare(valA, undefined, { numeric: true });
-      });
-    }
-
     return rows;
-  }, [currentSheet, searchQuery, statusFilter, sortState]);
+  }, [currentSheet, searchQuery, statusFilter]);
 
   // Pagination calculation
   const totalRows = filteredRows.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -462,9 +594,41 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   }, [totalPages, currentPage]);
 
   const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, currentPage, pageSize]);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, currentPage]);
+
+  // Summary Metrics
+  const summaryStats = useMemo(() => {
+    const allRows = currentSheet?.rows || [];
+    const filledRows = allRows.filter(r => 
+      (r.contactNumber && r.contactNumber.trim()) || 
+      (r.comments && r.comments.trim()) || 
+      (r.count && r.count.trim()) || 
+      (r.status && r.status.trim())
+    );
+
+    const waitingCount = allRows.filter(r => r.status === 'Waiting for Image').length;
+    const receivedCount = allRows.filter(r => r.status === 'Image Received').length;
+    const cancelCount = allRows.filter(r => r.status === 'Cancel').length;
+    const completedCount = allRows.filter(r => r.status === 'Completed').length;
+
+    let totalQuantity = 0;
+    allRows.forEach(r => {
+      const val = parseInt(String(r.count || '').replace(/\D/g, ''), 10);
+      if (!isNaN(val)) totalQuantity += val;
+    });
+
+    return {
+      totalRows: allRows.length,
+      filledRows: filledRows.length,
+      waitingCount,
+      receivedCount,
+      cancelCount,
+      completedCount,
+      totalQuantity
+    };
+  }, [currentSheet]);
 
   // --- ACTIONS & HANDLERS ---
 
@@ -499,20 +663,49 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     setEditingCell(null);
   };
 
-  const handleCellStatusChange = (rowId: string, newStatus: string) => {
+  const handleCellStatusChange = (rowId: string, colIdOrStatus: string, newStatusOptional?: string) => {
+    const colId = newStatusOptional !== undefined ? colIdOrStatus : 'status';
+    const newStatus = newStatusOptional !== undefined ? newStatusOptional : colIdOrStatus;
+
     const updatedSheets = sheets.map(sheet => {
       if (sheet.id !== currentSheet.id) return sheet;
       const updatedRows = sheet.rows.map(row => {
         if (row.id !== rowId) return row;
         return {
           ...row,
-          status: newStatus
+          [colId]: newStatus
         };
       });
       return { ...sheet, rows: updatedRows };
     });
     saveSheets(updatedSheets);
-    toast.success(`Status set to "${newStatus || 'None'}"`);
+    if (newStatus) {
+      toast.success(`Updated to "${newStatus}"`);
+    } else {
+      toast.info('Cleared');
+    }
+  };
+
+  const handleApplyDate = (rowId: string, colId: string, dateStr: string) => {
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      const updatedRows = sheet.rows.map(row => {
+        if (row.id !== rowId) return row;
+        return {
+          ...row,
+          [colId]: dateStr
+        };
+      });
+      return { ...sheet, rows: updatedRows };
+    });
+
+    saveSheets(updatedSheets);
+    setDatePickerCell(null);
+    if (dateStr) {
+      toast.success(`Date set to "${dateStr}"`);
+    } else {
+      toast.info('Date cleared');
+    }
   };
 
   // Keyboard navigation between cells
@@ -521,6 +714,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       if (e.key === 'Enter') {
         e.preventDefault();
         commitCellEdit();
+        // Move to row below if available
         const currentIndex = paginatedRows.findIndex(r => r.id === rowId);
         if (currentIndex < paginatedRows.length - 1) {
           const nextRow = paginatedRows[currentIndex + 1];
@@ -546,6 +740,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         }
       }
     } else {
+      // Cell selected but not in edit mode
       if (e.key === 'Enter') {
         e.preventDefault();
         const row = currentSheet.rows.find(r => r.id === rowId);
@@ -600,6 +795,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           setSelectedCell({ rowId, colId: currentSheet.columns[colIndex - 1].id });
         }
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Direct typing replaces cell content
         setSelectedCell({ rowId, colId });
         setEditingCell({ rowId, colId });
         setCellEditValue(e.key);
@@ -630,9 +826,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
     saveSheets(updatedSheets);
 
+    // If added at the end, navigate to that page
     if (typeof insertAtIndex !== 'number') {
       const newTotal = currentSheet.rows.length + 1;
-      const targetPage = Math.ceil(newTotal / pageSize);
+      const targetPage = Math.ceil(newTotal / PAGE_SIZE);
       setCurrentPage(targetPage);
     }
 
@@ -672,49 +869,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     toast.success(`Deleted ${count} selected rows`);
   };
 
-  // Bulk Status Change
-  const handleBulkStatusChange = (newStatus: string) => {
-    if (selectedRowIds.length === 0) return;
-    const count = selectedRowIds.length;
-
-    const updatedSheets = sheets.map(sheet => {
-      if (sheet.id !== currentSheet.id) return sheet;
-      const updatedRows = sheet.rows.map(row => {
-        if (!selectedRowIds.includes(row.id)) return row;
-        return {
-          ...row,
-          status: newStatus
-        };
-      });
-      return { ...sheet, rows: updatedRows };
-    });
-
-    saveSheets(updatedSheets);
-    toast.success(`Updated status to "${newStatus}" for ${count} rows`);
-  };
-
-  // Bulk Duplicate Rows
-  const handleBulkDuplicate = () => {
-    if (selectedRowIds.length === 0) return;
-    const selectedRows = currentSheet.rows.filter(r => selectedRowIds.includes(r.id));
-    const duplicates = selectedRows.map(r => ({
-      ...r,
-      id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
-    }));
-
-    const updatedSheets = sheets.map(sheet => {
-      if (sheet.id !== currentSheet.id) return sheet;
-      return {
-        ...sheet,
-        rows: [...sheet.rows, ...duplicates]
-      };
-    });
-
-    saveSheets(updatedSheets);
-    toast.success(`Duplicated ${duplicates.length} rows`);
-  };
-
-  // Duplicate Single Row
+  // Duplicate Row
   const handleDuplicateRow = (rowId: string) => {
     const targetRow = currentSheet.rows.find(r => r.id === rowId);
     if (!targetRow) return;
@@ -829,20 +984,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     toast.success(`Column "${colToDelete?.label || ''}" deleted`);
   };
 
-  // Sort Toggle
-  const handleSortToggle = (colId: string) => {
-    if (!sortState || sortState.colId !== colId) {
-      setSortState({ colId, direction: 'asc' });
-      toast.info(`Sorted ascending by column`);
-    } else if (sortState.direction === 'asc') {
-      setSortState({ colId, direction: 'desc' });
-      toast.info(`Sorted descending by column`);
-    } else {
-      setSortState(null);
-      toast.info('Sorting reset');
-    }
-  };
-
   // Sheet Tabs Actions
   const handleAddSheet = () => {
     const newSheetNumber = sheets.length + 1;
@@ -913,6 +1054,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     try {
       const wb = XLSX.utils.book_new();
 
+      // Export all sheets or active sheet
       sheets.forEach(sheet => {
         const headers = sheet.columns.map(c => c.label);
         const dataRows = sheet.rows.map(row => {
@@ -922,6 +1064,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         const sheetData = [headers, ...dataRows];
         const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
+        // Auto width
         const colWidths = sheet.columns.map(c => ({ wch: Math.max(12, (c.label || '').length + 4) }));
         ws['!cols'] = colWidths;
 
@@ -934,44 +1077,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     } catch (e) {
       console.error('Export error:', e);
       toast.error('Failed to export Excel file');
-    }
-  };
-
-  // Export CSV
-  const handleExportCSV = () => {
-    try {
-      const headers = currentSheet.columns.map(c => `"${(c.label || '').replace(/"/g, '""')}"`).join(',');
-      const rowsCsv = currentSheet.rows.map(row => {
-        return currentSheet.columns.map(c => `"${String(row[c.id] || '').replace(/"/g, '""')}"`).join(',');
-      }).join('\n');
-
-      const csvContent = "data:text/csv;charset=utf-8," + [headers, rowsCsv].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `${currentSheet.name}_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`Exported ${currentSheet.name} as CSV`);
-    } catch (e) {
-      toast.error('Failed to export CSV');
-    }
-  };
-
-  // Copy Table Data as TSV for instant Paste into Excel/Google Sheets
-  const handleCopyTableToClipboard = () => {
-    try {
-      const headers = currentSheet.columns.map(c => c.label).join('\t');
-      const rowsTsv = currentSheet.rows.map(row => {
-        return currentSheet.columns.map(c => String(row[c.id] || '')).join('\t');
-      }).join('\n');
-
-      const fullTsv = `${headers}\n${rowsTsv}`;
-      navigator.clipboard.writeText(fullTsv);
-      toast.success('Table copied to clipboard (ready to paste into Excel/Sheets)');
-    } catch (e) {
-      toast.error('Failed to copy table data');
     }
   };
 
@@ -997,6 +1102,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         const headerRow = rawJson[0] as string[];
         const dataRows = rawJson.slice(1);
 
+        // Build columns
         const importedColumns: ColumnDef[] = headerRow.map((h, i) => {
           const colLabel = String(h || `Column ${i + 1}`).trim();
           const colId = colLabel.toLowerCase().replace(/[^a-zA-Z0-9]/g, '') || `col_${i}`;
@@ -1011,6 +1117,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           };
         });
 
+        // Build rows
         const importedRows: SheetRow[] = dataRows.map((rowArr, rowIdx) => {
           const rowObj: SheetRow = { id: `row-imported-${Date.now()}-${rowIdx}` };
           importedColumns.forEach((col, colIdx) => {
@@ -1019,10 +1126,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           return rowObj;
         });
 
-        const finalRows = [...importedRows];
-        while (finalRows.length < 25) {
-          finalRows.push(createEmptyRow(finalRows.length + 1));
-        }
+        // Make sure at least 25 rows exist
+        const finalRows = generateInitialRows(importedRows, Math.max(25, importedRows.length));
 
         const newSheetName = file.name.replace(/\.[^/.]+$/, '').substring(0, 31);
         const newSheet: SheetData = {
@@ -1037,7 +1142,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         setActiveSheetId(newSheet.id);
         setCurrentPage(1);
 
-        toast.success(`Imported ${importedRows.length} records into "${newSheet.name}"`);
+        toast.success(`Imported ${importedRows.length} rows into new sheet "${newSheet.name}"`);
       } catch (err) {
         console.error('File import error:', err);
         toast.error('Failed to parse Excel file');
@@ -1061,36 +1166,28 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const isAllPageSelected = paginatedRows.length > 0 && paginatedRows.every(r => selectedRowIds.includes(r.id));
   const isSomePageSelected = paginatedRows.some(r => selectedRowIds.includes(r.id)) && !isAllPageSelected;
 
-  // Status Badge Colors mapping with glowing badges
+  // Status Badge Colors mapping to match 2nd image
   const getStatusBadgeStyle = (statusVal: string) => {
     const s = (statusVal || '').trim();
     if (s === 'Waiting for Image') {
-      return 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm shadow-amber-500/10 font-bold';
+      // Peach / Orange badge as seen in 2nd image
+      return 'bg-[#ffedd5] text-[#c2410c] dark:bg-[#7c2d12]/50 dark:text-[#fdba74] border border-orange-300 dark:border-orange-600/60 shadow-sm font-semibold';
     }
     if (s === 'Image Received') {
-      return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm shadow-emerald-500/10 font-bold';
+      // Light Green badge as seen in 2nd image
+      return 'bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/50 dark:text-[#86efac] border border-emerald-300 dark:border-emerald-600/60 shadow-sm font-semibold';
     }
     if (s === 'Cancel' || s === 'Cancelled') {
-      return 'bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-sm shadow-rose-500/10 font-bold';
+      // Dark Crimson / Red badge as seen in 2nd image
+      return 'bg-[#ffe4e6] text-[#be123c] dark:bg-[#881337]/60 dark:text-[#fda4af] border border-rose-300 dark:border-rose-600/60 shadow-sm font-semibold';
     }
     if (s === 'In Progress') {
-      return 'bg-sky-500/20 text-sky-300 border border-sky-500/50 shadow-sm shadow-sky-500/10 font-bold';
+      return 'bg-[#e0f2fe] text-[#0369a1] dark:bg-[#0c4a6e]/50 dark:text-[#7dd3fc] border border-sky-300 dark:border-sky-600/60 shadow-sm font-semibold';
     }
     if (s === 'Completed') {
-      return 'bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-sm shadow-purple-500/10 font-bold';
+      return 'bg-[#ecfdf5] text-[#047857] dark:bg-[#064e3b]/50 dark:text-[#6ee7b7] border border-teal-300 dark:border-teal-600/60 shadow-sm font-semibold';
     }
-    return 'bg-slate-800/80 text-slate-300 border border-slate-700 font-medium';
-  };
-
-  // Status Icon mapping
-  const renderStatusIcon = (statusVal: string) => {
-    const s = (statusVal || '').trim();
-    if (s === 'Waiting for Image') return <Clock className="w-3 h-3 text-amber-400 shrink-0" />;
-    if (s === 'Image Received') return <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />;
-    if (s === 'Cancel' || s === 'Cancelled') return <XCircle className="w-3 h-3 text-rose-400 shrink-0" />;
-    if (s === 'In Progress') return <Sparkles className="w-3 h-3 text-sky-400 shrink-0" />;
-    if (s === 'Completed') return <Check className="w-3 h-3 text-purple-400 shrink-0" />;
-    return null;
+    return 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 border border-slate-300 dark:border-slate-700/60';
   };
 
   // Column Letters (A, B, C, D, E, ...)
@@ -1103,113 +1200,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     return letter;
   };
 
-  // WhatsApp click handler
-  const handleWhatsAppClick = (phoneNumber: string) => {
-    const cleaned = String(phoneNumber || '').replace(/\D/g, '');
-    if (!cleaned) {
-      toast.error('No phone number provided');
-      return;
-    }
-    const fullNumber = cleaned.length === 10 ? `91${cleaned}` : cleaned;
-    window.open(`https://wa.me/${fullNumber}`, '_blank');
-  };
-
-  // Wallpaper Upload Handler
-  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1920;
-        const MAX_HEIGHT = 1080;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
-          setWallpaper(compressedBase64);
-          try {
-            localStorage.setItem('sabi_daily_tasks_wallpaper', compressedBase64);
-          } catch (err) {
-            console.warn('LocalStorage wallpaper save warning:', err);
-          }
-
-          // Sync to Firestore so it stays permanent across devices
-          try {
-            const wpDocRef = doc(db, 'daily_tasks_board', 'wallpaper_settings');
-            setDoc(wpDocRef, {
-              wallpaper: compressedBase64,
-              updatedAt: new Date().toISOString()
-            }, { merge: true }).catch(err => console.warn('Firestore wallpaper note:', err));
-          } catch (err) {}
-
-          if (onWallpaperChange) {
-            onWallpaperChange();
-          }
-          window.dispatchEvent(new Event('sabi-daily-tasks-wallpaper-changed'));
-          toast.success("Daily tasks wallpaper updated successfully!");
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-    if (wallpaperFileInputRef.current) wallpaperFileInputRef.current.value = '';
-  };
-
-  // Remove Wallpaper Handler
-  const handleRemoveWallpaper = () => {
-    setWallpaper('');
-    try {
-      localStorage.removeItem('sabi_daily_tasks_wallpaper');
-    } catch (e) {}
-
-    try {
-      const wpDocRef = doc(db, 'daily_tasks_board', 'wallpaper_settings');
-      setDoc(wpDocRef, {
-        wallpaper: '',
-        updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => console.warn('Firestore wallpaper clear note:', err));
-    } catch (err) {}
-
-    if (onWallpaperChange) {
-      onWallpaperChange();
-    }
-    window.dispatchEvent(new Event('sabi-daily-tasks-wallpaper-changed'));
-    toast.success("Wallpaper removed");
-  };
-
   return (
-    <div className={`w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans text-slate-100 transition-all duration-300 ${
-      wallpaper ? 'wallpaper-active' : ''
-    }`}>
-      {/* Hidden File Input for Wallpaper Upload */}
-      <input 
-        type="file" 
-        ref={wallpaperFileInputRef} 
-        onChange={handleWallpaperUpload} 
-        accept="image/*" 
-        className="hidden" 
-      />
+    <div className="w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans">
       {/* Hidden File Input for Excel Import */}
       <input 
         type="file" 
@@ -1220,176 +1212,69 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       />
 
       {/* TOP CONTROL PANEL / HERO BAR */}
-      <div className={`rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300 ${
-        wallpaper 
-          ? 'bg-slate-950/65 backdrop-blur-2xl border border-white/20 shadow-2xl' 
-          : 'bg-[#090f23]/95 backdrop-blur-2xl border border-cyan-500/25'
-      }`}>
-        {/* Subtle Ambient Radial Lighting */}
-        <div className="absolute -top-32 -left-32 w-72 h-72 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -right-32 w-72 h-72 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-[#0b1329]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300">
+        {/* Subtle glowing ambient lights */}
+        <div className="absolute -top-24 -left-24 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
-          {/* Header Title & Active Sheet Indicator */}
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 border border-cyan-300/30 shrink-0">
+          {/* Header Title & Tab Indicator */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-white/20">
               <FileSpreadsheet className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
                   Daily Tasks Spreadsheet
                 </h1>
-                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-extrabold bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-400/40 shadow-inner">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
-                  <span>{currentSheet.name}</span>
-                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                  {currentSheet.name}
+                </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium mt-0.5 flex items-center gap-2">
-                <span>Live interactive data grid</span>
-                <span>&bull;</span>
-                <span>Editable cells & headers</span>
-                <span>&bull;</span>
-                <span>Auto-sync enabled</span>
+              <p className="text-xs sm:text-sm text-slate-400 font-medium">
+                Live interactive data grid &bull; 25 rows per page &bull; Editable headers & cells
               </p>
             </div>
           </div>
 
-          {/* Interactive Quick Metrics Bar (Click to filter!) */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-            {/* Wallpaper Selector Button on the LEFT side of Total Rows */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button 
-                onClick={() => wallpaperFileInputRef.current?.click()}
-                className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left group cursor-pointer ${
-                  wallpaper 
-                    ? 'bg-gradient-to-br from-cyan-950/80 to-blue-950/80 border-cyan-400 ring-2 ring-cyan-400/30 text-cyan-200 hover:border-cyan-300' 
-                    : 'bg-[#101935] hover:bg-[#18264d] border-cyan-500/40 hover:border-cyan-400 text-slate-200'
-                }`}
-                title={wallpaper ? "Click to change Daily Tasks background wallpaper" : "Click to select and set Daily Tasks background wallpaper"}
-              >
-                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:scale-110 transition-transform">
-                  <ImageIcon className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Wallpaper</div>
-                  <div className="text-xs font-extrabold text-cyan-400 flex items-center gap-1">
-                    <span>{wallpaper ? 'Active' : 'Set Image'}</span>
-                    {wallpaper && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />}
-                  </div>
-                </div>
-              </button>
-
-              {wallpaper && (
-                <button 
-                  onClick={handleRemoveWallpaper}
-                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/40 transition-all active:scale-95 shadow-sm cursor-pointer"
-                  title="Remove Wallpaper"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Total Rows Card */}
-            <button 
-              onClick={() => {
-                setStatusFilter('All');
-                setCurrentPage(1);
-              }}
-              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'All' 
-                  ? 'border-cyan-400 ring-2 ring-cyan-400/30' 
-                  : (wallpaper ? 'border-white/15 hover:border-white/30' : 'border-slate-800 hover:border-slate-700')
-              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
-              title="Click to show all rows"
-            >
-              <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                <Layers className="w-4 h-4" />
-              </div>
+          {/* Quick Metrics Bar */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="bg-[#131d38] border border-slate-700/60 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+              <Layers className="w-4 h-4 text-cyan-400" />
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Rows</div>
                 <div className="text-sm font-extrabold text-white">{summaryStats.totalRows}</div>
               </div>
-            </button>
+            </div>
 
-            {/* Waiting for Image Card */}
-            <button 
-              onClick={() => {
-                setStatusFilter(statusFilter === 'Waiting for Image' ? 'All' : 'Waiting for Image');
-                setCurrentPage(1);
-              }}
-              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'Waiting for Image' 
-                  ? 'border-amber-400 ring-2 ring-amber-400/40 bg-amber-950/40' 
-                  : 'border-amber-500/40 hover:border-amber-400/70'
-              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
-              title="Click to filter by Waiting for Image"
-            >
-              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400">
-                <Clock className="w-4 h-4" />
-              </div>
+            <div className="bg-[#131d38] border border-orange-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+              <Clock className="w-4 h-4 text-orange-400" />
               <div>
-                <div className="text-[10px] text-amber-300 uppercase font-bold tracking-wider flex items-center gap-1">
-                  <span>Waiting Image</span>
-                  {summaryStats.waitingCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
-                </div>
-                <div className="text-sm font-extrabold text-amber-400">{summaryStats.waitingCount}</div>
+                <div className="text-[10px] text-orange-300 uppercase font-bold tracking-wider">Waiting Image</div>
+                <div className="text-sm font-extrabold text-orange-400">{summaryStats.waitingCount}</div>
               </div>
-            </button>
+            </div>
 
-            {/* Image Received Card */}
-            <button 
-              onClick={() => {
-                setStatusFilter(statusFilter === 'Image Received' ? 'All' : 'Image Received');
-                setCurrentPage(1);
-              }}
-              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'Image Received' 
-                  ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/40' 
-                  : 'border-emerald-500/40 hover:border-emerald-400/70'
-              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
-              title="Click to filter by Image Received"
-            >
-              <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
+            <div className="bg-[#131d38] border border-emerald-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <div>
                 <div className="text-[10px] text-emerald-300 uppercase font-bold tracking-wider">Image Received</div>
                 <div className="text-sm font-extrabold text-emerald-400">{summaryStats.receivedCount}</div>
               </div>
-            </button>
+            </div>
 
-            {/* Cancelled Card */}
-            <button 
-              onClick={() => {
-                setStatusFilter(statusFilter === 'Cancel' ? 'All' : 'Cancel');
-                setCurrentPage(1);
-              }}
-              className={`border rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm transition-all text-left ${
-                statusFilter === 'Cancel' 
-                  ? 'border-rose-400 ring-2 ring-rose-400/40 bg-rose-950/40' 
-                  : 'border-rose-500/40 hover:border-rose-400/70'
-              } ${wallpaper ? 'bg-slate-900/70 backdrop-blur-md hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#162247]'}`}
-              title="Click to filter by Cancelled"
-            >
-              <div className="p-1.5 rounded-lg bg-rose-500/15 text-rose-400">
-                <XCircle className="w-4 h-4" />
-              </div>
+            <div className="bg-[#131d38] border border-rose-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+              <XCircle className="w-4 h-4 text-rose-400" />
               <div>
                 <div className="text-[10px] text-rose-300 uppercase font-bold tracking-wider">Cancelled</div>
                 <div className="text-sm font-extrabold text-rose-400">{summaryStats.cancelCount}</div>
               </div>
-            </button>
+            </div>
 
-            {/* Total Quantity if exists */}
             {summaryStats.totalQuantity > 0 && (
-              <div className={`border border-blue-500/40 rounded-xl px-3.5 py-2 flex items-center gap-2.5 shadow-sm ${
-                wallpaper ? 'bg-slate-900/70 backdrop-blur-md' : 'bg-[#101935]'
-              }`}>
-                <div className="p-1.5 rounded-lg bg-blue-500/15 text-blue-400">
-                  <Hash className="w-4 h-4" />
-                </div>
+              <div className="bg-[#131d38] border border-blue-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+                <Hash className="w-4 h-4 text-blue-400" />
                 <div>
                   <div className="text-[10px] text-blue-300 uppercase font-bold tracking-wider">Total Count</div>
                   <div className="text-sm font-extrabold text-blue-400">{summaryStats.totalQuantity}</div>
@@ -1400,43 +1285,32 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
 
         {/* TOOLBAR & SEARCH SECTION */}
-        <div className="mt-4 pt-4 border-t border-white/10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Search Box & Quick Status Filter Chips */}
-          <div className="flex flex-1 items-center gap-2 flex-wrap">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-[240px] max-w-md">
-              <Search className="w-4 h-4 text-cyan-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search Box & Status Filter */}
+          <div className="flex flex-1 items-center gap-2">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input 
-                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search anything (phone, comments, date, count...)"
-                className={`w-full text-slate-100 placeholder-slate-400 text-xs sm:text-sm pl-10 pr-16 py-2 rounded-xl border focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all shadow-inner ${
-                  wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20' : 'bg-[#101935] border-slate-700'
-                }`}
+                placeholder="Search anything in sheet (phone, comments, count, date...)"
+                className="w-full bg-[#131d38] text-slate-100 placeholder-slate-500 text-xs sm:text-sm pl-10 pr-9 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors shadow-inner"
               />
-              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                {searchQuery ? (
-                  <button 
-                    onClick={() => setSearchQuery('')}
-                    className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800"
-                    title="Clear search"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-800 border border-slate-700 rounded shadow-sm">
-                    /
-                  </kbd>
-                )}
-              </div>
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
-            {/* Status Quick Filter Dropdown */}
+            {/* Status Filter Pill Dropdown */}
             <div className="relative">
               <select
                 value={statusFilter}
@@ -1444,16 +1318,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className={`text-slate-200 text-xs sm:text-sm px-3.5 py-2 rounded-xl border focus:outline-none focus:border-cyan-400 cursor-pointer font-medium shadow-sm transition-colors ${
-                  wallpaper ? 'bg-slate-900/75 backdrop-blur-md border-white/20 hover:border-white/30' : 'bg-[#101935] border-slate-700 hover:border-slate-600'
-                }`}
+                className="bg-[#131d38] text-slate-200 text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-cyan-400 cursor-pointer font-medium"
               >
-                <option value="All">All Statuses ({summaryStats.totalRows})</option>
-                <option value="Waiting for Image">Waiting for Image ({summaryStats.waitingCount})</option>
-                <option value="Image Received">Image Received ({summaryStats.receivedCount})</option>
-                <option value="Cancel">Cancel ({summaryStats.cancelCount})</option>
-                <option value="In Progress">In Progress ({summaryStats.inProgressCount})</option>
-                <option value="Completed">Completed ({summaryStats.completedCount})</option>
+                <option value="All">All Statuses</option>
+                <option value="Waiting for Image">Waiting for Image</option>
+                <option value="Image Received">Image Received</option>
+                <option value="Cancel">Cancel</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
               </select>
             </div>
           </div>
@@ -1461,9 +1333,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Undo / Redo */}
-            <div className={`flex items-center rounded-xl border p-0.5 shadow-sm ${
-              wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20' : 'bg-[#101935] border-slate-700'
-            }`}>
+            <div className="flex items-center bg-[#131d38] rounded-xl border border-slate-700 p-0.5">
               <button 
                 onClick={handleUndo}
                 title="Undo (Ctrl+Z)"
@@ -1480,10 +1350,20 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </button>
             </div>
 
+            {/* ✨ MANAGE HEADERS & DROPDOWNS BUTTON (Placed directly to the left of Add Row) */}
+            <button 
+              onClick={() => setIsHeaderManagerOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-lg shadow-indigo-500/25 border border-indigo-400/30 transition-all active:scale-95 group"
+              title="Manage Column Headers & Custom Dropdown Options"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-indigo-200 group-hover:rotate-90 transition-transform duration-300" />
+              <span>Manage Headers & Dropdowns</span>
+            </button>
+
             {/* Add Row Button */}
             <button 
               onClick={() => handleAddRow()}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all active:scale-95 border border-cyan-300/30 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>Add Row</span>
@@ -1493,15 +1373,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <Popover open={isAddColumnOpen} onOpenChange={setIsAddColumnOpen}>
               <PopoverTrigger asChild>
                 <button 
-                  className={`flex items-center gap-1.5 px-3 py-2 text-cyan-300 border text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer ${
-                    wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#172346] border-cyan-500/30'
-                  }`}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-[#131d38] hover:bg-[#1a274c] text-cyan-300 border border-cyan-500/30 text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm"
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>Add Column</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-4 rounded-xl shadow-2xl z-50">
+              <PopoverContent className="w-80 bg-[#0d162d] border border-cyan-500/30 text-slate-100 p-4 rounded-xl shadow-2xl">
                 <div className="space-y-3">
                   <h3 className="font-bold text-sm text-cyan-300 flex items-center gap-1.5">
                     <PlusCircle className="w-4 h-4" /> Add New Column
@@ -1550,120 +1428,49 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </PopoverContent>
             </Popover>
 
-            {/* Export Dropdown Popover */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button 
-                  className={`flex items-center gap-1.5 px-3 py-2 text-emerald-400 border text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer ${
-                    wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#172346] border-emerald-500/30'
-                  }`}
-                  title="Export options"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Export</span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 bg-[#0d162d]/95 backdrop-blur-2xl border border-emerald-500/30 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
-                <div className="space-y-1 text-xs">
-                  <div className="px-2 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                    Export Sheet Data
-                  </div>
-                  <button 
-                    onClick={handleExportExcel}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-[#18264e] rounded-lg text-slate-200"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                    <span>Excel Workbook (.xlsx)</span>
-                  </button>
-                  <button 
-                    onClick={handleExportCSV}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-[#18264e] rounded-lg text-slate-200"
-                  >
-                    <FileText className="w-4 h-4 text-sky-400" />
-                    <span>Current Sheet as CSV</span>
-                  </button>
-                  <button 
-                    onClick={handleCopyTableToClipboard}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-[#18264e] rounded-lg text-slate-200"
-                  >
-                    <Copy className="w-4 h-4 text-purple-400" />
-                    <span>Copy Table for Excel/Sheets</span>
-                  </button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            {/* Excel Export */}
+            <button 
+              onClick={handleExportExcel}
+              title="Export all sheets to Excel (.xlsx)"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#131d38] hover:bg-[#1a274c] text-emerald-400 border border-emerald-500/30 text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span> Excel
+            </button>
 
             {/* Excel Import */}
             <button 
               onClick={() => fileInputRef.current?.click()}
               title="Import Excel file (.xlsx, .csv)"
-              className={`flex items-center gap-1.5 px-3 py-2 text-indigo-300 border text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer ${
-                wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 hover:bg-slate-800/80' : 'bg-[#101935] hover:bg-[#172346] border-indigo-500/30'
-              }`}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#131d38] hover:bg-[#1a274c] text-indigo-300 border border-indigo-500/30 text-xs sm:text-sm font-bold rounded-xl transition-colors shadow-sm"
             >
               <Upload className="w-4 h-4" />
-              <span>Import</span>
+              <span className="hidden sm:inline">Import</span> Excel
             </button>
 
-            {/* Shortcuts Help Popover */}
-            <Popover open={isShortcutsOpen} onOpenChange={setIsShortcutsOpen}>
-              <PopoverTrigger asChild>
-                <button 
-                  className={`p-2 border rounded-xl transition-colors shadow-sm cursor-pointer ${
-                    wallpaper ? 'bg-slate-900/70 backdrop-blur-md border-white/20 text-slate-300 hover:text-cyan-300' : 'bg-[#101935] hover:bg-[#172346] text-slate-400 hover:text-cyan-300 border-slate-700'
-                  }`}
-                  title="Keyboard Shortcuts (?)"
-                >
-                  <HelpCircle className="w-4 h-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/30 text-slate-100 p-4 rounded-xl shadow-2xl z-50">
-                <div className="space-y-2.5 text-xs">
-                  <h3 className="font-bold text-sm text-cyan-300 flex items-center gap-1.5 pb-1 border-b border-slate-800">
-                    <HelpCircle className="w-4 h-4" /> Keyboard Shortcuts
-                  </h3>
-                  <div className="space-y-1.5 font-mono text-[11px]">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Edit Cell</span>
-                      <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Enter / 2x Click</kbd>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Navigate Cells</span>
-                      <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Arrow Keys</kbd>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Next / Prev Column</span>
-                      <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Tab / Shift+Tab</kbd>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Undo / Redo</span>
-                      <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Ctrl+Z / Ctrl+Y</kbd>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Focus Search</span>
-                      <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">/</kbd>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Clear Cell</span>
-                      <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Delete / Backspace</kbd>
-                    </div>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+            {/* Bulk Delete Button if items selected */}
+            {selectedRowIds.length > 0 && (
+              <button 
+                onClick={handleBulkDelete}
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs sm:text-sm font-bold rounded-xl transition-all animate-pulse"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete ({selectedRowIds.length})</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* SEARCH / FILTER ACTIVE INDICATOR BANNER */}
       {(searchQuery.trim() || statusFilter !== 'All') && (
-        <div className="bg-cyan-950/50 backdrop-blur-xl border border-cyan-500/40 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs sm:text-sm text-cyan-300 shadow-lg">
+        <div className="bg-cyan-950/40 border border-cyan-500/30 px-4 py-2 rounded-xl flex items-center justify-between text-xs sm:text-sm text-cyan-300">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-cyan-400" />
             <span>
-              Showing <strong className="text-white">{filteredRows.length}</strong> matching records 
-              {searchQuery && <> for "<strong>{searchQuery}</strong>"</>}
-              {statusFilter !== 'All' && <> with status "<strong className="text-cyan-200">{statusFilter}</strong>"</>}
+              Showing <strong>{filteredRows.length}</strong> matching records 
+              {searchQuery && <> for query "<strong>{searchQuery}</strong>"</>}
+              {statusFilter !== 'All' && <> with status "<strong>{statusFilter}</strong>"</>}
             </span>
           </div>
           <button 
@@ -1671,7 +1478,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               setSearchQuery('');
               setStatusFilter('All');
             }}
-            className="text-xs font-bold text-cyan-400 hover:text-cyan-200 underline px-2 py-1 rounded hover:bg-cyan-900/30 transition-colors"
+            className="text-xs font-bold text-cyan-400 hover:text-cyan-200 underline"
           >
             Clear Filters
           </button>
@@ -1679,55 +1486,33 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       )}
 
       {/* EXCEL SPREADSHEET MAIN CONTAINER */}
-      <div className={`rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all duration-300 ${
-        wallpaper 
-          ? 'bg-slate-950/65 backdrop-blur-2xl border border-white/20 shadow-2xl' 
-          : 'bg-[#090f23] border border-slate-800'
-      }`}>
+      <div className="bg-[#0b1329] border border-slate-800 rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative">
         {/* SPREADSHEET TABLE GRID (Scrollable) */}
-        <div className={`overflow-x-auto overflow-y-auto flex-1 custom-scrollbar border-b max-h-[620px] min-h-[440px] ${
-          wallpaper ? 'border-white/10' : 'border-slate-800'
-        }`}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar border-b border-slate-800 max-h-[600px] min-h-[420px]">
           <table className="w-full border-collapse text-left text-xs sm:text-sm select-none">
-            {/* TABLE HEADER */}
+            {/* TABLE HEADER (Cyan Excel Style like 2nd image) */}
             <thead className="sticky top-0 z-20 shadow-md">
-              {/* Top Row: Monospace Excel Column Letters (A, B, C, D...) */}
-              <tr className={`font-mono text-[10px] uppercase border-b ${
-                wallpaper 
-                  ? 'bg-slate-950/85 backdrop-blur-md border-white/10 text-slate-400' 
-                  : 'bg-[#060b18] border-slate-800 text-slate-500'
-              }`}>
-                <th className={`w-12 text-center py-1.5 border-r ${
-                  wallpaper ? 'border-white/10 bg-slate-950/90' : 'border-slate-800/80 bg-[#050813]'
-                }`}>
+              {/* Top Row: Excel Column Letters (A, B, C, D...) */}
+              <tr className="bg-[#070e1f] text-slate-500 font-mono text-[10px] uppercase border-b border-slate-800">
+                <th className="w-12 text-center py-1 border-r border-slate-800/80 bg-[#060b18]">
                   #
                 </th>
                 {currentSheet.columns.map((col, idx) => (
                   <th 
                     key={`letter-${col.id}`} 
-                    className={`py-1.5 px-3 border-r text-center tracking-wider ${
-                      wallpaper ? 'border-white/10' : 'border-slate-800/80'
-                    }`}
+                    className="py-1 px-3 border-r border-slate-800/80 text-center tracking-wider"
                     style={{ width: col.width ? `${col.width}px` : 'auto' }}
                   >
                     {getColumnLetter(idx)}
                   </th>
                 ))}
-                <th className={`w-16 text-center py-1.5 ${
-                  wallpaper ? 'bg-slate-950/90' : 'bg-[#050813]'
-                }`}>Actions</th>
+                <th className="w-14 text-center py-1 bg-[#060b18]">Actions</th>
               </tr>
 
-              {/* Main Header Row */}
-              <tr className={`font-bold tracking-tight border-b-2 ${
-                wallpaper 
-                  ? 'bg-slate-900/90 backdrop-blur-md border-cyan-500/50 text-white' 
-                  : 'bg-gradient-to-r from-slate-900 via-[#0d1630] to-slate-900 text-slate-100 border-cyan-500/40'
-              }`}>
+              {/* Main Header Row (Vibrant Cyan background as in reference image) */}
+              <tr className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 text-slate-950 font-black tracking-tight border-b-2 border-cyan-600">
                 {/* Checkbox select all */}
-                <th className={`w-12 py-3 px-2 text-center border-r ${
-                  wallpaper ? 'border-white/10 bg-slate-950/90' : 'border-slate-800 bg-[#070d1e]'
-                }`}>
+                <th className="w-12 py-3 px-2 text-center border-r border-cyan-500/60 bg-cyan-400/95">
                   <div className="flex items-center justify-center">
                     <input 
                       type="checkbox"
@@ -1736,22 +1521,19 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         if (el) el.indeterminate = isSomePageSelected;
                       }}
                       onChange={(e) => handleSelectAllOnPage(e.target.checked)}
-                      className="w-4 h-4 rounded text-cyan-500 bg-[#131e3d] border-slate-600 focus:ring-0 cursor-pointer"
+                      className="w-4 h-4 rounded text-cyan-600 bg-white border-slate-600 focus:ring-0 cursor-pointer"
                     />
                   </div>
                 </th>
 
-                {/* Column Headers with Inline Renaming & Column Menu */}
-                {currentSheet.columns.map((col) => {
+                {/* Column Headers with Edit & Menu */}
+                {currentSheet.columns.map((col, idx) => {
                   const isEditing = editingHeaderColId === col.id;
-                  const isSorted = sortState?.colId === col.id;
 
                   return (
                     <th 
                       key={col.id}
-                      className={`py-2.5 px-3 border-r font-bold group relative ${
-                        wallpaper ? 'border-white/10 text-slate-100' : 'border-slate-800 text-slate-200'
-                      }`}
+                      className="py-2.5 px-3 border-r border-cyan-500/60 text-slate-950 font-bold group relative"
                       style={{ width: col.width ? `${col.width}px` : 'auto' }}
                     >
                       {isEditing ? (
@@ -1766,45 +1548,36 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               if (e.key === 'Escape') setEditingHeaderColId(null);
                             }}
                             onBlur={commitHeaderEdit}
-                            className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs font-bold border border-cyan-400 focus:outline-none"
+                            className="w-full bg-white text-slate-900 px-2 py-1 rounded text-xs font-bold border border-cyan-700 focus:outline-none"
                           />
                           <button 
                             onClick={commitHeaderEdit}
-                            className="p-1 bg-cyan-600 text-white rounded hover:bg-cyan-500"
+                            className="p-1 bg-cyan-700 text-white rounded hover:bg-cyan-800"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between gap-1.5">
-                          <div 
-                            onClick={() => handleSortToggle(col.id)}
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              startEditingHeader(col);
-                            }}
-                            title="Click to sort, double-click to rename"
-                            className="truncate cursor-pointer hover:text-cyan-300 flex items-center gap-1.5 flex-1"
+                          <span 
+                            onDoubleClick={() => startEditingHeader(col)}
+                            title="Double-click to rename header"
+                            className="truncate cursor-pointer hover:underline flex-1"
                           >
-                            <span>{col.label}</span>
-                            {isSorted && (
-                              sortState.direction === 'asc' 
-                                ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400 inline" />
-                                : <ArrowDown className="w-3.5 h-3.5 text-cyan-400 inline" />
-                            )}
-                          </div>
+                            {col.label}
+                          </span>
 
                           {/* Column Header Dropdown Menu */}
                           <Popover>
                             <PopoverTrigger asChild>
                               <button 
-                                className="opacity-40 group-hover:opacity-100 hover:bg-slate-800 p-1 rounded transition-opacity"
+                                className="opacity-60 group-hover:opacity-100 hover:bg-cyan-500/40 p-1 rounded transition-opacity"
                                 title="Column options"
                               >
-                                <MoreHorizontal className="w-3.5 h-3.5 text-slate-300" />
+                                <MoreHorizontal className="w-3.5 h-3.5 text-slate-900" />
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-48 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+                            <PopoverContent className="w-48 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
                               <div className="space-y-0.5 text-xs">
                                 <button 
                                   onClick={() => startEditingHeader(col)}
@@ -1814,7 +1587,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 </button>
                                 <button 
                                   onClick={() => {
-                                    setSortState({ colId: col.id, direction: 'asc' });
+                                    // Sort ascending
+                                    const updatedSheets = sheets.map(s => {
+                                      if (s.id !== currentSheet.id) return s;
+                                      const sortedRows = [...s.rows].sort((a, b) => 
+                                        String(a[col.id] || '').localeCompare(String(b[col.id] || ''))
+                                      );
+                                      return { ...s, rows: sortedRows };
+                                    });
+                                    saveSheets(updatedSheets);
                                     toast.success(`Sorted by "${col.label}" (A-Z)`);
                                   }}
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
@@ -1823,7 +1604,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 </button>
                                 <button 
                                   onClick={() => {
-                                    setSortState({ colId: col.id, direction: 'desc' });
+                                    // Sort descending
+                                    const updatedSheets = sheets.map(s => {
+                                      if (s.id !== currentSheet.id) return s;
+                                      const sortedRows = [...s.rows].sort((a, b) => 
+                                        String(b[col.id] || '').localeCompare(String(a[col.id] || ''))
+                                      );
+                                      return { ...s, rows: sortedRows };
+                                    });
+                                    saveSheets(updatedSheets);
                                     toast.success(`Sorted by "${col.label}" (Z-A)`);
                                   }}
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
@@ -1847,30 +1636,26 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 })}
 
                 {/* Header Action spacer */}
-                <th className={`w-16 py-2.5 px-2 text-center font-bold ${
-                  wallpaper ? 'bg-slate-950/90 text-slate-300' : 'bg-[#070d1e] text-slate-400'
-                }`}>
+                <th className="w-14 py-2.5 px-2 text-center bg-cyan-400/95 text-slate-950 font-bold">
                   Edit
                 </th>
               </tr>
             </thead>
 
             {/* TABLE BODY (Rows & Cells) */}
-            <tbody className={`divide-y ${wallpaper ? 'divide-white/10 bg-transparent' : 'divide-slate-800/60 bg-[#091024]'}`}>
+            <tbody className="divide-y divide-slate-800/60 bg-[#091024]">
               {paginatedRows.length === 0 ? (
                 <tr>
                   <td 
                     colSpan={currentSheet.columns.length + 2} 
-                    className="text-center py-16 text-slate-400"
+                    className="text-center py-12 text-slate-400"
                   >
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-[#121c38]/80 backdrop-blur-md flex items-center justify-center text-slate-500 border border-slate-800">
-                        <FileSpreadsheet className="w-6 h-6" />
-                      </div>
-                      <p className="font-semibold text-sm text-slate-300">No records found matching your filters</p>
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <FileSpreadsheet className="w-8 h-8 text-slate-600" />
+                      <p className="font-semibold text-sm">No records found matching your filters</p>
                       <button 
                         onClick={() => handleAddRow()}
-                        className="px-4 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold rounded-lg border border-cyan-500/30 transition-all"
+                        className="mt-2 text-xs text-cyan-400 font-bold hover:underline"
                       >
                         + Add a new row to this sheet
                       </button>
@@ -1879,7 +1664,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 </tr>
               ) : (
                 paginatedRows.map((row, rowIdx) => {
-                  const globalRowIndex = (currentPage - 1) * pageSize + rowIdx + 1;
+                  const globalRowIndex = (currentPage - 1) * PAGE_SIZE + rowIdx + 1;
                   const isRowSelected = selectedRowIds.includes(row.id);
 
                   return (
@@ -1887,20 +1672,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       key={row.id}
                       className={`group transition-colors ${
                         isRowSelected 
-                          ? 'bg-cyan-950/55 border-l-4 border-l-cyan-400' 
-                          : (wallpaper 
-                              ? (rowIdx % 2 === 0 ? 'bg-slate-950/40 hover:bg-slate-900/70' : 'bg-slate-900/30 hover:bg-slate-900/70')
-                              : (rowIdx % 2 === 0 ? 'bg-[#090f23] hover:bg-[#121d3f]' : 'bg-[#060b1b] hover:bg-[#121d3f]')
-                            )
+                          ? 'bg-cyan-950/40 border-l-4 border-l-cyan-400' 
+                          : rowIdx % 2 === 0 
+                            ? 'bg-[#0b132a] hover:bg-[#111c3d]' 
+                            : 'bg-[#080e21] hover:bg-[#111c3d]'
                       }`}
                     >
                       {/* Row Index & Checkbox */}
-                      <td className={`w-12 py-2 px-2 text-center border-r font-mono text-xs ${
-                        wallpaper 
-                          ? 'border-white/10 bg-slate-950/50 group-hover:bg-slate-900/70' 
-                          : 'border-slate-800/80 bg-[#050917]/80 group-hover:bg-[#0c142c]'
-                      }`}>
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="w-12 py-2 px-2 text-center border-r border-slate-800 text-slate-400 font-mono text-xs bg-[#060b18]/60 group-hover:bg-[#080f26]">
+                        <div className="flex items-center justify-center gap-1">
                           <input 
                             type="checkbox"
                             checked={isRowSelected}
@@ -1911,9 +1691,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 setSelectedRowIds(prev => prev.filter(id => id !== row.id));
                               }
                             }}
-                            className="w-3.5 h-3.5 rounded text-cyan-500 bg-[#121d3d] border-slate-700 focus:ring-0 cursor-pointer"
+                            className="w-3.5 h-3.5 rounded text-cyan-600 bg-slate-800 border-slate-700 focus:ring-0 cursor-pointer"
                           />
-                          <span className="text-[11px] font-bold text-slate-400 group-hover:text-slate-200">{globalRowIndex}</span>
+                          <span className="text-[11px] font-bold text-slate-400">{globalRowIndex}</span>
                         </div>
                       </td>
 
@@ -1923,77 +1703,343 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         const isCellSelected = selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
                         const isCellEditing = editingCell?.rowId === row.id && editingCell?.colId === col.id;
 
-                        // Check if this is the Status Column (Special Dropdown Badge)
+                        const isDateColumn = col.id === 'date' || col.type === 'date' || col.id === 'birthday' || col.id === 'dispatch' || col.label.toLowerCase().includes('date') || col.label.toLowerCase().includes('birthday') || col.label.toLowerCase().includes('dispatch');
+
+                        // Check if this is a Dropdown / Select Column
                         if (col.id === 'status' || col.type === 'select') {
+                          const optionsList = (col.options && col.options.length > 0)
+                            ? col.options
+                            : ['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'];
+
                           return (
                             <td 
                               key={`${row.id}-${col.id}`}
                               tabIndex={0}
                               onFocus={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                               onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                              className={`py-1.5 px-3 border-r relative transition-all ${
-                                wallpaper ? 'border-white/10' : 'border-slate-800/80'
-                              } ${
-                                isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/40' : ''
+                              className={`py-1.5 px-3 border-r border-slate-800/80 relative transition-all ${
+                                isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/30' : ''
                               }`}
                             >
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <div 
-                                    className="cursor-pointer flex items-center justify-between w-full"
+                                    className="cursor-pointer flex items-center justify-between w-full min-h-[22px]"
                                     onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                                   >
                                     {cellValue ? (
-                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-transform group-hover:scale-[1.02] ${getStatusBadgeStyle(cellValue)}`}>
-                                        {renderStatusIcon(cellValue)}
-                                        <span>{cellValue}</span>
+                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold transition-transform group-hover:scale-[1.02] ${getDropdownOptionBadgeStyle(cellValue)}`}>
+                                        {cellValue}
                                       </span>
                                     ) : (
-                                      <span className={`border border-dashed px-2 py-0.5 rounded-full text-xs flex items-center gap-1 transition-colors ${
-                                        wallpaper ? 'text-slate-400 border-white/20 hover:border-white/40' : 'text-slate-600 border-slate-700/60 hover:border-slate-500 hover:text-slate-400'
-                                      }`}>
-                                        <Plus className="w-3 h-3" /> Set Status
+                                      <span className="text-slate-600 italic text-xs flex items-center gap-1 hover:text-slate-400">
+                                        <Plus className="w-3 h-3" /> Select {col.label.toLowerCase()}
                                       </span>
                                     )}
-                                    <MoreHorizontal className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                                    <ChevronDown className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1 shrink-0" />
                                   </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-56 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
-                                  <div className="space-y-1 text-xs">
-                                    <div className="px-2 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                      Select Status
-                                    </div>
-                                    {[
-                                      'Waiting for Image',
-                                      'Image Received',
-                                      'Cancel',
-                                      'In Progress',
-                                      'Completed'
-                                    ].map(statusOpt => (
+                                <PopoverContent className="w-64 bg-[#0d162d] border-2 border-indigo-500/40 text-slate-100 p-2 rounded-xl shadow-2xl z-50 backdrop-blur-xl">
+                                  <div className="space-y-2 text-xs">
+                                    <div className="flex items-center justify-between px-1 border-b border-slate-700/60 pb-1.5">
+                                      <span className="text-[11px] text-cyan-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                                        <Tag className="w-3 h-3 text-cyan-400" /> {col.label}
+                                      </span>
                                       <button 
-                                        key={statusOpt}
-                                        onClick={() => handleCellStatusChange(row.id, statusOpt)}
-                                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left font-medium hover:bg-[#1a274d] transition-colors ${
-                                          cellValue === statusOpt ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-200'
-                                        }`}
+                                        onClick={() => setIsHeaderManagerOpen(true)}
+                                        className="text-[10px] text-indigo-300 hover:text-white flex items-center gap-0.5 hover:underline"
+                                        title="Configure options in Header Manager"
                                       >
-                                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] ${getStatusBadgeStyle(statusOpt)}`}>
-                                          {renderStatusIcon(statusOpt)}
-                                          <span>{statusOpt}</span>
-                                        </span>
-                                        {cellValue === statusOpt && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                                        <Settings className="w-2.5 h-2.5" /> Setup
                                       </button>
-                                    ))}
-                                    <div className="border-t border-slate-700/60 my-1" />
-                                    <button 
-                                      onClick={() => handleCellStatusChange(row.id, '')}
-                                      className="w-full flex items-center gap-1.5 px-2.5 py-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg"
-                                    >
-                                      <X className="w-3 h-3" /> Clear Status
-                                    </button>
+                                    </div>
+
+                                    {/* Options list */}
+                                    <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                      {optionsList.map(statusOpt => (
+                                        <button 
+                                          key={statusOpt}
+                                          onClick={() => handleCellStatusChange(row.id, col.id, statusOpt)}
+                                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-medium hover:bg-[#1a274d] transition-colors ${
+                                            cellValue === statusOpt ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-200'
+                                          }`}
+                                        >
+                                          <span className={`px-2 py-0.5 rounded-full text-[11px] ${getDropdownOptionBadgeStyle(statusOpt)}`}>
+                                            {statusOpt}
+                                          </span>
+                                          {cellValue === statusOpt && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    {/* Quick inline option adder */}
+                                    <div className="pt-1.5 border-t border-slate-700/60">
+                                      <div className="flex items-center gap-1">
+                                        <input 
+                                          type="text"
+                                          placeholder="+ Add new choice..."
+                                          value={quickOptionInputs[col.id] || ''}
+                                          onChange={(e) => setQuickOptionInputs(prev => ({ ...prev, [col.id]: e.target.value }))}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              handleAddOptionToExistingColumn(col.id);
+                                            }
+                                          }}
+                                          className="w-full bg-[#172344] text-white px-2 py-1 rounded text-[11px] border border-slate-700 focus:outline-none focus:border-indigo-400"
+                                        />
+                                        <button 
+                                          onClick={() => handleAddOptionToExistingColumn(col.id)}
+                                          className="p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold shrink-0 px-2"
+                                        >
+                                          Add
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Clear button */}
+                                    <div className="border-t border-slate-700/60 pt-1 flex justify-end">
+                                      <button 
+                                        onClick={() => handleCellStatusChange(row.id, col.id, '')}
+                                        className="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 px-2 py-0.5 rounded flex items-center gap-1 text-[11px]"
+                                      >
+                                        <X className="w-3 h-3" /> Clear Selection
+                                      </button>
+                                    </div>
                                   </div>
                                 </PopoverContent>
                               </Popover>
+                            </td>
+                          );
+                        }
+
+                        // Check if this is a Date Column (Smart Recommendation Popover & Quick Apply)
+                        if (isDateColumn) {
+                          const isDateOpen = datePickerCell?.rowId === row.id && datePickerCell?.colId === col.id;
+
+                          return (
+                            <td 
+                              key={`${row.id}-${col.id}`}
+                              tabIndex={0}
+                              onClick={() => {
+                                setSelectedCell({ rowId: row.id, colId: col.id });
+                                if (!isCellEditing) {
+                                  setDatePickerCell({ rowId: row.id, colId: col.id });
+                                }
+                              }}
+                              onDoubleClick={() => {
+                                setDatePickerCell(null);
+                                startEditingCell(row.id, col.id, cellValue);
+                              }}
+                              onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
+                              className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all cursor-pointer ${
+                                isCellSelected 
+                                  ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/30 z-10' 
+                                  : 'hover:bg-[#142144]'
+                              }`}
+                            >
+                              {isCellEditing ? (
+                                <input 
+                                  ref={cellInputRef}
+                                  type="text"
+                                  value={cellEditValue}
+                                  onChange={(e) => setCellEditValue(e.target.value)}
+                                  onBlur={commitCellEdit}
+                                  onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
+                                  className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs sm:text-sm border border-cyan-400 focus:outline-none shadow-inner"
+                                />
+                              ) : (
+                                <Popover 
+                                  open={isDateOpen} 
+                                  onOpenChange={(open) => {
+                                    if (open) {
+                                      setSelectedCell({ rowId: row.id, colId: col.id });
+                                      setDatePickerCell({ rowId: row.id, colId: col.id });
+                                    } else {
+                                      setDatePickerCell(null);
+                                    }
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <div className="flex items-center justify-between w-full min-h-[20px] group/date">
+                                      <div className="truncate flex items-center gap-1.5">
+                                        {cellValue ? (
+                                          <span className="font-semibold text-cyan-200">
+                                            {cellValue}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-600/60 select-none flex items-center gap-1">
+                                            &mdash;
+                                          </span>
+                                        )}
+                                      </div>
+                                      <CalendarIcon className="w-3.5 h-3.5 text-cyan-400/60 group-hover/date:text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity ml-1 shrink-0" />
+                                    </div>
+                                  </PopoverTrigger>
+
+                                  <PopoverContent 
+                                    className="w-80 sm:w-84 bg-[#0b1328] border-2 border-cyan-500/40 text-slate-100 p-3 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+                                    align="start"
+                                    sideOffset={6}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="space-y-3">
+                                      {/* Popover Header */}
+                                      <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                                        <div className="flex items-center gap-1.5 text-cyan-300 font-bold text-xs">
+                                          <CalendarIcon className="w-4 h-4 text-cyan-400" />
+                                          <span>Date Recommendation</span>
+                                        </div>
+                                        <button 
+                                          onClick={() => setDatePickerCell(null)}
+                                          className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors"
+                                          title="Decline / Close (Esc)"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+
+                                      {/* Primary Auto Recommendation Box */}
+                                      <div className="bg-gradient-to-br from-cyan-950/80 via-[#0e1f3d] to-blue-950/80 border border-cyan-500/50 rounded-xl p-2.5 shadow-lg relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 bg-cyan-500/20 text-cyan-300 text-[10px] font-extrabold px-2 py-0.5 rounded-bl-lg border-b border-l border-cyan-500/30 flex items-center gap-1">
+                                          <Sparkles className="w-3 h-3 text-cyan-400" /> Today
+                                        </div>
+                                        
+                                        <div className="text-[11px] text-slate-400 mb-0.5 flex items-center gap-1">
+                                          <span>Automatic Date:</span>
+                                          <span className="text-slate-200 font-medium">
+                                            {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                          </span>
+                                        </div>
+                                        
+                                        <div className="text-base font-black text-cyan-300 tracking-wider mb-2.5 font-mono">
+                                          {getTodayFormatted(datePreferredFormat)}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={() => handleApplyDate(row.id, col.id, getTodayFormatted(datePreferredFormat))}
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs rounded-lg shadow-md shadow-cyan-500/20 active:scale-95 transition-all"
+                                          >
+                                            <Check className="w-4 h-4 stroke-[3]" />
+                                            <span>Apply Today</span>
+                                          </button>
+
+                                          <button
+                                            onClick={() => setDatePickerCell(null)}
+                                            className="py-1.5 px-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-lg border border-slate-700 transition-colors"
+                                            title="Decline suggestion"
+                                          >
+                                            Decline
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* Quick Chips: Yesterday, Today, Tomorrow */}
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={() => handleApplyDate(row.id, col.id, getOffsetDateFormatted(-1, datePreferredFormat))}
+                                          className="flex-1 py-1 px-1 bg-[#131e3d] hover:bg-[#1a2a54] text-slate-300 hover:text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40 rounded-lg text-[10px] font-semibold text-center transition-all"
+                                        >
+                                          <span className="block text-[9px] text-slate-400">Yesterday</span>
+                                          <span className="font-mono text-cyan-300 font-bold">{getOffsetDateFormatted(-1, datePreferredFormat)}</span>
+                                        </button>
+
+                                        <button
+                                          onClick={() => handleApplyDate(row.id, col.id, getTodayFormatted(datePreferredFormat))}
+                                          className="flex-1 py-1 px-1 bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 rounded-lg text-[10px] font-semibold text-center transition-all shadow-sm"
+                                        >
+                                          <span className="block text-[9px] text-cyan-400 font-bold">Today</span>
+                                          <span className="font-mono font-black">{getTodayFormatted(datePreferredFormat)}</span>
+                                        </button>
+
+                                        <button
+                                          onClick={() => handleApplyDate(row.id, col.id, getOffsetDateFormatted(1, datePreferredFormat))}
+                                          className="flex-1 py-1 px-1 bg-[#131e3d] hover:bg-[#1a2a54] text-slate-300 hover:text-cyan-300 border border-slate-700/80 hover:border-cyan-500/40 rounded-lg text-[10px] font-semibold text-center transition-all"
+                                        >
+                                          <span className="block text-[9px] text-slate-400">Tomorrow</span>
+                                          <span className="font-mono text-cyan-300 font-bold">{getOffsetDateFormatted(1, datePreferredFormat)}</span>
+                                        </button>
+                                      </div>
+
+                                      {/* Mini Interactive Calendar Picker */}
+                                      <div className="border border-slate-800 rounded-xl overflow-hidden bg-[#070d1e] p-1 flex justify-center">
+                                        <CalendarUI
+                                          mode="single"
+                                          selected={parseCellDateToDate(cellValue)}
+                                          onSelect={(selectedDate) => {
+                                            if (selectedDate) {
+                                              handleApplyDate(row.id, col.id, formatDateToString(selectedDate, datePreferredFormat));
+                                            }
+                                          }}
+                                          className="rounded-lg border-0 p-1 scale-90 origin-center"
+                                        />
+                                      </div>
+
+                                      {/* Bottom Controls: Format Switcher & Actions */}
+                                      <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[11px]">
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-slate-400 text-[10px]">Format:</span>
+                                          <button
+                                            onClick={() => setDatePreferredFormat('dot')}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                              datePreferredFormat === 'dot' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+                                            }`}
+                                            title="DD.MM.YYYY"
+                                          >
+                                            .
+                                          </button>
+                                          <button
+                                            onClick={() => setDatePreferredFormat('dash')}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                              datePreferredFormat === 'dash' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+                                            }`}
+                                            title="DD-MM-YYYY"
+                                          >
+                                            -
+                                          </button>
+                                          <button
+                                            onClick={() => setDatePreferredFormat('text')}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                              datePreferredFormat === 'text' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:text-white'
+                                            }`}
+                                            title="DD Mon YYYY"
+                                          >
+                                            Abc
+                                          </button>
+                                        </div>
+
+                                        <div className="flex items-center gap-1">
+                                          {cellValue && (
+                                            <button
+                                              onClick={() => handleApplyDate(row.id, col.id, '')}
+                                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-2 py-0.5 rounded flex items-center gap-1"
+                                              title="Clear date"
+                                            >
+                                              <Trash2 className="w-3 h-3" /> Clear
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => {
+                                              setDatePickerCell(null);
+                                              startEditingCell(row.id, col.id, cellValue);
+                                            }}
+                                            className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 px-2 py-0.5 rounded flex items-center gap-1"
+                                            title="Type custom date manually"
+                                          >
+                                            <Pencil className="w-3 h-3" /> Type
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+
+                              {/* Excel-style active cell corner marker */}
+                              {isCellSelected && !isCellEditing && (
+                                <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none" />
+                              )}
                             </td>
                           );
                         }
@@ -2006,12 +2052,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                             onDoubleClick={() => startEditingCell(row.id, col.id, cellValue)}
                             onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                            className={`py-2 px-3 border-r text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all ${
-                              wallpaper ? 'border-white/10 hover:bg-slate-800/40' : 'border-slate-800/80 hover:bg-[#142144]'
-                            } ${
+                            className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all ${
                               isCellSelected 
-                                ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/40 z-10' 
-                                : ''
+                                ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/30 z-10' 
+                                : 'hover:bg-[#142144]'
                             }`}
                           >
                             {isCellEditing ? (
@@ -2025,40 +2069,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs sm:text-sm border border-cyan-400 focus:outline-none shadow-inner"
                               />
                             ) : (
-                              <div className="truncate min-h-[20px] flex items-center justify-between gap-1">
+                              <div className="truncate min-h-[20px] flex items-center">
                                 {cellValue ? (
-                                  <span className={col.id === 'count' ? 'font-black text-cyan-300' : ''}>
+                                  <span className={col.id === 'count' ? 'font-bold text-cyan-300' : ''}>
                                     {cellValue}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-500/40 select-none">&mdash;</span>
-                                )}
-
-                                {/* Phone number quick action shortcut */}
-                                {col.id === 'contactNumber' && cellValue && (
-                                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleWhatsAppClick(cellValue);
-                                      }}
-                                      title="Open WhatsApp Chat"
-                                      className="p-1 hover:bg-emerald-500/20 text-emerald-400 rounded transition-colors"
-                                    >
-                                      <MessageCircle className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigator.clipboard.writeText(cellValue);
-                                        toast.success('Phone copied');
-                                      }}
-                                      title="Copy Number"
-                                      className="p-1 hover:bg-slate-700 text-slate-300 rounded transition-colors"
-                                    >
-                                      <Copy className="w-3 h-3" />
-                                    </button>
-                                  </div>
+                                  <span className="text-slate-600/40 select-none">&mdash;</span>
                                 )}
                               </div>
                             )}
@@ -2072,9 +2089,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       })}
 
                       {/* Row Action Menu */}
-                      <td className={`w-16 py-1.5 px-2 text-center ${
-                        wallpaper ? 'bg-slate-950/50' : 'bg-[#050917]/60 group-hover:bg-[#0c142c]'
-                      }`}>
+                      <td className="w-14 py-1.5 px-2 text-center">
                         <Popover>
                           <PopoverTrigger asChild>
                             <button 
@@ -2084,7 +2099,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               <MoreHorizontal className="w-4 h-4" />
                             </button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-48 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+                          <PopoverContent className="w-44 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
                             <div className="space-y-0.5 text-xs">
                               <button 
                                 onClick={() => handleAddRow(globalRowIndex)}
@@ -2123,92 +2138,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           </table>
         </div>
 
-        {/* FLOATING MULTI-SELECT ACTION BAR (When rows selected) */}
-        {selectedRowIds.length > 0 && (
-          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-[#0d1630]/95 backdrop-blur-xl border border-cyan-400/60 rounded-2xl px-4 py-2.5 shadow-2xl flex items-center gap-3 z-30 animate-in fade-in slide-in-from-bottom-3 duration-200">
-            <div className="flex items-center gap-2 pr-3 border-r border-slate-700 text-xs font-extrabold text-cyan-300">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span>{selectedRowIds.length} Selected</span>
-            </div>
-
-            {/* Bulk Status Change */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg border border-slate-600 transition-colors">
-                  Set Status
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
-                <div className="space-y-1 text-xs">
-                  {['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'].map(opt => (
-                    <button 
-                      key={opt}
-                      onClick={() => handleBulkStatusChange(opt)}
-                      className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#1a274c] text-slate-200"
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <button 
-              onClick={handleBulkDuplicate}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg border border-slate-600 transition-colors"
-            >
-              Duplicate
-            </button>
-
-            <button 
-              onClick={handleBulkDelete}
-              className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <Trash2 className="w-3.5 h-3.5" /> Delete ({selectedRowIds.length})
-            </button>
-
-            <button 
-              onClick={() => setSelectedRowIds([])}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-              title="Clear selection"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* BOTTOM PAGINATION BAR */}
-        <div className={`px-4 py-2.5 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-300 ${
-          wallpaper 
-            ? 'bg-slate-950/75 backdrop-blur-xl border-white/10' 
-            : 'bg-[#060b18] border-slate-800/80'
-        }`}>
-          {/* Row Counter info & Page Size Selector */}
-          <div className="flex items-center gap-3">
+        {/* BOTTOM PAGINATION BAR (25 details per page requirement) */}
+        <div className="bg-[#080f24] px-4 py-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-300">
+          {/* Row Counter info */}
+          <div className="flex items-center gap-2">
             <span className="text-slate-400 font-medium">
-              Showing <strong>{totalRows === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> to{' '}
-              <strong>{Math.min(currentPage * pageSize, totalRows)}</strong> of <strong>{totalRows}</strong> records
+              Showing <strong>{totalRows === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}</strong> to{' '}
+              <strong>{Math.min(currentPage * PAGE_SIZE, totalRows)}</strong> of <strong>{totalRows}</strong> details (25 per page)
             </span>
-
-            {/* Rows Per Page Selector */}
-            <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-              <span>Rows per page:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className={`text-slate-200 text-xs px-2 py-1 rounded-lg border focus:outline-none focus:border-cyan-400 cursor-pointer ${
-                  wallpaper ? 'bg-slate-900/80 border-white/20' : 'bg-[#101935] border-slate-700'
-                }`}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
           </div>
 
           {/* Page Navigation Buttons */}
@@ -2217,9 +2154,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className={`p-1.5 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${
-                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
-              }`}
+              className="p-1.5 rounded-lg bg-[#131d38] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="First Page"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -2229,11 +2164,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold text-xs ${
-                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
-              }`}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#131d38] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="w-4 h-4" />
               <span>Back</span>
             </button>
 
@@ -2248,10 +2181,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       {showEllipsis && <span className="text-slate-500 px-1">...</span>}
                       <button 
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`min-w-[30px] h-7 rounded-lg font-bold text-xs transition-all ${
+                        className={`min-w-[32px] h-8 rounded-lg font-bold text-xs transition-all ${
                           currentPage === pageNum 
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20' 
-                            : (wallpaper ? 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-white/20' : 'bg-[#101935] text-slate-300 hover:bg-slate-800 border border-slate-700')
+                            : 'bg-[#131d38] text-slate-300 hover:bg-slate-800 border border-slate-700'
                         }`}
                       >
                         {pageNum}
@@ -2265,21 +2198,17 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             <button 
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold text-xs ${
-                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
-              }`}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#131d38] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-semibold"
             >
               <span>Next</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-4 h-4" />
             </button>
 
             {/* Last Page */}
             <button 
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className={`p-1.5 rounded-lg border text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${
-                wallpaper ? 'bg-slate-900/80 border-white/20 hover:bg-slate-800' : 'bg-[#101935] border-slate-700 hover:bg-slate-800'
-              }`}
+              className="p-1.5 rounded-lg bg-[#131d38] border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Last Page"
             >
               <ChevronsRight className="w-4 h-4" />
@@ -2287,20 +2216,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           </div>
         </div>
 
-        {/* BOTTOM MULTI-SHEET TABS BAR */}
-        <div className={`px-4 py-2 border-t flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar ${
-          wallpaper 
-            ? 'bg-slate-950/85 backdrop-blur-xl border-white/10' 
-            : 'bg-[#050813] border-slate-800/90'
-        }`}>
+        {/* BOTTOM MULTI-SHEET TABS BAR (as in Image 2: Chocolate Price, AUG, SEP, OCT, Wholesale Price...) */}
+        <div className="bg-[#050914] px-4 py-2 border-t border-slate-800/90 flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar">
           <div className="flex items-center gap-1.5">
             {/* Add New Sheet (+) Button */}
             <button 
               onClick={handleAddSheet}
               title="Add New Sheet"
-              className={`p-2 rounded-xl text-cyan-400 border transition-all flex items-center justify-center active:scale-95 shadow-sm cursor-pointer ${
-                wallpaper ? 'bg-slate-900/80 hover:bg-cyan-500/20 border-white/20 hover:border-cyan-500/40' : 'bg-[#101935] hover:bg-cyan-500/20 border-slate-800 hover:border-cyan-500/40'
-              }`}
+              className="p-2 rounded-lg bg-[#101a35] hover:bg-cyan-500/20 text-cyan-400 border border-slate-800 hover:border-cyan-500/40 transition-all flex items-center justify-center active:scale-95"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -2315,14 +2238,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   key={sheet.id}
                   className={`group relative flex items-center rounded-xl transition-all ${
                     isActive 
-                      ? (wallpaper 
-                          ? 'bg-cyan-500/30 border border-cyan-400 text-white font-extrabold shadow-lg shadow-cyan-950/50 ring-1 ring-cyan-400/50' 
-                          : 'bg-gradient-to-r from-blue-600/30 to-cyan-500/30 border border-cyan-400 text-white font-extrabold shadow-lg shadow-cyan-950/50 ring-1 ring-cyan-400/40'
-                        )
-                      : (wallpaper 
-                          ? 'bg-slate-900/60 hover:bg-slate-800/80 border border-white/10 text-slate-300 font-semibold' 
-                          : 'bg-[#0f172e] hover:bg-[#162244] border border-slate-800 text-slate-400 hover:text-slate-200 font-semibold'
-                        )
+                      ? 'bg-gradient-to-r from-blue-600/30 to-cyan-500/30 border border-cyan-400 text-white font-extrabold shadow-lg shadow-cyan-950/50' 
+                      : 'bg-[#0f172e] hover:bg-[#162244] border border-slate-800 text-slate-400 hover:text-slate-200 font-semibold'
                   }`}
                 >
                   {isRenaming ? (
@@ -2343,7 +2260,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         onClick={() => handleRenameSheet(sheet.id)}
                         className="p-1 text-cyan-400"
                       >
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-3 h-3" />
                       </button>
                     </div>
                   ) : (
@@ -2373,19 +2290,19 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           }`}
                           title="Sheet settings"
                         >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
+                          <MoreHorizontal className="w-3 h-3" />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-40 bg-[#0d162d]/95 backdrop-blur-2xl border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
+                      <PopoverContent className="w-40 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
                         <div className="space-y-0.5 text-xs">
                           <button 
                             onClick={() => {
                               setEditingSheetId(sheet.id);
                               setSheetRenameValue(sheet.name);
                             }}
-                            className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
                           >
-                            <Pencil className="w-3.5 h-3.5 text-cyan-400" /> Rename Sheet
+                            <Pencil className="w-3 h-3 text-cyan-400" /> Rename Sheet
                           </button>
                           <button 
                             onClick={() => {
@@ -2400,15 +2317,15 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               setActiveSheetId(dupSheet.id);
                               toast.success('Sheet duplicated');
                             }}
-                            className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
                           >
-                            <Copy className="w-3.5 h-3.5 text-blue-400" /> Duplicate Sheet
+                            <Copy className="w-3 h-3 text-blue-400" /> Duplicate Sheet
                           </button>
                           <button 
                             onClick={() => handleClearEntireSheet(sheet.id)}
                             className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-amber-400"
                           >
-                            <RotateCcw className="w-3.5 h-3.5 text-amber-400" /> Clear Sheet Data
+                            <RotateCcw className="w-3 h-3 text-amber-400" /> Clear Sheet Data
                           </button>
                           {sheets.length > 1 && (
                             <>
@@ -2417,7 +2334,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 onClick={() => handleDeleteSheet(sheet.id)}
                                 className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg"
                               >
-                                <Trash2 className="w-3.5 h-3.5" /> Delete Sheet
+                                <Trash2 className="w-3 h-3" /> Delete Sheet
                               </button>
                             </>
                           )}
@@ -2430,11 +2347,375 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             })}
           </div>
 
-          <div className="text-[11px] text-slate-400 whitespace-nowrap hidden md:flex items-center gap-2">
-            <span>Double-click to edit cell &bull; Tab/Enter to navigate &bull; Press <kbd className="px-1 py-0.5 bg-slate-800/80 border border-white/15 rounded text-slate-300 font-mono">?</kbd> for help</span>
+          <div className="text-[11px] text-slate-500 whitespace-nowrap hidden md:block">
+            Double-click any cell or header to edit &bull; Press Enter / Tab to navigate
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 🎛️ COMPREHENSIVE HEADER & DROPDOWN MANAGER DIALOG MODAL */}
+      {/* ========================================================================= */}
+      <Dialog open={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen}>
+        <DialogContent className="max-w-2xl bg-[#091024] border-2 border-indigo-500/40 text-slate-100 p-6 rounded-3xl shadow-2xl backdrop-blur-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-xl font-black text-white flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <SlidersHorizontal className="w-4 h-4 text-white" />
+              </div>
+              <span>Header & Dropdown Manager</span>
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Add custom column headers, build dropdown choices with color tags, reorder columns, or configure existing headers.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-2 p-1 bg-[#101a38] rounded-xl border border-slate-700/80 my-2">
+            <button
+              onClick={() => setHeaderManagerTab('add')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                headerManagerTab === 'add'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Plus className="w-4 h-4" /> Add New Header
+            </button>
+
+            <button
+              onClick={() => setHeaderManagerTab('manage')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                headerManagerTab === 'manage'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Settings className="w-4 h-4" /> Manage Existing Headers ({currentSheet.columns.length})
+            </button>
+          </div>
+
+          {/* TAB 1: ADD NEW HEADER */}
+          {headerManagerTab === 'add' && (
+            <div className="space-y-4 pt-1">
+              {/* Header Title */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                  Header Title <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newColLabel}
+                  onChange={(e) => setNewColLabel(e.target.value)}
+                  placeholder="e.g. Courier Partner, Payment Status, Priority..."
+                  className="w-full bg-[#131d3b] border border-slate-700 text-white text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:border-indigo-400 transition-colors shadow-inner"
+                />
+              </div>
+
+              {/* Column Type Selector */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                  Column Type
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { type: 'select', label: 'Dropdown / Select', icon: Tag, desc: 'Choice list with colored badges' },
+                    { type: 'text', label: 'Text / General', icon: ListPlus, desc: 'Free text notes' },
+                    { type: 'date', label: 'Date Picker', icon: CalendarIcon, desc: 'Auto-today & calendar' },
+                    { type: 'number', label: 'Number / Qty', icon: Hash, desc: 'Numeric values' }
+                  ].map(t => (
+                    <button
+                      key={t.type}
+                      type="button"
+                      onClick={() => setNewColType(t.type as any)}
+                      className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 ${
+                        newColType === t.type
+                          ? 'bg-indigo-950/60 border-indigo-400 text-white shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-400'
+                          : 'bg-[#131d3b] border-slate-700/80 text-slate-400 hover:text-slate-200 hover:bg-[#19274e]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <t.icon className={`w-4 h-4 ${newColType === t.type ? 'text-indigo-300' : 'text-slate-400'}`} />
+                        <span>{t.label}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dropdown Options Builder (If select type) */}
+              {newColType === 'select' && (
+                <div className="bg-[#101a38] border border-indigo-500/30 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-indigo-400" /> Configure Dropdown Choices
+                    </span>
+                    <span className="text-[10px] text-slate-400">{newColOptions.length} choices added</span>
+                  </div>
+
+                  {/* Quick 1-Click Templates */}
+                  <div>
+                    <span className="text-[11px] text-slate-400 block mb-1">Quick Templates (1-Click Fill):</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DROPDOWN_PRESETS.map(preset => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => {
+                            setNewColOptions([...preset.options]);
+                            if (!newColLabel) setNewColLabel(preset.name);
+                            toast.success(`Loaded "${preset.name}" preset choices`);
+                          }}
+                          className="px-2.5 py-1 bg-[#18264e] hover:bg-indigo-600/30 text-indigo-200 hover:text-white text-[11px] font-semibold rounded-lg border border-indigo-500/30 transition-colors"
+                        >
+                          ⚡ {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add Custom Option Input */}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newColOptionInput}
+                        onChange={(e) => setNewColOptionInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddNewColOption();
+                          }
+                        }}
+                        placeholder="Type a new dropdown choice and press Enter..."
+                        className="flex-1 bg-[#172344] border border-slate-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-indigo-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddNewColOption()}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-sm"
+                      >
+                        + Add Choice
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Options Tag Badges List */}
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
+                    {newColOptions.map((opt, idx) => (
+                      <span
+                        key={`${opt}-${idx}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${getDropdownOptionBadgeStyle(opt)}`}
+                      >
+                        <span>{opt}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewColOption(idx)}
+                          className="text-slate-400 hover:text-rose-400 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Column Width Selector */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                  Column Width: <span className="text-indigo-300 font-mono">{newColWidth}px</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  {[120, 160, 200, 250].map(w => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setNewColWidth(w)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                        newColWidth === w
+                          ? 'bg-indigo-600 text-white border-indigo-400'
+                          : 'bg-[#131d3b] text-slate-400 border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      {w === 120 ? 'Compact' : w === 160 ? 'Standard' : w === 200 ? 'Wide' : 'Extra Wide'} ({w}px)
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Create Button */}
+              <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsHeaderManagerOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateHeader}
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-indigo-500/25 active:scale-95 transition-all"
+                >
+                  ✨ Create Header & Add to Table
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: MANAGE EXISTING HEADERS */}
+          {headerManagerTab === 'manage' && (
+            <div className="space-y-3 pt-1">
+              <div className="text-xs text-slate-400 mb-2">
+                All active columns in this sheet. You can reorder, delete, edit header names, and add/remove dropdown choices for any column:
+              </div>
+
+              <div className="space-y-2.5 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
+                {currentSheet.columns.map((col, idx) => {
+                  const isDropdown = col.id === 'status' || col.type === 'select';
+                  const options = col.options || (col.id === 'status' ? ['Waiting for Image', 'Image Received', 'Cancel', 'In Progress', 'Completed'] : []);
+
+                  return (
+                    <div
+                      key={col.id}
+                      className="bg-[#101a38] border border-slate-800 hover:border-indigo-500/40 rounded-xl p-3 space-y-2 transition-all shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="w-6 h-6 rounded-lg bg-[#18264e] text-indigo-300 font-mono text-xs font-black flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={col.label}
+                            onChange={(e) => {
+                              const newLabel = e.target.value;
+                              const updatedSheets = sheets.map(s => {
+                                if (s.id !== currentSheet.id) return s;
+                                return {
+                                  ...s,
+                                  columns: s.columns.map(c => c.id === col.id ? { ...c, label: newLabel } : c)
+                                };
+                              });
+                              saveSheets(updatedSheets, false);
+                            }}
+                            className="bg-[#172344] text-white text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-700 focus:outline-none focus:border-indigo-400 flex-1 max-w-[200px]"
+                          />
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            isDropdown 
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                              : col.type === 'date' || col.id === 'date' || col.id === 'birthday' || col.id === 'dispatch'
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                : 'bg-slate-700/50 text-slate-300 border border-slate-700'
+                          }`}>
+                            {isDropdown ? 'Dropdown' : col.type === 'date' || col.id === 'date' || col.id === 'birthday' || col.id === 'dispatch' ? 'Date' : 'Text'}
+                          </span>
+                        </div>
+
+                        {/* Actions: Move left, Move right, Delete */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleMoveColumn(col.id, 'left')}
+                            disabled={idx === 0}
+                            className="p-1 text-slate-400 hover:text-white bg-[#172344] disabled:opacity-30 disabled:cursor-not-allowed rounded-lg"
+                            title="Move Left"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleMoveColumn(col.id, 'right')}
+                            disabled={idx === currentSheet.columns.length - 1}
+                            className="p-1 text-slate-400 hover:text-white bg-[#172344] disabled:opacity-30 disabled:cursor-not-allowed rounded-lg"
+                            title="Move Right"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteColumn(col.id)}
+                            className="p-1 text-rose-400 hover:bg-rose-500/20 rounded-lg ml-1"
+                            title="Delete Column"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* If Dropdown column: Display and add/remove options */}
+                      {isDropdown && (
+                        <div className="bg-[#0b1227] p-2.5 rounded-lg border border-indigo-500/20 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400">
+                            <span>Dropdown choices ({options.length}):</span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5">
+                            {options.map((opt, optIdx) => (
+                              <span
+                                key={`${opt}-${optIdx}`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${getDropdownOptionBadgeStyle(opt)}`}
+                              >
+                                <span>{opt}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOptionFromExistingColumn(col.id, optIdx)}
+                                  className="text-slate-400 hover:text-rose-400 ml-0.5"
+                                  title="Remove choice"
+                                >
+                                  <X className="w-2.5 h-2.5" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Add choice input */}
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <input
+                              type="text"
+                              placeholder={`+ Add choice to ${col.label}...`}
+                              value={quickOptionInputs[col.id] || ''}
+                              onChange={(e) => setQuickOptionInputs(prev => ({ ...prev, [col.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddOptionToExistingColumn(col.id);
+                                }
+                              }}
+                              className="flex-1 bg-[#131d3b] text-white text-xs px-2.5 py-1 rounded-lg border border-slate-700 focus:outline-none focus:border-indigo-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddOptionToExistingColumn(col.id)}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg shadow-sm"
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+                <button
+                  onClick={() => setHeaderManagerTab('add')}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 hover:underline"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add another new column
+                </button>
+                <button
+                  onClick={() => setIsHeaderManagerOpen(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

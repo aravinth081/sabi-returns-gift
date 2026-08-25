@@ -743,18 +743,6 @@ export default function Dashboard() {
   }, [readCardIds]);
 
   useEffect(() => {
-    const handleWpSync = () => {
-      setDailyTasksWallpaper(localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
-    };
-    window.addEventListener('sabi-daily-tasks-wallpaper-changed', handleWpSync);
-    window.addEventListener('storage', handleWpSync);
-    return () => {
-      window.removeEventListener('sabi-daily-tasks-wallpaper-changed', handleWpSync);
-      window.removeEventListener('storage', handleWpSync);
-    };
-  }, []);
-
-  useEffect(() => {
     const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
     const unsubscribe = onSnapshot(boardDocRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -4141,7 +4129,7 @@ export default function Dashboard() {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
+          backgroundAttachment: 'scroll'
         }}
       >
 
