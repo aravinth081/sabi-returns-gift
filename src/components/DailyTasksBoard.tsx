@@ -8,7 +8,7 @@ import {
   Sparkles, CheckCircle2, Clock, AlertTriangle, XCircle, Hash,
   Layers, PlusCircle, MoveHorizontal, CheckSquare, Square,
   SlidersHorizontal, ListPlus, Tag, Settings, ArrowLeft, ArrowRight,
-  ChevronDown
+  ChevronDown, Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -20,7 +20,7 @@ import {
   DialogDescription 
 } from '@/components/ui/dialog';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 // --- TYPES & INTERFACES ---
@@ -149,6 +149,61 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     return 'sheet-aug';
   });
 
+  // Wallpaper State for Daily Tasks section
+  const [dailyTasksWallpaper, setDailyTasksWallpaper] = useState<string>(() => {
+    return localStorage.getItem('sabi_daily_tasks_wallpaper') || '';
+  });
+  const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+        setDailyTasksWallpaper(compressedBase64);
+        localStorage.setItem('sabi_daily_tasks_wallpaper', compressedBase64);
+        toast.success("Daily Tasks wallpaper updated!");
+        if (onWallpaperChange) onWallpaperChange();
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearWallpaper = () => {
+    setDailyTasksWallpaper('');
+    localStorage.removeItem('sabi_daily_tasks_wallpaper');
+    toast.success("Daily Tasks wallpaper removed!");
+    if (onWallpaperChange) onWallpaperChange();
+  };
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
 
@@ -206,26 +261,26 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
   ];
 
-  // Dynamic Dropdown Option Badge Style Helper
+  // Dynamic Dropdown Option Badge Style Helper (High-contrast, crystal clear text across themes)
   const getDropdownOptionBadgeStyle = (optionVal: string) => {
     const s = (optionVal || '').trim().toLowerCase();
     
     if (s === 'waiting for image' || s.includes('waiting') || s.includes('pending') || s.includes('advance') || s.includes('unpaid')) {
-      return 'bg-[#ffedd5] text-[#c2410c] dark:bg-[#7c2d12]/50 dark:text-[#fdba74] border border-orange-300 dark:border-orange-600/60 shadow-sm font-semibold';
+      return 'bg-amber-500/25 !text-amber-300 border border-amber-500/50 shadow-sm font-black tracking-wide';
     }
     if (s === 'image received' || s.includes('received') || s.includes('full paid') || s.includes('paid') || s.includes('yes') || s.includes('completed') || s.includes('delivered') || s.includes('success')) {
-      return 'bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/50 dark:text-[#86efac] border border-emerald-300 dark:border-emerald-600/60 shadow-sm font-semibold';
+      return 'bg-emerald-500/25 !text-emerald-300 border border-emerald-500/50 shadow-sm font-black tracking-wide';
     }
     if (s === 'cancel' || s.includes('cancel') || s.includes('refund') || s.includes('no') || s.includes('rejected') || s.includes('urgent') || s.includes('vip')) {
-      return 'bg-[#ffe4e6] text-[#be123c] dark:bg-[#881337]/60 dark:text-[#fda4af] border border-rose-300 dark:border-rose-600/60 shadow-sm font-semibold';
+      return 'bg-rose-500/25 !text-rose-300 border border-rose-500/50 shadow-sm font-black tracking-wide';
     }
     if (s === 'in progress' || s.includes('progress') || s.includes('courier') || s.includes('dtdc') || s.includes('st courier') || s.includes('speed post')) {
-      return 'bg-[#e0f2fe] text-[#0369a1] dark:bg-[#0c4a6e]/50 dark:text-[#7dd3fc] border border-sky-300 dark:border-sky-600/60 shadow-sm font-semibold';
+      return 'bg-sky-500/25 !text-sky-300 border border-sky-500/50 shadow-sm font-black tracking-wide';
     }
     if (s.includes('high') || s.includes('medium') || s.includes('priority')) {
-      return 'bg-[#fef3c7] text-[#b45309] dark:bg-[#78350f]/50 dark:text-[#fcd34d] border border-amber-300 dark:border-amber-600/60 shadow-sm font-semibold';
+      return 'bg-yellow-500/25 !text-yellow-300 border border-yellow-500/50 shadow-sm font-black tracking-wide';
     }
-    return 'bg-[#f3e8ff] text-[#7e22ce] dark:bg-[#3b0764]/50 dark:text-[#d8b4fe] border border-purple-300 dark:border-purple-600/60 shadow-sm font-semibold';
+    return 'bg-purple-500/25 !text-purple-300 border border-purple-500/50 shadow-sm font-black tracking-wide';
   };
 
   // Add Option to New Column Form
@@ -448,25 +503,37 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       console.error('Error saving to localStorage:', e);
     }
 
-    // Sync to Firestore
+    // Sync to Firestore (Master doc and individual sheets for 100% data persistence)
     try {
       const sheetDocRef = doc(db, 'daily_tasks_board', 'sheet_data');
       setDoc(sheetDocRef, {
         sheets: updatedSheets,
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => {
-        console.warn('Firestore sheet sync background note:', err);
+        console.warn('Firestore master sheet sync note:', err);
+      });
+
+      // Also persist each sheet into daily_tasks_sheets collection
+      updatedSheets.forEach(sheet => {
+        const indDocRef = doc(db, 'daily_tasks_sheets', sheet.id);
+        setDoc(indDocRef, {
+          ...sheet,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
       });
     } catch (err) {
       console.warn('Firestore sync failed:', err);
     }
   }, [sheets, pushHistory]);
 
-  // Firestore Real-time Listener
+  // Firestore Real-time Listener (both master doc and collection)
   useEffect(() => {
+    let unsubscribeMaster: (() => void) | null = null;
+    let unsubscribeCollection: (() => void) | null = null;
+
     try {
       const sheetDocRef = doc(db, 'daily_tasks_board', 'sheet_data');
-      const unsubscribe = onSnapshot(sheetDocRef, (snapshot) => {
+      unsubscribeMaster = onSnapshot(sheetDocRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           if (data && Array.isArray(data.sheets) && data.sheets.length > 0) {
@@ -481,10 +548,40 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       }, (error) => {
         console.warn('Firestore real-time subscription error:', error);
       });
-      return () => unsubscribe();
     } catch (e) {
-      console.warn('Could not set up Firestore listener:', e);
+      console.warn('Could not set up master Firestore listener:', e);
     }
+
+    try {
+      unsubscribeCollection = onSnapshot(collection(db, 'daily_tasks_sheets'), (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteSheets: SheetData[] = [];
+          snapshot.forEach(docSnap => {
+            const d = docSnap.data() as SheetData;
+            if (d && d.id && d.name) {
+              remoteSheets.push(d);
+            }
+          });
+          if (remoteSheets.length > 0) {
+            setSheets(prev => {
+              const map = new Map<string, SheetData>();
+              prev.forEach(s => map.set(s.id, s));
+              remoteSheets.forEach(s => map.set(s.id, s));
+              const merged = Array.from(map.values());
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+              return merged;
+            });
+          }
+        }
+      }, (error) => {
+        console.warn('Firestore collection listener note:', error);
+      });
+    } catch (e) {}
+
+    return () => {
+      if (unsubscribeMaster) unsubscribeMaster();
+      if (unsubscribeCollection) unsubscribeCollection();
+    };
   }, []);
 
   // Keyboard Shortcuts for Undo/Redo & Custom Events from Dashboard
@@ -719,6 +816,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         if (currentIndex < paginatedRows.length - 1) {
           const nextRow = paginatedRows[currentIndex + 1];
           setSelectedCell({ rowId: nextRow.id, colId });
+          setDatePickerCell(null);
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -731,11 +829,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           if (colIndex > 0) {
             const prevCol = currentSheet.columns[colIndex - 1];
             setSelectedCell({ rowId, colId: prevCol.id });
+            setDatePickerCell(null);
           }
         } else {
           if (colIndex < currentSheet.columns.length - 1) {
             const nextCol = currentSheet.columns[colIndex + 1];
             setSelectedCell({ rowId, colId: nextCol.id });
+            setDatePickerCell(null);
           }
         }
       }
@@ -744,8 +844,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       if (e.key === 'Enter') {
         e.preventDefault();
         const row = currentSheet.rows.find(r => r.id === rowId);
-        if (row) {
-          startEditingCell(rowId, colId, row[colId]);
+        const col = currentSheet.columns.find(c => c.id === colId);
+        if (row && col) {
+          if (col.type === 'date' || col.id === 'date' || col.id === 'birthday' || col.id === 'dispatch') {
+            setDatePickerCell({ rowId, colId });
+          } else if (col.id !== 'status' && col.type !== 'select') {
+            startEditingCell(rowId, colId, row[colId]);
+          }
         }
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
@@ -761,47 +866,179 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       } else if (e.key === 'Tab') {
         e.preventDefault();
         const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
+        setDatePickerCell(null);
         if (e.shiftKey) {
           if (colIndex > 0) {
             setSelectedCell({ rowId, colId: currentSheet.columns[colIndex - 1].id });
+          } else {
+            const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
+            if (currRowIdx > 0) {
+              setSelectedCell({ 
+                rowId: paginatedRows[currRowIdx - 1].id, 
+                colId: currentSheet.columns[currentSheet.columns.length - 1].id 
+              });
+            }
           }
         } else {
           if (colIndex < currentSheet.columns.length - 1) {
             setSelectedCell({ rowId, colId: currentSheet.columns[colIndex + 1].id });
+          } else {
+            const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
+            if (currRowIdx < paginatedRows.length - 1) {
+              setSelectedCell({ 
+                rowId: paginatedRows[currRowIdx + 1].id, 
+                colId: currentSheet.columns[0].id 
+              });
+            }
           }
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
+        setDatePickerCell(null);
         const currIdx = paginatedRows.findIndex(r => r.id === rowId);
         if (currIdx < paginatedRows.length - 1) {
           setSelectedCell({ rowId: paginatedRows[currIdx + 1].id, colId });
         }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        setDatePickerCell(null);
         const currIdx = paginatedRows.findIndex(r => r.id === rowId);
         if (currIdx > 0) {
           setSelectedCell({ rowId: paginatedRows[currIdx - 1].id, colId });
         }
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
+        setDatePickerCell(null);
         const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
         if (colIndex < currentSheet.columns.length - 1) {
           setSelectedCell({ rowId, colId: currentSheet.columns[colIndex + 1].id });
         }
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
+        setDatePickerCell(null);
         const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
         if (colIndex > 0) {
           setSelectedCell({ rowId, colId: currentSheet.columns[colIndex - 1].id });
         }
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Direct typing replaces cell content
-        setSelectedCell({ rowId, colId });
-        setEditingCell({ rowId, colId });
-        setCellEditValue(e.key);
+        const col = currentSheet.columns.find(c => c.id === colId);
+        if (col && col.id !== 'status' && col.type !== 'select') {
+          setDatePickerCell(null);
+          setSelectedCell({ rowId, colId });
+          setEditingCell({ rowId, colId });
+          setCellEditValue(e.key);
+        }
       }
     }
   };
+
+  // Global Keyboard listener for arrow keys and grid navigation
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if header manager modal is open or no cell selected or currently editing
+      if (!selectedCell || editingCell || isHeaderManagerOpen) return;
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+        return;
+      }
+      
+      const { rowId, colId } = selectedCell;
+      const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
+      const currColIdx = currentSheet.columns.findIndex(c => c.id === colId);
+      if (currRowIdx === -1 || currColIdx === -1) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setDatePickerCell(null);
+        if (currRowIdx < paginatedRows.length - 1) {
+          setSelectedCell({ rowId: paginatedRows[currRowIdx + 1].id, colId });
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setDatePickerCell(null);
+        if (currRowIdx > 0) {
+          setSelectedCell({ rowId: paginatedRows[currRowIdx - 1].id, colId });
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setDatePickerCell(null);
+        if (currColIdx < currentSheet.columns.length - 1) {
+          setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx + 1].id });
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setDatePickerCell(null);
+        if (currColIdx > 0) {
+          setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx - 1].id });
+        }
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        setDatePickerCell(null);
+        if (e.shiftKey) {
+          if (currColIdx > 0) {
+            setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx - 1].id });
+          } else if (currRowIdx > 0) {
+            setSelectedCell({ 
+              rowId: paginatedRows[currRowIdx - 1].id, 
+              colId: currentSheet.columns[currentSheet.columns.length - 1].id 
+            });
+          }
+        } else {
+          if (currColIdx < currentSheet.columns.length - 1) {
+            setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx + 1].id });
+          } else if (currRowIdx < paginatedRows.length - 1) {
+            setSelectedCell({ 
+              rowId: paginatedRows[currRowIdx + 1].id, 
+              colId: currentSheet.columns[0].id 
+            });
+          }
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const row = currentSheet.rows.find(r => r.id === rowId);
+        const col = currentSheet.columns[currColIdx];
+        if (row) {
+          if (col.type === 'date' || col.id === 'date' || col.id === 'birthday' || col.id === 'dispatch') {
+            setDatePickerCell({ rowId, colId });
+          } else if (col.id !== 'status' && col.type !== 'select') {
+            startEditingCell(rowId, colId, row[colId]);
+          }
+        }
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        const updatedSheets = sheets.map(sheet => {
+          if (sheet.id !== currentSheet.id) return sheet;
+          const updatedRows = sheet.rows.map(row => {
+            if (row.id !== rowId) return row;
+            return { ...row, [colId]: '' };
+          });
+          return { ...sheet, rows: updatedRows };
+        });
+        saveSheets(updatedSheets);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const col = currentSheet.columns[currColIdx];
+        if (col && col.id !== 'status' && col.type !== 'select') {
+          e.preventDefault();
+          setDatePickerCell(null);
+          startEditingCell(rowId, colId, e.key);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [selectedCell, editingCell, paginatedRows, currentSheet, isHeaderManagerOpen, sheets]);
+
+  // Auto-scroll and DOM focus on selected cell
+  useEffect(() => {
+    if (selectedCell && !editingCell) {
+      const cellEl = document.querySelector(`[data-cell-id="${selectedCell.rowId}-${selectedCell.colId}"]`) as HTMLElement;
+      if (cellEl) {
+        cellEl.focus({ preventScroll: true });
+        cellEl.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      }
+    }
+  }, [selectedCell, editingCell]);
 
   // Add Row Handler
   const handleAddRow = (insertAtIndex?: number) => {
@@ -1168,26 +1405,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   // Status Badge Colors mapping to match 2nd image
   const getStatusBadgeStyle = (statusVal: string) => {
-    const s = (statusVal || '').trim();
-    if (s === 'Waiting for Image') {
-      // Peach / Orange badge as seen in 2nd image
-      return 'bg-[#ffedd5] text-[#c2410c] dark:bg-[#7c2d12]/50 dark:text-[#fdba74] border border-orange-300 dark:border-orange-600/60 shadow-sm font-semibold';
-    }
-    if (s === 'Image Received') {
-      // Light Green badge as seen in 2nd image
-      return 'bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/50 dark:text-[#86efac] border border-emerald-300 dark:border-emerald-600/60 shadow-sm font-semibold';
-    }
-    if (s === 'Cancel' || s === 'Cancelled') {
-      // Dark Crimson / Red badge as seen in 2nd image
-      return 'bg-[#ffe4e6] text-[#be123c] dark:bg-[#881337]/60 dark:text-[#fda4af] border border-rose-300 dark:border-rose-600/60 shadow-sm font-semibold';
-    }
-    if (s === 'In Progress') {
-      return 'bg-[#e0f2fe] text-[#0369a1] dark:bg-[#0c4a6e]/50 dark:text-[#7dd3fc] border border-sky-300 dark:border-sky-600/60 shadow-sm font-semibold';
-    }
-    if (s === 'Completed') {
-      return 'bg-[#ecfdf5] text-[#047857] dark:bg-[#064e3b]/50 dark:text-[#6ee7b7] border border-teal-300 dark:border-teal-600/60 shadow-sm font-semibold';
-    }
-    return 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 border border-slate-300 dark:border-slate-700/60';
+    return getDropdownOptionBadgeStyle(statusVal);
   };
 
   // Column Letters (A, B, C, D, E, ...)
@@ -1201,7 +1419,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   };
 
   return (
-    <div className="w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans">
+    <div 
+      className={`w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans relative rounded-2xl ${dailyTasksWallpaper ? 'wallpaper-active' : ''}`}
+    >
       {/* Hidden File Input for Excel Import */}
       <input 
         type="file" 
@@ -1212,7 +1432,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       />
 
       {/* TOP CONTROL PANEL / HERO BAR */}
-      <div className="bg-[#0b1329]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300">
+      <div className={`backdrop-blur-xl border rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300 daily-tasks-panel ${dailyTasksWallpaper ? 'bg-[#0b1329]/45 border-cyan-500/30' : 'bg-[#0b1329]/95 border-cyan-500/20'}`}>
         {/* Subtle glowing ambient lights */}
         <div className="absolute -top-24 -left-24 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -1240,7 +1460,40 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
           {/* Quick Metrics Bar */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <div className="bg-[#131d38] border border-slate-700/60 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+            {/* Wallpaper Selector Button immediately to left of Total Rows */}
+            <div className="relative group">
+              <input 
+                type="file" 
+                ref={wallpaperFileInputRef} 
+                onChange={handleWallpaperUpload} 
+                accept="image/*" 
+                className="hidden" 
+              />
+              <div className={`daily-tasks-metric border border-cyan-500/40 hover:border-cyan-400 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm transition-all ${dailyTasksWallpaper ? 'bg-[#131d38]/50 backdrop-blur-md' : 'bg-[#131d38]'}`}>
+                <button
+                  type="button"
+                  onClick={() => wallpaperFileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 text-xs font-black text-cyan-300 hover:text-white transition-colors cursor-pointer"
+                  title="Upload Wallpaper Image for Daily Tasks Section"
+                >
+                  <ImageIcon className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <span className="uppercase tracking-wider text-[10px]">Wallpaper</span>
+                </button>
+
+                {dailyTasksWallpaper && (
+                  <button
+                    type="button"
+                    onClick={handleClearWallpaper}
+                    className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors cursor-pointer ml-0.5"
+                    title="Remove Wallpaper"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className={`daily-tasks-metric border border-slate-700/60 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm ${dailyTasksWallpaper ? 'bg-[#131d38]/50 backdrop-blur-md' : 'bg-[#131d38]'}`}>
               <Layers className="w-4 h-4 text-cyan-400" />
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Rows</div>
@@ -1248,7 +1501,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </div>
             </div>
 
-            <div className="bg-[#131d38] border border-orange-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+            <div className={`daily-tasks-metric border border-orange-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm ${dailyTasksWallpaper ? 'bg-[#131d38]/50 backdrop-blur-md' : 'bg-[#131d38]'}`}>
               <Clock className="w-4 h-4 text-orange-400" />
               <div>
                 <div className="text-[10px] text-orange-300 uppercase font-bold tracking-wider">Waiting Image</div>
@@ -1256,7 +1509,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </div>
             </div>
 
-            <div className="bg-[#131d38] border border-emerald-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+            <div className={`daily-tasks-metric border border-emerald-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm ${dailyTasksWallpaper ? 'bg-[#131d38]/50 backdrop-blur-md' : 'bg-[#131d38]'}`}>
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <div>
                 <div className="text-[10px] text-emerald-300 uppercase font-bold tracking-wider">Image Received</div>
@@ -1264,7 +1517,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
               </div>
             </div>
 
-            <div className="bg-[#131d38] border border-rose-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+            <div className={`daily-tasks-metric border border-rose-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm ${dailyTasksWallpaper ? 'bg-[#131d38]/50 backdrop-blur-md' : 'bg-[#131d38]'}`}>
               <XCircle className="w-4 h-4 text-rose-400" />
               <div>
                 <div className="text-[10px] text-rose-300 uppercase font-bold tracking-wider">Cancelled</div>
@@ -1273,7 +1526,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             </div>
 
             {summaryStats.totalQuantity > 0 && (
-              <div className="bg-[#131d38] border border-blue-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm">
+              <div className={`daily-tasks-metric border border-blue-500/30 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm ${dailyTasksWallpaper ? 'bg-[#131d38]/50 backdrop-blur-md' : 'bg-[#131d38]'}`}>
                 <Hash className="w-4 h-4 text-blue-400" />
                 <div>
                   <div className="text-[10px] text-blue-300 uppercase font-bold tracking-wider">Total Count</div>
@@ -1486,33 +1739,33 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       )}
 
       {/* EXCEL SPREADSHEET MAIN CONTAINER */}
-      <div className="bg-[#0b1329] border border-slate-800 rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative">
+      <div className={`daily-tasks-table-container border rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all ${dailyTasksWallpaper ? 'bg-[#0b1329]/35 backdrop-blur-xl border-white/15' : 'bg-[#0b1329] border-slate-800'}`}>
         {/* SPREADSHEET TABLE GRID (Scrollable) */}
         <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar border-b border-slate-800 max-h-[600px] min-h-[420px]">
           <table className="w-full border-collapse text-left text-xs sm:text-sm select-none">
             {/* TABLE HEADER (Cyan Excel Style like 2nd image) */}
             <thead className="sticky top-0 z-20 shadow-md">
               {/* Top Row: Excel Column Letters (A, B, C, D...) */}
-              <tr className="bg-[#070e1f] text-slate-500 font-mono text-[10px] uppercase border-b border-slate-800">
-                <th className="w-12 text-center py-1 border-r border-slate-800/80 bg-[#060b18]">
+              <tr className={`text-slate-400 font-mono text-[10px] uppercase border-b ${dailyTasksWallpaper ? 'bg-slate-950/40 backdrop-blur-md border-white/10 text-cyan-200' : 'bg-[#070e1f] border-slate-800'}`}>
+                <th className={`w-12 text-center py-1 border-r ${dailyTasksWallpaper ? 'border-white/10 bg-slate-950/30' : 'border-slate-800/80 bg-[#060b18]'}`}>
                   #
                 </th>
                 {currentSheet.columns.map((col, idx) => (
                   <th 
                     key={`letter-${col.id}`} 
-                    className="py-1 px-3 border-r border-slate-800/80 text-center tracking-wider"
+                    className={`py-1 px-3 border-r text-center tracking-wider ${dailyTasksWallpaper ? 'border-white/10' : 'border-slate-800/80'}`}
                     style={{ width: col.width ? `${col.width}px` : 'auto' }}
                   >
                     {getColumnLetter(idx)}
                   </th>
                 ))}
-                <th className="w-14 text-center py-1 bg-[#060b18]">Actions</th>
+                <th className={`w-14 text-center py-1 ${dailyTasksWallpaper ? 'bg-slate-950/30' : 'bg-[#060b18]'}`}>Actions</th>
               </tr>
 
               {/* Main Header Row (Vibrant Cyan background as in reference image) */}
-              <tr className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 text-slate-950 font-black tracking-tight border-b-2 border-cyan-600">
+              <tr className={`font-black tracking-tight border-b-2 ${dailyTasksWallpaper ? 'bg-gradient-to-r from-cyan-600/80 via-blue-600/80 to-cyan-600/80 backdrop-blur-md text-white border-cyan-400/50 shadow-md' : 'bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 text-slate-950 border-cyan-600'}`}>
                 {/* Checkbox select all */}
-                <th className="w-12 py-3 px-2 text-center border-r border-cyan-500/60 bg-cyan-400/95">
+                <th className={`w-12 py-3 px-2 text-center border-r ${dailyTasksWallpaper ? 'border-white/15 bg-cyan-600/60' : 'border-cyan-500/60 bg-cyan-400/95'}`}>
                   <div className="flex items-center justify-center">
                     <input 
                       type="checkbox"
@@ -1533,7 +1786,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   return (
                     <th 
                       key={col.id}
-                      className="py-2.5 px-3 border-r border-cyan-500/60 text-slate-950 font-bold group relative"
+                      className={`py-2.5 px-3 border-r group relative ${dailyTasksWallpaper ? 'border-white/15 text-white' : 'border-cyan-500/60 text-slate-950 font-bold'}`}
                       style={{ width: col.width ? `${col.width}px` : 'auto' }}
                     >
                       {isEditing ? (
@@ -1636,14 +1889,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 })}
 
                 {/* Header Action spacer */}
-                <th className="w-14 py-2.5 px-2 text-center bg-cyan-400/95 text-slate-950 font-bold">
+                <th className={`w-14 py-2.5 px-2 text-center font-bold ${dailyTasksWallpaper ? 'bg-cyan-600/60 text-white' : 'bg-cyan-400/95 text-slate-950'}`}>
                   Edit
                 </th>
               </tr>
             </thead>
 
             {/* TABLE BODY (Rows & Cells) */}
-            <tbody className="divide-y divide-slate-800/60 bg-[#091024]">
+            <tbody className={`daily-tasks-table-body divide-y divide-slate-800/60 ${dailyTasksWallpaper ? 'bg-transparent' : 'bg-[#091024]'}`}>
               {paginatedRows.length === 0 ? (
                 <tr>
                   <td 
@@ -1672,14 +1925,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       key={row.id}
                       className={`group transition-colors ${
                         isRowSelected 
-                          ? 'bg-cyan-950/40 border-l-4 border-l-cyan-400' 
+                          ? 'bg-cyan-950/50 border-l-4 border-l-cyan-400' 
                           : rowIdx % 2 === 0 
-                            ? 'bg-[#0b132a] hover:bg-[#111c3d]' 
-                            : 'bg-[#080e21] hover:bg-[#111c3d]'
+                            ? (dailyTasksWallpaper ? 'daily-tasks-row-even bg-[#0b132a]/35 hover:bg-[#111c3d]/60 backdrop-blur-xs' : 'bg-[#0b132a] hover:bg-[#111c3d]') 
+                            : (dailyTasksWallpaper ? 'daily-tasks-row-odd bg-[#080e21]/20 hover:bg-[#111c3d]/60 backdrop-blur-xs' : 'bg-[#080e21] hover:bg-[#111c3d]')
                       }`}
                     >
                       {/* Row Index & Checkbox */}
-                      <td className="w-12 py-2 px-2 text-center border-r border-slate-800 text-slate-400 font-mono text-xs bg-[#060b18]/60 group-hover:bg-[#080f26]">
+                      <td className={`w-12 py-2 px-2 text-center border-r border-slate-800 text-slate-400 font-mono text-xs ${dailyTasksWallpaper ? 'bg-[#060b18]/25' : 'bg-[#060b18]/60'} group-hover:bg-[#080f26]`}>
                         <div className="flex items-center justify-center gap-1">
                           <input 
                             type="checkbox"
@@ -1714,10 +1967,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           return (
                             <td 
                               key={`${row.id}-${col.id}`}
+                              data-cell-id={`${row.id}-${col.id}`}
                               tabIndex={0}
+                              onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                               onFocus={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                               onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                              className={`py-1.5 px-3 border-r border-slate-800/80 relative transition-all ${
+                              className={`py-1.5 px-3 border-r border-slate-800/80 relative transition-all cursor-pointer ${
                                 isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/30' : ''
                               }`}
                             >
@@ -1728,7 +1983,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                     onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                                   >
                                     {cellValue ? (
-                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold transition-transform group-hover:scale-[1.02] ${getDropdownOptionBadgeStyle(cellValue)}`}>
+                                      <span className={`status-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold transition-transform group-hover:scale-[1.02] ${getDropdownOptionBadgeStyle(cellValue)}`}>
                                         {cellValue}
                                       </span>
                                     ) : (
@@ -1764,7 +2019,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                             cellValue === statusOpt ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-200'
                                           }`}
                                         >
-                                          <span className={`px-2 py-0.5 rounded-full text-[11px] ${getDropdownOptionBadgeStyle(statusOpt)}`}>
+                                          <span className={`status-badge px-2 py-0.5 rounded-full text-[11px] ${getDropdownOptionBadgeStyle(statusOpt)}`}>
                                             {statusOpt}
                                           </span>
                                           {cellValue === statusOpt && <Check className="w-3.5 h-3.5 text-cyan-400" />}
@@ -1820,12 +2075,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           return (
                             <td 
                               key={`${row.id}-${col.id}`}
+                              data-cell-id={`${row.id}-${col.id}`}
                               tabIndex={0}
                               onClick={() => {
                                 setSelectedCell({ rowId: row.id, colId: col.id });
-                                if (!isCellEditing) {
-                                  setDatePickerCell({ rowId: row.id, colId: col.id });
-                                }
+                                setDatePickerCell(null);
                               }}
                               onDoubleClick={() => {
                                 setDatePickerCell(null);
@@ -1860,22 +2114,29 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                     }
                                   }}
                                 >
-                                  <PopoverTrigger asChild>
-                                    <div className="flex items-center justify-between w-full min-h-[20px] group/date">
-                                      <div className="truncate flex items-center gap-1.5">
-                                        {cellValue ? (
-                                          <span className="font-semibold text-cyan-200">
-                                            {cellValue}
-                                          </span>
-                                        ) : (
-                                          <span className="text-slate-600/60 select-none flex items-center gap-1">
-                                            &mdash;
-                                          </span>
-                                        )}
-                                      </div>
-                                      <CalendarIcon className="w-3.5 h-3.5 text-cyan-400/60 group-hover/date:text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity ml-1 shrink-0" />
+                                  <div className="flex items-center justify-between w-full min-h-[20px] group/date">
+                                    <div className="truncate flex items-center gap-1.5 flex-1 min-h-[20px]">
+                                      {cellValue ? (
+                                        <span className="font-semibold text-cyan-200">
+                                          {cellValue}
+                                        </span>
+                                      ) : null}
                                     </div>
-                                  </PopoverTrigger>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedCell({ rowId: row.id, colId: col.id });
+                                          setDatePickerCell({ rowId: row.id, colId: col.id });
+                                        }}
+                                        className="p-0.5 text-cyan-400/60 hover:text-cyan-300 opacity-0 group-hover/date:opacity-100 transition-opacity ml-1 shrink-0 rounded hover:bg-cyan-500/20"
+                                        title="Open Date Recommendation"
+                                      >
+                                        <CalendarIcon className="w-3.5 h-3.5" />
+                                      </button>
+                                    </PopoverTrigger>
+                                  </div>
 
                                   <PopoverContent 
                                     className="w-80 sm:w-84 bg-[#0b1328] border-2 border-cyan-500/40 text-slate-100 p-3 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
@@ -2048,11 +2309,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                         return (
                           <td 
                             key={`${row.id}-${col.id}`}
+                            data-cell-id={`${row.id}-${col.id}`}
                             tabIndex={0}
                             onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
                             onDoubleClick={() => startEditingCell(row.id, col.id, cellValue)}
                             onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                            className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all ${
+                            className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all cursor-pointer ${
                               isCellSelected 
                                 ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/30 z-10' 
                                 : 'hover:bg-[#142144]'
@@ -2074,9 +2336,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                   <span className={col.id === 'count' ? 'font-bold text-cyan-300' : ''}>
                                     {cellValue}
                                   </span>
-                                ) : (
-                                  <span className="text-slate-600/40 select-none">&mdash;</span>
-                                )}
+                                ) : null}
                               </div>
                             )}
 
@@ -2139,7 +2399,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
 
         {/* BOTTOM PAGINATION BAR (25 details per page requirement) */}
-        <div className="bg-[#080f24] px-4 py-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-300">
+        <div className={`daily-tasks-footer-bar px-4 py-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-300 ${dailyTasksWallpaper ? 'bg-[#080f24]/50 backdrop-blur-md border-white/10' : 'bg-[#080f24]'}`}>
           {/* Row Counter info */}
           <div className="flex items-center gap-2">
             <span className="text-slate-400 font-medium">
@@ -2171,17 +2431,17 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             </button>
 
             {/* Page number indicators */}
-            <div className="flex items-center gap-1 px-1">
+            <div className="flex items-center gap-1 mx-1">
               {Array.from({ length: totalPages }, (_, i) => i + 1)
                 .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
                 .map((pageNum, idx, arr) => {
                   const showEllipsis = idx > 0 && pageNum - arr[idx - 1] > 1;
                   return (
                     <React.Fragment key={pageNum}>
-                      {showEllipsis && <span className="text-slate-500 px-1">...</span>}
+                      {showEllipsis && <span className="text-slate-600 px-1 font-bold">...</span>}
                       <button 
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`min-w-[32px] h-8 rounded-lg font-bold text-xs transition-all ${
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                           currentPage === pageNum 
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20' 
                             : 'bg-[#131d38] text-slate-300 hover:bg-slate-800 border border-slate-700'
@@ -2217,7 +2477,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         </div>
 
         {/* BOTTOM MULTI-SHEET TABS BAR (as in Image 2: Chocolate Price, AUG, SEP, OCT, Wholesale Price...) */}
-        <div className="bg-[#050914] px-4 py-2 border-t border-slate-800/90 flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar">
+        <div className={`daily-tasks-tabs-bar px-4 py-2 border-t border-slate-800/90 flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar ${dailyTasksWallpaper ? 'bg-[#050914]/50 backdrop-blur-md border-white/10' : 'bg-[#050914]'}`}>
           <div className="flex items-center gap-1.5">
             {/* Add New Sheet (+) Button */}
             <button 

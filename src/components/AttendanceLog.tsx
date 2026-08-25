@@ -154,8 +154,26 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     "July", "August", "September", "October", "November", "December"
   ];
 
-  // Attendance Records State
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  // Attendance Records State with local storage fallback
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
+    const localSaved = localStorage.getItem('sabi_attendance_records');
+    if (localSaved) {
+      try {
+        const parsed = JSON.parse(localSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const saveAttendanceList = (newList: AttendanceRecord[]) => {
+    setAttendanceRecords(newList);
+    try {
+      localStorage.setItem('sabi_attendance_records', JSON.stringify(newList));
+    } catch (e) {
+      console.error("Error saving attendance to localStorage", e);
+    }
+  };
   const [employeeSalaries, setEmployeeSalaries] = useState<Record<string, EmployeeSalary>>({});
 
   // Modals & Forms State
@@ -180,14 +198,33 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>("All");
   const [adminDuplicateFilter, setAdminDuplicateFilter] = useState<string>("All");
 
-  // Fetch Attendance Records from Firestore
+  // Fetch Attendance Records from Firestore and merge with localStorage
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "attendance"), (snap) => {
       const records: AttendanceRecord[] = [];
       snap.forEach(docSnap => {
         records.push({ fireId: docSnap.id, ...docSnap.data() } as AttendanceRecord);
       });
-      setAttendanceRecords(records);
+      if (records.length > 0) {
+        setAttendanceRecords(prev => {
+          const map = new Map<string, AttendanceRecord>();
+          // Put existing local records first
+          prev.forEach(r => {
+            const k = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+            map.set(k, r);
+          });
+          // Merge incoming firestore records (or overwrite matching date/user)
+          records.forEach(r => {
+            const k = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+            map.set(k, r);
+          });
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('sabi_attendance_records', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
+      }
     }, (error) => {
       console.log("Firestore attendance snapshot error or offline mode", error);
     });
@@ -349,7 +386,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
       newRecord
     ];
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     setSelectedDateAction(null);
     toast.success(`Marked Late Attendance for ${selectedUser} on ${targetDate}!`);
 
@@ -397,7 +434,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
       newRecord
     ];
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     setSelectedDateAction(null);
     toast.success(`Applied Leave for ${selectedUser} on ${targetDate}!`);
 
@@ -415,7 +452,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const handleActionUnmark = async (targetDate: string) => {
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
     const updated = attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate));
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     setSelectedDateAction(null);
     toast.success(`Unmarked attendance for ${selectedUser} on ${targetDate}!`);
 
@@ -447,7 +484,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
       newRecord
     ];
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     setSelectedDateAction(null);
     toast.success(`Marked Present for ${selectedUser} on ${targetDate}!`);
 
@@ -479,7 +516,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === todayStr)), newRecord];
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     toast.success(`Logged In successfully at ${loginTimeStr}! Marked as Present.`);
 
     try {
@@ -558,7 +595,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       (isSameEmployee(r.employeeName, selectedUser) && r.date === todayStr) ? updatedRecord : r
     );
 
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     toast.success(`Logged Out successfully! Working Hours: ${hoursFormatted}`);
 
     try {
@@ -598,7 +635,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, targetUser) && r.date === leaveDate)), leaveRecord];
-    setAttendanceRecords(updated);
+    saveAttendanceList(updated);
     setIsLeaveModalOpen(false);
     toast.success(`Leave applied for ${targetUser} on ${leaveDate}! Date marked in Red.`);
 

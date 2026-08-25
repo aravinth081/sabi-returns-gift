@@ -602,9 +602,9 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover {
   color: #cbd5e1 !important;
 }
 
-.wallpaper-active td:not(.fixed *),
+.wallpaper-active td:not(.fixed *):not(:has(.status-badge, [class*="rounded-full"])),
 .wallpaper-active label:not(.fixed *),
-.wallpaper-active span:not(.fixed *):not([class*="badge"]):not([class*="text-green"]):not([class*="text-rose"]):not([class*="text-red"]):not([class*="text-blue"]):not([class*="text-orange"]):not([class*="text-purple"]) {
+.wallpaper-active span:not(.fixed *):not([class*="badge"]):not([class*="rounded-full"]):not([class*="status"]):not([class*="text-green"]):not([class*="text-emerald"]):not([class*="text-rose"]):not([class*="text-red"]):not([class*="text-blue"]):not([class*="text-sky"]):not([class*="text-cyan"]):not([class*="text-orange"]):not([class*="text-amber"]):not([class*="text-purple"]):not([class*="text-yellow"]):not([class*="text-["]) {
   color: #e2e8f0 !important;
 }
 
@@ -727,6 +727,59 @@ table tbody td.sticky-actions-col {
   background-color: rgba(37, 99, 235, 0.2) !important;
   color: #93c5fd !important;
   border-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+/* Daily Tasks Wallpaper Blending Glassmorphism - Ultra Premium Transparent */
+.wallpaper-active .daily-tasks-panel {
+  background-color: rgba(11, 19, 41, 0.30) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.wallpaper-active .daily-tasks-metric {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.wallpaper-active .daily-tasks-table-container {
+  background-color: rgba(10, 16, 35, 0.25) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.wallpaper-active .daily-tasks-table-body {
+  background-color: transparent !important;
+}
+
+.wallpaper-active .daily-tasks-row-even {
+  background-color: rgba(15, 23, 42, 0.20) !important;
+}
+
+.wallpaper-active .daily-tasks-row-odd {
+  background-color: rgba(0, 0, 0, 0.10) !important;
+}
+
+.wallpaper-active .daily-tasks-row-even:hover,
+.wallpaper-active .daily-tasks-row-odd:hover {
+  background-color: rgba(6, 182, 212, 0.22) !important;
+}
+
+.wallpaper-active .daily-tasks-footer-bar {
+  background-color: rgba(10, 16, 35, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.wallpaper-active .daily-tasks-tabs-bar {
+  background-color: rgba(7, 11, 24, 0.40) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Chocolate badge overrides when wallpaper is active */
