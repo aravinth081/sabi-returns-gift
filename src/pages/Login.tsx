@@ -37,30 +37,24 @@ const Login = () => {
       <div className="relative z-10 w-full max-w-md bg-[#0c1326]/90 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(245,158,11,0.12)] p-7 sm:p-9 border border-amber-500/30 overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
 
-        {/* Sabi Return Gifts Logo Header - Royal Gold Circular Medallion */}
+        {/* Sabi Return Gifts Logo Showcase (Full Unclipped 3D Gold Art) */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="relative group mb-3">
-            <div className="absolute -inset-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-full blur-md opacity-60 group-hover:opacity-90 transition duration-500 animate-pulse" />
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1 bg-gradient-to-tr from-amber-600 via-yellow-300 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.5)] flex items-center justify-center">
-              <div className="w-full h-full rounded-full bg-[#050914] border-2 border-amber-400/80 overflow-hidden flex items-center justify-center p-1.5 shadow-inner relative">
-                <img 
-                  src="/sabi-gold-logo.png" 
-                  alt="Sabi Return Gifts" 
-                  className="w-full h-full object-cover scale-110 rounded-full filter drop-shadow-[0_2px_10px_rgba(245,158,11,0.6)]"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
+          <div className="relative group w-full flex items-center justify-center mb-2">
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/30 via-yellow-400/40 to-amber-500/30 rounded-3xl blur-2xl opacity-60 group-hover:opacity-90 transition duration-700" />
+            <div className="relative w-64 sm:w-72 h-32 flex items-center justify-center p-1 transition-transform duration-500 group-hover:scale-[1.02]">
+              <img 
+                src="/sabi-gold-logo.png" 
+                alt="Sabi Return Gifts" 
+                className="w-full h-full object-contain filter drop-shadow-[0_4px_25px_rgba(245,158,11,0.6)]"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
             </div>
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-yellow-300 to-amber-200 drop-shadow-md">
-            Sabi Return Gifts
-          </h1>
-          
-          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold tracking-widest uppercase mt-1">
-            <Sparkles className="w-3 h-3 text-amber-400" /> Member Login
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 via-amber-400/20 to-amber-500/15 border border-amber-400/35 text-amber-300 text-[10px] sm:text-[11px] font-black tracking-widest uppercase shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Member Login
           </div>
         </div>
 
