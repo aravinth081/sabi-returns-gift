@@ -216,6 +216,14 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   // Cell Editing & Selection State
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; colId: string } | null>(null);
+  const [anchorCell, setAnchorCell] = useState<{ rowId: string; colId: string } | null>(null);
+  const [selectedRange, setSelectedRange] = useState<{
+    startRowIdx: number;
+    endRowIdx: number;
+    startColIdx: number;
+    endColIdx: number;
+  } | null>(null);
+  const [isDraggingSelection, setIsDraggingSelection] = useState<boolean>(false);
   const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null);
   const [cellEditValue, setCellEditValue] = useState<string>('');
 
@@ -619,27 +627,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     window.addEventListener('sabi-daily-tasks-undo', onUndoEvent);
     window.addEventListener('sabi-daily-tasks-redo', onRedoEvent);
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-      if (isCtrlOrCmd && e.key.toLowerCase() === 'z') {
-        if (e.shiftKey) {
-          e.preventDefault();
-          handleRedo();
-        } else {
-          e.preventDefault();
-          handleUndo();
-        }
-      } else if (isCtrlOrCmd && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('sabi-daily-tasks-undo', onUndoEvent);
       window.removeEventListener('sabi-daily-tasks-redo', onRedoEvent);
-      window.removeEventListener('keydown', onKeyDown);
     };
   }, [handleUndo, handleRedo]);
 
@@ -732,9 +722,123 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   // --- ACTIONS & HANDLERS ---
 
+  // Normalized bounds of the current selection (minRow, maxRow, minCol, maxCol)
+  const normalizedRange = useMemo(() => {
+    if (!selectedRange) {
+      if (selectedCell) {
+        const rIdx = paginatedRows.findIndex(r => r.id === selectedCell.rowId);
+        const cIdx = currentSheet.columns.findIndex(c => c.id === selectedCell.colId);
+        if (rIdx !== -1 && cIdx !== -1) {
+          return {
+            minRow: rIdx,
+            maxRow: rIdx,
+            minCol: cIdx,
+            maxCol: cIdx
+          };
+        }
+      }
+      return null;
+    }
+    return {
+      minRow: Math.max(0, Math.min(selectedRange.startRowIdx, selectedRange.endRowIdx)),
+      maxRow: Math.min(paginatedRows.length - 1, Math.max(selectedRange.startRowIdx, selectedRange.endRowIdx)),
+      minCol: Math.max(0, Math.min(selectedRange.startColIdx, selectedRange.endColIdx)),
+      maxCol: Math.min(currentSheet.columns.length - 1, Math.max(selectedRange.startColIdx, selectedRange.endColIdx))
+    };
+  }, [selectedRange, selectedCell, paginatedRows, currentSheet.columns]);
+
+  // Check if a cell is included in the selection range
+  const isCellInRange = useCallback((rowIdx: number, colIdx: number) => {
+    if (!normalizedRange) return false;
+    return (
+      rowIdx >= normalizedRange.minRow &&
+      rowIdx <= normalizedRange.maxRow &&
+      colIdx >= normalizedRange.minCol &&
+      colIdx <= normalizedRange.maxCol
+    );
+  }, [normalizedRange]);
+
+  // Mouse Drag & Click Selection Handlers
+  const handleCellMouseDown = (rowId: string, colId: string, rowIdx: number, colIdx: number, e: React.MouseEvent) => {
+    if (editingCell) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('select') || 
+      target.closest('[data-radix-popper-content-wrapper]') ||
+      target.closest('[role="dialog"]')
+    ) {
+      return;
+    }
+
+    setDatePickerCell(null);
+    setOpenDropdownCell(null);
+
+    if (e.shiftKey && anchorCell) {
+      const anchorRowIdx = paginatedRows.findIndex(r => r.id === anchorCell.rowId);
+      const anchorColIdx = currentSheet.columns.findIndex(c => c.id === anchorCell.colId);
+      if (anchorRowIdx !== -1 && anchorColIdx !== -1) {
+        setSelectedCell({ rowId, colId });
+        setSelectedRange({
+          startRowIdx: anchorRowIdx,
+          endRowIdx: rowIdx,
+          startColIdx: anchorColIdx,
+          endColIdx: colIdx
+        });
+        return;
+      }
+    }
+
+    // Normal single-cell click & start potential drag
+    setSelectedCell({ rowId, colId });
+    setAnchorCell({ rowId, colId });
+    setSelectedRange({
+      startRowIdx: rowIdx,
+      endRowIdx: rowIdx,
+      startColIdx: colIdx,
+      endColIdx: colIdx
+    });
+    setIsDraggingSelection(true);
+  };
+
+  const handleCellMouseEnter = (rowId: string, colId: string, rowIdx: number, colIdx: number) => {
+    if (!isDraggingSelection || !anchorCell) return;
+    const anchorRowIdx = paginatedRows.findIndex(r => r.id === anchorCell.rowId);
+    const anchorColIdx = currentSheet.columns.findIndex(c => c.id === anchorCell.colId);
+    if (anchorRowIdx === -1 || anchorColIdx === -1) return;
+
+    setSelectedCell({ rowId, colId });
+    setSelectedRange({
+      startRowIdx: anchorRowIdx,
+      endRowIdx: rowIdx,
+      startColIdx: anchorColIdx,
+      endColIdx: colIdx
+    });
+  };
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      setIsDraggingSelection(false);
+    };
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, []);
+
   // Cell Edit Handlers
   const startEditingCell = (rowId: string, colId: string, initialValue: any) => {
     setSelectedCell({ rowId, colId });
+    setAnchorCell({ rowId, colId });
+    const rIdx = paginatedRows.findIndex(r => r.id === rowId);
+    const cIdx = currentSheet.columns.findIndex(c => c.id === colId);
+    if (rIdx !== -1 && cIdx !== -1) {
+      setSelectedRange({
+        startRowIdx: rIdx,
+        endRowIdx: rIdx,
+        startColIdx: cIdx,
+        endColIdx: cIdx
+      });
+    }
     setEditingCell({ rowId, colId });
     setCellEditValue(initialValue !== undefined && initialValue !== null ? String(initialValue) : '');
   };
@@ -809,229 +913,558 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
   };
 
-  // Keyboard navigation between cells
-  const handleCellKeyDown = (e: React.KeyboardEvent, rowId: string, colId: string) => {
-    if (editingCell) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commitCellEdit();
-        // Move to row below if available
-        const currentIndex = paginatedRows.findIndex(r => r.id === rowId);
-        if (currentIndex < paginatedRows.length - 1) {
-          const nextRow = paginatedRows[currentIndex + 1];
-          setSelectedCell({ rowId: nextRow.id, colId });
-          setDatePickerCell(null);
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        cancelCellEdit();
-      } else if (e.key === 'Tab') {
-        e.preventDefault();
-        commitCellEdit();
-        const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
-        if (e.shiftKey) {
-          if (colIndex > 0) {
-            const prevCol = currentSheet.columns[colIndex - 1];
-            setSelectedCell({ rowId, colId: prevCol.id });
-            setDatePickerCell(null);
-          }
-        } else {
-          if (colIndex < currentSheet.columns.length - 1) {
-            const nextCol = currentSheet.columns[colIndex + 1];
-            setSelectedCell({ rowId, colId: nextCol.id });
-            setDatePickerCell(null);
-          }
-        }
-      }
-    } else {
-      // Cell selected but not in edit mode
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const row = currentSheet.rows.find(r => r.id === rowId);
-        const col = currentSheet.columns.find(c => c.id === colId);
-        if (row && col) {
-          if (col.type === 'date' || col.id === 'date' || col.id === 'birthday' || col.id === 'dispatch') {
-            setDatePickerCell({ rowId, colId });
-          } else if (col.id !== 'status' && col.type !== 'select') {
-            startEditingCell(rowId, colId, row[colId]);
-          }
-        }
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        const updatedSheets = sheets.map(sheet => {
-          if (sheet.id !== currentSheet.id) return sheet;
-          const updatedRows = sheet.rows.map(row => {
-            if (row.id !== rowId) return row;
-            return { ...row, [colId]: '' };
-          });
-          return { ...sheet, rows: updatedRows };
+  // Keyboard navigation inside an inline active input
+  const handleInlineInputKeyDown = (e: React.KeyboardEvent, rowId: string, colId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitCellEdit();
+      const currIdx = paginatedRows.findIndex(r => r.id === rowId);
+      const currColIdx = currentSheet.columns.findIndex(c => c.id === colId);
+      if (currIdx < paginatedRows.length - 1 && currColIdx !== -1) {
+        const nextRow = paginatedRows[currIdx + 1];
+        setSelectedCell({ rowId: nextRow.id, colId });
+        setAnchorCell({ rowId: nextRow.id, colId });
+        setSelectedRange({
+          startRowIdx: currIdx + 1,
+          endRowIdx: currIdx + 1,
+          startColIdx: currColIdx,
+          endColIdx: currColIdx
         });
-        saveSheets(updatedSheets);
-      } else if (e.key === 'Tab') {
-        e.preventDefault();
-        const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
-        setDatePickerCell(null);
-        if (e.shiftKey) {
-          if (colIndex > 0) {
-            setSelectedCell({ rowId, colId: currentSheet.columns[colIndex - 1].id });
-          } else {
-            const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
-            if (currRowIdx > 0) {
-              setSelectedCell({ 
-                rowId: paginatedRows[currRowIdx - 1].id, 
-                colId: currentSheet.columns[currentSheet.columns.length - 1].id 
-              });
-            }
-          }
-        } else {
-          if (colIndex < currentSheet.columns.length - 1) {
-            setSelectedCell({ rowId, colId: currentSheet.columns[colIndex + 1].id });
-          } else {
-            const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
-            if (currRowIdx < paginatedRows.length - 1) {
-              setSelectedCell({ 
-                rowId: paginatedRows[currRowIdx + 1].id, 
-                colId: currentSheet.columns[0].id 
-              });
-            }
-          }
-        }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setDatePickerCell(null);
-        const currIdx = paginatedRows.findIndex(r => r.id === rowId);
-        if (currIdx < paginatedRows.length - 1) {
-          setSelectedCell({ rowId: paginatedRows[currIdx + 1].id, colId });
-        }
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setDatePickerCell(null);
-        const currIdx = paginatedRows.findIndex(r => r.id === rowId);
-        if (currIdx > 0) {
-          setSelectedCell({ rowId: paginatedRows[currIdx - 1].id, colId });
-        }
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        setDatePickerCell(null);
-        const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
-        if (colIndex < currentSheet.columns.length - 1) {
-          setSelectedCell({ rowId, colId: currentSheet.columns[colIndex + 1].id });
-        }
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        setDatePickerCell(null);
-        const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelCellEdit();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      commitCellEdit();
+      const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
+      const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
+      if (e.shiftKey) {
         if (colIndex > 0) {
-          setSelectedCell({ rowId, colId: currentSheet.columns[colIndex - 1].id });
+          const prevCol = currentSheet.columns[colIndex - 1];
+          setSelectedCell({ rowId, colId: prevCol.id });
+          setAnchorCell({ rowId, colId: prevCol.id });
+          setSelectedRange({
+            startRowIdx: currRowIdx,
+            endRowIdx: currRowIdx,
+            startColIdx: colIndex - 1,
+            endColIdx: colIndex - 1
+          });
         }
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const col = currentSheet.columns.find(c => c.id === colId);
-        if (col && col.id !== 'status' && col.type !== 'select') {
-          setDatePickerCell(null);
-          setSelectedCell({ rowId, colId });
-          setEditingCell({ rowId, colId });
-          setCellEditValue(e.key);
+      } else {
+        if (colIndex < currentSheet.columns.length - 1) {
+          const nextCol = currentSheet.columns[colIndex + 1];
+          setSelectedCell({ rowId, colId: nextCol.id });
+          setAnchorCell({ rowId, colId: nextCol.id });
+          setSelectedRange({
+            startRowIdx: currRowIdx,
+            endRowIdx: currRowIdx,
+            startColIdx: colIndex + 1,
+            endColIdx: colIndex + 1
+          });
         }
       }
     }
   };
 
-  // Global Keyboard listener for arrow keys and grid navigation
+  // Clipboard: Copy selected range as Tab-Separated Values (TSV)
+  const handleCopySelectedRange = useCallback(async () => {
+    if (!normalizedRange) return;
+    const { minRow, maxRow, minCol, maxCol } = normalizedRange;
+    const lines: string[] = [];
+
+    for (let r = minRow; r <= maxRow; r++) {
+      const row = paginatedRows[r];
+      if (!row) continue;
+      const rowCells: string[] = [];
+      for (let c = minCol; c <= maxCol; c++) {
+        const colDef = currentSheet.columns[c];
+        if (!colDef) continue;
+        const val = row[colDef.id] !== undefined && row[colDef.id] !== null ? String(row[colDef.id]) : '';
+        rowCells.push(val);
+      }
+      lines.push(rowCells.join('\t'));
+    }
+
+    const tsvData = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(tsvData);
+      toast.success(`Copied ${maxRow - minRow + 1}×${maxCol - minCol + 1} cells to clipboard`);
+    } catch (err) {
+      console.error('Clipboard copy failed:', err);
+    }
+  }, [normalizedRange, paginatedRows, currentSheet.columns]);
+
+  // Clipboard: Cut selected range
+  const handleCutSelectedRange = useCallback(async () => {
+    if (!normalizedRange) return;
+    await handleCopySelectedRange();
+
+    const { minRow, maxRow, minCol, maxCol } = normalizedRange;
+    const affectedRowIds = new Set<string>();
+    for (let r = minRow; r <= maxRow; r++) {
+      if (paginatedRows[r]) affectedRowIds.add(paginatedRows[r].id);
+    }
+
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      const updatedRows = sheet.rows.map(row => {
+        if (!affectedRowIds.has(row.id)) return row;
+        const newRow = { ...row };
+        for (let c = minCol; c <= maxCol; c++) {
+          const colDef = currentSheet.columns[c];
+          if (colDef) {
+            newRow[colDef.id] = '';
+          }
+        }
+        return newRow;
+      });
+      return { ...sheet, rows: updatedRows };
+    });
+
+    saveSheets(updatedSheets);
+    toast.success('Cut selected range');
+  }, [normalizedRange, handleCopySelectedRange, paginatedRows, currentSheet, sheets, saveSheets]);
+
+  // Clipboard: Paste tabular data into grid
+  const handlePasteIntoGrid = useCallback(async () => {
+    if (!selectedCell) return;
+    let clipText = '';
+    try {
+      clipText = await navigator.clipboard.readText();
+    } catch (err) {
+      console.warn('Clipboard read error:', err);
+      return;
+    }
+
+    if (!clipText) return;
+
+    const rawLines = clipText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') {
+      rawLines.pop();
+    }
+    const matrix = rawLines.map(line => line.split('\t'));
+    if (matrix.length === 0 || matrix[0].length === 0) return;
+
+    const startRowIdx = normalizedRange ? normalizedRange.minRow : paginatedRows.findIndex(r => r.id === selectedCell.rowId);
+    const startColIdx = normalizedRange ? normalizedRange.minCol : currentSheet.columns.findIndex(c => c.id === selectedCell.colId);
+    if (startRowIdx === -1 || startColIdx === -1) return;
+
+    const rowIdMap = new Map<string, Record<string, string>>();
+
+    for (let r = 0; r < matrix.length; r++) {
+      const targetRowIdx = startRowIdx + r;
+      if (targetRowIdx >= paginatedRows.length) break;
+      const targetRow = paginatedRows[targetRowIdx];
+      if (!targetRow) continue;
+
+      if (!rowIdMap.has(targetRow.id)) {
+        rowIdMap.set(targetRow.id, {});
+      }
+      const rowUpdates = rowIdMap.get(targetRow.id)!;
+
+      for (let c = 0; c < matrix[r].length; c++) {
+        const targetColIdx = startColIdx + c;
+        if (targetColIdx >= currentSheet.columns.length) break;
+        const colDef = currentSheet.columns[targetColIdx];
+        if (colDef) {
+          rowUpdates[colDef.id] = matrix[r][c];
+        }
+      }
+    }
+
+    if (rowIdMap.size === 0) return;
+
+    const updatedSheets = sheets.map(sheet => {
+      if (sheet.id !== currentSheet.id) return sheet;
+      const updatedRows = sheet.rows.map(row => {
+        if (!rowIdMap.has(row.id)) return row;
+        return {
+          ...row,
+          ...rowIdMap.get(row.id)
+        };
+      });
+      return { ...sheet, rows: updatedRows };
+    });
+
+    saveSheets(updatedSheets);
+
+    const pastedEndRow = Math.min(paginatedRows.length - 1, startRowIdx + matrix.length - 1);
+    const pastedEndCol = Math.min(currentSheet.columns.length - 1, startColIdx + (matrix[0]?.length || 1) - 1);
+    setSelectedRange({
+      startRowIdx,
+      endRowIdx: pastedEndRow,
+      startColIdx,
+      endColIdx: pastedEndCol
+    });
+    setAnchorCell({ rowId: paginatedRows[startRowIdx].id, colId: currentSheet.columns[startColIdx].id });
+    setSelectedCell({ rowId: paginatedRows[pastedEndRow].id, colId: currentSheet.columns[pastedEndCol].id });
+
+    toast.success(`Pasted data into ${pastedEndRow - startRowIdx + 1}×${pastedEndCol - startColIdx + 1} cells`);
+  }, [selectedCell, normalizedRange, paginatedRows, currentSheet, sheets, saveSheets]);
+
+  // Select all cells in the current page
+  const handleSelectAllGrid = useCallback(() => {
+    if (paginatedRows.length === 0 || currentSheet.columns.length === 0) return;
+    setSelectedRange({
+      startRowIdx: 0,
+      endRowIdx: paginatedRows.length - 1,
+      startColIdx: 0,
+      endColIdx: currentSheet.columns.length - 1
+    });
+    setAnchorCell({ rowId: paginatedRows[0].id, colId: currentSheet.columns[0].id });
+    setSelectedCell({ rowId: paginatedRows[paginatedRows.length - 1].id, colId: currentSheet.columns[currentSheet.columns.length - 1].id });
+  }, [paginatedRows, currentSheet.columns]);
+
+  // Unified Global Keyboard Listener for Grid Navigation & Actions
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if header manager modal is open or no cell selected or currently editing
-      if (!selectedCell || editingCell || isHeaderManagerOpen) return;
+      // 1. If currently editing a cell, or modal is open, or focused in an input/textarea/select, DO NOT intercept
+      if (editingCell || isHeaderManagerOpen || editingHeaderColId || editingSheetId) return;
       const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
         return;
       }
-      
+      const activeEl = document.activeElement as HTMLElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable)) {
+        return;
+      }
+
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      // Undo / Redo
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // Copy: Ctrl/Cmd + C
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'c') {
+        if (selectedCell || selectedRange) {
+          e.preventDefault();
+          handleCopySelectedRange();
+        }
+        return;
+      }
+
+      // Cut: Ctrl/Cmd + X
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'x') {
+        if (selectedCell || selectedRange) {
+          e.preventDefault();
+          handleCutSelectedRange();
+        }
+        return;
+      }
+
+      // Paste: Ctrl/Cmd + V
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'v') {
+        if (selectedCell || selectedRange) {
+          e.preventDefault();
+          handlePasteIntoGrid();
+        }
+        return;
+      }
+
+      // Select All: Ctrl/Cmd + A
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        handleSelectAllGrid();
+        return;
+      }
+
+      // If no cell is selected, nothing more to do
+      if (!selectedCell) return;
+
       const { rowId, colId } = selectedCell;
       const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
       const currColIdx = currentSheet.columns.findIndex(c => c.id === colId);
       if (currRowIdx === -1 || currColIdx === -1) return;
 
+      const anchorRowIdx = anchorCell ? paginatedRows.findIndex(r => r.id === anchorCell.rowId) : currRowIdx;
+      const anchorColIdx = anchorCell ? currentSheet.columns.findIndex(c => c.id === anchorCell.colId) : currColIdx;
+      const effectiveAnchorRow = anchorRowIdx === -1 ? currRowIdx : anchorRowIdx;
+      const effectiveAnchorCol = anchorColIdx === -1 ? currColIdx : anchorColIdx;
+
+      // ARROW DOWN (A1 -> A2)
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setDatePickerCell(null);
+        setOpenDropdownCell(null);
         if (currRowIdx < paginatedRows.length - 1) {
-          setSelectedCell({ rowId: paginatedRows[currRowIdx + 1].id, colId });
+          const nextRowIdx = currRowIdx + 1;
+          const nextRowId = paginatedRows[nextRowIdx].id;
+          setSelectedCell({ rowId: nextRowId, colId });
+          if (e.shiftKey) {
+            setSelectedRange({
+              startRowIdx: effectiveAnchorRow,
+              endRowIdx: nextRowIdx,
+              startColIdx: selectedRange ? selectedRange.startColIdx : effectiveAnchorCol,
+              endColIdx: selectedRange ? selectedRange.endColIdx : effectiveAnchorCol
+            });
+          } else {
+            setAnchorCell({ rowId: nextRowId, colId });
+            setSelectedRange({
+              startRowIdx: nextRowIdx,
+              endRowIdx: nextRowIdx,
+              startColIdx: currColIdx,
+              endColIdx: currColIdx
+            });
+          }
         }
-      } else if (e.key === 'ArrowUp') {
+        return;
+      }
+
+      // ARROW UP (A2 -> A1)
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
         setDatePickerCell(null);
+        setOpenDropdownCell(null);
         if (currRowIdx > 0) {
-          setSelectedCell({ rowId: paginatedRows[currRowIdx - 1].id, colId });
+          const prevRowIdx = currRowIdx - 1;
+          const prevRowId = paginatedRows[prevRowIdx].id;
+          setSelectedCell({ rowId: prevRowId, colId });
+          if (e.shiftKey) {
+            setSelectedRange({
+              startRowIdx: effectiveAnchorRow,
+              endRowIdx: prevRowIdx,
+              startColIdx: selectedRange ? selectedRange.startColIdx : effectiveAnchorCol,
+              endColIdx: selectedRange ? selectedRange.endColIdx : effectiveAnchorCol
+            });
+          } else {
+            setAnchorCell({ rowId: prevRowId, colId });
+            setSelectedRange({
+              startRowIdx: prevRowIdx,
+              endRowIdx: prevRowIdx,
+              startColIdx: currColIdx,
+              endColIdx: currColIdx
+            });
+          }
         }
-      } else if (e.key === 'ArrowRight') {
+        return;
+      }
+
+      // ARROW RIGHT (A1 -> B1 -> C1)
+      if (e.key === 'ArrowRight') {
         e.preventDefault();
         setDatePickerCell(null);
+        setOpenDropdownCell(null);
         if (currColIdx < currentSheet.columns.length - 1) {
-          setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx + 1].id });
+          const nextColIdx = currColIdx + 1;
+          const nextColId = currentSheet.columns[nextColIdx].id;
+          setSelectedCell({ rowId, colId: nextColId });
+          if (e.shiftKey) {
+            setSelectedRange({
+              startRowIdx: selectedRange ? selectedRange.startRowIdx : effectiveAnchorRow,
+              endRowIdx: selectedRange ? selectedRange.endRowIdx : effectiveAnchorRow,
+              startColIdx: effectiveAnchorCol,
+              endColIdx: nextColIdx
+            });
+          } else {
+            setAnchorCell({ rowId, colId: nextColId });
+            setSelectedRange({
+              startRowIdx: currRowIdx,
+              endRowIdx: currRowIdx,
+              startColIdx: nextColIdx,
+              endColIdx: nextColIdx
+            });
+          }
         }
-      } else if (e.key === 'ArrowLeft') {
+        return;
+      }
+
+      // ARROW LEFT (C1 -> B1 -> A1)
+      if (e.key === 'ArrowLeft') {
         e.preventDefault();
         setDatePickerCell(null);
+        setOpenDropdownCell(null);
         if (currColIdx > 0) {
-          setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx - 1].id });
+          const prevColIdx = currColIdx - 1;
+          const prevColId = currentSheet.columns[prevColIdx].id;
+          setSelectedCell({ rowId, colId: prevColId });
+          if (e.shiftKey) {
+            setSelectedRange({
+              startRowIdx: selectedRange ? selectedRange.startRowIdx : effectiveAnchorRow,
+              endRowIdx: selectedRange ? selectedRange.endRowIdx : effectiveAnchorRow,
+              startColIdx: effectiveAnchorCol,
+              endColIdx: prevColIdx
+            });
+          } else {
+            setAnchorCell({ rowId, colId: prevColId });
+            setSelectedRange({
+              startRowIdx: currRowIdx,
+              endRowIdx: currRowIdx,
+              startColIdx: prevColIdx,
+              endColIdx: prevColIdx
+            });
+          }
         }
-      } else if (e.key === 'Tab') {
+        return;
+      }
+
+      // TAB
+      if (e.key === 'Tab') {
         e.preventDefault();
         setDatePickerCell(null);
+        setOpenDropdownCell(null);
         if (e.shiftKey) {
           if (currColIdx > 0) {
-            setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx - 1].id });
+            const prevColId = currentSheet.columns[currColIdx - 1].id;
+            setSelectedCell({ rowId, colId: prevColId });
+            setAnchorCell({ rowId, colId: prevColId });
+            setSelectedRange({
+              startRowIdx: currRowIdx,
+              endRowIdx: currRowIdx,
+              startColIdx: currColIdx - 1,
+              endColIdx: currColIdx - 1
+            });
           } else if (currRowIdx > 0) {
-            setSelectedCell({ 
-              rowId: paginatedRows[currRowIdx - 1].id, 
-              colId: currentSheet.columns[currentSheet.columns.length - 1].id 
+            const prevRowId = paginatedRows[currRowIdx - 1].id;
+            const lastColIdx = currentSheet.columns.length - 1;
+            const lastColId = currentSheet.columns[lastColIdx].id;
+            setSelectedCell({ rowId: prevRowId, colId: lastColId });
+            setAnchorCell({ rowId: prevRowId, colId: lastColId });
+            setSelectedRange({
+              startRowIdx: currRowIdx - 1,
+              endRowIdx: currRowIdx - 1,
+              startColIdx: lastColIdx,
+              endColIdx: lastColIdx
             });
           }
         } else {
           if (currColIdx < currentSheet.columns.length - 1) {
-            setSelectedCell({ rowId, colId: currentSheet.columns[currColIdx + 1].id });
+            const nextColId = currentSheet.columns[currColIdx + 1].id;
+            setSelectedCell({ rowId, colId: nextColId });
+            setAnchorCell({ rowId, colId: nextColId });
+            setSelectedRange({
+              startRowIdx: currRowIdx,
+              endRowIdx: currRowIdx,
+              startColIdx: currColIdx + 1,
+              endColIdx: currColIdx + 1
+            });
           } else if (currRowIdx < paginatedRows.length - 1) {
-            setSelectedCell({ 
-              rowId: paginatedRows[currRowIdx + 1].id, 
-              colId: currentSheet.columns[0].id 
+            const nextRowId = paginatedRows[currRowIdx + 1].id;
+            const firstColId = currentSheet.columns[0].id;
+            setSelectedCell({ rowId: nextRowId, colId: firstColId });
+            setAnchorCell({ rowId: nextRowId, colId: firstColId });
+            setSelectedRange({
+              startRowIdx: currRowIdx + 1,
+              endRowIdx: currRowIdx + 1,
+              startColIdx: 0,
+              endColIdx: 0
             });
           }
         }
-      } else if (e.key === 'Enter') {
+        return;
+      }
+
+      // ENTER
+      if (e.key === 'Enter') {
         e.preventDefault();
         const row = currentSheet.rows.find(r => r.id === rowId);
         const col = currentSheet.columns[currColIdx];
-        if (row) {
-          if (col.type === 'date' || col.id === 'date' || col.id === 'birthday' || col.id === 'dispatch') {
+        if (row && col) {
+          const isDateCol = col.id === 'date' || col.type === 'date' || col.id === 'birthday' || col.id === 'dispatch' || col.label.toLowerCase().includes('date');
+          const isSelectCol = col.id === 'status' || col.type === 'select';
+          if (isDateCol) {
             setDatePickerCell({ rowId, colId });
-          } else if (col.id !== 'status' && col.type !== 'select') {
+          } else if (isSelectCol) {
+            setOpenDropdownCell({ rowId, colId });
+          } else {
             startEditingCell(rowId, colId, row[colId]);
           }
         }
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        return;
+      }
+
+      // ESCAPE
+      if (e.key === 'Escape') {
         e.preventDefault();
+        setDatePickerCell(null);
+        setOpenDropdownCell(null);
+        setSelectedRange({
+          startRowIdx: currRowIdx,
+          endRowIdx: currRowIdx,
+          startColIdx: currColIdx,
+          endColIdx: currColIdx
+        });
+        return;
+      }
+
+      // DELETE / BACKSPACE (Clears all cells in selectedRange)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (!normalizedRange) return;
+        const { minRow, maxRow, minCol, maxCol } = normalizedRange;
+        const targetRowIds = new Set<string>();
+        for (let r = minRow; r <= maxRow; r++) {
+          if (paginatedRows[r]) targetRowIds.add(paginatedRows[r].id);
+        }
+
         const updatedSheets = sheets.map(sheet => {
           if (sheet.id !== currentSheet.id) return sheet;
           const updatedRows = sheet.rows.map(row => {
-            if (row.id !== rowId) return row;
-            return { ...row, [colId]: '' };
+            if (!targetRowIds.has(row.id)) return row;
+            const newRow = { ...row };
+            for (let c = minCol; c <= maxCol; c++) {
+              const colDef = currentSheet.columns[c];
+              if (colDef) newRow[colDef.id] = '';
+            }
+            return newRow;
           });
           return { ...sheet, rows: updatedRows };
         });
+
         saveSheets(updatedSheets);
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        return;
+      }
+
+      // Single character input directly starts typing into editable cell
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const col = currentSheet.columns[currColIdx];
         if (col && col.id !== 'status' && col.type !== 'select') {
-          e.preventDefault();
-          setDatePickerCell(null);
-          startEditingCell(rowId, colId, e.key);
+          const isDateCol = col.id === 'date' || col.type === 'date' || col.id === 'birthday' || col.id === 'dispatch' || col.label.toLowerCase().includes('date');
+          if (!isDateCol) {
+            e.preventDefault();
+            setDatePickerCell(null);
+            setOpenDropdownCell(null);
+            startEditingCell(rowId, colId, e.key);
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [selectedCell, editingCell, paginatedRows, currentSheet, isHeaderManagerOpen, sheets]);
+  }, [
+    selectedCell,
+    anchorCell,
+    selectedRange,
+    normalizedRange,
+    editingCell,
+    paginatedRows,
+    currentSheet,
+    isHeaderManagerOpen,
+    editingHeaderColId,
+    editingSheetId,
+    sheets,
+    handleUndo,
+    handleRedo,
+    handleCopySelectedRange,
+    handleCutSelectedRange,
+    handlePasteIntoGrid,
+    handleSelectAllGrid,
+    saveSheets
+  ]);
 
   // Auto-scroll and DOM focus on selected cell
   useEffect(() => {
@@ -1959,10 +2392,29 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                       </td>
 
                       {/* Dynamic Columns Data Cells */}
-                      {currentSheet.columns.map((col) => {
+                      {currentSheet.columns.map((col, colIdx) => {
                         const cellValue = row[col.id] !== undefined ? row[col.id] : '';
-                        const isCellSelected = selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
+                        const isCellActive = selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
+                        const isCellSelected = isCellInRange(rowIdx, colIdx);
                         const isCellEditing = editingCell?.rowId === row.id && editingCell?.colId === col.id;
+
+                        const isTopEdge = normalizedRange && rowIdx === normalizedRange.minRow && isCellSelected;
+                        const isBottomEdge = normalizedRange && rowIdx === normalizedRange.maxRow && isCellSelected;
+                        const isLeftEdge = normalizedRange && colIdx === normalizedRange.minCol && isCellSelected;
+                        const isRightEdge = normalizedRange && colIdx === normalizedRange.maxCol && isCellSelected;
+                        const isBottomRightCorner = normalizedRange && rowIdx === normalizedRange.maxRow && colIdx === normalizedRange.maxCol;
+
+                        const cellBaseClass = `py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-colors cursor-pointer select-none ${
+                          isCellActive && !isCellEditing
+                            ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-900/40 z-10' 
+                            : isCellSelected 
+                              ? 'bg-cyan-500/20 text-white' 
+                              : 'hover:bg-[#142144]'
+                        } ${isTopEdge ? 'border-t-2 !border-t-cyan-400' : ''} ${
+                          isBottomEdge ? 'border-b-2 !border-b-cyan-400' : ''
+                        } ${isLeftEdge ? 'border-l-2 !border-l-cyan-400' : ''} ${
+                          isRightEdge ? 'border-r-2 !border-r-cyan-400' : ''
+                        }`;
 
                         const isDateColumn = col.id === 'date' || col.type === 'date' || col.id === 'birthday' || col.id === 'dispatch' || col.label.toLowerCase().includes('date') || col.label.toLowerCase().includes('birthday') || col.label.toLowerCase().includes('dispatch');
 
@@ -1979,20 +2431,22 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               key={`${row.id}-${col.id}`}
                               data-cell-id={`${row.id}-${col.id}`}
                               tabIndex={0}
-                              onClick={() => {
-                                setSelectedCell({ rowId: row.id, colId: col.id });
-                              }}
-                              onFocus={() => setSelectedCell({ rowId: row.id, colId: col.id })}
-                              onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                              className={`py-1.5 px-3 border-r border-slate-800/80 relative transition-all cursor-pointer ${
-                                isCellSelected ? 'ring-2 ring-cyan-400 ring-inset z-10 bg-cyan-950/30' : ''
-                              }`}
+                              onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
+                              onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
+                              className={cellBaseClass}
                             >
                               <Popover 
                                 open={isDropdownOpen}
                                 onOpenChange={(open) => {
                                   if (open) {
                                     setSelectedCell({ rowId: row.id, colId: col.id });
+                                    setAnchorCell({ rowId: row.id, colId: col.id });
+                                    setSelectedRange({
+                                      startRowIdx: rowIdx,
+                                      endRowIdx: rowIdx,
+                                      startColIdx: colIdx,
+                                      endColIdx: colIdx
+                                    });
                                     setOpenDropdownCell({ rowId: row.id, colId: col.id });
                                   } else {
                                     setOpenDropdownCell(null);
@@ -2005,6 +2459,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedCell({ rowId: row.id, colId: col.id });
+                                      setAnchorCell({ rowId: row.id, colId: col.id });
+                                      setSelectedRange({
+                                        startRowIdx: rowIdx,
+                                        endRowIdx: rowIdx,
+                                        startColIdx: colIdx,
+                                        endColIdx: colIdx
+                                      });
                                       setOpenDropdownCell(prev => (prev?.rowId === row.id && prev?.colId === col.id ? null : { rowId: row.id, colId: col.id }));
                                     }}
                                   >
@@ -2110,6 +2571,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                   </div>
                                 </PopoverContent>
                               </Popover>
+
+                              {/* Excel-style active cell corner marker */}
+                              {(isBottomRightCorner || (isCellActive && !normalizedRange)) && !isCellEditing && (
+                                <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none z-20" />
+                              )}
                             </td>
                           );
                         }
@@ -2123,20 +2589,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               key={`${row.id}-${col.id}`}
                               data-cell-id={`${row.id}-${col.id}`}
                               tabIndex={0}
-                              onClick={() => {
-                                setSelectedCell({ rowId: row.id, colId: col.id });
-                                setDatePickerCell(null);
-                              }}
+                              onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
+                              onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
                               onDoubleClick={() => {
                                 setDatePickerCell(null);
                                 startEditingCell(row.id, col.id, cellValue);
                               }}
-                              onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                              className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all cursor-pointer ${
-                                isCellSelected 
-                                  ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/30 z-10' 
-                                  : 'hover:bg-[#142144]'
-                              }`}
+                              className={cellBaseClass}
                             >
                               {isCellEditing ? (
                                 <input 
@@ -2145,7 +2604,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                   value={cellEditValue}
                                   onChange={(e) => setCellEditValue(e.target.value)}
                                   onBlur={commitCellEdit}
-                                  onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
+                                  onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
                                   className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs sm:text-sm border border-cyan-400 focus:outline-none shadow-inner"
                                 />
                               ) : (
@@ -2154,6 +2613,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                   onOpenChange={(open) => {
                                     if (open) {
                                       setSelectedCell({ rowId: row.id, colId: col.id });
+                                      setAnchorCell({ rowId: row.id, colId: col.id });
+                                      setSelectedRange({
+                                        startRowIdx: rowIdx,
+                                        endRowIdx: rowIdx,
+                                        startColIdx: colIdx,
+                                        endColIdx: colIdx
+                                      });
                                       setDatePickerCell({ rowId: row.id, colId: col.id });
                                     } else {
                                       setDatePickerCell(null);
@@ -2174,6 +2640,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setSelectedCell({ rowId: row.id, colId: col.id });
+                                          setAnchorCell({ rowId: row.id, colId: col.id });
+                                          setSelectedRange({
+                                            startRowIdx: rowIdx,
+                                            endRowIdx: rowIdx,
+                                            startColIdx: colIdx,
+                                            endColIdx: colIdx
+                                          });
                                           setDatePickerCell({ rowId: row.id, colId: col.id });
                                         }}
                                         className="p-0.5 text-cyan-400/60 hover:text-cyan-300 opacity-0 group-hover/date:opacity-100 transition-opacity ml-1 shrink-0 rounded hover:bg-cyan-500/20"
@@ -2344,8 +2817,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               )}
 
                               {/* Excel-style active cell corner marker */}
-                              {isCellSelected && !isCellEditing && (
-                                <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none" />
+                              {(isBottomRightCorner || (isCellActive && !normalizedRange)) && !isCellEditing && (
+                                <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none z-20" />
                               )}
                             </td>
                           );
@@ -2357,14 +2830,10 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             key={`${row.id}-${col.id}`}
                             data-cell-id={`${row.id}-${col.id}`}
                             tabIndex={0}
-                            onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
+                            onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
+                            onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
                             onDoubleClick={() => startEditingCell(row.id, col.id, cellValue)}
-                            onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
-                            className={`py-2 px-3 border-r border-slate-800/80 text-slate-200 text-xs sm:text-sm font-medium relative focus:outline-none transition-all cursor-pointer ${
-                              isCellSelected 
-                                ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-950/30 z-10' 
-                                : 'hover:bg-[#142144]'
-                            }`}
+                            className={cellBaseClass}
                           >
                             {isCellEditing ? (
                               <input 
@@ -2373,7 +2842,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 value={cellEditValue}
                                 onChange={(e) => setCellEditValue(e.target.value)}
                                 onBlur={commitCellEdit}
-                                onKeyDown={(e) => handleCellKeyDown(e, row.id, col.id)}
+                                onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
                                 className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs sm:text-sm border border-cyan-400 focus:outline-none shadow-inner"
                               />
                             ) : (
@@ -2387,8 +2856,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                             )}
 
                             {/* Excel-style active cell corner marker */}
-                            {isCellSelected && !isCellEditing && (
-                              <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none" />
+                            {(isBottomRightCorner || (isCellActive && !normalizedRange)) && !isCellEditing && (
+                              <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none z-20" />
                             )}
                           </td>
                         );

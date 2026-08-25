@@ -1013,6 +1013,7 @@ export default function Dashboard() {
   const [d1TableTypeFilter, setD1TableTypeFilter] = useState<string>('All');
   const [d1DuplicateFilter, setD1DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
   const [d1RevenueDateType, setD1RevenueDateType] = useState<string>('Dispatch Date');
+  const [d1RevenueMonthKey, setD1RevenueMonthKey] = useState<string>("");
   const [d1DateFilter, setD1DateFilter] = useState({ from: "", to: "" });
   const [d1CountFilter, setD1CountFilter] = useState<string>('All');
   const [d1DashboardSearch, setD1DashboardSearch] = useState("");
@@ -1029,6 +1030,7 @@ export default function Dashboard() {
   const [d2TableTypeFilter, setD2TableTypeFilter] = useState<string>('All');
   const [d2DuplicateFilter, setD2DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
   const [d2RevenueDateType, setD2RevenueDateType] = useState<string>('Dispatch Date');
+  const [d2RevenueMonthKey, setD2RevenueMonthKey] = useState<string>("");
   const [d2DateFilter, setD2DateFilter] = useState({ from: "", to: "" });
   const [d2CountFilter, setD2CountFilter] = useState<string>('All');
   const [d2DashboardSearch, setD2DashboardSearch] = useState("");
@@ -1149,8 +1151,27 @@ export default function Dashboard() {
   const setDuplicateFilter = activeTab === 'dashboard2' ? setD2DuplicateFilter : setD1DuplicateFilter;
   const revenueDateType = activeTab === 'dashboard2' ? d2RevenueDateType : d1RevenueDateType;
   const setRevenueDateType = activeTab === 'dashboard2' ? setD2RevenueDateType : setD1RevenueDateType;
+  const revenueMonthKey = activeTab === 'dashboard2' ? d2RevenueMonthKey : d1RevenueMonthKey;
+  const setRevenueMonthKey = activeTab === 'dashboard2' ? setD2RevenueMonthKey : setD1RevenueMonthKey;
   const dateFilter = activeTab === 'dashboard2' ? d2DateFilter : d1DateFilter;
   const setDateFilter = activeTab === 'dashboard2' ? setD2DateFilter : setD1DateFilter;
+
+  const handleRevenueMonthChange = (monthKey: string) => {
+    if (!monthKey) {
+      setRevenueMonthKey("");
+      setDateFilter({ from: "", to: "" });
+      return;
+    }
+    setRevenueMonthKey(monthKey);
+    const [yearStr, monthStr] = monthKey.split('-');
+    const y = parseInt(yearStr, 10);
+    const m = parseInt(monthStr, 10);
+    const startDate = new Date(y, m - 1, 1);
+    const endDate = new Date(y, m, 0);
+    const fromStr = format(startDate, "yyyy-MM-dd");
+    const toStr = format(endDate, "yyyy-MM-dd");
+    setDateFilter({ from: fromStr, to: toStr });
+  };
   const countFilter = activeTab === 'dashboard2' ? d2CountFilter : d1CountFilter;
   const setCountFilter = activeTab === 'dashboard2' ? setD2CountFilter : setD1CountFilter;
   const dashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
@@ -4890,7 +4911,29 @@ export default function Dashboard() {
                       </div>
 
                       <div className="text-right">
-                        <div className="text-[10px] font-black text-green-800 uppercase tracking-tighter">Revenue</div>
+                        <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                          <div className="text-[10px] font-black text-green-800 uppercase tracking-tighter">Revenue</div>
+                          
+                          {/* Month & Year Picker Badge matching Targets */}
+                          <div className="relative">
+                            <input
+                              type="month"
+                              value={revenueMonthKey}
+                              onChange={(e) => {
+                                if (e.target.value) handleRevenueMonthChange(e.target.value);
+                              }}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              title="Click to Filter Revenue by Month & Year"
+                            />
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 text-[10px] font-black text-amber-900 bg-white/90 hover:bg-white px-2 py-0.5 rounded-lg border border-amber-400/60 shadow-xs cursor-pointer transition-all hover:scale-105"
+                            >
+                              <span>{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
+                              <Pencil size={9} className="text-amber-700 ml-0.5" />
+                            </button>
+                          </div>
+                        </div>
                         <h3 className="text-lg font-black text-green-700 leading-tight">{maskAmount(displayRevenue)}</h3>
                         <div className="text-[9px] font-black text-rose-700 uppercase tracking-tighter mt-0.5">Pending Amount</div>
                         <h4 className="text-sm font-black text-rose-600 leading-tight">{maskAmount(displayPendingAmount)}</h4>
@@ -4922,7 +4965,10 @@ export default function Dashboard() {
 
                       {(dateFilter.from || dateFilter.to) && (
                         <button
-                          onClick={() => setDateFilter({ from: "", to: "" })}
+                          onClick={() => {
+                            setDateFilter({ from: "", to: "" });
+                            setRevenueMonthKey("");
+                          }}
                           className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors"
                           title="Clear Date Filter"
                         >
