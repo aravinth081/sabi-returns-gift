@@ -1116,6 +1116,129 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     setSelectedCell({ rowId: paginatedRows[paginatedRows.length - 1].id, colId: currentSheet.columns[currentSheet.columns.length - 1].id });
   }, [paginatedRows, currentSheet.columns]);
 
+  // Excel Fill Down (Ctrl + D): duplicate top value downwards across selected rows
+  const handleFillDown = useCallback(() => {
+    if (!normalizedRange) return;
+    const { minRow, maxRow, minCol, maxCol } = normalizedRange;
+
+    // Multi-row selection: Copy top row's cells downwards across all selected rows
+    if (minRow < maxRow) {
+      const topRow = paginatedRows[minRow];
+      if (!topRow) return;
+
+      const targetRowIds = new Set<string>();
+      for (let r = minRow + 1; r <= maxRow; r++) {
+        if (paginatedRows[r]) targetRowIds.add(paginatedRows[r].id);
+      }
+
+      const updatedSheets = sheets.map(sheet => {
+        if (sheet.id !== currentSheet.id) return sheet;
+        const updatedRows = sheet.rows.map(row => {
+          if (!targetRowIds.has(row.id)) return row;
+          const newRow = { ...row };
+          for (let c = minCol; c <= maxCol; c++) {
+            const colDef = currentSheet.columns[c];
+            if (colDef) {
+              newRow[colDef.id] = topRow[colDef.id] !== undefined ? topRow[colDef.id] : '';
+            }
+          }
+          return newRow;
+        });
+        return { ...sheet, rows: updatedRows };
+      });
+
+      saveSheets(updatedSheets);
+      const rowCount = maxRow - minRow + 1;
+      toast.success(`Filled down (Ctrl+D) across ${rowCount} rows`);
+    } else if (minRow === maxRow && minRow > 0) {
+      // Single row / cell selection: copy from cell directly above
+      const sourceRow = paginatedRows[minRow - 1];
+      const targetRow = paginatedRows[minRow];
+      if (!sourceRow || !targetRow) return;
+
+      const updatedSheets = sheets.map(sheet => {
+        if (sheet.id !== currentSheet.id) return sheet;
+        const updatedRows = sheet.rows.map(row => {
+          if (row.id !== targetRow.id) return row;
+          const newRow = { ...row };
+          for (let c = minCol; c <= maxCol; c++) {
+            const colDef = currentSheet.columns[c];
+            if (colDef) {
+              newRow[colDef.id] = sourceRow[colDef.id] !== undefined ? sourceRow[colDef.id] : '';
+            }
+          }
+          return newRow;
+        });
+        return { ...sheet, rows: updatedRows };
+      });
+
+      saveSheets(updatedSheets);
+      toast.success('Filled down from cell above (Ctrl+D)');
+    }
+  }, [normalizedRange, paginatedRows, currentSheet, sheets, saveSheets]);
+
+  // Excel Fill Right (Ctrl + R): duplicate leftmost value rightwards across selected columns
+  const handleFillRight = useCallback(() => {
+    if (!normalizedRange) return;
+    const { minRow, maxRow, minCol, maxCol } = normalizedRange;
+
+    // Multi-column selection: For each row in selection, copy leftmost cell value rightwards
+    if (minCol < maxCol) {
+      const targetRowIdMap = new Map<string, SheetRow>();
+      for (let r = minRow; r <= maxRow; r++) {
+        if (paginatedRows[r]) targetRowIdMap.set(paginatedRows[r].id, paginatedRows[r]);
+      }
+
+      const sourceColDef = currentSheet.columns[minCol];
+      if (!sourceColDef) return;
+
+      const updatedSheets = sheets.map(sheet => {
+        if (sheet.id !== currentSheet.id) return sheet;
+        const updatedRows = sheet.rows.map(row => {
+          if (!targetRowIdMap.has(row.id)) return row;
+          const newRow = { ...row };
+          const leftVal = row[sourceColDef.id] !== undefined ? row[sourceColDef.id] : '';
+          for (let c = minCol + 1; c <= maxCol; c++) {
+            const colDef = currentSheet.columns[c];
+            if (colDef) {
+              newRow[colDef.id] = leftVal;
+            }
+          }
+          return newRow;
+        });
+        return { ...sheet, rows: updatedRows };
+      });
+
+      saveSheets(updatedSheets);
+      const colCount = maxCol - minCol + 1;
+      toast.success(`Filled right (Ctrl+R) across ${colCount} columns`);
+    } else if (minCol === maxCol && minCol > 0) {
+      // Single column / cell selection: copy from cell directly to the left
+      const targetRowIds = new Set<string>();
+      for (let r = minRow; r <= maxRow; r++) {
+        if (paginatedRows[r]) targetRowIds.add(paginatedRows[r].id);
+      }
+
+      const sourceColDef = currentSheet.columns[minCol - 1];
+      const targetColDef = currentSheet.columns[minCol];
+      if (!sourceColDef || !targetColDef) return;
+
+      const updatedSheets = sheets.map(sheet => {
+        if (sheet.id !== currentSheet.id) return sheet;
+        const updatedRows = sheet.rows.map(row => {
+          if (!targetRowIds.has(row.id)) return row;
+          const newRow = { ...row };
+          newRow[targetColDef.id] = row[sourceColDef.id] !== undefined ? row[sourceColDef.id] : '';
+          return newRow;
+        });
+        return { ...sheet, rows: updatedRows };
+      });
+
+      saveSheets(updatedSheets);
+      toast.success('Filled right from cell on left (Ctrl+R)');
+    }
+  }, [normalizedRange, paginatedRows, currentSheet, sheets, saveSheets]);
+
   // Unified Global Keyboard Listener for Grid Navigation & Actions
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -1145,6 +1268,24 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       if (isCtrlOrCmd && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         handleRedo();
+        return;
+      }
+
+      // Fill Down (Ctrl/Cmd + D) - duplicate column value downwards
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'd') {
+        if (selectedCell || selectedRange) {
+          e.preventDefault();
+          handleFillDown();
+        }
+        return;
+      }
+
+      // Fill Right (Ctrl/Cmd + R) - duplicate row value rightwards
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'r') {
+        if (selectedCell || selectedRange) {
+          e.preventDefault();
+          handleFillRight();
+        }
         return;
       }
 
@@ -1463,6 +1604,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     handleCutSelectedRange,
     handlePasteIntoGrid,
     handleSelectAllGrid,
+    handleFillDown,
+    handleFillRight,
     saveSheets
   ]);
 
@@ -2026,8 +2169,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Undo / Redo */}
-            <div className="flex items-center bg-[#131d38] rounded-xl border border-slate-700 p-0.5">
+            {/* Undo / Redo / Fill Down / Fill Right */}
+            <div className="flex items-center bg-[#131d38] rounded-xl border border-slate-700 p-0.5 gap-0.5">
               <button 
                 onClick={handleUndo}
                 title="Undo (Ctrl+Z)"
@@ -2041,6 +2184,25 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                 className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors"
               >
                 <RotateCw className="w-4 h-4" />
+              </button>
+              <div className="w-[1px] h-4 bg-slate-700 mx-0.5" />
+              <button
+                onClick={handleFillDown}
+                title="Fill Down (Ctrl+D) - Duplicate text down selected column"
+                className="flex items-center gap-1 px-2 py-1 text-slate-300 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors text-xs font-semibold"
+              >
+                <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden xl:inline">Fill Down</span>
+                <span className="text-[10px] bg-slate-800 px-1 py-0.5 rounded text-slate-400 font-mono border border-slate-700">Ctrl+D</span>
+              </button>
+              <button
+                onClick={handleFillRight}
+                title="Fill Right (Ctrl+R) - Duplicate text right across row"
+                className="flex items-center gap-1 px-2 py-1 text-slate-300 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors text-xs font-semibold"
+              >
+                <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden xl:inline">Fill Right</span>
+                <span className="text-[10px] bg-slate-800 px-1 py-0.5 rounded text-slate-400 font-mono border border-slate-700">Ctrl+R</span>
               </button>
             </div>
 
