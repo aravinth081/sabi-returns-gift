@@ -313,7 +313,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         placeholder="Username" 
                         required 
                         autoComplete="username"
-                        className="w-full pl-12 pr-4 h-13 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                        className="w-full pl-12 pr-4 h-[52px] bg-[#131d35] border border-[#223354] focus:border-[#D9A628] focus:ring-1 focus:ring-[#D9A628] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
                       />
                     </div>
                     
@@ -330,7 +330,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         placeholder="Password" 
                         required 
                         autoComplete="current-password"
-                        className="w-full pl-12 pr-12 h-13 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                        className="w-full pl-12 pr-12 h-[52px] bg-[#131d35] border border-[#223354] focus:border-[#D9A628] focus:ring-1 focus:ring-[#D9A628] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
                       />
                       <button 
                         type="button" 
@@ -338,23 +338,23 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A628] hover:text-[#E8BD45] transition-colors cursor-pointer"
                         aria-label={showPassword ? "Hide password" : "Show password"}
                       >
-                        {showPassword ? <EyeOff className="h-4.5 w-4.5 sm:h-5 sm:w-5" /> : <Eye className="h-4.5 w-4.5 sm:h-5 sm:w-5" />}
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Options Row: Remember Me & Register button */}
-                  <div className="flex items-center justify-between px-3 pt-0.5">
+                  {/* Options Row: Remember Me & Register button (perfectly aligned with box edges) */}
+                  <div className="flex items-center justify-between px-0.5 pt-0.5">
                     <div className="flex items-center space-x-2.5">
                       <Checkbox 
                         id="remember" 
                         checked={rememberMe}
                         onCheckedChange={(checked) => setRememberMe(!!checked)}
-                        className="w-4.5 h-4.5 rounded border-[#9F7820] data-[state=checked]:bg-[#D9A628] data-[state=checked]:text-white focus-visible:ring-1 focus-visible:ring-[#F0C64A]" 
+                        className="w-4.5 h-4.5 rounded border-[#223354] data-[state=checked]:bg-[#D9A628] data-[state=checked]:border-[#D9A628] data-[state=checked]:text-white focus-visible:ring-1 focus-visible:ring-[#D9A628]" 
                       />
                       <label
                         htmlFor="remember"
-                        className="text-xs sm:text-sm font-medium leading-none text-[#E8EAF0] cursor-pointer hover:text-white transition-colors select-none"
+                        className="text-sm font-medium leading-none text-[#E8EAF0] cursor-pointer hover:text-white transition-colors select-none"
                       >
                         Remember Me?
                       </label>
@@ -364,18 +364,18 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <button
                       type="button"
                       onClick={() => setIsFlipped(true)}
-                      className="text-xs sm:text-sm font-semibold text-[#D9A628] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                      className="text-sm font-semibold text-[#D9A628] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
                     >
                       Register
                     </button>
                   </div>
 
                   {/* Action Button: Luxury Gold #D9A628 */}
-                  <div className="pt-1 flex justify-center">
+                  <div className="pt-2 flex justify-center">
                     <Button 
                       type="submit" 
                       disabled={isLoading}
-                      className="w-48 sm:w-52 h-11 sm:h-12 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_6px_22px_rgba(217,166,40,0.45)] hover:shadow-[0_10px_28px_rgba(232,189,69,0.6)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer"
+                      className="w-52 h-12 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer"
                     >
                       {isLoading ? "Logging In..." : "Log In"}
                     </Button>
@@ -422,7 +422,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegName(e.target.value)} 
                         placeholder="Full Name" 
                         required 
-                        className="w-full pl-12 pr-4 h-13 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                        className="w-full pl-12 pr-4 h-[52px] bg-[#131d35] border border-[#223354] focus:border-[#D9A628] focus:ring-1 focus:ring-[#D9A628] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
                       />
                     </div>
 
@@ -439,7 +439,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         placeholder="Username" 
                         required 
                         autoComplete="username"
-                        className="w-full pl-12 pr-4 h-13 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                        className="w-full pl-12 pr-4 h-[52px] bg-[#131d35] border border-[#223354] focus:border-[#D9A628] focus:ring-1 focus:ring-[#D9A628] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
                       />
                     </div>
                     
@@ -455,7 +455,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegPassword(e.target.value)} 
                         placeholder="Password" 
                         required 
-                        className="w-full pl-12 pr-12 h-13 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                        className="w-full pl-12 pr-12 h-[52px] bg-[#131d35] border border-[#223354] focus:border-[#D9A628] focus:ring-1 focus:ring-[#D9A628] rounded-xl text-[#E8EAF0] placeholder-[#8995AA] text-sm sm:text-base font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
                       />
                       <button 
                         type="button" 
@@ -463,31 +463,31 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A628] hover:text-[#E8BD45] transition-colors cursor-pointer"
                         aria-label={showRegPassword ? "Hide password" : "Show password"}
                       >
-                        {showRegPassword ? <EyeOff className="h-4.5 w-4.5 sm:h-5 sm:w-5" /> : <Eye className="h-4.5 w-4.5 sm:h-5 sm:w-5" />}
+                        {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Flip Back to Login Row */}
-                  <div className="flex items-center justify-between px-3 pt-0.5">
-                    <span className="text-xs sm:text-sm text-[#9DAAC2] font-medium">
+                  {/* Flip Back to Login Row (perfectly aligned with box edges) */}
+                  <div className="flex items-center justify-between px-0.5 pt-0.5">
+                    <span className="text-sm text-[#9DAAC2] font-medium">
                       Already have an account?
                     </span>
                     <button
                       type="button"
                       onClick={() => setIsFlipped(false)}
-                      className="text-xs sm:text-sm font-semibold text-[#D9A628] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                      className="text-sm font-semibold text-[#D9A628] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
                     >
                       Login
                     </button>
                   </div>
 
                   {/* Action Button */}
-                  <div className="pt-1 flex justify-center">
+                  <div className="pt-2 flex justify-center">
                     <Button 
                       type="submit" 
                       disabled={isRegistering}
-                      className="w-48 sm:w-52 h-11 sm:h-12 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_6px_22px_rgba(217,166,40,0.45)] hover:shadow-[0_10px_28px_rgba(232,189,69,0.6)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer"
+                      className="w-52 h-12 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer"
                     >
                       {isRegistering ? "Creating..." : "Create Account"}
                     </Button>
