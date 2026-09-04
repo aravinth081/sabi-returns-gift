@@ -1,143 +1,507 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { collection, getDocs, doc, updateDoc, addDoc, query } from "firebase/firestore";
+import { db } from "@/firebase";
 
-const Login = () => {
+interface LoginProps {
+  onLoginSuccess?: (userData?: { role: 'Admin' | 'Employee'; name: string; employeeId?: string }) => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+  // Flip state for 3D book page turning effect
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  // Login form states
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  // Register form states
+  const [regName, setRegName] = useState("");
+  const [regUsername, setRegUsername] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState("");
+
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle Login submission
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
+    setLoginError("");
+
+    const inputUser = username.trim().toLowerCase();
+    const inputPass = password.trim();
+
     try {
-      await signIn(username, password);
-      navigate("/dashboard");
+      // 1. Admin Login (subash g / 561997)
+      if (inputUser === "subash g" && inputPass === "561997") {
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("loggedInName", "Subash");
+        localStorage.setItem("role", "Admin");
+        localStorage.setItem("loginTimestamp", Date.now().toString());
+        toast({
+          title: "Welcome Back, Subash!",
+          description: "Logged in as Admin",
+        });
+
+        if (onLoginSuccess) {
+          onLoginSuccess({ role: 'Admin', name: 'Subash' });
+        } else {
+          navigate("/dashboard");
+        }
+        return;
+      }
+
+      // 2. Firebase Employee Check
+      try {
+        const q = query(collection(db, "employees"));
+        const snap = await getDocs(q);
+        const employeesList = snap.docs.map((docSnap) => ({
+          fireId: docSnap.id,
+          ...docSnap.data(),
+        })) as any[];
+
+        const matchedEmp = employeesList.find(
+          (emp) =>
+            emp.username &&
+            emp.username.toLowerCase() === inputUser &&
+            emp.password === inputPass
+        );
+
+        if (matchedEmp) {
+          if (matchedEmp.status === "Approved") {
+            updateDoc(doc(db, "employees", matchedEmp.fireId), {
+              isLive: true,
+              lastLoginAt: new Date().toISOString(),
+            }).catch((err) => console.error("Error setting live status:", err));
+
+            localStorage.setItem("isLoggedIn", "true");
+            localStorage.setItem("loggedInName", matchedEmp.name || matchedEmp.username);
+            localStorage.setItem("role", "Employee");
+            localStorage.setItem("employeeId", matchedEmp.fireId);
+            localStorage.setItem("loginTimestamp", Date.now().toString());
+
+            toast({
+              title: `Welcome, ${matchedEmp.name}!`,
+              description: "Logged in successfully",
+            });
+
+            if (onLoginSuccess) {
+              onLoginSuccess({
+                role: 'Employee',
+                name: matchedEmp.name || matchedEmp.username,
+                employeeId: matchedEmp.fireId
+              });
+            } else {
+              navigate("/dashboard");
+            }
+            return;
+          } else {
+            setLoginError("Your account is still pending approval or declined.");
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (fbErr) {
+        console.warn("Firebase employee check failed:", fbErr);
+      }
+
+      // 3. Supabase Auth fallback
+      try {
+        await signIn(username, password);
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("loggedInName", username);
+        localStorage.setItem("loginTimestamp", Date.now().toString());
+        if (onLoginSuccess) {
+          onLoginSuccess({ role: 'Admin', name: username });
+        } else {
+          navigate("/dashboard");
+        }
+        return;
+      } catch (supErr: any) {
+        console.warn("Supabase auth fallback error:", supErr);
+      }
+
+      setLoginError("Invalid Username or Password!");
     } catch (err: any) {
-      toast({ title: "Login failed", description: err.message, variant: "destructive" });
+      setLoginError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle Register submission
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegisterError("");
+
+    if (!regName || !regUsername || !regPassword) {
+      setRegisterError("Please fill all required fields");
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      await addDoc(collection(db, "employees"), {
+        name: regName,
+        username: regUsername,
+        password: regPassword,
+        status: "Pending",
+        createdAt: new Date().toISOString(),
+      });
+
+      toast({
+        title: "Registration Request Sent!",
+        description: "Account created! Pending administrator approval.",
+      });
+
+      // Clear fields and smoothly flip back to Login page
+      setRegName("");
+      setRegUsername("");
+      setRegPassword("");
+      setTimeout(() => {
+        setIsFlipped(false);
+      }, 500);
+    } catch (err: any) {
+      setRegisterError("Failed to register. Please try again.");
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F4F6F9] flex items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-[1200px] min-h-[700px] bg-[#0B101E] rounded-3xl shadow-[0_25px_65px_rgba(0,_0,_0,_0.2)] flex overflow-hidden border border-white/5">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 md:p-8 select-none relative overflow-hidden"
+      style={{
+        backgroundColor: "#060a14",
+        backgroundImage: `
+          radial-gradient(circle at 18% 40%, rgba(217, 169, 40, 0.14) 0%, transparent 45%),
+          radial-gradient(circle at 82% 60%, rgba(30, 58, 110, 0.28) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 50%, #0c1427 0%, #060a14 100%)
+        `
+      }}
+    >
+      {/* Main Split Card Container */}
+      <div className="w-full max-w-[1260px] min-h-[690px] md:min-h-[720px] rounded-[2.75rem] shadow-[0_30px_90px_rgba(0,0,0,0.7),0_0_60px_rgba(0,0,0,0.5)] flex flex-col md:flex-row overflow-hidden border border-white/15 relative z-10">
         
-        {/* Left Side (Branding/Info) */}
-        <div className="hidden md:flex w-1/2 relative bg-gradient-to-br from-[#E2B743] via-[#D19B27] to-[#B07D15] flex-col items-center justify-center p-12 text-center overflow-hidden">
-          {/* Wave effect overlay */}
-          <div className="absolute bottom-0 left-0 w-full h-1/2 opacity-20 pointer-events-none">
-             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-                <path d="M0,50 Q25,30 50,50 T100,50 L100,100 L0,100 Z" fill="#ffffff" />
-             </svg>
+        {/* ================= LEFT SIDE (Rich Champagne Gold Branding: #D9A928) ================= */}
+        <div className="w-full md:w-1/2 relative bg-[#D9A928] flex flex-col items-center justify-center p-10 sm:p-12 md:p-16 text-center overflow-hidden min-h-[440px] md:min-h-auto">
+          
+          {/* Subtle Dynamic Bottom Waves: #E4BE5C */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {/* Wave 1 */}
+            <svg 
+              viewBox="0 0 500 500" 
+              preserveAspectRatio="none" 
+              className="absolute bottom-0 left-0 w-full h-[52%] opacity-60"
+            >
+              <path 
+                d="M0,280 C150,210 270,330 420,260 C460,240 480,245 500,255 L500,500 L0,500 Z" 
+                fill="#E4BE5C" 
+              />
+            </svg>
+
+            {/* Wave 2 */}
+            <svg 
+              viewBox="0 0 500 500" 
+              preserveAspectRatio="none" 
+              className="absolute bottom-0 left-0 w-full h-[40%] opacity-90"
+            >
+              <path 
+                d="M0,340 C140,260 300,380 500,300 L500,500 L0,500 Z" 
+                fill="#E4BE5C" 
+              />
+            </svg>
+
+            {/* Wave 3 */}
+            <svg 
+              viewBox="0 0 500 500" 
+              preserveAspectRatio="none" 
+              className="absolute bottom-0 left-0 w-full h-[26%] opacity-100"
+            >
+              <path 
+                d="M0,400 C160,330 340,420 500,360 L500,500 L0,500 Z" 
+                fill="#E4BE5C" 
+              />
+            </svg>
           </div>
           
-          <div className="relative z-10 flex flex-col items-center">
-            {/* Logo Image */}
-            <div className="w-[320px] h-[320px] p-2 flex items-center justify-center mb-10 rounded-[2rem] overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.5)] bg-black border border-white/10 relative group">
-              <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none"></div>
-              <img src="/logo.jpeg" alt="Sabi Returns" className="w-full h-full object-contain transform group-hover:scale-105 transition-transform duration-500" />
+          {/* Left Panel Content */}
+          <div className="relative z-10 flex flex-col items-center max-w-[420px]">
+            {/* Logo Badge Container */}
+            <div className="w-[230px] h-[230px] sm:w-[260px] sm:h-[260px] md:w-[290px] md:h-[290px] p-2.5 flex items-center justify-center mb-8 rounded-[2.25rem] overflow-hidden shadow-[0_20px_45px_rgba(0,0,0,0.35)] bg-black border border-[#F1D27A]/30 relative group transition-transform duration-500 hover:scale-[1.02]">
+              <img 
+                src="/logo.jpeg" 
+                alt="Sabi Return Gifts" 
+                className="w-full h-full object-cover rounded-[1.85rem]" 
+              />
             </div>
             
-            <h1 className="text-4xl font-serif font-bold text-white tracking-wider mb-2 drop-shadow-md">SABI RETURNS</h1>
-            <p className="text-[11px] font-bold tracking-[0.35em] text-white/90 mb-8 uppercase drop-shadow-sm">Premium Gifting Solutions</p>
+            {/* Brand Titles: Ivory White #F8F5ED */}
+            <h1 className="text-3xl sm:text-4xl md:text-[42px] font-serif font-bold text-[#F8F5ED] tracking-wider mb-2 drop-shadow-md">
+              SABI RETURNS
+            </h1>
+            {/* Subtitle: Soft White #E8EAF0 */}
+            <p className="text-xs sm:text-[13px] font-bold tracking-[0.35em] text-[#E8EAF0] mb-6 uppercase drop-shadow-sm opacity-95">
+              PREMIUM GIFTING SOLUTIONS
+            </p>
             
-            <div className="w-12 h-[2px] bg-white/60 mb-8 rounded-full"></div>
+            {/* Decorative Line: Champagne #F1D27A */}
+            <div className="w-16 h-[2.5px] bg-[#F1D27A] mb-6 rounded-full shadow-sm"></div>
             
-            <p className="text-white/90 text-sm font-medium px-4 leading-relaxed max-w-[320px] drop-shadow-sm">
-              Empowering your celebrations with elegant,<br/>secure, and seamless return gift solutions.
+            {/* Tagline: Soft White #E8EAF0 */}
+            <p className="text-[#E8EAF0] text-sm sm:text-base font-medium px-4 leading-relaxed drop-shadow-sm opacity-95 max-w-[360px]">
+              Empowering your celebrations with elegant,<br className="hidden sm:inline" /> secure, and seamless return gift solutions.
             </p>
           </div>
         </div>
 
-        {/* Right Side (Login Form) */}
-        <div className="w-full md:w-1/2 flex flex-col justify-center p-8 md:p-16 bg-gradient-to-b from-[#0F172A] to-[#020617] relative">
-          <div className="max-w-md w-full mx-auto space-y-12">
+        {/* ================= RIGHT SIDE (3D BOOK PAGE FLIP: Deep Navy #080F23 to #101A33) ================= */}
+        <div className="w-full md:w-1/2 relative bg-gradient-to-b from-[#101A33] via-[#0C142A] to-[#080F23] book-perspective overflow-hidden">
+          
+          <div className={`book-card-inner ${isFlipped ? "is-flipped" : ""}`}>
             
-            <div className="text-center space-y-3">
-              <h2 className="text-[48px] font-serif font-bold text-white tracking-wide drop-shadow-md">Login</h2>
-              <p className="text-gray-400 text-sm font-medium">Sign in to your Sabi Returns account</p>
+            {/* ---------------- FRONT PAGE: LOGIN ---------------- */}
+            <div className="book-face p-8 sm:p-14 md:p-18 lg:p-20">
+              <div className="max-w-[460px] w-full mx-auto space-y-11">
+                
+                {/* Header: Ivory White #F8F5ED & Muted Blue-Gray #9DAAC2 */}
+                <div className="text-center space-y-2">
+                  <h2 className="text-[48px] sm:text-[54px] md:text-[58px] font-serif font-bold text-[#F8F5ED] tracking-wide drop-shadow-md">
+                    Login
+                  </h2>
+                  <p className="text-[#9DAAC2] text-sm sm:text-base font-medium">
+                    Sign in to your Sabi Returns account
+                  </p>
+                </div>
+
+                {/* Error Message Display */}
+                {loginError && (
+                  <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-sm font-medium px-4 py-3 rounded-xl text-center">
+                    {loginError}
+                  </div>
+                )}
+
+                {/* Login Form */}
+                <form onSubmit={handleLoginSubmit} className="space-y-8">
+                  <div className="space-y-6">
+                    
+                    {/* Username Input */}
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
+                        <User className="h-[22px] w-[22px] text-[#D9A628] transition-colors group-focus-within:text-[#F0C64A]" />
+                      </div>
+                      <input 
+                        id="username" 
+                        type="text"
+                        value={username} 
+                        onChange={(e) => setUsername(e.target.value)} 
+                        placeholder="Username" 
+                        required 
+                        autoComplete="username"
+                        className="w-full pl-14 pr-4 h-16 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-base sm:text-lg font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                      />
+                    </div>
+                    
+                    {/* Password Input */}
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
+                        <Lock className="h-[22px] w-[22px] text-[#D9A628] transition-colors group-focus-within:text-[#F0C64A]" />
+                      </div>
+                      <input 
+                        id="password" 
+                        type={showPassword ? "text" : "password"} 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        placeholder="Password" 
+                        required 
+                        autoComplete="current-password"
+                        className="w-full pl-14 pr-14 h-16 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-base sm:text-lg font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-5 text-[#D9A628] hover:text-[#E8BD45] transition-colors cursor-pointer"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Eye className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Options Row: Remember Me (aligned with Lock) & Register button (aligned with Eye) */}
+                  <div className="flex items-center justify-between px-5 pt-1">
+                    <div className="flex items-center space-x-3.5">
+                      <Checkbox 
+                        id="remember" 
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(!!checked)}
+                        className="w-5 h-5 rounded border-[#9F7820] data-[state=checked]:bg-[#D9A628] data-[state=checked]:text-white focus-visible:ring-1 focus-visible:ring-[#F0C64A]" 
+                      />
+                      <label
+                        htmlFor="remember"
+                        className="text-sm sm:text-base font-medium leading-none text-[#E8EAF0] cursor-pointer hover:text-white transition-colors select-none"
+                      >
+                        Remember Me?
+                      </label>
+                    </div>
+
+                    {/* Book Flip to Register Page */}
+                    <button
+                      type="button"
+                      onClick={() => setIsFlipped(true)}
+                      className="text-sm sm:text-base font-semibold text-[#D9A628] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                    >
+                      Register
+                    </button>
+                  </div>
+
+                  {/* Action Button: Luxury Gold #D9A628 */}
+                  <div className="pt-2 flex justify-center">
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-56 sm:w-60 h-13 sm:h-14 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-base sm:text-lg tracking-wide border-none cursor-pointer"
+                    >
+                      {isLoading ? "Logging In..." : "Log In"}
+                    </Button>
+                  </div>
+                  
+                </form>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="space-y-6">
+            {/* ---------------- BACK PAGE: REGISTER (3D Book Turned View) ---------------- */}
+            <div className="book-face-back p-8 sm:p-14 md:p-18 lg:p-20">
+              <div className="max-w-[460px] w-full mx-auto space-y-10">
                 
-                {/* Username Input - Sleek Glassmorphism */}
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
-                    <User className="h-5 w-5 text-[#D19B27] opacity-80 group-focus-within:opacity-100 transition-opacity" />
-                  </div>
-                  <Input 
-                    id="username" 
-                    value={username} 
-                    onChange={(e) => setUsername(e.target.value)} 
-                    placeholder="Username" 
-                    required 
-                    className="pl-14 bg-[#151F32] border border-[#D19B27]/60 rounded-xl h-16 text-white font-medium placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#D19B27] focus-visible:border-[#D19B27] transition-all text-base shadow-inner"
-                  />
+                {/* Header: Ivory White #F8F5ED */}
+                <div className="text-center space-y-2">
+                  <h2 className="text-[48px] sm:text-[54px] md:text-[58px] font-serif font-bold text-[#F8F5ED] tracking-wide drop-shadow-md">
+                    Register
+                  </h2>
+                  <p className="text-[#9DAAC2] text-sm sm:text-base font-medium">
+                    Create your Sabi Returns account
+                  </p>
                 </div>
-                
-                {/* Password Input - Sleek Glassmorphism */}
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
-                    <Lock className="h-5 w-5 text-[#D19B27] opacity-80 group-focus-within:opacity-100 transition-opacity" />
+
+                {/* Error Message Display */}
+                {registerError && (
+                  <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-sm font-medium px-4 py-3 rounded-xl text-center">
+                    {registerError}
                   </div>
-                  <Input 
-                    id="password" 
-                    type={showPassword ? "text" : "password"} 
-                    value={password} 
-                    onChange={(e) => setPassword(e.target.value)} 
-                    placeholder="Password" 
-                    required 
-                    className="pl-14 pr-12 bg-[#151F32] border border-[#D19B27]/60 rounded-xl h-16 text-white font-medium placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#D19B27] focus-visible:border-[#D19B27] transition-all text-base shadow-inner"
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-5 text-gray-400 hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
+                )}
 
-              {/* Remember Me */}
-              <div className="flex items-center space-x-3 justify-center pt-2">
-                <Checkbox id="remember" className="border-gray-500 rounded-[4px] data-[state=checked]:bg-[#D19B27] data-[state=checked]:border-[#D19B27]" />
-                <label
-                  htmlFor="remember"
-                  className="text-sm font-medium leading-none text-gray-300 cursor-pointer hover:text-white transition-colors"
-                >
-                  Remember Me?
-                </label>
-              </div>
+                {/* Register Form */}
+                <form onSubmit={handleRegisterSubmit} className="space-y-8">
+                  <div className="space-y-6">
+                    
+                    {/* Full Name Input: Identical to Login size (h-16 rounded-2xl pl-14) */}
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
+                        <User className="h-[22px] w-[22px] text-[#D9A628] transition-colors group-focus-within:text-[#F0C64A]" />
+                      </div>
+                      <input 
+                        id="reg-name" 
+                        type="text"
+                        value={regName} 
+                        onChange={(e) => setRegName(e.target.value)} 
+                        placeholder="Full Name" 
+                        required 
+                        className="w-full pl-14 pr-4 h-16 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-base sm:text-lg font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                      />
+                    </div>
 
-              {/* Login Button */}
-              <div className="pt-4 flex justify-center">
-                <Button 
-                  type="submit" 
-                  disabled={isLoading}
-                  className="w-48 h-12 bg-gradient-to-r from-[#D9AA3B] to-[#C18C1D] hover:from-[#C99127] hover:to-[#A37415] text-white font-bold rounded-full shadow-[0_4px_20px_-4px_rgba(217,170,59,0.5)] transition-all duration-300 hover:shadow-[0_8px_25px_-4px_rgba(217,170,59,0.6)] hover:-translate-y-1 text-base border border-[#E2B743]/30"
-                >
-                  {isLoading ? "Logging In..." : "Log In"}
-                </Button>
+                    {/* Username Input: Identical to Login size (h-16 rounded-2xl pl-14) */}
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
+                        <User className="h-[22px] w-[22px] text-[#D9A628] transition-colors group-focus-within:text-[#F0C64A]" />
+                      </div>
+                      <input 
+                        id="reg-username" 
+                        type="text"
+                        value={regUsername} 
+                        onChange={(e) => setRegUsername(e.target.value)} 
+                        placeholder="Username" 
+                        required 
+                        autoComplete="username"
+                        className="w-full pl-14 pr-4 h-16 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-base sm:text-lg font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                      />
+                    </div>
+                    
+                    {/* Password Input: Identical to Login size (h-16 rounded-2xl pl-14 pr-14) */}
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
+                        <Lock className="h-[22px] w-[22px] text-[#D9A628] transition-colors group-focus-within:text-[#F0C64A]" />
+                      </div>
+                      <input 
+                        id="reg-password" 
+                        type={showRegPassword ? "text" : "password"} 
+                        value={regPassword} 
+                        onChange={(e) => setRegPassword(e.target.value)} 
+                        placeholder="Password" 
+                        required 
+                        className="w-full pl-14 pr-14 h-16 bg-[#151F36] border border-[#9F7820] focus:border-[#F0C64A] focus:ring-1 focus:ring-[#F0C64A] rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-base sm:text-lg font-medium outline-none focus:outline-none transition-all duration-200 shadow-inner"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-5 text-[#D9A628] hover:text-[#E8BD45] transition-colors cursor-pointer"
+                        aria-label={showRegPassword ? "Hide password" : "Show password"}
+                      >
+                        {showRegPassword ? <EyeOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Eye className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Flip Back to Login Row: Left aligned with icons, Right aligned with Eye */}
+                  <div className="flex items-center justify-between px-5 pt-1">
+                    <span className="text-sm sm:text-base text-[#9DAAC2] font-medium">
+                      Already have an account?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsFlipped(false)}
+                      className="text-sm sm:text-base font-semibold text-[#D9A628] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                    >
+                      Login
+                    </button>
+                  </div>
+
+                  {/* Action Button: Luxury Gold #D9A628 */}
+                  <div className="pt-2 flex justify-center">
+                    <Button 
+                      type="submit" 
+                      disabled={isRegistering}
+                      className="w-56 sm:w-60 h-13 sm:h-14 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-base sm:text-lg tracking-wide border-none cursor-pointer"
+                    >
+                      {isRegistering ? "Creating..." : "Create Account"}
+                    </Button>
+                  </div>
+                  
+                </form>
               </div>
-              
-            </form>
+            </div>
+
           </div>
         </div>
 
       </div>
+
     </div>
   );
 };

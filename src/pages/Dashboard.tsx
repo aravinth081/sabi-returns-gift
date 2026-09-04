@@ -25,6 +25,7 @@ import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
 import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
 import AttendanceLog from "@/components/AttendanceLog";
+import Login from "./Login";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -682,9 +683,10 @@ export default function Dashboard() {
     };
   }, [openActionId]);
 
-  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker' | 'attendance'>(
+  const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'products' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker' | 'attendance'>(
     (localStorage.getItem('activeTab') as any) || 'dashboard1'
   );
+  const [productSearchQuery, setProductSearchQuery] = useState("");
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -1357,8 +1359,21 @@ export default function Dashboard() {
 
   const customPricesMap = useMemo(() => {
     const map: Record<string, number> = {};
-    customProducts.forEach(p => map[p.name.toLowerCase()] = Number(p.price));
+    customProducts.forEach(p => {
+      if (p.name) {
+        const val = Number(p.price !== undefined && p.price !== null ? p.price : p.sellingPrice) || 0;
+        map[p.name.toLowerCase().trim()] = val;
+      }
+    });
     return map;
+  }, [customProducts]);
+
+  const orderedProducts = useMemo(() => {
+    return [...customProducts].sort((a: any, b: any) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tA - tB;
+    });
   }, [customProducts]);
 
   const monthWiseReportData = useMemo(() => {
@@ -3254,7 +3269,14 @@ export default function Dashboard() {
       price: String(prod.price ?? prod.sellingPrice ?? "") 
     });
     setEditProductId(prod.fireId);
-    setIsAddProductModalOpen(true);
+    if (activeTab === 'products') {
+      const formEl = document.getElementById("product-inline-form");
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      setIsAddProductModalOpen(true);
+    }
   };
 
   const handleDeleteProductClick = async (fireId: string) => {
@@ -3911,104 +3933,15 @@ export default function Dashboard() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#2d1b14] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#5e3827] via-[#2d1b14] to-[#1a0f0b] opacity-80"></div>
-        <div className="login-card relative z-10 w-full max-w-sm bg-[#fffdf7] rounded-[2rem] shadow-2xl p-8 border-4 border-[#e8dccb]">
-          <div className="flex flex-col items-center mb-8">
-            <div className="flex gap-2 text-[#7c4d36] mb-4" style={{ color: '#7c4d36' }}>
-              <User size={32} />
-              <User size={40} className="relative -top-2" />
-              <User size={32} />
-            </div>
-            <h2 className="login-title text-2xl font-black text-[#4a2c1d] tracking-widest uppercase" style={{ color: '#4a2c1d' }}>
-              Login
-            </h2>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            {loginError && <div className="text-red-500 text-center text-sm font-bold bg-red-50 p-2 rounded-lg border border-red-200">{loginError}</div>}
-
-            <div className="relative flex items-center">
-              <div className="absolute left-0 w-14 h-14 bg-[#4a2c1d] rounded-l-xl flex items-center justify-center text-amber-100 shadow-[inset_-2px_0_5px_rgba(0,0,0,0.5)]">
-                <User size={24} />
-              </div>
-              <input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-16 pr-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60"
-              />
-            </div>
-
-            <div className="relative flex items-center">
-              <div className="absolute left-0 w-14 h-14 bg-[#4a2c1d] rounded-l-xl flex items-center justify-center text-amber-100 shadow-[inset_-2px_0_5px_rgba(0,0,0,0.5)]">
-                <Lock size={20} />
-              </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-16 pr-12 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60"
-              />
-              <div
-                className="absolute right-4 text-[#8b5a3e] cursor-pointer hover:text-[#4a2c1d]"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{ color: '#8b5a3e' }}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </div>
-            </div>
-
-            <button type="submit" className="w-full h-14 mt-4 bg-[#3e2316] hover:bg-[#2d1b14] text-amber-100 font-black text-xl rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] transition-colors tracking-widest border-b-4 border-[#1a0f0b] active:border-b-0 active:translate-y-1 cursor-pointer">
-              Login
-            </button>
-
-            <div className="flex items-center justify-between pt-2 px-2">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="remember" className="w-5 h-5 rounded bg-[#4a2c1d] border-none accent-[#4a2c1d] cursor-pointer" />
-                <label htmlFor="remember" className="text-sm font-bold text-[#4a2c1d] cursor-pointer" style={{ color: '#4a2c1d' }}>
-                  Remember me?
-                </label>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setShowRegisterModal(true)} 
-                className="text-sm font-black text-[#4a2c1d] underline hover:text-[#7c4d36]"
-                style={{ color: '#4a2c1d' }}
-              >
-                Register
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {showRegisterModal && (
-          <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="bg-[#fffdf7] rounded-[2rem] shadow-2xl w-full max-w-sm border-4 border-[#e8dccb] p-8 relative">
-              <button type="button" onClick={() => setShowRegisterModal(false)} className="absolute top-4 right-4 text-[#7c4d36] hover:text-[#4a2c1d]"><X size={24} /></button>
-              <h2 className="text-2xl font-black text-[#4a2c1d] tracking-widest uppercase text-center mb-6" style={{ color: '#4a2c1d' }}>
-                Register
-              </h2>
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="relative flex items-center">
-                  <input type="text" placeholder="Full Name" required value={regData.name} onChange={(e) => setRegData({ ...regData, name: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60" />
-                </div>
-                <div className="relative flex items-center">
-                  <input type="text" placeholder="Username" required value={regData.username} onChange={(e) => setRegData({ ...regData, username: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60" />
-                </div>
-                <div className="relative flex items-center">
-                  <input type="password" placeholder="Password" required value={regData.password} onChange={(e) => setRegData({ ...regData, password: e.target.value })} className="w-full px-4 h-14 bg-[#faeedb] border-2 border-transparent focus:border-[#4a2c1d] rounded-xl text-[#4a2c1d] font-bold outline-none shadow-inner placeholder-[#8b5a3e]/60" />
-                </div>
-                <button type="submit" className="w-full h-14 mt-4 bg-[#3e2316] hover:bg-[#2d1b14] text-amber-100 font-black text-xl rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.3)] transition-colors tracking-widest border-b-4 border-[#1a0f0b] cursor-pointer">
-                  Create Account
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
+      <Login 
+        onLoginSuccess={(userData) => {
+          setIsLoggedIn(true);
+          if (userData?.role) setRole(userData.role);
+          if (userData?.name) setLoggedInName(userData.name);
+          if (userData?.employeeId) setEmployeeId(userData.employeeId);
+          setActiveTab('dashboard1');
+        }} 
+      />
     );
   }
 
@@ -4072,6 +4005,14 @@ export default function Dashboard() {
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard2' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <Package size={18} className={showSidebarHighlight && activeTab === 'dashboard2' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Dashboard 2</span>
+              </button>
+
+              {/* Products Section directly under Dashboard 2 */}
+              <button
+                onClick={() => { setActiveTab('products'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'products' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
+                <ShoppingBag size={18} className={showSidebarHighlight && activeTab === 'products' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
+                <span>Products</span>
               </button>
 
               <button
@@ -4200,6 +4141,7 @@ export default function Dashboard() {
                 <h1 className="text-2xl md:text-3xl font-black text-white">
                   {activeTab === 'dashboard1' && 'Order Management (Chocolates)'}
                   {activeTab === 'dashboard2' && 'Order Management (Products)'}
+                  {activeTab === 'products' && 'Products Management'}
                   {activeTab === 'tracking' && 'Orders Tracking Center'}
                   {activeTab === 'reports' && 'Analytics & Reports'}
                   {activeTab === 'inventories' && 'Inventory Management'}
@@ -4208,6 +4150,7 @@ export default function Dashboard() {
                 </h1>
                 <p className="hidden md:block text-sm text-blue-300 font-medium">
                   {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
+                  {activeTab === 'products' && 'Manage all products, selling prices, wholesale costs, and profit margins.'}
                   {activeTab === 'tracking' && 'Search and trace live order statuses.'}
                   {activeTab === 'reports' && 'View your sales and item statistics.'}
                   {activeTab === 'inventories' && 'Track live chocolate stock & manual entries.'}
@@ -4247,6 +4190,287 @@ export default function Dashboard() {
                   setDailyTasksWallpaper(localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
                 }}
               />
+            </div>
+          )}
+
+          {/* ================= PRODUCTS MANAGEMENT SECTION ================= */}
+          {activeTab === 'products' && (
+            <div className="space-y-8 print:hidden animate-in fade-in duration-300 pb-12">
+              
+              {/* Top Control Header Card */}
+              <div className="bg-[#0d1527] p-5 md:p-6 rounded-3xl shadow-2xl border border-white/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/50 shrink-0">
+                    <ShoppingBag size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
+                      Products Management & Inventory
+                    </h2>
+                    <p className="text-xs md:text-sm text-slate-300 font-medium">
+                      Create new listings, track wholesale costs, selling prices, and real-time profit margins.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-[#162035] border border-white/10 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300">
+                  <Package size={16} className="text-blue-400" />
+                  <span>Total Items: <strong className="text-white text-sm">{orderedProducts.length}</strong></span>
+                </div>
+              </div>
+
+              {/* 🟢 INLINE "ADD NEW LISTING" FORM (Directly on Page - NO POPUP MODAL) */}
+              <div id="product-inline-form" className="bg-[#0c1427] border border-white/15 rounded-[2rem] p-6 md:p-8 max-w-xl mx-auto shadow-2xl text-white">
+                <div className="flex items-center justify-between border-b border-white/15 pb-4 mb-6">
+                  <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider">
+                    {editProductId ? "Edit Listing" : "Add New Listing"}
+                  </h3>
+                  {editProductId && (
+                    <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-400/50 px-3 py-1 rounded-full font-bold">
+                      Editing Mode
+                    </span>
+                  )}
+                </div>
+
+                <form onSubmit={handleAddCustomProduct} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
+                      Item Name
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      value={newProductForm.name}
+                      onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                      style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
+                      placeholder="Enter Item Name (e.g. Munch)"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div>
+                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
+                        Wholesale Price
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        step="any"
+                        value={newProductForm.wholesalePrice}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })}
+                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
+                        placeholder="Wholesale Price"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
+                        Selling Price
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        step="any"
+                        value={newProductForm.price}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })}
+                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
+                        placeholder="Selling Price"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dynamic Real-time Profit Indicator inside the Form */}
+                  {(newProductForm.price || newProductForm.wholesalePrice) && (() => {
+                    const sp = Number(newProductForm.price) || 0;
+                    const wp = Number(newProductForm.wholesalePrice) || 0;
+                    const profit = sp - wp;
+                    const marginPct = wp > 0 ? Math.round((profit / wp) * 100) : 100;
+                    return (
+                      <div className="bg-[#151f36]/80 border border-white/10 rounded-xl p-3 flex items-center justify-between text-xs animate-in fade-in">
+                        <span className="text-slate-300 font-semibold">Calculated Profit (Selling - Wholesale):</span>
+                        <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          ₹{profit.toLocaleString()} {wp > 0 ? `(${marginPct}%)` : ''}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewProductForm({ name: "", wholesalePrice: "", price: "" });
+                        setEditProductId(null);
+                      }}
+                      className="flex-1 px-5 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-all cursor-pointer text-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-5 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/40 hover:shadow-xl transition-all cursor-pointer text-sm"
+                    >
+                      {editProductId ? "Update Listing" : "Save Listing"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* 🟢 DEDICATED PRODUCTS TABLE (Chronological Order Added, Profit Calculation) */}
+              <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 text-white">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5 pb-4 border-b border-white/10">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
+                      <ShoppingBag className="text-blue-400" size={20} />
+                      <span>Product Listings Table ({orderedProducts.length})</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      Items are shown in the exact order added with auto-calculated profit margins.
+                    </p>
+                  </div>
+
+                  {/* Search Filter */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search product name..."
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {orderedProducts.length === 0 ? (
+                  <div className="py-16 text-center space-y-3">
+                    <Package size={48} className="mx-auto text-slate-600 animate-pulse" />
+                    <p className="text-lg font-bold text-slate-400">No product listings added yet.</p>
+                    <p className="text-xs text-slate-500">Fill in the "ADD NEW LISTING" form above to create your first product.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 shadow-inner">
+                    <table className="w-full text-left border-collapse text-xs md:text-sm">
+                      <thead>
+                        <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
+                          <th className="py-3.5 px-4 text-center w-16">#</th>
+                          <th className="py-3.5 px-4">Item Name</th>
+                          <th className="py-3.5 px-4 text-right">Wholesale Price (₹)</th>
+                          <th className="py-3.5 px-4 text-right">Selling Price (₹)</th>
+                          <th className="py-3.5 px-4 text-right">Profit (₹)</th>
+                          <th className="py-3.5 px-4 text-center w-28">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {orderedProducts
+                          .filter(p => !productSearchQuery.trim() || (p.name && p.name.toLowerCase().includes(productSearchQuery.toLowerCase())))
+                          .map((prod, index) => {
+                            const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
+                            const wholePrice = Number(prod.wholesalePrice) || 0;
+                            const profit = sellPrice - wholePrice;
+                            const marginPct = wholePrice > 0 ? Math.round((profit / wholePrice) * 100) : 100;
+                            const isCurrentlyEditing = editProductId === prod.fireId;
+
+                            return (
+                              <tr
+                                key={prod.fireId || index}
+                                className={`hover:bg-[#15213b]/60 transition-colors ${isCurrentlyEditing ? 'bg-amber-500/15 border-l-4 border-l-amber-400' : ''}`}
+                              >
+                                {/* # / Order Number */}
+                                <td className="py-3.5 px-4 text-center font-black text-amber-400">
+                                  {index + 1}
+                                </td>
+
+                                {/* Item Name */}
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0">
+                                      {prod.name ? prod.name.charAt(0).toUpperCase() : 'P'}
+                                    </div>
+                                    <span className="font-extrabold text-white tracking-wide">
+                                      {prod.name}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Wholesale Price */}
+                                <td className="py-3.5 px-4 text-right font-black text-blue-400">
+                                  ₹{wholePrice.toLocaleString()}
+                                </td>
+
+                                {/* Selling Price */}
+                                <td className="py-3.5 px-4 text-right font-black text-emerald-400">
+                                  ₹{sellPrice.toLocaleString()}
+                                </td>
+
+                                {/* Profit = Selling Price - Wholesale Price */}
+                                <td className="py-3.5 px-4 text-right">
+                                  <div className="flex flex-col items-end">
+                                    <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      ₹{profit.toLocaleString()}
+                                    </span>
+                                    <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                                      {marginPct}% margin
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Actions */}
+                                <td className="py-3.5 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditProductClick(prod)}
+                                      className="p-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                                      title="Edit Listing"
+                                    >
+                                      <Pencil size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteProductClick(prod.fireId)}
+                                      className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                      title="Delete Listing"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                      {/* Summary Row */}
+                      {orderedProducts.length > 0 && (() => {
+                        const totalWholesale = orderedProducts.reduce((sum, p) => sum + (Number(p.wholesalePrice) || 0), 0);
+                        const totalSelling = orderedProducts.reduce((sum, p) => sum + (Number(p.price ?? p.sellingPrice) || 0), 0);
+                        const totalProfit = totalSelling - totalWholesale;
+                        const avgMarginPct = totalWholesale > 0 ? Math.round((totalProfit / totalWholesale) * 100) : 0;
+                        return (
+                          <tfoot>
+                            <tr className="bg-[#121a2d] border-t-2 border-white/15 font-black text-xs md:text-sm">
+                              <td className="py-3.5 px-4 text-center text-amber-400">Total</td>
+                              <td className="py-3.5 px-4 text-slate-300">{orderedProducts.length} Listings</td>
+                              <td className="py-3.5 px-4 text-right text-blue-400">₹{totalWholesale.toLocaleString()}</td>
+                              <td className="py-3.5 px-4 text-right text-emerald-400">₹{totalSelling.toLocaleString()}</td>
+                              <td className="py-3.5 px-4 text-right">
+                                <span className={`text-sm ${totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  ₹{totalProfit.toLocaleString()} ({avgMarginPct}%)
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4"></td>
+                            </tr>
+                          </tfoot>
+                        );
+                      })()}
+                    </table>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
@@ -4879,13 +5103,13 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
-                    <div className="flex justify-between items-start w-full mb-1 relative z-10">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px]">
+                    <div className="flex justify-between items-start w-full mb-1.5 relative z-10">
                       <div className="flex items-center gap-1 group relative">
-                        <p className="text-[11px] font-black text-[#c2410c] tracking-wide leading-tight">Revenue <br />Filter</p>
+                        <p className="text-[11px] font-black text-amber-400 tracking-wide leading-tight uppercase">Revenue <br />Filter</p>
 
                         <div className="relative inline-block">
-                          <ChevronDown size={14} className="text-[#c2410c] cursor-pointer hover:scale-125 transition-transform" />
+                          <ChevronDown size={14} className="text-amber-400 cursor-pointer hover:scale-125 transition-transform" />
                           <select
                             value={revenueDateType}
                             onChange={(e) => setRevenueDateType(e.target.value)}
@@ -4903,7 +5127,7 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => setShowAmounts(!showAmounts)}
-                          className="ml-1 p-1 rounded-lg bg-white/80 hover:bg-white text-[#c2410c] hover:text-[#9a3412] transition-all cursor-pointer shadow-sm border border-amber-300/60 flex items-center justify-center shrink-0"
+                          className="ml-1 p-1 rounded-lg bg-[#162035] hover:bg-[#1e2c47] text-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow-sm border border-amber-400/60 flex items-center justify-center shrink-0"
                           title={showAmounts ? "Hide monetary amounts" : "Show monetary amounts"}
                         >
                           {showAmounts ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -4911,11 +5135,11 @@ export default function Dashboard() {
                       </div>
 
                       <div className="text-right">
-                        <div className="flex items-center justify-end gap-1.5 mb-0.5">
-                          <div className="text-[10px] font-black text-green-800 uppercase tracking-tighter">Revenue</div>
+                        <div className="flex items-center justify-end gap-1.5 mb-1">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 text-[10px] font-black uppercase tracking-wider shadow-sm">Revenue</span>
                           
-                          {/* Month & Year Picker Badge matching Targets */}
-                          <div className="relative">
+                          {/* Month & Year Picker Badge - High contrast dark slate pill with gold typography */}
+                          <div className="relative flex items-center">
                             <input
                               type="month"
                               value={revenueMonthKey}
@@ -4927,21 +5151,34 @@ export default function Dashboard() {
                             />
                             <button
                               type="button"
-                              className="flex items-center gap-1 text-[10px] font-black text-amber-900 bg-white/90 hover:bg-white px-2 py-0.5 rounded-lg border border-amber-400/60 shadow-xs cursor-pointer transition-all hover:scale-105"
+                              className="flex items-center gap-1.5 text-[10px] font-black text-amber-300 bg-[#162035] hover:bg-[#1f2d4a] px-2.5 py-1 rounded-lg border border-amber-400/90 shadow-md cursor-pointer transition-all hover:scale-105"
                             >
-                              <span>{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
-                              <Pencil size={9} className="text-amber-700 ml-0.5" />
+                              <span className="text-amber-300 font-extrabold">{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
+                              <Pencil size={10} className="text-amber-400 shrink-0" />
                             </button>
+                            {revenueMonthKey && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRevenueMonthChange("");
+                                }}
+                                className="ml-1 p-0.5 rounded-full bg-rose-500/30 hover:bg-rose-500 text-rose-300 hover:text-white transition-colors cursor-pointer z-30"
+                                title="Clear Month Filter"
+                              >
+                                <X size={10} strokeWidth={3} />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        <h3 className="text-lg font-black text-green-700 leading-tight">{maskAmount(displayRevenue)}</h3>
-                        <div className="text-[9px] font-black text-rose-700 uppercase tracking-tighter mt-0.5">Pending Amount</div>
-                        <h4 className="text-sm font-black text-rose-600 leading-tight">{maskAmount(displayPendingAmount)}</h4>
+                        <h3 className="text-2xl font-black text-emerald-400 leading-tight tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">{maskAmount(displayRevenue)}</h3>
+                        <div className="text-[9px] font-bold text-rose-400/90 uppercase tracking-wider mt-1">Pending Amount</div>
+                        <h4 className="text-base font-black text-rose-400 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{maskAmount(displayPendingAmount)}</h4>
                       </div>
                     </div>
 
-                    <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter -mt-1 mb-1 z-10 relative">
-                      Based on: {revenueDateType}
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider -mt-1 mb-1.5 z-10 relative">
+                      Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
                     </p>
 
                     <div className="flex items-center gap-1 mt-auto relative z-10 w-full">
@@ -4949,17 +5186,17 @@ export default function Dashboard() {
                         type="date"
                         value={dateFilter.from}
                         onChange={e => setDateFilter({ ...dateFilter, from: e.target.value })}
-                        className="flex-1 w-full min-w-0 px-1 py-1.5 border-2 border-white rounded-md text-[9px] font-bold text-purple-950 outline-none focus:ring-1 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] tracking-tighter"
+                        className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
                         title="From Date"
                       />
 
-                      <span className="text-[10px] font-black text-purple-700 shrink-0">To</span>
+                      <span className="text-[10px] font-black text-amber-400 shrink-0 px-0.5">To</span>
 
                       <input
                         type="date"
                         value={dateFilter.to}
                         onChange={e => setDateFilter({ ...dateFilter, to: e.target.value })}
-                        className="flex-1 w-full min-w-0 px-1 py-1.5 border-2 border-white rounded-md text-[9px] font-bold text-purple-950 outline-none focus:ring-1 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] tracking-tighter"
+                        className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
                         title="To Date"
                       />
 
@@ -4969,7 +5206,7 @@ export default function Dashboard() {
                             setDateFilter({ from: "", to: "" });
                             setRevenueMonthKey("");
                           }}
-                          className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors"
+                          className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors cursor-pointer"
                           title="Clear Date Filter"
                         >
                           <X size={12} strokeWidth={3} />
@@ -7617,8 +7854,15 @@ export default function Dashboard() {
                         <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Product Name</label>
                         <ChocolateSingleSelect
                           value={formData.chocolate}
-                          onChange={(val) => setFormData({ ...formData, chocolate: val })}
-                          suggestions={customProducts.map(p => p.name)}
+                          onChange={(val) => {
+                            const matched = customProducts.find(p => p.name?.trim().toLowerCase() === val.trim().toLowerCase());
+                            setFormData(prev => ({
+                              ...prev,
+                              chocolate: val,
+                              manualProductPrice: matched ? String(matched.price ?? matched.sellingPrice ?? '') : prev.manualProductPrice
+                            }));
+                          }}
+                          suggestions={Array.from(new Set(orderedProducts.map(p => p.name).filter(Boolean)))}
                           pricesMap={customPricesMap}
                           placeholderText="Select product..."
                         />
