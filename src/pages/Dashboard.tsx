@@ -345,23 +345,38 @@ const ChocolateSingleSelect = ({
   placeholderText?: string;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setSearchQuery("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  const filteredSuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return suggestions;
+    const q = searchQuery.trim().toLowerCase();
+    return suggestions.filter(item => item.toLowerCase().includes(q));
+  }, [suggestions, searchQuery]);
+
   return (
     <div ref={wrapperRef} className="relative w-full">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen); if (isOpen) setSearchQuery(""); }}
         style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
         className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner flex justify-between items-center text-left cursor-pointer transition-all hover:border-amber-400/50"
       >
@@ -372,34 +387,56 @@ const ChocolateSingleSelect = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-[250] w-full mt-1.5 bg-[#121a2d] border border-white/20 shadow-2xl max-h-60 overflow-y-auto py-1 rounded-xl text-left backdrop-blur-xl custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
-          <div
-            className="px-3.5 py-2 cursor-pointer hover:bg-amber-500/20 hover:text-amber-300 text-slate-400 text-xs font-semibold select-none transition-colors border-b border-white/10"
-            onClick={() => {
-              onChange("");
-              setIsOpen(false);
-            }}
-          >
-            {placeholderText}
+        <div className="absolute z-[250] w-full mt-1.5 bg-[#121a2d] border border-white/20 shadow-2xl max-h-60 overflow-hidden rounded-xl text-left backdrop-blur-xl custom-scrollbar animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+          {/* Search Input */}
+          <div className="px-2.5 py-2 border-b border-white/15 shrink-0 sticky top-0 bg-[#121a2d] z-10">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="w-full pl-8 pr-3 py-1.5 bg-[#1a2540] border border-white/15 rounded-lg text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-amber-400/60 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
           </div>
-          {suggestions.map((item, index) => {
-            const isSelected = value === item;
-            return (
-              <div
-                key={index}
-                className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold select-none transition-colors border-b border-white/5 last:border-0 ${isSelected
-                    ? 'bg-amber-500/20 text-amber-300 font-extrabold'
-                    : 'text-slate-200 hover:bg-amber-500/15 hover:text-amber-300'
-                  }`}
-                onClick={() => {
-                  onChange(item);
-                  setIsOpen(false);
-                }}
-              >
-                {item}
-              </div>
-            );
-          })}
+          <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
+            <div
+              className="px-3.5 py-2 cursor-pointer hover:bg-amber-500/20 hover:text-amber-300 text-slate-400 text-xs font-semibold select-none transition-colors border-b border-white/10"
+              onClick={() => {
+                onChange("");
+                setIsOpen(false);
+                setSearchQuery("");
+              }}
+            >
+              {placeholderText}
+            </div>
+            {filteredSuggestions.length === 0 && (
+              <div className="px-3.5 py-3 text-xs text-slate-500 text-center font-medium">No results found</div>
+            )}
+            {filteredSuggestions.map((item, index) => {
+              const isSelected = value === item;
+              return (
+                <div
+                  key={index}
+                  className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold select-none transition-colors border-b border-white/5 last:border-0 ${isSelected
+                      ? 'bg-amber-500/20 text-amber-300 font-extrabold'
+                      : 'text-slate-200 hover:bg-amber-500/15 hover:text-amber-300'
+                    }`}
+                  onClick={() => {
+                    onChange(item);
+                    setIsOpen(false);
+                    setSearchQuery("");
+                  }}
+                >
+                  {item}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -475,6 +512,16 @@ export default function Dashboard() {
   const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
   const [chocolateRows, setChocolateRows] = useState<{ chocolate: string; count: string }[]>([{ chocolate: "", count: "" }]);
+
+  // --- MULTI-PRODUCT ORDER ROWS (Dashboard 2) ---
+  const [productRows, setProductRows] = useState<{ productName: string; quantity: string; price: string }[]>([{ productName: "", quantity: "", price: "" }]);
+
+  // --- PRODUCT IMAGE MANAGEMENT ---
+  const [imageGalleryProduct, setImageGalleryProduct] = useState<any>(null);
+  const [isImageGalleryOpen, setIsImageGalleryOpen] = useState(false);
+  const [galleryActiveIndex, setGalleryActiveIndex] = useState(0);
+  const [imageUploadingFor, setImageUploadingFor] = useState<string | null>(null);
+  const [deleteImageConfirm, setDeleteImageConfirm] = useState<{ productFireId: string; imageIndex: number } | null>(null);
 
   // --- MONTHLY TARGET STATE & COMPUTATION ---
   const [targetMonthKey, setTargetMonthKey] = useState<string>(() => format(new Date(), "yyyy-MM"));
@@ -2560,6 +2607,7 @@ export default function Dashboard() {
       : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
     setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setChocolateRows([{ chocolate: "", count: "" }]);
+    setProductRows([{ productName: "", quantity: "", price: "" }]);
     setOrderTypeOthersToggle(true);
     setIsModalOpen(true);
   };
@@ -3066,6 +3114,19 @@ export default function Dashboard() {
       calculatedDeliveryFee: priceData.fullDeliveryCharge || 0
     };
 
+    // For product-category orders with multi-product rows, attach products array
+    if (formData.category === 'product' && productRows.length > 0) {
+      const validRows = productRows.filter(r => r.productName.trim());
+      if (validRows.length > 0) {
+        formattedOrder.products = validRows.map(r => ({
+          productName: r.productName.trim(),
+          quantity: Number(r.quantity) || 0,
+          price: Number(r.price) || 0,
+          productId: customProducts.find(p => p.name?.trim().toLowerCase() === r.productName.trim().toLowerCase())?.fireId || ''
+        }));
+      }
+    }
+
     try {
       const moduleName = (formData.category === 'product') ? 'Order Management (Products)' : 'Order Management (Chocolates)';
       if (formData.fireId) {
@@ -3338,6 +3399,115 @@ export default function Dashboard() {
       } catch (err) {
         console.error("Failed to delete chocolate:", err);
       }
+    }
+  };
+
+  // --- PRODUCT IMAGE HANDLERS ---
+  const handleImageUpload = async (productFireId: string, files: FileList) => {
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const toastId = toast.loading('Uploading images...');
+    setImageUploadingFor(productFireId);
+
+    try {
+      const newImages: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!validTypes.includes(file.type)) {
+          toast.error(`${file.name}: Unsupported format. Use JPG, PNG, or WEBP.`);
+          continue;
+        }
+        if (file.size > maxSize) {
+          toast.error(`${file.name}: File too large. Max 5MB.`);
+          continue;
+        }
+        // Convert to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        newImages.push(base64);
+      }
+
+      if (newImages.length > 0) {
+        const product = customProducts.find(p => p.fireId === productFireId);
+        const existingImages = product?.images || [];
+        const updatedImages = [...existingImages, ...newImages];
+        await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
+        toast.success(`${newImages.length} image(s) uploaded!`, { id: toastId });
+      } else {
+        toast.dismiss(toastId);
+      }
+    } catch (err) {
+      console.error("Image upload error:", err);
+      toast.error("Failed to upload images.", { id: toastId });
+    } finally {
+      setImageUploadingFor(null);
+    }
+  };
+
+  const handleDeleteImage = async (productFireId: string, imageIndex: number) => {
+    try {
+      const product = customProducts.find(p => p.fireId === productFireId);
+      if (!product || !product.images) return;
+      const updatedImages = product.images.filter((_: any, i: number) => i !== imageIndex);
+      await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
+      toast.success("Image deleted.");
+      // Update gallery state
+      if (imageGalleryProduct?.fireId === productFireId) {
+        setImageGalleryProduct({ ...imageGalleryProduct, images: updatedImages });
+        if (galleryActiveIndex >= updatedImages.length) {
+          setGalleryActiveIndex(Math.max(0, updatedImages.length - 1));
+        }
+      }
+      setDeleteImageConfirm(null);
+    } catch (err) {
+      console.error("Delete image error:", err);
+      toast.error("Failed to delete image.");
+    }
+  };
+
+  const handleCopyImage = async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = imageUrl;
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("No canvas context");
+      
+      ctx.drawImage(img, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error("Failed to copy image data.");
+          return;
+        }
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "image/png": blob
+            })
+          ]);
+          toast.success("Image copied to clipboard!");
+        } catch (err) {
+          console.error("Clipboard write error:", err);
+          toast.error("Failed to copy. Browser may have blocked it.");
+        }
+      }, "image/png");
+    } catch (err) {
+      console.error("Copy image error:", err);
+      toast.error("Failed to load image for copying.");
     }
   };
 
@@ -4420,7 +4590,7 @@ export default function Dashboard() {
 
                                 {/* Actions */}
                                 <td className="py-3.5 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-1.5">
+                                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     <button
                                       type="button"
                                       onClick={() => handleEditProductClick(prod)}
@@ -4429,6 +4599,39 @@ export default function Dashboard() {
                                     >
                                       <Pencil size={15} />
                                     </button>
+                                    <label
+                                      className={`p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer inline-flex ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
+                                      title="Upload Images"
+                                    >
+                                      <ImageIcon size={15} />
+                                      <input
+                                        type="file"
+                                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                                        multiple
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          if (e.target.files && e.target.files.length > 0) {
+                                            handleImageUpload(prod.fireId, e.target.files);
+                                          }
+                                          e.target.value = '';
+                                        }}
+                                      />
+                                    </label>
+                                    {prod.images && prod.images.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setImageGalleryProduct(prod);
+                                          setGalleryActiveIndex(0);
+                                          setIsImageGalleryOpen(true);
+                                        }}
+                                        className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer relative"
+                                        title={`View ${prod.images.length} Image(s)`}
+                                      >
+                                        <Eye size={15} />
+                                        <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black rounded-full w-3.5 h-3.5 flex items-center justify-center">{prod.images.length}</span>
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteProductClick(prod.fireId)}
@@ -4796,7 +4999,7 @@ export default function Dashboard() {
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-1 lg:min-h-0">
                 <div className={`grid grid-cols-1 sm:grid-cols-2 ${showHeader
-                    ? 'lg:grid-cols-4'
+                    ? (activeTab === 'dashboard2' ? 'lg:grid-cols-2' : 'lg:grid-cols-3')
                     : 'hidden'
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
@@ -4817,6 +5020,7 @@ export default function Dashboard() {
                         <option value="All">All Types</option>
                         <option value="Sabi">Sabi</option>
                         <option value="Thaaru">Thaaru</option>
+                        <option value="Choco Wrapz">Choco Wrapz</option>
                       </select>
                     </div>
                   </div>
@@ -4951,157 +5155,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
-                    <div className="flex justify-between items-start mb-1 relative z-10">
-                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Chocolates</p>
-                      <div className="flex items-center gap-1.5">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-inner ${
-                                dateFilter.from || dateFilter.to
-                                  ? 'bg-amber-600 text-white ring-2 ring-amber-400'
-                                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                              }`}
-                              title="Filter by Date Range (From - To)"
-                            >
-                              <Calendar size={15} />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="sabi-calendar-popover p-3.5 border border-white/20 bg-[#0c1427] text-white shadow-2xl rounded-2xl w-auto z-50" align="end">
-                            <div className="flex flex-col gap-3 min-w-[260px]">
-                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <p className="text-xs font-black text-amber-400 tracking-wide uppercase">Select Date Range</p>
-                                {(dateFilter.from || dateFilter.to) && (
-                                  <button
-                                    onClick={() => setDateFilter({ from: "", to: "" })}
-                                    className="text-[10px] text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer"
-                                  >
-                                    Clear Filter
-                                  </button>
-                                )}
-                              </div>
-
-                              <div className="flex flex-col gap-2">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-300 font-bold">From:</span>
-                                  <input
-                                    type="date"
-                                    value={dateFilter.from}
-                                    onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
-                                    className="bg-slate-800 border border-white/20 rounded-lg px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-300 font-bold">To:</span>
-                                  <input
-                                    type="date"
-                                    value={dateFilter.to}
-                                    onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
-                                    className="bg-slate-800 border border-white/20 rounded-lg px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="border-t border-white/10 pt-2 flex justify-center">
-                                <CalendarComponent
-                                  mode="single"
-                                  selected={dateFilter.from ? new Date(dateFilter.from) : undefined}
-                                  onSelect={(date) => {
-                                    if (date) {
-                                      const formatted = format(date, "yyyy-MM-dd");
-                                      if (!dateFilter.from || (dateFilter.from && dateFilter.to)) {
-                                        setDateFilter({ from: formatted, to: "" });
-                                      } else {
-                                        if (new Date(formatted) < new Date(dateFilter.from)) {
-                                          setDateFilter({ from: formatted, to: dateFilter.from });
-                                        } else {
-                                          setDateFilter({ ...dateFilter, to: formatted });
-                                        }
-                                      }
-                                    }
-                                  }}
-                                  className="rounded-xl border-none p-0 scale-90"
-                                />
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-600 shadow-inner">
-                          <Package size={16} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-baseline justify-between relative z-10 mb-1">
-                      <p className="text-2xl font-black text-amber-950">
-                        {chocFilter
-                          ? (topChocolates.find(([name]) => name === chocFilter)?.[1] || 0)
-                          : totalItems}
-                      </p>
-                      {(dateFilter.from || dateFilter.to) && (
-                        <span className="text-[9px] font-extrabold text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded-md truncate max-w-[120px]" title={`${dateFilter.from || 'Start'} - ${dateFilter.to || 'End'}`}>
-                          📅 {dateFilter.from || 'Start'} - {dateFilter.to || 'End'}
-                        </span>
-                      )}
-                    </div>
-
-                    <select value={chocFilter} onChange={(e) => setChocFilter(e.target.value)} className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-green-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto">
-                      <option value="">All Chocolates</option>
-                      {uniqueChocolates.map((name) => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {activeTab === 'dashboard2' && (
-                    <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
-                      <div className="flex justify-between items-start mb-2 relative z-10 shrink-0">
-                        <p className="text-sm font-black text-[#c2410c] tracking-wide">Production Listing</p>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-100 text-purple-600 shadow-inner"><Package size={16} /></div>
-                      </div>
-
-                      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-1.5 relative z-10 text-xs font-bold max-h-[75px] mb-2">
-                        {customProducts.length === 0 ? (
-                          <p className="text-amber-700/60 text-center mt-2 italic">No products added.</p>
-                        ) : (
-                          customProducts.map(prod => (
-                            <div key={prod.fireId} className="flex justify-between items-center bg-slate-900/80 hover:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-white/20 shadow-md transition-all">
-                              <div className="flex-1 pr-2 truncate">
-                                <span className="text-white font-extrabold text-xs block truncate" title={prod.name}>{prod.name}</span>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-[10px] text-emerald-300 font-bold">S: ₹{prod.price ?? prod.sellingPrice}</span>
-                                  {prod.wholesalePrice !== undefined && prod.wholesalePrice !== null && prod.wholesalePrice !== "" && (
-                                    <span className="text-[10px] text-blue-300 font-bold">W: ₹{prod.wholesalePrice}</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button onClick={() => handleEditProductClick(prod)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 p-1 rounded-lg transition-colors cursor-pointer" title="Edit"><Pencil size={13} /></button>
-                                <button onClick={() => handleDeleteProductClick(prod.fireId)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1 rounded-lg transition-colors cursor-pointer" title="Delete"><Trash2 size={13} /></button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-
-                      {/* Dropdown similar to Chocolate dropdown in Dashboard 1 */}
-                      <select 
-                        value={d2ChocFilter} 
-                        onChange={(e) => setD2ChocFilter(e.target.value)} 
-                        className="w-full p-2.5 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-purple-400 bg-white/70 cursor-pointer shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05)] relative z-10 mt-auto"
-                      >
-                        <option value="">All Products</option>
-                        {Array.from(new Set([
-                          ...customProducts.map(p => p.name).filter(Boolean),
-                          ...uniqueChocolates
-                        ])).map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
                   <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px]">
                     <div className="flex justify-between items-start w-full mb-1.5 relative z-10">
@@ -5641,18 +5694,7 @@ export default function Dashboard() {
                         className="hidden"
                       />
 
-                      {activeTab === 'dashboard2' && (
-                        <button 
-                          onClick={() => {
-                            setEditProductId(null);
-                            setNewProductForm({ name: "", wholesalePrice: "", price: "" });
-                            setIsAddProductModalOpen(true);
-                          }} 
-                          className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-black rounded-lg transition-colors shadow-sm bg-blue-600 text-white hover:bg-blue-700 uppercase tracking-wider cursor-pointer"
-                        >
-                          <Plus size={18} /> NEW LISTING
-                        </button>
-                      )}
+
 
                       <button onClick={handleAddClick} className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors shadow-sm bg-amber-600 text-white hover:bg-amber-700`}>
                         <Plus size={18} /> Add Order
@@ -7834,53 +7876,111 @@ export default function Dashboard() {
                 {/* Column 2: Order Details */}
                 <div className="space-y-3">
                   {formData.category === 'product' && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Product Unit Price (₹)</label>
-                      <input
-                        type="number"
-                        name="manualProductPrice"
-                        value={formData.manualProductPrice || ''}
-                        onChange={handleInputChange}
-                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
-                        placeholder="Enter price per unit"
-                      />
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-slate-200">Products</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductRows(prev => [...prev, { productName: "", quantity: "", price: "" }]);
+                          }}
+                          style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#ffffff' }}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 transition-all hover:brightness-110 shadow-sm cursor-pointer"
+                        >
+                          <Plus size={10} /> Add Product
+                        </button>
+                      </div>
+                      {productRows.map((row, idx) => (
+                        <div key={idx} style={{ backgroundColor: '#141d33', borderColor: 'rgba(255, 255, 255, 0.15)' }} className="p-2.5 rounded-xl border space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">Product {idx + 1}</span>
+                            {productRows.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newRows = productRows.filter((_, i) => i !== idx);
+                                  setProductRows(newRows);
+                                  // Sync formData
+                                  const names = newRows.map(r => r.productName.trim()).filter(Boolean).join(', ');
+                                  const qtys = newRows.map(r => r.quantity.trim()).filter(Boolean).join(', ');
+                                  const totalPrice = newRows.reduce((s, r) => s + (Number(r.price) || 0) * (Number(r.quantity) || 0), 0);
+                                  const totalQty = newRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+                                  setFormData(prev => ({ ...prev, chocolate: names, count: String(totalQty), manualProductPrice: totalQty > 0 ? String(Math.round(totalPrice / totalQty)) : '' }));
+                                }}
+                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1 rounded-lg transition-colors shrink-0 cursor-pointer"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <ChocolateSingleSelect
+                              value={row.productName}
+                              onChange={(val) => {
+                                const newRows = [...productRows];
+                                newRows[idx].productName = val;
+                                // Auto-populate selling price
+                                const matched = customProducts.find(p => p.name?.trim().toLowerCase() === val.trim().toLowerCase());
+                                if (matched) {
+                                  newRows[idx].price = String(matched.price ?? matched.sellingPrice ?? '');
+                                }
+                                setProductRows(newRows);
+                                // Sync formData for backward compat
+                                const names = newRows.map(r => r.productName.trim()).filter(Boolean).join(', ');
+                                const totalQty = newRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+                                const totalPrice = newRows.reduce((s, r) => s + (Number(r.price) || 0) * (Number(r.quantity) || 0), 0);
+                                setFormData(prev => ({ ...prev, chocolate: names, count: String(totalQty), manualProductPrice: totalQty > 0 ? String(Math.round(totalPrice / totalQty)) : matched ? String(matched.price ?? matched.sellingPrice ?? '') : prev.manualProductPrice }));
+                              }}
+                              suggestions={Array.from(new Set(orderedProducts.map(p => p.name).filter(Boolean)))}
+                              pricesMap={customPricesMap}
+                              placeholderText="Select product..."
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">Quantity</label>
+                              <input
+                                type="number"
+                                value={row.quantity}
+                                onChange={(e) => {
+                                  const newRows = [...productRows];
+                                  newRows[idx].quantity = e.target.value;
+                                  setProductRows(newRows);
+                                  const totalQty = newRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+                                  const totalPrice = newRows.reduce((s, r) => s + (Number(r.price) || 0) * (Number(r.quantity) || 0), 0);
+                                  setFormData(prev => ({ ...prev, count: String(totalQty), manualProductPrice: totalQty > 0 ? String(Math.round(totalPrice / totalQty)) : prev.manualProductPrice }));
+                                }}
+                                style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                                className="w-full text-xs font-bold rounded-lg p-2 outline-none border focus:border-amber-400 text-white shadow-inner"
+                                placeholder="Qty"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">Price (₹)</label>
+                              <input
+                                type="number"
+                                value={row.price}
+                                onChange={(e) => {
+                                  const newRows = [...productRows];
+                                  newRows[idx].price = e.target.value;
+                                  setProductRows(newRows);
+                                  const totalQty = newRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+                                  const totalPrice = newRows.reduce((s, r) => s + (Number(r.price) || 0) * (Number(r.quantity) || 0), 0);
+                                  setFormData(prev => ({ ...prev, manualProductPrice: totalQty > 0 ? String(Math.round(totalPrice / totalQty)) : prev.manualProductPrice }));
+                                }}
+                                style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                                className="w-full text-xs font-bold rounded-lg p-2 outline-none border focus:border-amber-400 text-white shadow-inner"
+                                placeholder="Selling Price"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   {formData.category === 'product' ? (
-                    <>
-                      <div>
-                        <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Product Name</label>
-                        <ChocolateSingleSelect
-                          value={formData.chocolate}
-                          onChange={(val) => {
-                            const matched = customProducts.find(p => p.name?.trim().toLowerCase() === val.trim().toLowerCase());
-                            setFormData(prev => ({
-                              ...prev,
-                              chocolate: val,
-                              manualProductPrice: matched ? String(matched.price ?? matched.sellingPrice ?? '') : prev.manualProductPrice
-                            }));
-                          }}
-                          suggestions={Array.from(new Set(orderedProducts.map(p => p.name).filter(Boolean)))}
-                          pricesMap={customPricesMap}
-                          placeholderText="Select product..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Count (Quantity)</label>
-                        <input
-                          required
-                          type="number"
-                          name="count"
-                          value={formData.count}
-                          onChange={handleInputChange}
-                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                          className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner"
-                          placeholder="Quantity"
-                        />
-                      </div>
-                    </>
+                    <></>
                   ) : (
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
@@ -8042,21 +8142,21 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {formData.category !== 'product' && (
+                  {/* Order Type - shown for all categories as dropdown */}
                     <div>
                       <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Order Type</label>
-                      <div className="flex gap-3">
-                        <label style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="flex items-center gap-1.5 cursor-pointer font-bold border px-3 py-2 rounded-xl focus-within:border-amber-400 hover:border-amber-400 transition-colors flex-1 shadow-sm text-xs">
-                          <input type="radio" name="orderType" value="Sabi" checked={formData.orderType === "Sabi"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-amber-400" />
-                          Sabi
-                        </label>
-                        <label style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="flex items-center gap-1.5 cursor-pointer font-bold border px-3 py-2 rounded-xl focus-within:border-amber-400 hover:border-amber-400 transition-colors flex-1 shadow-sm text-xs">
-                          <input type="radio" name="orderType" value="Thaaru" checked={formData.orderType === "Thaaru"} onChange={handleInputChange} className="w-3.5 h-3.5 accent-amber-400" />
-                          Thaaru
-                        </label>
-                      </div>
+                      <select
+                        name="orderType"
+                        value={formData.orderType}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer"
+                      >
+                        <option value="Sabi" className="bg-[#0f172a] text-white">Sabi</option>
+                        <option value="Thaaru" className="bg-[#0f172a] text-white">Thaaru</option>
+                        <option value="Choco Wrapz" className="bg-[#0f172a] text-white">Choco Wrapz</option>
+                      </select>
                     </div>
-                  )}
                 </div>
 
                 {/* Column 3: Payment & Summary */}
@@ -9776,6 +9876,134 @@ export default function Dashboard() {
                 className="px-6 py-2 rounded-xl font-bold text-xs text-amber-900 bg-white border-2 border-amber-200 hover:bg-amber-50 shadow-sm transition-all active:scale-95 cursor-pointer"
               >
                 Close details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* === IMAGE GALLERY MODAL === */}
+      {isImageGalleryOpen && imageGalleryProduct && (() => {
+        const images = imageGalleryProduct.images || [];
+        const currentImage = images[galleryActiveIndex];
+        return (
+          <div
+            className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md"
+            onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }}
+          >
+            <div
+              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden border border-white/15 flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 shrink-0">
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">{imageGalleryProduct.name} — Images ({images.length})</h3>
+                <button onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }} className="text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"><X size={18} /></button>
+              </div>
+
+              {images.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+                  <ImageIcon size={48} className="text-slate-600 mb-3" />
+                  <p className="text-slate-400 font-bold text-sm">No images added yet.</p>
+                  <label className="mt-4 px-5 py-2.5 bg-amber-500 text-black font-black text-xs rounded-xl cursor-pointer hover:bg-amber-400 transition-colors">
+                    + Add Images
+                    <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
+                  </label>
+                </div>
+              ) : (
+                <>
+                  {/* Main Image Display */}
+                  <div className="relative flex-1 flex items-center justify-center bg-black/30 min-h-[300px] max-h-[50vh]">
+                    {currentImage && (
+                      <img
+                        src={currentImage}
+                        alt={`Product ${galleryActiveIndex + 1}`}
+                        className="max-w-full max-h-full object-contain p-4"
+                      />
+                    )}
+                    {/* Nav Arrows */}
+                    {images.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => setGalleryActiveIndex(prev => prev === 0 ? images.length - 1 : prev - 1)}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors cursor-pointer"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+                        <button
+                          onClick={() => setGalleryActiveIndex(prev => prev === images.length - 1 ? 0 : prev + 1)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors cursor-pointer"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      </>
+                    )}
+                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[10px] font-bold px-3 py-1 rounded-full">{galleryActiveIndex + 1} / {images.length}</span>
+                  </div>
+
+                  {/* Thumbnails */}
+                  <div className="px-4 py-3 border-t border-white/10 shrink-0">
+                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                      {images.map((img: string, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => setGalleryActiveIndex(idx)}
+                          className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === galleryActiveIndex ? 'border-amber-400 shadow-lg shadow-amber-400/30' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'}`}
+                        >
+                          <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="px-5 py-3 border-t border-white/10 flex items-center justify-between shrink-0 gap-3 flex-wrap">
+                    <label className="px-3 py-2 bg-amber-500/15 text-amber-400 font-bold text-xs rounded-xl cursor-pointer hover:bg-amber-500/30 transition-colors flex items-center gap-1.5">
+                      <Upload size={13} /> Add More
+                      <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => currentImage && handleCopyImage(currentImage)}
+                        className="px-3 py-2 bg-blue-500/15 text-blue-400 font-bold text-xs rounded-xl hover:bg-blue-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <ClipboardList size={13} /> Copy Image
+                      </button>
+                      <button
+                        onClick={() => setDeleteImageConfirm({ productFireId: imageGalleryProduct.fireId, imageIndex: galleryActiveIndex })}
+                        className="px-3 py-2 bg-rose-500/15 text-rose-400 font-bold text-xs rounded-xl hover:bg-rose-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* === DELETE IMAGE CONFIRMATION === */}
+      {deleteImageConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-[210] flex items-center justify-center p-4" onClick={() => setDeleteImageConfirm(null)}>
+          <div className="bg-[#0b1329] rounded-2xl p-6 max-w-sm w-full border border-white/15 shadow-2xl text-center" onClick={(e) => e.stopPropagation()}>
+            <Trash2 size={36} className="text-rose-400 mx-auto mb-3" />
+            <h4 className="text-white font-black text-sm mb-2">Delete this image?</h4>
+            <p className="text-slate-400 text-xs mb-5 font-medium">This action cannot be undone. The image will be permanently removed from this product.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteImageConfirm(null)}
+                className="flex-1 px-4 py-2.5 bg-[#1e293b] text-white font-bold text-xs rounded-xl border border-white/15 hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteImage(deleteImageConfirm.productFireId, deleteImageConfirm.imageIndex)}
+                className="flex-1 px-4 py-2.5 bg-rose-600 text-white font-black text-xs rounded-xl hover:bg-rose-500 transition-colors cursor-pointer"
+              >
+                Delete
               </button>
             </div>
           </div>
