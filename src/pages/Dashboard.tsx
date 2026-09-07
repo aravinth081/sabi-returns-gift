@@ -512,6 +512,7 @@ export default function Dashboard() {
   const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
   const [chocolateRows, setChocolateRows] = useState<{ chocolate: string; count: string }[]>([{ chocolate: "", count: "" }]);
+  const [d1SelectedChocolateBoxFilter, setD1SelectedChocolateBoxFilter] = useState<string>("All Chocolates");
 
   // --- MULTI-PRODUCT ORDER ROWS (Dashboard 2) ---
   const [productRows, setProductRows] = useState<{ productName: string; quantity: string; price: string }[]>([{ productName: "", quantity: "", price: "" }]);
@@ -4999,7 +5000,7 @@ export default function Dashboard() {
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-1 lg:min-h-0">
                 <div className={`grid grid-cols-1 sm:grid-cols-2 ${showHeader
-                    ? (activeTab === 'dashboard2' ? 'lg:grid-cols-2' : 'lg:grid-cols-3')
+                    ? (activeTab === 'dashboard2' ? 'lg:grid-cols-2' : 'lg:grid-cols-4')
                     : 'hidden'
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
@@ -5025,6 +5026,53 @@ export default function Dashboard() {
                     </div>
                   </div>
                   )}
+
+                  {activeTab !== 'dashboard2' && (() => {
+                    const displayTotalItems = d1SelectedChocolateBoxFilter === "All Chocolates"
+                      ? totalItems
+                      : (topChocolates.find(c => c[0] === d1SelectedChocolateBoxFilter)?.[1] || 0);
+
+                    return (
+                    <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-amber-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
+                      <div className="flex justify-between items-start mb-1 relative z-10">
+                        <div className="flex items-center gap-1 group relative">
+                          <p 
+                            className="text-[13px] font-black text-amber-600 tracking-wide uppercase leading-tight truncate max-w-[100px] sm:max-w-[120px]" 
+                            title={d1SelectedChocolateBoxFilter === "All Chocolates" ? "Total Chocolates" : d1SelectedChocolateBoxFilter}
+                          >
+                            {d1SelectedChocolateBoxFilter === "All Chocolates" ? (
+                              <>Total<br/>Chocolates</>
+                            ) : (
+                              d1SelectedChocolateBoxFilter
+                            )}
+                          </p>
+                          <div className="relative inline-block">
+                            <ChevronDown size={14} className="text-amber-600 cursor-pointer hover:scale-125 transition-transform" />
+                            <select
+                              value={d1SelectedChocolateBoxFilter}
+                              onChange={(e) => setD1SelectedChocolateBoxFilter(e.target.value)}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              title="Filter by Chocolate"
+                            >
+                              <option value="All Chocolates">All Chocolates</option>
+                              {topChocolates.map((c, idx) => (
+                                <option key={idx} value={c[0]}>{c[0]}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner shrink-0"><Gift size={16} /></div>
+                      </div>
+                      <div className="flex items-end justify-between gap-1 relative z-10 mt-auto w-full">
+                        <div className="flex items-baseline gap-1">
+                          <h3 className="text-3xl font-black text-[#3e2723]">{displayTotalItems.toLocaleString()}</h3>
+                          <span className="text-[10px] font-black text-amber-700 bg-amber-200/50 px-1.5 py-0.5 rounded border border-amber-300/50 shadow-sm leading-none mb-1">Pcs</span>
+                        </div>
+                      </div>
+                    </div>
+                    );
+                  })()}
+
 
                   <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px] overflow-hidden group">
                     {/* Animated Liquid Wave Filling Background */}
