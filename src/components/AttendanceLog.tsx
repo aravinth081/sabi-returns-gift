@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export interface AttendanceRecord {
   id: string;
@@ -32,31 +33,121 @@ export interface EmployeeSalary {
   dailyAmount?: number; // for Special Bonus, Overtime, Manual Adjustments
 }
 
-// Normalize employee name for robust matching (e.g. Gayathri.s, Gayathri S, Gayathri, kavi, kavilaya)
-export const normalizeEmpName = (name: string) => {
-  if (!name) return "";
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+export interface EmployeeMeta {
+  id: string;
+  username: string;
+  name: string;
+  status?: string;
+}
+
+// Robust, clean 12-hour format time string: "09:15 AM", "12:30 PM", etc.
+export const formatTime12 = (d: Date = new Date()): string => {
+  try {
+    const validDate = (d instanceof Date && !isNaN(d.getTime())) ? d : new Date();
+    let hours = validDate.getHours();
+    const minutes = validDate.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 hour is 12 AM
+    const hStr = hours < 10 ? `0${hours}` : `${hours}`;
+    const mStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
+    return `${hStr}:${mStr} ${ampm}`;
+  } catch (e) {
+    return "09:00 AM";
+  }
 };
 
-export const isSameEmployee = (name1: string, name2: string) => {
+// Normalize employee name for robust matching (e.g. Gayathri.s, Gayathri S, Gayathri, kavi, kavilaya)
+export const normalizeEmpName = (name: any) => {
+  if (!name) return "";
+  return String(name).toLowerCase().replace(/[^a-z0-9]/g, "");
+};
+
+// Check if two names refer to the same employee using normalized string and employee directory aliases
+export const isSameEmployee = (name1: any, name2: any, directory: EmployeeMeta[] = []): boolean => {
   if (!name1 || !name2) return false;
   const n1 = normalizeEmpName(name1);
   const n2 = normalizeEmpName(name2);
   if (!n1 || !n2) return false;
   if (n1 === n2) return true;
-  if (n1.startsWith(n2) || n2.startsWith(n1)) return true;
-  if (n1.includes(n2) || n2.includes(n1)) return true;
-  if (n1.length >= 5 && n2.length >= 5 && n1.slice(0, 5) === n2.slice(0, 5)) return true;
+
+  // Handle Tamil phonetic variations for Gayathri / Gayathiri / Gayathri.s
+  if (n1.startsWith("gayath") && n2.startsWith("gayath")) return true;
+
+  // Check known employee directory for matching aliases (e.g. username 'rukkeshg' <-> name 'Rukkesh')
+  if (directory && Array.isArray(directory) && directory.length > 0) {
+    for (const emp of directory) {
+      if (!emp) continue;
+      const u = normalizeEmpName(emp.username);
+      const n = normalizeEmpName(emp.name);
+      const aliases = [u, n].filter(Boolean);
+      const m1 = aliases.some(a => a === n1 || (a.length >= 4 && n1.length >= 4 && (a.startsWith(n1) || n1.startsWith(a))));
+      const m2 = aliases.some(a => a === n2 || (a.length >= 4 && n2.length >= 4 && (a.startsWith(n2) || n2.startsWith(a))));
+      if (m1 && m2) return true;
+    }
+  }
+
+  // Fallback prefix matching only for reasonably long names (>= 4 chars)
+  if (n1.length >= 4 && n2.length >= 4) {
+    if (n1.startsWith(n2) || n2.startsWith(n1)) return true;
+  }
+
   return false;
 };
 
+// Error Boundary for Attendance Log so it NEVER crashes into a blank screen
+export class AttendanceErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: Error }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
 
-export default function AttendanceLog({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Attendance Log error caught by boundary:", error, errorInfo);
+  }
+
+  handleReload = () => {
+    try {
+      localStorage.removeItem('sabi_attendance_records');
+      localStorage.removeItem('sabi_employees_directory');
+    } catch (e) {}
+    this.setState({ hasError: false, error: undefined });
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ backgroundColor: '#131c2e' }} className="p-8 rounded-3xl border-2 border-amber-500/40 bg-[#131c2e] text-white max-w-xl mx-auto my-12 text-center space-y-4 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto text-2xl font-black">
+            📋
+          </div>
+          <h2 className="text-xl font-black text-amber-400 uppercase tracking-wider">Attendance Log Syncing</h2>
+          <p className="text-sm text-slate-300">
+            A temporary display cache issue was detected. Click below to refresh the Attendance Log safely.
+          </p>
+          <button
+            onClick={this.handleReload}
+            className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase text-xs rounded-xl shadow-lg cursor-pointer transition-all hover:scale-105"
+          >
+            Refresh Attendance Log
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AttendanceLogContent({ isAdminOverride = true, onWallpaperChange }: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
   const { profile } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'employee' | 'admin'>('employee');
   const activeUser = localStorage.getItem('loggedInName') || profile?.username || "";
-  const currentLoggedInUser = activeUser || "Gayathiri";
+  const currentLoggedInUser = activeUser || (isAdminOverride ? "Subash" : "Employee");
 
   // Helper to retrieve user-specific or global wallpaper
   const getAttendanceWallpaper = (username?: string) => {
@@ -77,49 +168,24 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     setAttendanceWallpaper(wp);
   }, [profile?.username]);
 
-  const handleAttendanceWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttendanceWallpaperUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-        setAttendanceWallpaper(compressedBase64);
-        localStorage.setItem('sabi_wallpaper_attendance', compressedBase64);
-        if (activeUser) {
-          localStorage.setItem(`sabi_wallpaper_attendance_${activeUser}`, compressedBase64);
-        }
-        toast.success("Attendance Log wallpaper updated!");
-        if (onWallpaperChange) onWallpaperChange();
-      };
-    };
-    reader.readAsDataURL(file);
+    const toastId = toast.loading("Uploading Attendance wallpaper to Cloudinary...");
+    try {
+      const imageUrl = await uploadToCloudinary(file);
+      setAttendanceWallpaper(imageUrl);
+      localStorage.setItem('sabi_wallpaper_attendance', imageUrl);
+      if (activeUser) {
+        localStorage.setItem(`sabi_wallpaper_attendance_${activeUser}`, imageUrl);
+      }
+      toast.success("Attendance Log wallpaper updated!", { id: toastId });
+      if (onWallpaperChange) onWallpaperChange();
+    } catch (err: any) {
+      console.error("Cloudinary upload failed:", err);
+      toast.error(err.message || "Failed to upload wallpaper", { id: toastId });
+    }
   };
 
   const handleClearAttendanceWallpaper = () => {
@@ -132,13 +198,29 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     if (onWallpaperChange) onWallpaperChange();
   };
 
-  // Employee State
+  // Employee State & Directory with localStorage instant cache
+  const [employeesDirectory, setEmployeesDirectory] = useState<EmployeeMeta[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_employees_directory');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
   const [selectedUser, setSelectedUser] = useState(currentLoggedInUser);
   const [employeeOptions, setEmployeeOptions] = useState<string[]>(currentLoggedInUser ? [currentLoggedInUser] : []);
+  const [liveClock, setLiveClock] = useState(() => formatTime12(new Date()));
 
-  // Sync selectedUser if currentLoggedInUser changes
+  // Live ticking clock (updates every second)
   useEffect(() => {
-    if (currentLoggedInUser) {
+    const timer = setInterval(() => {
+      setLiveClock(formatTime12(new Date()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Sync selectedUser if currentLoggedInUser changes and not yet initialized
+  useEffect(() => {
+    if (currentLoggedInUser && (!selectedUser || selectedUser === "Gayathiri" || selectedUser === "Employee")) {
       setSelectedUser(currentLoggedInUser);
     }
   }, [currentLoggedInUser]);
@@ -179,6 +261,8 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   // Modals & Forms State
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [selectedDateAction, setSelectedDateAction] = useState<{ dayStr: string; displayDate: string } | null>(null);
+  const [customActionLoginTime, setCustomActionLoginTime] = useState<string>("");
+  const [customActionLogoutTime, setCustomActionLogoutTime] = useState<string>("");
   const [leaveEmployee, setLeaveEmployee] = useState(selectedUser);
   const [leaveDate, setLeaveDate] = useState("");
   const [leaveRemark, setLeaveRemark] = useState("");
@@ -198,33 +282,38 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>("All");
   const [adminDuplicateFilter, setAdminDuplicateFilter] = useState<string>("All");
 
-  // Fetch Attendance Records from Firestore and merge with localStorage
+  // Fetch Attendance Records from Firestore in real-time
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "attendance"), (snap) => {
       const records: AttendanceRecord[] = [];
       snap.forEach(docSnap => {
         records.push({ fireId: docSnap.id, ...docSnap.data() } as AttendanceRecord);
       });
-      if (records.length > 0) {
-        setAttendanceRecords(prev => {
-          const map = new Map<string, AttendanceRecord>();
-          // Put existing local records first
-          prev.forEach(r => {
-            const k = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+
+      // Deduplicate by employee + date, keeping the most complete / active record
+      const map = new Map<string, AttendanceRecord>();
+      records.forEach(r => {
+        const k = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+        const existing = map.get(k);
+        if (!existing) {
+          map.set(k, r);
+        } else {
+          // If incoming record has loginTime and existing doesn't, or newer id
+          if ((!existing.loginTime || existing.loginTime === "-") && r.loginTime && r.loginTime !== "-") {
             map.set(k, r);
-          });
-          // Merge incoming firestore records (or overwrite matching date/user)
-          records.forEach(r => {
-            const k = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+          } else if (r.status === "Present" && existing.status !== "Present") {
             map.set(k, r);
-          });
-          const merged = Array.from(map.values());
-          try {
-            localStorage.setItem('sabi_attendance_records', JSON.stringify(merged));
-          } catch (e) {}
-          return merged;
-        });
-      }
+          } else if (String(r.id || '') > String(existing.id || '')) {
+            map.set(k, r);
+          }
+        }
+      });
+
+      const merged = Array.from(map.values());
+      setAttendanceRecords(merged);
+      try {
+        localStorage.setItem('sabi_attendance_records', JSON.stringify(merged));
+      } catch (e) {}
     }, (error) => {
       console.log("Firestore attendance snapshot error or offline mode", error);
     });
@@ -258,71 +347,74 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     return () => unsub();
   }, []);
 
-  // Fetch Approved Employees from Firestore collection("employees")
-  const [approvedEmployees, setApprovedEmployees] = useState<string[]>([]);
-
+  // Fetch all registered employees from Firestore collection("employees")
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "employees"), (snap) => {
-      const namesSet = new Set<string>();
+      const list: EmployeeMeta[] = [];
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        // Only include registered employees approved by Admin (status === 'Approved')
-        if (data.status === "Approved") {
-          const empName = (data.username || data.name || data.employeeName || "").trim();
-          const lower = empName.toLowerCase();
-          if (empName && !lower.includes("hello") && !lower.includes("test")) {
-            namesSet.add(empName);
-          }
+        const username = (data.username || "").trim();
+        const name = (data.name || "").trim();
+        const lower = username.toLowerCase();
+        if (username && !lower.includes("hello") && !lower.includes("test")) {
+          list.push({
+            id: docSnap.id,
+            username,
+            name: name || username,
+            status: data.status || ""
+          });
         }
       });
-      const namesList = Array.from(namesSet);
-      setApprovedEmployees(namesList);
+      setEmployeesDirectory(list);
     }, (error) => {
       console.log("Firestore employees snapshot error", error);
     });
     return () => unsub();
   }, []);
 
-  // Sync employeeOptions with approved employees AND employees from attendance records
+  // Sync employeeOptions ONLY with registered and approved employees (accepted by admin) + current logged in user
   useEffect(() => {
-    const namesSet = new Set<string>();
-    
-    // Add approved employees
-    approvedEmployees.forEach(emp => {
-      if (emp) namesSet.add(emp);
-    });
+    const options: string[] = [];
 
-    // Add employees from existing attendance records
-    attendanceRecords.forEach(rec => {
-      if (rec.employeeName && !rec.employeeName.toLowerCase().includes("hello") && !rec.employeeName.toLowerCase().includes("test")) {
-        const existing = Array.from(namesSet).find(e => isSameEmployee(e, rec.employeeName));
-        if (!existing) {
-          namesSet.add(rec.employeeName);
+    // 1. Include current logged in user (e.g. Subash)
+    if (currentLoggedInUser) {
+      options.push(currentLoggedInUser);
+    }
+
+    // 2. Add ONLY approved employees (registered and accepted by admin)
+    employeesDirectory.forEach(emp => {
+      const status = String(emp.status || "").trim().toLowerCase();
+      if (status === "approved" && emp.username) {
+        // Prevent duplicate usernames or aliases already added
+        const alreadyAdded = options.some(existing => 
+          existing.toLowerCase() === emp.username.toLowerCase() ||
+          isSameEmployee(existing, emp.username, employeesDirectory)
+        );
+        if (!alreadyAdded) {
+          options.push(emp.username);
         }
       }
     });
 
-    if (currentLoggedInUser) {
-      const existing = Array.from(namesSet).find(e => isSameEmployee(e, currentLoggedInUser));
-      if (!existing) {
-        namesSet.add(currentLoggedInUser);
+    if (options.length > 0) {
+      setEmployeeOptions(options);
+    }
+  }, [employeesDirectory, currentLoggedInUser]);
+
+  // Ensure selectedUser is always an approved option or current logged in user
+  useEffect(() => {
+    if (employeeOptions.length > 0 && selectedUser) {
+      const isValid = employeeOptions.some(opt => isSameEmployee(opt, selectedUser, employeesDirectory));
+      if (!isValid) {
+        setSelectedUser(employeeOptions[0]);
       }
     }
+  }, [employeeOptions, selectedUser, employeesDirectory]);
 
-    const allOptions = Array.from(namesSet);
-    if (allOptions.length > 0) {
-      setEmployeeOptions(allOptions);
-      const match = allOptions.find(emp => isSameEmployee(emp, selectedUser || currentLoggedInUser));
-      if (match && match !== selectedUser) {
-        setSelectedUser(match);
-      }
-    }
-  }, [approvedEmployees, attendanceRecords, currentLoggedInUser]);
-
-  // Filter attendance records for current selected employee
+  // Filter attendance records for current selected employee with directory awareness
   const userAttendanceRecords = useMemo(() => {
-    return attendanceRecords.filter(r => isSameEmployee(r.employeeName, selectedUser));
-  }, [attendanceRecords, selectedUser]);
+    return attendanceRecords.filter(r => isSameEmployee(r.employeeName, selectedUser, employeesDirectory));
+  }, [attendanceRecords, selectedUser, employeesDirectory]);
 
   // Today's date string YYYY-MM-DD
   const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
@@ -332,9 +424,15 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   yesterdayObj.setDate(todayObj.getDate() - 1);
   const yesterdayStr = `${yesterdayObj.getFullYear()}-${String(yesterdayObj.getMonth() + 1).padStart(2, '0')}-${String(yesterdayObj.getDate()).padStart(2, '0')}`;
 
-  // Today's record for selected employee
+  // Today's record for selected employee - prioritize record with valid login time
   const todayRecord = useMemo(() => {
-    return userAttendanceRecords.find(r => r.date === todayStr);
+    const matching = userAttendanceRecords.filter(r => r.date === todayStr);
+    if (matching.length === 0) return undefined;
+    const presentRec = matching.find(r => r.status === "Present" && r.loginTime && r.loginTime !== "-");
+    if (presentRec) return presentRec;
+    const activeRec = matching.find(r => r.loginTime && r.loginTime !== "-");
+    if (activeRec) return activeRec;
+    return matching[matching.length - 1];
   }, [userAttendanceRecords, todayStr]);
 
   // Yesterday's record for selected employee
@@ -349,6 +447,8 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const nextMonth = () => {
     setCurrentDate(new Date(year, month + 1, 1));
   };
+
+  // --- ATTENDANCE ACTIONS ---
 
   // --- ATTENDANCE ACTIONS ---
 
@@ -369,35 +469,36 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       return;
     }
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const isTargetToday = targetDate === todayStr;
+    const nowTime = formatTime12(new Date());
+    const loginTime = isTargetToday ? nowTime : "10:30 AM";
+    const docId = existing?.fireId || `${normalizeEmpName(selectedUser)}_${targetDate}`;
+
     const newRecord: AttendanceRecord = {
       id: existing?.id || String(Date.now()),
-      fireId: existing?.fireId,
+      fireId: docId,
       employeeName: selectedUser,
       date: targetDate,
-      loginTime: "10:30 AM",
-      logoutTime: "06:00 PM",
-      workingHours: "7.5 hrs",
-      workingHoursNum: 7.5,
+      loginTime,
+      logoutTime: isTargetToday ? "-" : "06:00 PM",
+      workingHours: isTargetToday ? "In Progress" : "7.5 hrs",
+      workingHoursNum: isTargetToday ? 0 : 7.5,
       status: "Late Attendance",
       remarks: "Late Attendance Marked"
     };
 
     const updated = [
-      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === targetDate)),
       newRecord
     ];
     saveAttendanceList(updated);
     setSelectedDateAction(null);
-    toast.success(`Marked Late Attendance for ${selectedUser} on ${targetDate}!`);
+    toast.success(`Marked Late Attendance for ${selectedUser} on ${targetDate} (${loginTime})!`);
 
     try {
-      if (existing?.fireId) {
-        await updateDoc(doc(db, "attendance", existing.fireId), newRecord as any);
-      } else {
-        await addDoc(collection(db, "attendance"), newRecord);
-      }
+      await setDoc(doc(db, "attendance", docId), newRecord, { merge: true });
     } catch (e) {
-      console.log("Offline mode");
+      console.log("Offline mode or Firestore sync note", e);
     }
   };
 
@@ -417,9 +518,10 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       return;
     }
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const docId = existing?.fireId || `${normalizeEmpName(selectedUser)}_${targetDate}`;
     const newRecord: AttendanceRecord = {
       id: existing?.id || String(Date.now()),
-      fireId: existing?.fireId,
+      fireId: docId,
       employeeName: selectedUser,
       date: targetDate,
       loginTime: "-",
@@ -431,7 +533,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = [
-      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === targetDate)),
       newRecord
     ];
     saveAttendanceList(updated);
@@ -439,19 +541,15 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     toast.success(`Applied Leave for ${selectedUser} on ${targetDate}!`);
 
     try {
-      if (existing?.fireId) {
-        await updateDoc(doc(db, "attendance", existing.fireId), newRecord as any);
-      } else {
-        await addDoc(collection(db, "attendance"), newRecord);
-      }
+      await setDoc(doc(db, "attendance", docId), newRecord, { merge: true });
     } catch (e) {
-      console.log("Offline mode");
+      console.log("Offline mode or Firestore sync note", e);
     }
   };
 
   const handleActionUnmark = async (targetDate: string) => {
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
-    const updated = attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate));
+    const updated = attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === targetDate));
     saveAttendanceList(updated);
     setSelectedDateAction(null);
     toast.success(`Unmarked attendance for ${selectedUser} on ${targetDate}!`);
@@ -459,52 +557,131 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     try {
       if (existing?.fireId) {
         await deleteDoc(doc(db, "attendance", existing.fireId));
+      } else {
+        const docId = `${normalizeEmpName(selectedUser)}_${targetDate}`;
+        await deleteDoc(doc(db, "attendance", docId));
       }
     } catch (e) {
-      console.log("Offline mode");
+      console.log("Offline mode or delete note", e);
     }
   };
 
   const handleActionMarkPresent = async (targetDate: string) => {
     const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    const isTargetToday = targetDate === todayStr;
+    const nowTime = formatTime12(new Date());
+
+    // If existing record already has an accurate login time, preserve it! Otherwise use current exact time if today.
+    const loginTime = (existing && existing.loginTime && existing.loginTime !== "-")
+      ? existing.loginTime
+      : (isTargetToday ? nowTime : "09:00 AM");
+
+    const logoutTime = isTargetToday ? (existing?.logoutTime || "-") : "06:00 PM";
+    const workingHours = isTargetToday ? (existing?.workingHours || "In Progress") : "9 hrs";
+    const workingHoursNum = isTargetToday ? (existing?.workingHoursNum || 0) : 9;
+
+    const docId = existing?.fireId || `${normalizeEmpName(selectedUser)}_${targetDate}`;
     const newRecord: AttendanceRecord = {
       id: existing?.id || String(Date.now()),
-      fireId: existing?.fireId,
+      fireId: docId,
       employeeName: selectedUser,
       date: targetDate,
-      loginTime: "09:00 AM",
-      logoutTime: "06:00 PM",
-      workingHours: "9 hrs",
-      workingHoursNum: 9,
+      loginTime,
+      logoutTime,
+      workingHours,
+      workingHoursNum,
       status: "Present",
       remarks: "Marked Present"
     };
 
     const updated = [
-      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === targetDate)),
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === targetDate)),
       newRecord
     ];
     saveAttendanceList(updated);
     setSelectedDateAction(null);
-    toast.success(`Marked Present for ${selectedUser} on ${targetDate}!`);
+    toast.success(`Marked Present for ${selectedUser} on ${targetDate} (${loginTime})!`);
 
     try {
-      if (existing?.fireId) {
-        await updateDoc(doc(db, "attendance", existing.fireId), newRecord as any);
-      } else {
-        await addDoc(collection(db, "attendance"), newRecord);
-      }
+      await setDoc(doc(db, "attendance", docId), newRecord, { merge: true });
     } catch (e) {
-      console.log("Offline mode");
+      console.log("Offline mode or Firestore sync note", e);
+    }
+  };
+
+  // Allow custom manual time entry or adjustment for any date
+  const handleSaveCustomTime = async (targetDate: string, customLogin: string, customLogout: string) => {
+    if (!customLogin) {
+      toast.error("Please enter a valid Login Time (e.g. 09:15 AM)");
+      return;
+    }
+
+    const existing = userAttendanceRecords.find(r => r.date === targetDate);
+    let hoursFormatted = "In Progress";
+    let hoursNum = 0;
+
+    if (customLogout && customLogout !== "-") {
+      try {
+        const inMatch = customLogin.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        const outMatch = customLogout.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (inMatch && outMatch) {
+          let h1 = parseInt(inMatch[1]), m1 = parseInt(inMatch[2]), p1 = inMatch[3].toUpperCase();
+          let h2 = parseInt(outMatch[1]), m2 = parseInt(outMatch[2]), p2 = outMatch[3].toUpperCase();
+          if (p1 === "PM" && h1 < 12) h1 += 12;
+          if (p1 === "AM" && h1 === 12) h1 = 0;
+          if (p2 === "PM" && h2 < 12) h2 += 12;
+          if (p2 === "AM" && h2 === 12) h2 = 0;
+
+          const d1 = new Date(); d1.setHours(h1, m1, 0, 0);
+          const d2 = new Date(); d2.setHours(h2, m2, 0, 0);
+          let diffMs = d2.getTime() - d1.getTime();
+          if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+          const diffHrs = Math.max(0.1, diffMs / (1000 * 60 * 60));
+          hoursNum = Number(diffHrs.toFixed(2));
+          const fullH = Math.floor(diffHrs);
+          const mins = Math.round((diffHrs - fullH) * 60);
+          hoursFormatted = `${fullH} hrs ${mins} mins`;
+        }
+      } catch (e) {}
+    }
+
+    const docId = existing?.fireId || `${normalizeEmpName(selectedUser)}_${targetDate}`;
+    const newRecord: AttendanceRecord = {
+      id: existing?.id || String(Date.now()),
+      fireId: docId,
+      employeeName: selectedUser,
+      date: targetDate,
+      loginTime: customLogin,
+      logoutTime: customLogout || "-",
+      workingHours: hoursFormatted,
+      workingHoursNum: hoursNum,
+      status: "Present",
+      remarks: "Time Adjusted"
+    };
+
+    const updated = [
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === targetDate)),
+      newRecord
+    ];
+    saveAttendanceList(updated);
+    setSelectedDateAction(null);
+    toast.success(`Time updated for ${selectedUser} on ${targetDate}: In ${customLogin}${customLogout && customLogout !== '-' ? ` / Out ${customLogout}` : ''}!`);
+
+    try {
+      await setDoc(doc(db, "attendance", docId), newRecord, { merge: true });
+    } catch (e) {
+      console.log("Offline mode note", e);
     }
   };
 
   const proceedTodayLogin = async () => {
     const now = new Date();
-    const loginTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const loginTimeStr = formatTime12(now);
+    const docId = `${normalizeEmpName(selectedUser)}_${todayStr}`;
 
     const newRecord: AttendanceRecord = {
       id: String(Date.now()),
+      fireId: docId,
       employeeName: selectedUser,
       date: todayStr,
       loginTime: loginTimeStr,
@@ -515,12 +692,15 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       remarks: "Logged In"
     };
 
-    const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser) && r.date === todayStr)), newRecord];
+    const updated = [
+      ...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === todayStr)),
+      newRecord
+    ];
     saveAttendanceList(updated);
     toast.success(`Logged In successfully at ${loginTimeStr}! Marked as Present.`);
 
     try {
-      await addDoc(collection(db, "attendance"), newRecord);
+      await setDoc(doc(db, "attendance", docId), newRecord, { merge: true });
     } catch (e) {
       console.log("Offline mode, saved locally");
     }
@@ -532,7 +712,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
         toast.error("Cannot Log In today: Leave is already applied for today.");
         return;
       }
-      if (todayRecord.loginTime !== "-") {
+      if (todayRecord.loginTime && todayRecord.loginTime !== "-") {
         toast.info(`Already logged in today at ${todayRecord.loginTime}`);
         return;
       }
@@ -542,20 +722,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   };
 
   const handleLogOut = async () => {
-    if (!todayRecord || todayRecord.status !== "Present" || todayRecord.loginTime === "-") {
+    if (!todayRecord || todayRecord.status !== "Present" || !todayRecord.loginTime || todayRecord.loginTime === "-") {
       toast.error("You must Log In first before logging out!");
       return;
     }
 
-    if (todayRecord.logoutTime !== "-") {
+    if (todayRecord.logoutTime && todayRecord.logoutTime !== "-") {
       toast.warning(`Already logged out today at ${todayRecord.logoutTime}`);
       return;
     }
 
     const now = new Date();
-    const logoutTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const logoutTimeStr = formatTime12(now);
 
-    // Calculate working hours automatically
+    // Calculate working hours automatically from exact login time to current logout time
     let hoursFormatted = "8 hrs";
     let hoursNum = 8;
 
@@ -571,7 +751,8 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
         const loginDateObj = new Date();
         loginDateObj.setHours(h, m, 0, 0);
 
-        const diffMs = now.getTime() - loginDateObj.getTime();
+        let diffMs = now.getTime() - loginDateObj.getTime();
+        if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHrs = Math.max(0.1, diffMs / (1000 * 60 * 60));
         hoursNum = Number(diffHrs.toFixed(2));
         
@@ -583,8 +764,10 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       console.error("Error calculating hours", e);
     }
 
+    const docId = todayRecord.fireId || `${normalizeEmpName(selectedUser)}_${todayStr}`;
     const updatedRecord: AttendanceRecord = {
       ...todayRecord,
+      fireId: docId,
       logoutTime: logoutTimeStr,
       workingHours: hoursFormatted,
       workingHoursNum: hoursNum,
@@ -592,18 +775,14 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     };
 
     const updated = attendanceRecords.map(r => 
-      (isSameEmployee(r.employeeName, selectedUser) && r.date === todayStr) ? updatedRecord : r
+      (isSameEmployee(r.employeeName, selectedUser, employeesDirectory) && r.date === todayStr) ? updatedRecord : r
     );
 
     saveAttendanceList(updated);
-    toast.success(`Logged Out successfully! Working Hours: ${hoursFormatted}`);
+    toast.success(`Logged Out successfully at ${logoutTimeStr}! Working Hours: ${hoursFormatted}`);
 
     try {
-      if (todayRecord.fireId) {
-        await updateDoc(doc(db, "attendance", todayRecord.fireId), updatedRecord as any);
-      } else {
-        await addDoc(collection(db, "attendance"), updatedRecord as any);
-      }
+      await setDoc(doc(db, "attendance", docId), updatedRecord, { merge: true });
     } catch (e) {
       console.log("Offline update");
     }
@@ -616,14 +795,16 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     const targetUser = leaveEmployee.trim() || selectedUser;
 
     // Check if record exists
-    const existing = attendanceRecords.find(r => isSameEmployee(r.employeeName, targetUser) && r.date === leaveDate);
+    const existing = attendanceRecords.find(r => isSameEmployee(r.employeeName, targetUser, employeesDirectory) && r.date === leaveDate);
     if (existing && existing.status === "Present") {
       toast.error(`Cannot apply leave: Already logged in as Present on ${leaveDate}`);
       return;
     }
 
+    const docId = existing?.fireId || `${normalizeEmpName(targetUser)}_${leaveDate}`;
     const leaveRecord: AttendanceRecord = {
       id: String(Date.now()),
+      fireId: docId,
       employeeName: targetUser,
       date: leaveDate,
       loginTime: "-",
@@ -634,13 +815,13 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       remarks: leaveRemark || "Leave Applied"
     };
 
-    const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, targetUser) && r.date === leaveDate)), leaveRecord];
+    const updated = [...attendanceRecords.filter(r => !(isSameEmployee(r.employeeName, targetUser, employeesDirectory) && r.date === leaveDate)), leaveRecord];
     saveAttendanceList(updated);
     setIsLeaveModalOpen(false);
     toast.success(`Leave applied for ${targetUser} on ${leaveDate}! Date marked in Red.`);
 
     try {
-      await addDoc(collection(db, "attendance"), leaveRecord);
+      await setDoc(doc(db, "attendance", docId), leaveRecord, { merge: true });
     } catch (e) {
       console.log("Offline mode");
     }
@@ -689,7 +870,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   // Current month's records for employee view
   const currentMonthRecords = useMemo(() => {
     const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    return userAttendanceRecords.filter(r => r.date.startsWith(monthPrefix));
+    return userAttendanceRecords.filter(r => r && typeof r.date === 'string' && r.date.startsWith(monthPrefix));
   }, [userAttendanceRecords, year, month]);
 
   // History stats
@@ -699,10 +880,10 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
     let leaveDays = 0;
 
     currentMonthRecords.forEach(r => {
-      if (r.status === "Present") {
+      if (r && r.status === "Present") {
         presentDays++;
         totalHours += r.workingHoursNum || 0;
-      } else if (r.status === "Leave") {
+      } else if (r && r.status === "Leave") {
         leaveDays++;
       }
     });
@@ -717,7 +898,8 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   const duplicateAttendanceMap = useMemo(() => {
     const map = new Map<string, number>();
     attendanceRecords.forEach(r => {
-      const key = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+      if (!r) return;
+      const key = `${normalizeEmpName(r.employeeName)}_${String(r.date || '')}`;
       map.set(key, (map.get(key) || 0) + 1);
     });
     return map;
@@ -726,19 +908,25 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
   // Admin filtered records with duplicate filter and chronological date sorting
   const adminFilteredRecords = useMemo(() => {
     return attendanceRecords.filter(r => {
+      if (!r) return false;
+      const empName = String(r.employeeName || '');
+      const recDate = String(r.date || '');
+      const status = String(r.status || '');
+      const remarks = String(r.remarks || '');
+
       const searchLower = adminSearch.trim().toLowerCase();
       const matchesSearch = !searchLower || 
-        r.employeeName.toLowerCase().includes(searchLower) ||
-        (r.remarks && r.remarks.toLowerCase().includes(searchLower)) ||
-        r.status.toLowerCase().includes(searchLower);
+        empName.toLowerCase().includes(searchLower) ||
+        remarks.toLowerCase().includes(searchLower) ||
+        status.toLowerCase().includes(searchLower);
 
       // If specific date filter is selected, ignore month filter conflict
-      const matchesDate = !adminDateFilter || r.date === adminDateFilter;
-      const matchesMonth = adminDateFilter ? true : (!adminMonthFilter || r.date.startsWith(adminMonthFilter));
+      const matchesDate = !adminDateFilter || recDate === adminDateFilter;
+      const matchesMonth = adminDateFilter ? true : (!adminMonthFilter || recDate.startsWith(adminMonthFilter));
       
-      const matchesStatus = adminStatusFilter === "All" || r.status === adminStatusFilter;
+      const matchesStatus = adminStatusFilter === "All" || status === adminStatusFilter;
 
-      const dupKey = `${normalizeEmpName(r.employeeName)}_${r.date}`;
+      const dupKey = `${normalizeEmpName(empName)}_${recDate}`;
       const isDup = (duplicateAttendanceMap.get(dupKey) || 0) > 1;
       const matchesDuplicate = 
         adminDuplicateFilter === "All" ||
@@ -747,9 +935,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
       return matchesSearch && matchesDate && matchesMonth && matchesStatus && matchesDuplicate;
     }).sort((a, b) => {
-      const dateComp = b.date.localeCompare(a.date);
+      const dateComp = String(b?.date || '').localeCompare(String(a?.date || ''));
       if (dateComp !== 0) return dateComp;
-      return a.employeeName.localeCompare(b.employeeName);
+      return String(a?.employeeName || '').localeCompare(String(b?.employeeName || ''));
     });
   }, [attendanceRecords, adminSearch, adminMonthFilter, adminDateFilter, adminStatusFilter, adminDuplicateFilter, duplicateAttendanceMap]);
 
@@ -827,11 +1015,22 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
           
           {/* User selector bar for preview / testing */}
           <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] border border-amber-500/30 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs font-extrabold text-slate-200 shadow-md">
-            <div className="flex items-center gap-2">
-              <User size={16} className="text-amber-400" />
-              <span className="text-slate-300 font-extrabold">Logged In User:</span>
-              <span className="bg-amber-400 text-black px-3 py-0.5 rounded-lg text-sm font-black shadow-sm">{selectedUser}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-[#090e1a] px-3 py-1.5 rounded-xl border border-white/10">
+                <User size={15} className="text-amber-400" />
+                <span className="text-slate-300 font-extrabold">Logged In User:</span>
+                <span className="text-amber-300 font-black">{currentLoggedInUser}</span>
+                {isAdminOverride && <span className="bg-amber-400/20 text-amber-300 text-[10px] px-1.5 py-0.5 rounded font-black border border-amber-400/30">ADMIN</span>}
+              </div>
+
+              {isAdminOverride && (
+                <div className="flex items-center gap-1.5 bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-500/30 text-amber-300">
+                  <span className="text-slate-300 font-bold">Viewing:</span>
+                  <strong className="text-amber-400 font-black underline uppercase tracking-wide">{selectedUser}</strong>
+                </div>
+              )}
             </div>
+
             {isAdminOverride && (
               <div className="flex items-center gap-2">
                 <span className="text-slate-300 font-extrabold">Switch Employee View:</span>
@@ -839,11 +1038,20 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                   value={selectedUser}
                   onChange={(e) => setSelectedUser(e.target.value)}
                   style={{ backgroundColor: '#162035', color: '#fbbf24' }}
-                  className="bg-[#162035] border border-white/20 rounded-xl px-3 py-1 text-xs font-black text-amber-400 outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shadow-inner"
+                  className="bg-[#162035] border border-amber-400/40 rounded-xl px-3 py-1.5 text-xs font-black text-amber-400 outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shadow-inner"
                 >
-                  {employeeOptions.map(emp => (
-                    <option key={emp} value={emp}>{emp}</option>
-                  ))}
+                  {employeeOptions.map(emp => {
+                    const empStr = String(emp || '').trim();
+                    if (!empStr) return null;
+                    const dirEmp = employeesDirectory.find(d => isSameEmployee(d.username, empStr, employeesDirectory) || isSameEmployee(d.name, empStr, employeesDirectory));
+                    const dirName = String(dirEmp?.name || '').trim();
+                    const label = dirName && dirName.toLowerCase() !== empStr.toLowerCase()
+                      ? `${empStr} (${dirName})`
+                      : empStr;
+                    return (
+                      <option key={empStr} value={empStr}>{label}</option>
+                    );
+                  })}
                 </select>
               </div>
             )}
@@ -851,46 +1059,58 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
 
           {/* Mark Attendance Section */}
           <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-6 rounded-3xl shadow-xl border border-white/15 text-white">
-            <h2 className="text-xl font-black text-amber-400 uppercase tracking-wide mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
-              <Clock className="text-amber-400" size={22} /> Mark Attendance
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3 mb-4">
+              <h2 className="text-xl font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">
+                <Clock className="text-amber-400" size={22} /> Mark Attendance
+              </h2>
+              {/* Live Digital Clock Badge */}
+              <div className="flex items-center gap-2 bg-[#090e1a] border border-amber-400/30 px-3.5 py-1.5 rounded-2xl font-mono text-amber-300 text-xs md:text-sm font-black shadow-inner">
+                <Clock size={16} className="text-amber-400 animate-pulse" />
+                <span className="text-slate-400 text-[11px] font-sans font-bold">Live Clock:</span>
+                <span className="tracking-wider">{liveClock}</span>
+              </div>
+            </div>
 
             {/* Three Primary Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <button
                 onClick={handleLogIn}
-                className="flex items-center justify-center gap-3 px-6 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-2xl shadow-lg hover:shadow-emerald-500/20 transition-all text-base cursor-pointer"
+                className="flex items-center justify-center gap-2.5 px-6 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-2xl shadow-lg hover:shadow-emerald-500/20 transition-all text-sm md:text-base cursor-pointer"
+                title={`Log In at exact live time: ${liveClock}`}
               >
-                <CheckCircle2 size={22} /> Log In
+                <CheckCircle2 size={22} /> Log In ({liveClock})
               </button>
 
               <button
                 onClick={handleLogOut}
-                className="flex items-center justify-center gap-3 px-6 py-4 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black rounded-2xl shadow-lg hover:shadow-rose-500/20 transition-all text-base cursor-pointer"
+                className="flex items-center justify-center gap-2.5 px-6 py-4 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black rounded-2xl shadow-lg hover:shadow-rose-500/20 transition-all text-sm md:text-base cursor-pointer"
+                title={`Log Out at exact live time: ${liveClock}`}
               >
                 <XCircle size={22} /> Log Out
               </button>
 
               <button
                 onClick={() => setIsLeaveModalOpen(true)}
-                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-95 text-black font-black rounded-2xl shadow-lg hover:shadow-amber-500/20 transition-all text-base cursor-pointer"
+                className="flex items-center justify-center gap-2.5 px-6 py-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-95 text-black font-black rounded-2xl shadow-lg hover:shadow-amber-500/20 transition-all text-sm md:text-base cursor-pointer"
               >
                 <CalendarIcon size={22} /> Apply Leave
               </button>
             </div>
 
             {/* Today's Live Status Banner */}
-            <div className="mt-5 p-3.5 bg-[#0c1427] rounded-2xl border border-white/10 flex flex-wrap justify-between items-center text-xs font-extrabold text-slate-300 gap-2 shadow-inner">
-              <div>
-                <span>Today ({todayStr}): </span>
+            <div className="mt-5 p-3.5 bg-[#0c1427] rounded-2xl border border-white/10 flex flex-wrap justify-between items-center text-xs font-extrabold text-slate-300 gap-3 shadow-inner">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span>Today ({todayStr}) for <strong className="text-amber-300 underline font-black">{selectedUser}</strong>: </span>
                 <span className={`px-2.5 py-0.5 rounded-md font-black ${
                   todayRecord?.status === 'Present' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                  todayRecord?.status === 'Leave' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-700/60 text-slate-300 border border-white/10'
+                  todayRecord?.status === 'Leave' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                  todayRecord?.status === 'Late Attendance' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                  'bg-slate-700/60 text-slate-300 border border-white/10'
                 }`}>
                   {todayRecord?.status || 'Not Marked'}
                 </span>
               </div>
-              <div className="flex gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <span>Login: <strong className="text-emerald-400 font-mono font-black">{todayRecord?.loginTime || '-'}</strong></span>
                 <span>Logout: <strong className="text-rose-400 font-mono font-black">{todayRecord?.logoutTime || '-'}</strong></span>
                 <span>Working Hours: <strong className="text-amber-300 font-mono font-black">{todayRecord?.workingHours || '-'}</strong></span>
@@ -987,6 +1207,9 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                         });
                         return;
                       }
+                      const existingRec = userAttendanceRecords.find(r => r.date === dayStr);
+                      setCustomActionLoginTime(existingRec?.loginTime && existingRec.loginTime !== '-' ? existingRec.loginTime : (dayStr === todayStr ? liveClock : "09:00 AM"));
+                      setCustomActionLogoutTime(existingRec?.logoutTime && existingRec.logoutTime !== '-' ? existingRec.logoutTime : (dayStr === todayStr ? "-" : "06:00 PM"));
                       setSelectedDateAction({
                         dayStr,
                         displayDate: `${d} ${monthNames[month]} ${year}`
@@ -1190,7 +1413,7 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                       <tr key={r.fireId || r.id || idx} className={`border-b border-white/5 transition-colors ${idx % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#131c2e]'} hover:bg-[#18243b]`}>
                         <td className="p-3.5 text-white font-extrabold flex items-center gap-2 border-r border-white/5">
                           <div className="w-7 h-7 rounded-full bg-amber-400 text-black font-black flex items-center justify-center text-xs shadow-sm">
-                            {r.employeeName[0]}
+                            {(String(r.employeeName || 'U'))[0]}
                           </div>
                           {r.employeeName}
                         </td>
@@ -1289,6 +1512,59 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
                 className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs md:text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2.5 hover:scale-[1.02]"
               >
                 <CheckCircle2 size={18} /> Mark Present
+              </button>
+            </div>
+
+            {/* Custom Exact Time Adjustment */}
+            <div className="bg-[#131c2e] p-4 rounded-2xl border border-amber-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={15} className="text-amber-400" /> Adjust / Custom In-Out Time
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold">Format: 09:15 AM</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-extrabold text-slate-300 mb-1">In / Login Time</label>
+                  <input
+                    type="text"
+                    value={customActionLoginTime}
+                    onChange={(e) => setCustomActionLoginTime(e.target.value)}
+                    placeholder="e.g. 09:15 AM"
+                    className="w-full px-3 py-2 bg-[#0c1427] border border-white/20 rounded-xl text-xs font-bold text-emerald-300 focus:border-amber-400 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCustomActionLoginTime(liveClock)}
+                    className="mt-1 text-[10px] text-amber-400 hover:underline font-bold cursor-pointer block"
+                  >
+                    Set Live Clock ({liveClock})
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-extrabold text-slate-300 mb-1">Out / Logout Time</label>
+                  <input
+                    type="text"
+                    value={customActionLogoutTime}
+                    onChange={(e) => setCustomActionLogoutTime(e.target.value)}
+                    placeholder="e.g. 06:30 PM or -"
+                    className="w-full px-3 py-2 bg-[#0c1427] border border-white/20 rounded-xl text-xs font-bold text-rose-300 focus:border-amber-400 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCustomActionLogoutTime(liveClock)}
+                    className="mt-1 text-[10px] text-amber-400 hover:underline font-bold cursor-pointer block"
+                  >
+                    Set Live Clock ({liveClock})
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSaveCustomTime(selectedDateAction.dayStr, customActionLoginTime, customActionLogoutTime)}
+                className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow cursor-pointer transition-all hover:scale-[1.01] flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={16} /> Save Exact Time to Record
               </button>
             </div>
 
@@ -1491,5 +1767,13 @@ export default function AttendanceLog({ isAdminOverride = true, onWallpaperChang
       )}
 
     </div>
+  );
+}
+
+export default function AttendanceLog(props: { isAdminOverride?: boolean; onWallpaperChange?: () => void }) {
+  return (
+    <AttendanceErrorBoundary>
+      <AttendanceLogContent {...props} />
+    </AttendanceErrorBoundary>
   );
 }

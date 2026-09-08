@@ -20,8 +20,9 @@ import {
   DialogDescription 
 } from '@/components/ui/dialog';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
-import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 // --- TYPES & INTERFACES ---
 export interface ColumnDef {
@@ -123,16 +124,22 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [sheets, setSheets] = useState<SheetData[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const deletedIds: string[] = JSON.parse(localStorage.getItem('sabi_deleted_sheet_ids') || '[]');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const filtered = parsed.filter((s: SheetData) => s && s.id && !deletedIds.includes(s.id));
+          if (filtered.length > 0) {
+            return filtered;
+          }
         }
       }
     } catch (e) {
       console.error('Failed to parse local sheets data:', e);
     }
-    return DEFAULT_SHEETS;
+    const deletedIds: string[] = JSON.parse(localStorage.getItem('sabi_deleted_sheet_ids') || '[]');
+    const fallback = DEFAULT_SHEETS.filter(s => !deletedIds.includes(s.id));
+    return fallback.length > 0 ? fallback : DEFAULT_SHEETS;
   });
 
   const [activeSheetId, setActiveSheetId] = useState<string>(() => {
@@ -155,46 +162,21 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   });
   const wallpaperFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWallpaperUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1920;
-        const MAX_HEIGHT = 1080;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
-        setDailyTasksWallpaper(compressedBase64);
-        localStorage.setItem('sabi_daily_tasks_wallpaper', compressedBase64);
-        toast.success("Daily Tasks wallpaper updated!");
-        if (onWallpaperChange) onWallpaperChange();
-      };
-    };
-    reader.readAsDataURL(file);
+    const toastId = toast.loading("Uploading wallpaper to Cloudinary...");
+    try {
+      const cdnUrl = await uploadToCloudinary(file);
+      setDailyTasksWallpaper(cdnUrl);
+      localStorage.setItem('sabi_daily_tasks_wallpaper', cdnUrl);
+      toast.success("Daily Tasks wallpaper updated!", { id: toastId });
+      if (onWallpaperChange) onWallpaperChange();
+    } catch (err: any) {
+      console.error("Wallpaper upload error:", err);
+      toast.error(err?.message || "Failed to upload wallpaper", { id: toastId });
+    }
   };
 
   const handleClearWallpaper = () => {
@@ -520,17 +502,20 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       setDoc(sheetDocRef, {
         sheets: updatedSheets,
         updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => {
+      }, { merge: false }).catch(err => {
         console.warn('Firestore master sheet sync note:', err);
       });
 
-      // Also persist each sheet into daily_tasks_sheets collection
+      // Also persist each non-deleted sheet into daily_tasks_sheets collection
+      const deletedIds: string[] = JSON.parse(localStorage.getItem('sabi_deleted_sheet_ids') || '[]');
       updatedSheets.forEach(sheet => {
-        const indDocRef = doc(db, 'daily_tasks_sheets', sheet.id);
-        setDoc(indDocRef, {
-          ...sheet,
-          updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(() => {});
+        if (!deletedIds.includes(sheet.id)) {
+          const indDocRef = doc(db, 'daily_tasks_sheets', sheet.id);
+          setDoc(indDocRef, {
+            ...sheet,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(() => {});
+        }
       });
     } catch (err) {
       console.warn('Firestore sync failed:', err);
@@ -542,18 +527,30 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     let unsubscribeMaster: (() => void) | null = null;
     let unsubscribeCollection: (() => void) | null = null;
 
+    const getDeletedIds = (): string[] => {
+      try {
+        return JSON.parse(localStorage.getItem('sabi_deleted_sheet_ids') || '[]');
+      } catch (e) {
+        return [];
+      }
+    };
+
     try {
       const sheetDocRef = doc(db, 'daily_tasks_board', 'sheet_data');
       unsubscribeMaster = onSnapshot(sheetDocRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           if (data && Array.isArray(data.sheets) && data.sheets.length > 0) {
-            isSyncingFromRemoteRef.current = true;
-            setSheets(data.sheets);
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data.sheets));
-            setTimeout(() => {
-              isSyncingFromRemoteRef.current = false;
-            }, 100);
+            const deletedIds = getDeletedIds();
+            const validSheets = data.sheets.filter((s: SheetData) => s && s.id && !deletedIds.includes(s.id));
+            if (validSheets.length > 0) {
+              isSyncingFromRemoteRef.current = true;
+              setSheets(validSheets);
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(validSheets));
+              setTimeout(() => {
+                isSyncingFromRemoteRef.current = false;
+              }, 100);
+            }
           }
         }
       }, (error) => {
@@ -566,19 +563,32 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     try {
       unsubscribeCollection = onSnapshot(collection(db, 'daily_tasks_sheets'), (snapshot) => {
         if (!snapshot.empty) {
+          const deletedIds = getDeletedIds();
           const remoteSheets: SheetData[] = [];
           snapshot.forEach(docSnap => {
+            if (deletedIds.includes(docSnap.id)) {
+              // Delete zombie doc from Firestore daily_tasks_sheets so it never returns
+              deleteDoc(doc(db, 'daily_tasks_sheets', docSnap.id)).catch(() => {});
+              return;
+            }
             const d = docSnap.data() as SheetData;
-            if (d && d.id && d.name) {
+            if (d && d.id && d.name && !deletedIds.includes(d.id)) {
               remoteSheets.push(d);
             }
           });
+
           if (remoteSheets.length > 0) {
             setSheets(prev => {
+              const currentDeletedIds = getDeletedIds();
+              const validPrev = prev.filter(s => !currentDeletedIds.includes(s.id));
               const map = new Map<string, SheetData>();
-              prev.forEach(s => map.set(s.id, s));
-              remoteSheets.forEach(s => map.set(s.id, s));
-              const merged = Array.from(map.values());
+              validPrev.forEach(s => map.set(s.id, s));
+              remoteSheets.forEach(s => {
+                if (!currentDeletedIds.includes(s.id)) {
+                  map.set(s.id, s);
+                }
+              });
+              const merged = Array.from(map.values()).filter(s => !currentDeletedIds.includes(s.id));
               localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
               return merged;
             });
@@ -1859,15 +1869,48 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
 
     const sheetToDelete = sheets.find(s => s.id === sheetId);
-    const updated = sheets.filter(s => s.id !== sheetId);
-    saveSheets(updated);
+    if (!window.confirm(`Are you sure you want to permanently delete sheet "${sheetToDelete?.name || ''}"?`)) {
+      return;
+    }
 
+    // 1. Permanently track in deleted sheet IDs
+    const deletedIds: string[] = JSON.parse(localStorage.getItem('sabi_deleted_sheet_ids') || '[]');
+    if (!deletedIds.includes(sheetId)) {
+      deletedIds.push(sheetId);
+      localStorage.setItem('sabi_deleted_sheet_ids', JSON.stringify(deletedIds));
+    }
+
+    // 2. Remove from active state and local storage immediately
+    const updated = sheets.filter(s => s.id !== sheetId && !deletedIds.includes(s.id));
+    setSheets(updated);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+
+    // 3. Switch active sheet if needed
     if (activeSheetId === sheetId) {
-      setActiveSheetId(updated[0].id);
+      const nextActive = updated[0]?.id || 'sheet-aug';
+      setActiveSheetId(nextActive);
       setCurrentPage(1);
     }
 
-    toast.success(`Deleted sheet "${sheetToDelete?.name || ''}"`);
+    // 4. Overwrite master document in Firestore
+    try {
+      const sheetDocRef = doc(db, 'daily_tasks_board', 'sheet_data');
+      setDoc(sheetDocRef, {
+        sheets: updated,
+        updatedAt: new Date().toISOString()
+      }, { merge: false }).catch(err => {
+        console.warn('Firestore master sheet sync note:', err);
+      });
+    } catch (e) {}
+
+    // 5. Permanently delete from daily_tasks_sheets Firestore collection
+    try {
+      deleteDoc(doc(db, 'daily_tasks_sheets', sheetId)).catch(err => {
+        console.warn('Firestore doc delete note:', err);
+      });
+    } catch (e) {}
+
+    toast.success(`Deleted sheet "${sheetToDelete?.name || ''}" permanently`);
   };
 
   // Export to Excel (.xlsx)

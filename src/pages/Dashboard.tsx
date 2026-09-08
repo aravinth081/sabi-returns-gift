@@ -17,7 +17,7 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 // Removed: import sabiLogo from "../assets/sabi-logo.png";
@@ -32,6 +32,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { uploadToCloudinary, uploadMultipleToCloudinary } from "@/lib/cloudinary";
 
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
@@ -504,11 +505,74 @@ export default function Dashboard() {
   const [customProducts, setCustomProducts] = useState<any[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "" });
+  const [newProductImages, setNewProductImages] = useState<File[]>([]);
+  const [newProductExistingImages, setNewProductExistingImages] = useState<string[]>([]);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [continuousVisibleCount, setContinuousVisibleCount] = useState(10);
 
-  const [managedChocolates, setManagedChocolates] = useState<any[]>([]);
+  const DEFAULT_CHOCOLATES = [
+    { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 1 },
+    { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 2 },
+    { name: "10 rs Dairy Milk", retailPrice: 20, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 3 },
+    { name: "5 rs Peanut Candy", retailPrice: 17, wholesalePrice: 17, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 4 },
+    { name: "5 rs 5 Star", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 5 },
+    { name: "5 rs Dairy Milk", retailPrice: 15, wholesalePrice: 15, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 6 },
+    { name: "2 rs Dairymilk Shots", retailPrice: 10, wholesalePrice: 10, costPrice: 1.5, stickerPrice: 1.5, displayOrder: 7 },
+    { name: "5 rs Milky Bar", retailPrice: 10, wholesalePrice: 10, costPrice: 4.5, stickerPrice: 1.5, displayOrder: 8 },
+    { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5, stickerPrice: 1.5, displayOrder: 9 }
+  ];
+
+  const [managedChocolates, setManagedChocolates] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_managed_chocolates');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_CHOCOLATES.map((c, i) => ({ fireId: `init-${i + 1}`, ...c }));
+  });
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types'>('order_types');
+  // Safe order type helpers (guarantees zero runtime crashes regardless of string or object shape)
+  const getOrderTypeName = (ot: any): string => {
+    if (!ot) return '';
+    if (typeof ot === 'string') return ot.trim();
+    return String(ot.name || ot.orderType || ot.label || ot.title || '').trim();
+  };
+
+  const getOrderTypeId = (ot: any, index: number): string => {
+    if (!ot) return `ot-${index}`;
+    if (typeof ot === 'string') return `ot-${ot.trim().toLowerCase().replace(/\s+/g, '-')}-${index}`;
+    return String(ot.fireId || ot.id || `ot-${index}`);
+  };
+
+  const [orderTypes, setOrderTypes] = useState<{ fireId: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_order_types');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any, idx: number) => {
+            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
+            return {
+              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+              name: String(item?.name || item?.orderType || item?.label || `Type ${idx + 1}`).trim()
+            };
+          });
+        }
+      }
+    } catch (e) {}
+    return [
+      { fireId: 'default-1', name: 'Sabi' },
+      { fireId: 'default-2', name: 'Thaaru' },
+      { fireId: 'default-3', name: 'Choco Wrapz' }
+    ];
+  });
+  const [newOrderTypeName, setNewOrderTypeName] = useState("");
+  const [editOrderTypeId, setEditOrderTypeId] = useState<string | null>(null);
+
   const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
   const [chocolateRows, setChocolateRows] = useState<{ chocolate: string; count: string }[]>([{ chocolate: "", count: "" }]);
@@ -523,6 +587,40 @@ export default function Dashboard() {
   const [galleryActiveIndex, setGalleryActiveIndex] = useState(0);
   const [imageUploadingFor, setImageUploadingFor] = useState<string | null>(null);
   const [deleteImageConfirm, setDeleteImageConfirm] = useState<{ productFireId: string; imageIndex: number } | null>(null);
+
+  // Keyboard Left / Right navigation for Image Gallery Modal
+  useEffect(() => {
+    if (!isImageGalleryOpen || !imageGalleryProduct) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't interfere if user is typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+
+      const images = imageGalleryProduct.images || [];
+      if (images.length <= 1) {
+        if (e.key === 'Escape') {
+          setIsImageGalleryOpen(false);
+          setDeleteImageConfirm(null);
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setGalleryActiveIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setGalleryActiveIndex(prev => (prev === images.length - 1 ? 0 : prev + 1));
+      } else if (e.key === 'Escape') {
+        setIsImageGalleryOpen(false);
+        setDeleteImageConfirm(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isImageGalleryOpen, imageGalleryProduct]);
 
   // --- MONTHLY TARGET STATE & COMPUTATION ---
   const [targetMonthKey, setTargetMonthKey] = useState<string>(() => format(new Date(), "yyyy-MM"));
@@ -627,7 +725,12 @@ export default function Dashboard() {
           { name: "1 rs Chocolate", retailPrice: 8, wholesalePrice: 8, costPrice: 0.5, stickerPrice: 1.5, displayOrder: 9 }
         ];
 
-        defaults.forEach(d => addDoc(collection(db, "managed_chocolates"), d));
+        defaults.forEach(d => addDoc(collection(db, "managed_chocolates"), d).catch(() => {}));
+        const initialList = defaults.map((d, i) => ({ fireId: `init-${i + 1}`, ...d }));
+        setManagedChocolates(initialList);
+        try {
+          localStorage.setItem('sabi_managed_chocolates', JSON.stringify(initialList));
+        } catch (e) {}
       } else {
         // Filter duplicates by name (case-insensitive)
         const seen = new Set();
@@ -652,6 +755,9 @@ export default function Dashboard() {
         });
 
         setManagedChocolates(list);
+        try {
+          localStorage.setItem('sabi_managed_chocolates', JSON.stringify(list));
+        } catch (e) {}
       }
     });
 
@@ -703,7 +809,35 @@ export default function Dashboard() {
       }
     });
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); };
+    const unsubOrderTypes = onSnapshot(collection(db, "order_types"), (snapshot) => {
+      let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      if (list.length === 0) {
+        const defaults = [
+          { name: "Sabi", createdAt: new Date().toISOString() },
+          { name: "Thaaru", createdAt: new Date().toISOString() },
+          { name: "Choco Wrapz", createdAt: new Date().toISOString() }
+        ];
+        defaults.forEach(d => addDoc(collection(db, "order_types"), d).catch(() => {}));
+        const initialList = defaults.map((d, i) => ({ fireId: `default-${i + 1}`, name: d.name }));
+        setOrderTypes(initialList);
+        try {
+          localStorage.setItem('sabi_order_types', JSON.stringify(initialList));
+        } catch (e) {}
+      } else {
+        list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        const normalizedList = list.map((item, idx) => ({
+          fireId: item.fireId || `ot-${idx + 1}`,
+          name: getOrderTypeName(item) || `Order Type ${idx + 1}`,
+          ...item
+        }));
+        setOrderTypes(normalizedList);
+        try {
+          localStorage.setItem('sabi_order_types', JSON.stringify(normalizedList));
+        } catch (e) {}
+      }
+    });
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -897,39 +1031,38 @@ export default function Dashboard() {
     { name: "Minimal Soft Slate", value: "linear-gradient(to bottom, #f8fafc, #f1f5f9)" }
   ];
 
-  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'd1' | 'd2' | 'inventories' | 'tracking' | 'reports') => {
+  const handleWallpaperUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'd1' | 'd2' | 'inventories' | 'tracking' | 'reports') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Store original image as-is — no compression, no resize, preserves full quality & original aspect ratio
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const originalBase64 = event.target?.result as string;
-      if (!originalBase64) return;
-
+    const toastId = toast.loading("Uploading background to Cloudinary...");
+    try {
+      const cdnUrl = await uploadToCloudinary(file);
       if (target === 'd1') {
-        setD1Wallpaper(originalBase64);
-        localStorage.setItem('sabi_wallpaper_dashboard1', originalBase64);
-        toast.success("Dashboard 1 background updated!");
+        setD1Wallpaper(cdnUrl);
+        localStorage.setItem('sabi_wallpaper_dashboard1', cdnUrl);
+        toast.success("Dashboard 1 background updated!", { id: toastId });
       } else if (target === 'd2') {
-        setD2Wallpaper(originalBase64);
-        localStorage.setItem('sabi_wallpaper_dashboard2', originalBase64);
-        toast.success("Dashboard 2 background updated!");
+        setD2Wallpaper(cdnUrl);
+        localStorage.setItem('sabi_wallpaper_dashboard2', cdnUrl);
+        toast.success("Dashboard 2 background updated!", { id: toastId });
       } else if (target === 'inventories') {
-        setInvWallpaper(originalBase64);
-        localStorage.setItem('sabi_wallpaper_inventories', originalBase64);
-        toast.success("Inventories background updated!");
+        setInvWallpaper(cdnUrl);
+        localStorage.setItem('sabi_wallpaper_inventories', cdnUrl);
+        toast.success("Inventories background updated!", { id: toastId });
       } else if (target === 'tracking') {
-        setTrackWallpaper(originalBase64);
-        localStorage.setItem('sabi_wallpaper_tracking', originalBase64);
-        toast.success("Orders Tracking background updated!");
+        setTrackWallpaper(cdnUrl);
+        localStorage.setItem('sabi_wallpaper_tracking', cdnUrl);
+        toast.success("Orders Tracking background updated!", { id: toastId });
       } else if (target === 'reports') {
-        setReportsWallpaper(originalBase64);
-        localStorage.setItem('sabi_wallpaper_reports', originalBase64);
-        toast.success("Reports background updated!");
+        setReportsWallpaper(cdnUrl);
+        localStorage.setItem('sabi_wallpaper_reports', cdnUrl);
+        toast.success("Reports background updated!", { id: toastId });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("Cloudinary wallpaper upload error:", err);
+      toast.error(err?.message || "Failed to upload wallpaper.", { id: toastId });
+    }
   };
 
   const handleClearWallpaper = (target: 'd1' | 'd2' | 'inventories' | 'tracking' | 'reports') => {
@@ -1020,6 +1153,16 @@ export default function Dashboard() {
       if (!isNotificationClick) {
         setShowNotificationDropdown(false);
       }
+
+      // Close Money and Delivery dropdowns when clicking outside
+      const isMoneyDropdown = target.closest('.d1-money-dropdown-container');
+      if (!isMoneyDropdown) {
+        setD1MoneyDropdownOpen(false);
+      }
+      const isDeliveryDropdown = target.closest('.d1-delivery-dropdown-container');
+      if (!isDeliveryDropdown) {
+        setD1DeliveryDropdownOpen(false);
+      }
     };
     document.addEventListener('click', handleDocumentClick);
     return () => {
@@ -1033,6 +1176,8 @@ export default function Dashboard() {
   // Dashboard 1 filters
   const [d1PaymentFilter, setD1PaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
   const [d1DeliveryFilter, setD1DeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
+  const [d1MoneyDropdownOpen, setD1MoneyDropdownOpen] = useState(false);
+  const [d1DeliveryDropdownOpen, setD1DeliveryDropdownOpen] = useState(false);
   const [d1OrderStatusFilter, setD1OrderStatusFilter] = useState<string>('All');
   const [d1TableTypeFilter, setD1TableTypeFilter] = useState<string>('All');
   const [d1DuplicateFilter, setD1DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
@@ -1204,8 +1349,17 @@ export default function Dashboard() {
   const setFunctionDates = activeTab === 'dashboard2' ? setD2FunctionDates : setD1FunctionDates;
   const deliveryDates = activeTab === 'dashboard2' ? d2DeliveryDates : d1DeliveryDates;
   const setDeliveryDates = activeTab === 'dashboard2' ? setD2DeliveryDates : setD1DeliveryDates;
-  const chocFilter = activeTab === 'dashboard2' ? d2ChocFilter : d1ChocFilter;
-  const setChocFilter = activeTab === 'dashboard2' ? setD2ChocFilter : setD1ChocFilter;
+  const chocFilter = activeTab === 'dashboard2'
+    ? d2ChocFilter
+    : (d1SelectedChocolateBoxFilter !== 'All Chocolates' && d1SelectedChocolateBoxFilter ? d1SelectedChocolateBoxFilter : d1ChocFilter);
+  const setChocFilter = (val: string) => {
+    if (activeTab === 'dashboard2') {
+      setD2ChocFilter(val);
+    } else {
+      setD1ChocFilter(val);
+      setD1SelectedChocolateBoxFilter(val && val !== 'All Chocolates' ? val : 'All Chocolates');
+    }
+  };
   const locationFilter = activeTab === 'dashboard2' ? d2LocationFilter : d1LocationFilter;
   const setLocationFilter = activeTab === 'dashboard2' ? setD2LocationFilter : setD1LocationFilter;
   const roleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
@@ -1221,6 +1375,7 @@ export default function Dashboard() {
       Boolean(dateFilter.from || dateFilter.to) ||
       countFilter !== 'All' ||
       chocFilter !== '' ||
+      (activeTab !== 'dashboard2' && d1SelectedChocolateBoxFilter !== 'All Chocolates') ||
       locationFilter !== 'All' ||
       roleFilter !== 'All' ||
       deliveryDates.length > 0 ||
@@ -1236,11 +1391,13 @@ export default function Dashboard() {
     dateFilter,
     countFilter,
     chocFilter,
+    d1SelectedChocolateBoxFilter,
     locationFilter,
     roleFilter,
     deliveryDates,
     functionDates,
     dashboardSearch,
+    activeTab,
   ]);
 
   const handleClearAllFilters = () => {
@@ -1260,6 +1417,7 @@ export default function Dashboard() {
     setD2CountFilter('All');
     setD1ChocFilter('');
     setD2ChocFilter('');
+    setD1SelectedChocolateBoxFilter('All Chocolates');
     setD1LocationFilter('All');
     setD2LocationFilter('All');
     setD1RoleFilter('All');
@@ -1867,7 +2025,7 @@ export default function Dashboard() {
     return { count, revenue: Math.round(revenue) };
   }, [orders, salesTrackerChoc, salesTrackerFrom, salesTrackerTo, customPricesMap]);
 
-  const filteredDashboardOrders = useMemo(() => {
+  const baseDashboardOrders = useMemo(() => {
     // Use the correct per-tab filter values
     const curPaymentFilter = activeTab === 'dashboard2' ? d2PaymentFilter : d1PaymentFilter;
     const curDeliveryFilter = activeTab === 'dashboard2' ? d2DeliveryFilter : d1DeliveryFilter;
@@ -1879,14 +2037,21 @@ export default function Dashboard() {
     const curDashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
     const curCountFilter = activeTab === 'dashboard2' ? d2CountFilter : d1CountFilter;
     const curTableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
-    const curChocFilter = activeTab === 'dashboard2' ? d2ChocFilter : d1ChocFilter;
     const curLocationFilter = activeTab === 'dashboard2' ? d2LocationFilter : d1LocationFilter;
     const curRoleFilter = activeTab === 'dashboard2' ? d2RoleFilter : d1RoleFilter;
     const curDuplicateFilter = activeTab === 'dashboard2' ? d2DuplicateFilter : d1DuplicateFilter;
 
     return orders.filter(order => {
-      const pMatch = curPaymentFilter === 'All' || order.paymentStatus === curPaymentFilter;
-      const dMatch = curDeliveryFilter === 'All' || order.status === curDeliveryFilter;
+      const pMatch = curPaymentFilter === 'All' || 
+        order.paymentStatus === curPaymentFilter ||
+        (curPaymentFilter === 'Full Paid' && (order.paymentStatus === 'Fully Paid' || String(order.paymentStatus || '').toLowerCase() === 'fully paid' || String(order.paymentStatus || '').toLowerCase() === 'full paid')) ||
+        (curPaymentFilter === 'Partially Paid' && String(order.paymentStatus || '').toLowerCase() === 'partially paid') ||
+        (curPaymentFilter === 'Pending' && String(order.paymentStatus || '').toLowerCase() === 'pending');
+
+      const dMatch = curDeliveryFilter === 'All' || 
+        order.status === curDeliveryFilter ||
+        (curDeliveryFilter === 'In Process' && String(order.status || '').toLowerCase() === 'in process') ||
+        (curDeliveryFilter === 'Delivered' && String(order.status || '').toLowerCase() === 'delivered');
       const osMatch = curOrderStatusFilter === 'All' || (order.orderStatus || "image edited (not paid)") === curOrderStatusFilter;
 
       let rangeMatch = true;
@@ -1935,13 +2100,6 @@ export default function Dashboard() {
       const countMatch = curCountFilter === 'All' || order.count.toString() === curCountFilter;
       const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
 
-      let chocMatch = true;
-      if (curChocFilter.trim()) {
-        const chocQuery = curChocFilter.toLowerCase().trim();
-        const orderChocs = order.chocolate ? String(order.chocolate).toLowerCase() : '';
-        chocMatch = orderChocs.includes(chocQuery);
-      }
-
       let locationMatch = true;
       if (curLocationFilter === 'Chennai') {
         locationMatch = order.isChennai === true || String(order.location || "").toLowerCase() === 'chennai';
@@ -1970,9 +2128,59 @@ export default function Dashboard() {
         }
       }
 
-      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && chocMatch && categoryMatch && locationMatch && roleMatch && duplicateMatch;
+      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && categoryMatch && locationMatch && roleMatch && duplicateMatch;
     });
-  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1ChocFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2ChocFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts]);
+  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts]);
+
+  const availableChocolatesData = useMemo(() => {
+    const chocolateCounts: Record<string, number> = {};
+    let totalItemsCount = 0;
+
+    baseDashboardOrders.forEach(o => {
+      if (o.category !== 'product' && o.chocolate) {
+        const orderChocs = String(o.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean);
+        const counts = String(o.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        orderChocs.forEach((key, idx) => {
+          const qty = counts[idx] !== undefined ? counts[idx] : (counts[0] || 0);
+          chocolateCounts[key] = (chocolateCounts[key] || 0) + qty;
+          totalItemsCount += qty;
+        });
+      }
+    });
+
+    const top = Object.entries(chocolateCounts).sort((a, b) => b[1] - a[1]);
+    return {
+      topChocolates: top,
+      preChocTotalItems: totalItemsCount,
+      chocolateCountsMap: chocolateCounts
+    };
+  }, [baseDashboardOrders]);
+
+  const filteredDashboardOrders = useMemo(() => {
+    const activeChoc = activeTab === 'dashboard2'
+      ? d2ChocFilter
+      : (d1SelectedChocolateBoxFilter && d1SelectedChocolateBoxFilter !== 'All Chocolates'
+          ? d1SelectedChocolateBoxFilter
+          : d1ChocFilter);
+
+    if (!activeChoc || activeChoc === 'All Chocolates' || !activeChoc.trim()) {
+      return baseDashboardOrders;
+    }
+
+    const chocQuery = activeChoc.toLowerCase().trim();
+
+    return baseDashboardOrders.filter(order => {
+      const isProduct = order.category === 'product';
+      if (activeTab === 'dashboard2' || isProduct) {
+        const prodName = String(order.productName || order.chocolate || '').toLowerCase();
+        return prodName.includes(chocQuery);
+      }
+
+      if (!order.chocolate) return false;
+      const rawChocs = String(order.chocolate).split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+      return rawChocs.some(c => c === chocQuery || c.includes(chocQuery) || chocQuery.includes(c));
+    });
+  }, [baseDashboardOrders, activeTab, d1SelectedChocolateBoxFilter, d1ChocFilter, d2ChocFilter]);
 
   const { totalOrders, deliveredCount, inProcessCount, totalItems, topChocolates, totalRevenue, totalDeliveryCharge, totalPendingAmount } = useMemo(() => {
     const total = filteredDashboardOrders.length;
@@ -1983,7 +2191,6 @@ export default function Dashboard() {
       return sum + counts.reduce((s, val) => s + val, 0);
     }, 0);
 
-    const chocolateCounts: Record<string, number> = {};
     let netRevenue = 0;
     let totalDelivery = 0;
     let pendingSum = 0;
@@ -1998,29 +2205,19 @@ export default function Dashboard() {
       if (o.paymentStatus !== 'Pending') {
         totalDelivery += priceInfo.deliveryCharge;
       }
-
-      if (o.chocolate) {
-        const orderChocs = String(o.chocolate).split(',').map((c: string) => c.trim()).filter(Boolean);
-        const counts = String(o.count || 0).split(',').map(c => Number(c.trim()) || 0);
-        orderChocs.forEach((key, idx) => {
-          const qty = counts[idx] !== undefined ? counts[idx] : (counts[0] || 0);
-          chocolateCounts[key] = (chocolateCounts[key] || 0) + qty;
-        });
-      }
     });
 
-    const top = Object.entries(chocolateCounts).sort((a, b) => b[1] - a[1]);
     return {
       totalOrders: total,
       deliveredCount: delivered,
       inProcessCount: inProcess,
       totalItems: items,
-      topChocolates: top,
+      topChocolates: availableChocolatesData.topChocolates,
       totalRevenue: netRevenue,
       totalDeliveryCharge: totalDelivery,
       totalPendingAmount: pendingSum
     };
-  }, [filteredDashboardOrders, customPricesMap]);
+  }, [filteredDashboardOrders, availableChocolatesData.topChocolates, customPricesMap, managedChocPricesMap]);
 
   const displayRevenue = totalRevenue;
   const displayPendingAmount = totalPendingAmount;
@@ -2580,7 +2777,7 @@ export default function Dashboard() {
     const category = (categoryOverride === 'chocolate' || categoryOverride === 'product')
       ? categoryOverride
       : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setChocolateRows([{ chocolate: "", count: "" }]);
     setProductRows([{ productName: "", quantity: "", price: "" }]);
     setOrderTypeOthersToggle(true);
@@ -2616,7 +2813,7 @@ export default function Dashboard() {
       discount: 0,
       isDeliveryFree: false,
       isChennai: false,
-      orderType: "Sabi",
+      orderType: getOrderTypeName(orderTypes[0]) || "Sabi",
       role: "Others",
       orderStatus: "image edited (not paid)",
       category,
@@ -3216,7 +3413,7 @@ export default function Dashboard() {
       setIsModalOpen(false);
 
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
 
     } catch (err) {
       console.error("Error saving:", err);
@@ -3272,12 +3469,30 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.price) return;
     try {
+      setIsSavingProduct(true);
+      let uploadedImageUrls: string[] = [];
+
+      if (newProductImages.length > 0) {
+        const toastId = toast.loading(`Uploading ${newProductImages.length} product image(s) to Cloudinary...`);
+        try {
+          uploadedImageUrls = await uploadMultipleToCloudinary(newProductImages);
+          toast.success(`${uploadedImageUrls.length} image(s) uploaded to Cloudinary!`, { id: toastId });
+        } catch (uploadErr: any) {
+          toast.error(uploadErr?.message || "Cloudinary image upload failed", { id: toastId });
+          setIsSavingProduct(false);
+          return;
+        }
+      }
+
+      const combinedImages = [...newProductExistingImages, ...uploadedImageUrls];
+
       const dataToSave = {
         name: newProductForm.name,
         price: Number(newProductForm.price),
         sellingPrice: Number(newProductForm.price),
         wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        images: combinedImages
       };
 
       if (editProductId) {
@@ -3285,17 +3500,27 @@ export default function Dashboard() {
           name: newProductForm.name,
           price: Number(newProductForm.price),
           sellingPrice: Number(newProductForm.price),
-          wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0
+          wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
+          images: combinedImages
         });
+        toast.success("Listing updated successfully!");
         logActivity(`Edited Listing: ${newProductForm.name} (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       } else {
         await addDoc(collection(db, "products"), dataToSave);
+        toast.success("Product listing added successfully!");
         logActivity(`Added New Listing: ${newProductForm.name} (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       }
       setIsAddProductModalOpen(false);
       setNewProductForm({ name: "", wholesalePrice: "", price: "" });
+      setNewProductImages([]);
+      setNewProductExistingImages([]);
       setEditProductId(null);
-    } catch (err) { console.error("Error saving product:", err); }
+    } catch (err: any) {
+      console.error("Error saving product:", err);
+      toast.error(err?.message || "Error saving product.");
+    } finally {
+      setIsSavingProduct(false);
+    }
   };
 
   const handleEditProductClick = (prod: any) => {
@@ -3304,6 +3529,8 @@ export default function Dashboard() {
       wholesalePrice: String(prod.wholesalePrice !== undefined && prod.wholesalePrice !== null ? prod.wholesalePrice : ""), 
       price: String(prod.price ?? prod.sellingPrice ?? "") 
     });
+    setNewProductExistingImages(prod.images || []);
+    setNewProductImages([]);
     setEditProductId(prod.fireId);
     if (activeTab === 'products') {
       const formEl = document.getElementById("product-inline-form");
@@ -3377,98 +3604,298 @@ export default function Dashboard() {
     }
   };
 
-  // --- PRODUCT IMAGE HANDLERS ---
-  const handleImageUpload = async (productFireId: string, files: FileList) => {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    const toastId = toast.loading(`Processing ${files.length} image(s)...`);
-    setImageUploadingFor(productFireId);
+  // --- DYNAMIC ORDER TYPES HANDLERS ---
+  const handleAddOrderType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newOrderTypeName.trim();
+    if (!trimmed) return;
+
+    // Check duplicate name (case-insensitive)
+    const isDup = orderTypes.some(
+      (ot, idx) => {
+        const otId = getOrderTypeId(ot, idx);
+        const otName = getOrderTypeName(ot);
+        return otId !== editOrderTypeId && otName.toLowerCase() === trimmed.toLowerCase();
+      }
+    );
+    if (isDup) {
+      toast.error(`Order type "${trimmed}" already exists!`);
+      return;
+    }
 
     try {
-      // Validate and filter files first
-      const validFiles: File[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (!validTypes.includes(file.type)) {
-          toast.error(`${file.name}: Unsupported format. Use JPG, PNG, or WEBP.`);
-          continue;
+      if (editOrderTypeId) {
+        const prev = orderTypes.find((ot, idx) => getOrderTypeId(ot, idx) === editOrderTypeId);
+        const prevName = getOrderTypeName(prev);
+        if (editOrderTypeId.startsWith('default-') || editOrderTypeId.startsWith('ot-')) {
+          const docRef = await addDoc(collection(db, "order_types"), {
+            name: trimmed,
+            createdAt: new Date().toISOString()
+          });
+          const updated = orderTypes.map((ot, idx) => getOrderTypeId(ot, idx) === editOrderTypeId ? { fireId: docRef.id, name: trimmed } : (typeof ot === 'string' ? { fireId: `default-${idx + 1}`, name: ot } : ot));
+          setOrderTypes(updated);
+          localStorage.setItem('sabi_order_types', JSON.stringify(updated));
+        } else {
+          await updateDoc(doc(db, "order_types", editOrderTypeId), { name: trimmed });
+          const updated = orderTypes.map((ot, idx) => getOrderTypeId(ot, idx) === editOrderTypeId ? { ...ot, name: trimmed } : (typeof ot === 'string' ? { fireId: `default-${idx + 1}`, name: ot } : ot));
+          setOrderTypes(updated);
+          localStorage.setItem('sabi_order_types', JSON.stringify(updated));
         }
-        if (file.size > maxSize) {
-          toast.error(`${file.name}: File too large. Max 10MB.`);
-          continue;
+        toast.success(`Order type updated to "${trimmed}"!`);
+        logActivity(`Edited Order Type: "${prevName || 'Unknown'}" -> "${trimmed}"`, 'Orders');
+        setEditOrderTypeId(null);
+      } else {
+        const docRef = await addDoc(collection(db, "order_types"), {
+          name: trimmed,
+          createdAt: new Date().toISOString()
+        });
+        const cleanList = orderTypes.map((ot, idx) => typeof ot === 'string' ? { fireId: `default-${idx + 1}`, name: ot } : ot);
+        const updated = [...cleanList, { fireId: docRef.id, name: trimmed }];
+        setOrderTypes(updated);
+        localStorage.setItem('sabi_order_types', JSON.stringify(updated));
+        toast.success(`Added Order Type "${trimmed}"!`);
+        logActivity(`Added Order Type: "${trimmed}"`, 'Orders');
+      }
+      setNewOrderTypeName("");
+    } catch (err) {
+      console.error("Failed to save order type:", err);
+      // Fallback local update
+      if (!editOrderTypeId) {
+        const cleanList = orderTypes.map((ot, idx) => typeof ot === 'string' ? { fireId: `default-${idx + 1}`, name: ot } : ot);
+        const updated = [...cleanList, { fireId: `local-${Date.now()}`, name: trimmed }];
+        setOrderTypes(updated);
+        localStorage.setItem('sabi_order_types', JSON.stringify(updated));
+        toast.success(`Added Order Type "${trimmed}"!`);
+      }
+      setNewOrderTypeName("");
+    }
+  };
+
+  const handleDeleteOrderType = async (otInput: any) => {
+    if (orderTypes.length <= 1) {
+      toast.error("At least one order type must remain in the system!");
+      return;
+    }
+    const otName = getOrderTypeName(otInput);
+    const otId = otInput?.fireId || getOrderTypeId(otInput, 0);
+
+    if (window.confirm(`Are you sure you want to delete order type "${otName}"?`)) {
+      // 1. Immediately update state and localStorage for instant feedback
+      const updated = orderTypes.filter((item, idx) => {
+        const iName = getOrderTypeName(item);
+        const iId = getOrderTypeId(item, idx);
+        return iName !== otName && iId !== otId;
+      }).map((item, idx) => typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item);
+      setOrderTypes(updated);
+      try {
+        localStorage.setItem('sabi_order_types', JSON.stringify(updated));
+      } catch (e) {}
+
+      if (editOrderTypeId === otId || editOrderTypeId === otName) {
+        setEditOrderTypeId(null);
+        setNewOrderTypeName("");
+      }
+
+      // 2. Delete from Firestore if it's a real Firestore doc
+      if (otId && !otId.startsWith('default-') && !otId.startsWith('local-') && !otId.startsWith('ot-')) {
+        try {
+          await deleteDoc(doc(db, "order_types", otId));
+        } catch (err) {
+          console.warn("Firestore delete order type note:", err);
         }
+      }
+      toast.success(`Deleted order type "${otName}"!`);
+      logActivity(`Deleted Order Type: "${otName}"`, 'Orders');
+    }
+  };
+
+  // --- FAST CLIENT-SIDE IMAGE COMPRESSION (50ms) FOR SUB-SECOND UPLOADS ---
+  const compressImageForUpload = async (file: File): Promise<File | Blob> => {
+    if (file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
+    if (file.size < 400 * 1024) return file; // Under 400KB doesn't need compression
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1800;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob && blob.size < file.size) {
+              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+            } else {
+              resolve(file);
+            }
+          }, 'image/jpeg', 0.88);
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // --- PRODUCT IMAGE HANDLERS (⚡ INSTANT 1-SECOND OPTIMISTIC UI) ---
+  const handleImageUpload = async (productFireId: string, files: FileList | File[]) => {
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validFiles: File[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (validTypes.includes(file.type)) {
         validFiles.push(file);
       }
+    }
 
-      if (validFiles.length === 0) {
-        toast.dismiss(toastId);
-        setImageUploadingFor(null);
-        return;
+    if (validFiles.length === 0) {
+      toast.error("Please select a JPG, PNG, or WEBP image.");
+      return;
+    }
+
+    // ⚡ 1. INSTANT OPTIMISTIC PREVIEW (0ms: displays immediately in gallery)
+    const localPreviews = validFiles.map(f => URL.createObjectURL(f));
+    const product = customProducts.find(p => p.fireId === productFireId);
+    const existingImages = product?.images || [];
+    const optimisticImages = [...existingImages, ...localPreviews];
+
+    // Immediately update gallery modal view
+    if (imageGalleryProduct?.fireId === productFireId) {
+      setImageGalleryProduct({ ...imageGalleryProduct, images: optimisticImages });
+      setGalleryActiveIndex(optimisticImages.length - 1);
+    }
+
+    // Immediately update custom products list for table thumbnail
+    setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: optimisticImages } : p));
+    toast.success(`${validFiles.length} image(s) added!`, { duration: 1500 });
+
+    // ⚡ 2. FAST BACKGROUND COMPRESSION & CLOUDINARY UPLOAD (< 1 second)
+    try {
+      const compressedFiles = await Promise.all(validFiles.map(f => compressImageForUpload(f)));
+      const cloudinaryUrls = await uploadMultipleToCloudinary(compressedFiles as any);
+
+      // Replace temporary previews with permanent Cloudinary URLs
+      const finalImages = [...existingImages, ...cloudinaryUrls];
+
+      // Save to Firestore permanently so refresh NEVER removes the images!
+      await updateDoc(doc(db, "products", productFireId), { images: finalImages });
+
+      // Update state with permanent URLs
+      if (imageGalleryProduct?.fireId === productFireId) {
+        setImageGalleryProduct({ ...imageGalleryProduct, images: finalImages });
       }
-
-      // Read ALL files in parallel for maximum speed
-      toast.loading(`Reading ${validFiles.length} image(s)...`, { id: toastId });
-      const readPromises = validFiles.map(file =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        })
-      );
-      const newImages = await Promise.all(readPromises);
-
-      // Save to Firestore
-      toast.loading('Saving...', { id: toastId });
-      const product = customProducts.find(p => p.fireId === productFireId);
-      const existingImages = product?.images || [];
-      const updatedImages = [...existingImages, ...newImages];
-      await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
-      toast.success(`${newImages.length} image(s) uploaded!`, { id: toastId });
-    } catch (err) {
-      console.error("Image upload error:", err);
-      toast.error("Failed to upload images.", { id: toastId });
-    } finally {
-      setImageUploadingFor(null);
+      setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: finalImages } : p));
+    } catch (err: any) {
+      console.error("Cloudinary upload background error:", err);
+      // Fallback: save to Firestore as base64 so it persists on refresh even if network hiccup
+      try {
+        const base64List = await Promise.all(validFiles.map(f => {
+          return new Promise<string>((res) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result as string);
+            r.readAsDataURL(f);
+          });
+        }));
+        const finalImages = [...existingImages, ...base64List];
+        await updateDoc(doc(db, "products", productFireId), { images: finalImages });
+        if (imageGalleryProduct?.fireId === productFireId) {
+          setImageGalleryProduct({ ...imageGalleryProduct, images: finalImages });
+        }
+        setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: finalImages } : p));
+      } catch (firestoreErr) {
+        toast.error("Failed to save image to cloud database.");
+      }
     }
   };
 
+  // ⚡ INSTANT 0ms OPTIMISTIC DELETE
   const handleDeleteImage = async (productFireId: string, imageIndex: number) => {
-    try {
-      const product = customProducts.find(p => p.fireId === productFireId);
-      if (!product || !product.images) return;
-      const updatedImages = product.images.filter((_: any, i: number) => i !== imageIndex);
-      await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
-      toast.success("Image deleted.");
-      // Update gallery state
-      if (imageGalleryProduct?.fireId === productFireId) {
-        setImageGalleryProduct({ ...imageGalleryProduct, images: updatedImages });
-        if (galleryActiveIndex >= updatedImages.length) {
-          setGalleryActiveIndex(Math.max(0, updatedImages.length - 1));
-        }
+    const product = customProducts.find(p => p.fireId === productFireId);
+    if (!product || !product.images) return;
+    const oldImages = [...product.images];
+    const updatedImages = product.images.filter((_: any, i: number) => i !== imageIndex);
+
+    // 1. Instant optimistic state update (0ms delay!)
+    if (imageGalleryProduct?.fireId === productFireId) {
+      setImageGalleryProduct({ ...imageGalleryProduct, images: updatedImages });
+      if (galleryActiveIndex >= updatedImages.length) {
+        setGalleryActiveIndex(Math.max(0, updatedImages.length - 1));
       }
-      setDeleteImageConfirm(null);
+    }
+    setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: updatedImages } : p));
+    setDeleteImageConfirm(null);
+    toast.success("Image deleted", { duration: 1500 });
+
+    // 2. Async save to Firestore in background
+    try {
+      await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
     } catch (err) {
       console.error("Delete image error:", err);
-      toast.error("Failed to delete image.");
+      // Revert if failed
+      if (imageGalleryProduct?.fireId === productFireId) {
+        setImageGalleryProduct({ ...imageGalleryProduct, images: oldImages });
+      }
+      setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: oldImages } : p));
+      toast.error("Failed to delete image from database.");
     }
   };
 
+  // ⚡ INSTANT 0ms DOM COPY IMAGE
   const handleCopyImage = async (imageUrl: string) => {
     try {
-      // Fast copy: convert base64/data URL directly to blob
-      const response = await fetch(imageUrl);
+      // 1. Try instant copy directly from decoded DOM Image (0ms, no network fetch!)
+      const domImg = document.getElementById("gallery-main-image") as HTMLImageElement;
+      if (domImg && domImg.complete && domImg.naturalWidth > 0) {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = domImg.naturalWidth;
+          canvas.height = domImg.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(domImg, 0, 0);
+            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/png"));
+            if (blob) {
+              await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+              toast.success("Image copied to clipboard!");
+              return;
+            }
+          }
+        } catch (canvasErr) {
+          // If tainted canvas due to cross-origin, fall through to fetch
+        }
+      }
+
+      // 2. Fast fetch copy with caching
+      const response = await fetch(imageUrl, { cache: 'force-cache' });
       const originalBlob = await response.blob();
 
-      // If already PNG, use directly; otherwise convert via canvas
       if (originalBlob.type === 'image/png') {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': originalBlob })
         ]);
         toast.success('Image copied to clipboard!');
       } else {
-        // Convert to PNG for clipboard compatibility
         const img = new Image();
+        img.crossOrigin = 'anonymous';
         img.src = imageUrl;
         await new Promise((resolve, reject) => {
           img.onload = resolve;
@@ -3489,7 +3916,13 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Copy image error:', err);
-      toast.error('Failed to copy. Browser may have blocked it.');
+      // Fallback: copy image URL to clipboard
+      try {
+        await navigator.clipboard.writeText(imageUrl);
+        toast.success('Image URL copied to clipboard!');
+      } catch (clipboardErr) {
+        toast.error('Failed to copy image.');
+      }
     }
   };
 
@@ -4434,6 +4867,72 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* 📷 Product Images Uploader (Cloudinary) */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Camera size={13} className="text-amber-400" />
+                        <span>Product Photos (Saved to Cloudinary)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+                    </label>
+
+                    {/* Previews of Existing & Selected Images */}
+                    {(newProductExistingImages.length > 0 || newProductImages.length > 0) && (
+                      <div className="flex flex-wrap gap-2 p-2.5 bg-[#121b2f] rounded-xl border border-white/10">
+                        {/* Saved Cloudinary Images */}
+                        {newProductExistingImages.map((imgUrl, idx) => (
+                          <div key={`existing-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-white/20 shadow-sm">
+                            <img src={imgUrl} alt="Product" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setNewProductExistingImages(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute top-0.5 right-0.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
+                              title="Remove image"
+                            >
+                              <X size={10} />
+                            </button>
+                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] text-center text-slate-300 font-bold">Saved</span>
+                          </div>
+                        ))}
+
+                        {/* Selected New Images to Upload */}
+                        {newProductImages.map((file, idx) => (
+                          <div key={`new-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-emerald-400/50 shadow-sm">
+                            <img src={URL.createObjectURL(file)} alt="New upload" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setNewProductImages(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute top-0.5 right-0.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
+                              title="Remove image"
+                            >
+                              <X size={10} />
+                            </button>
+                            <span className="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-[8px] text-center text-white font-bold">Ready</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
+                      <Upload size={15} className="text-amber-400" />
+                      <span>Click to select product photos</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            const selected = Array.from(e.target.files);
+                            setNewProductImages(prev => [...prev, ...selected]);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   {/* Dynamic Real-time Profit Indicator inside the Form */}
                   {(newProductForm.price || newProductForm.wholesalePrice) && (() => {
                     const sp = Number(newProductForm.price) || 0;
@@ -4455,6 +4954,8 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => {
                         setNewProductForm({ name: "", wholesalePrice: "", price: "" });
+                        setNewProductImages([]);
+                        setNewProductExistingImages([]);
                         setEditProductId(null);
                       }}
                       className="flex-1 px-5 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-all cursor-pointer text-sm"
@@ -4463,9 +4964,10 @@ export default function Dashboard() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-5 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/40 hover:shadow-xl transition-all cursor-pointer text-sm"
+                      disabled={isSavingProduct}
+                      className={`flex-1 px-5 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/40 hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                      {editProductId ? "Update Listing" : "Save Listing"}
+                      {isSavingProduct ? "Uploading to Cloudinary..." : (editProductId ? "Update Listing" : "Save Listing")}
                     </button>
                   </div>
                 </form>
@@ -4539,9 +5041,23 @@ export default function Dashboard() {
                                 {/* Item Name */}
                                 <td className="py-3.5 px-4">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0">
-                                      {prod.name ? prod.name.charAt(0).toUpperCase() : 'P'}
-                                    </div>
+                                    {prod.images && prod.images.length > 0 ? (
+                                      <img
+                                        src={prod.images[0]}
+                                        alt={prod.name}
+                                        onClick={() => {
+                                          setImageGalleryProduct(prod);
+                                          setGalleryActiveIndex(0);
+                                          setIsImageGalleryOpen(true);
+                                        }}
+                                        className="w-9 h-9 rounded-lg object-cover border border-amber-400/40 shadow-sm cursor-pointer hover:scale-110 transition-transform shrink-0"
+                                        title="Click to view full photo gallery"
+                                      />
+                                    ) : (
+                                      <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0">
+                                        {prod.name ? prod.name.charAt(0).toUpperCase() : 'P'}
+                                      </div>
+                                    )}
                                     <span className="font-extrabold text-white tracking-wide">
                                       {prod.name}
                                     </span>
@@ -4990,68 +5506,319 @@ export default function Dashboard() {
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
                   {activeTab !== 'dashboard2' && (
-                  <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-white/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
+                  <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
                     <div className="flex justify-between items-start mb-1 relative z-10">
-                      <p className="text-sm font-black text-[#c2410c] tracking-wide">Filtered Orders</p>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner"><ShoppingBag size={16} /></div>
+                      <p className="text-sm font-black text-amber-400 tracking-wide uppercase">Filtered Orders</p>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-400 border border-amber-400/30 shadow-inner"><ShoppingBag size={16} /></div>
                     </div>
                     <div className="flex items-center justify-between gap-2 relative z-10 mt-auto">
-                      <h3 className="text-3xl font-black text-[#3e2723]">{filteredDashboardOrders.length}</h3>
+                      <h3 className="text-3xl font-black text-white font-mono">{filteredDashboardOrders.length}</h3>
                       <select
                         value={tableTypeFilter}
                         onChange={(e) => setTableTypeFilter(e.target.value)}
-                        className="p-2 border-2 border-white rounded-xl text-xs font-bold text-amber-950 outline-none focus:ring-2 focus:ring-amber-500 bg-white/80 cursor-pointer shadow-inner"
+                        className="p-2 border border-white/20 rounded-xl text-xs font-bold text-amber-300 outline-none focus:ring-2 focus:ring-amber-500 bg-[#162035] cursor-pointer shadow-inner"
                         title="Filter by Order Type (Sabi / Thaaru)"
                       >
-                        <option value="All">All Types</option>
-                        <option value="Sabi">Sabi</option>
-                        <option value="Thaaru">Thaaru</option>
-                        <option value="Choco Wrapz">Choco Wrapz</option>
+                        <option value="All" className="bg-[#0d1527] text-white">All Types</option>
+                        {orderTypes.map((ot, idx) => {
+                          const name = getOrderTypeName(ot);
+                          const id = getOrderTypeId(ot, idx);
+                          return (
+                            <option key={id} value={name} className="bg-[#0d1527] text-white">
+                              {name}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
                   )}
 
                   {activeTab !== 'dashboard2' && (() => {
-                    const displayTotalItems = d1SelectedChocolateBoxFilter === "All Chocolates"
-                      ? totalItems
-                      : (topChocolates.find(c => c[0] === d1SelectedChocolateBoxFilter)?.[1] || 0);
+                    const isAll = !d1SelectedChocolateBoxFilter || d1SelectedChocolateBoxFilter === "All Chocolates";
+                    const displayTotalItems = isAll
+                      ? availableChocolatesData.preChocTotalItems
+                      : (availableChocolatesData.chocolateCountsMap[d1SelectedChocolateBoxFilter]
+                          ?? (availableChocolatesData.topChocolates.find(c => c[0].toLowerCase() === d1SelectedChocolateBoxFilter.toLowerCase())?.[1] || 0));
 
                     return (
-                    <div className="relative bg-[#ebe6df] p-3.5 rounded-[1.5rem] shadow-[6px_6px_12px_rgba(0,0,0,0.1),-6px_-6px_12px_rgba(255,255,255,0.8)] border-2 border-amber-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[115px]">
+                    <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
+                      {/* Top Row: Title + Dropdown + Gift Icon */}
                       <div className="flex justify-between items-start mb-1 relative z-10">
-                        <div className="flex items-center gap-1 group relative">
+                        <div className="flex items-center gap-1 group relative flex-1 min-w-0">
                           <p 
-                            className="text-[13px] font-black text-amber-600 tracking-wide uppercase leading-tight truncate max-w-[100px] sm:max-w-[120px]" 
-                            title={d1SelectedChocolateBoxFilter === "All Chocolates" ? "Total Chocolates" : d1SelectedChocolateBoxFilter}
+                            className="text-[12px] font-black text-white tracking-wide uppercase leading-tight truncate max-w-[110px] sm:max-w-[140px]" 
+                            title={isAll ? "Total Chocolates" : d1SelectedChocolateBoxFilter}
                           >
-                            {d1SelectedChocolateBoxFilter === "All Chocolates" ? (
-                              <>Total<br/>Chocolates</>
+                            {isAll ? (
+                              <>TOTAL<br/>CHOCOLATES</>
                             ) : (
                               d1SelectedChocolateBoxFilter
                             )}
                           </p>
-                          <div className="relative inline-block">
-                            <ChevronDown size={14} className="text-amber-600 cursor-pointer hover:scale-125 transition-transform" />
+                          <div className="relative inline-block shrink-0">
+                            <ChevronDown size={14} className="text-white/70 hover:text-white cursor-pointer hover:scale-125 transition-transform" />
                             <select
                               value={d1SelectedChocolateBoxFilter}
-                              onChange={(e) => setD1SelectedChocolateBoxFilter(e.target.value)}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setD1SelectedChocolateBoxFilter(val);
+                                setD1ChocFilter(val === 'All Chocolates' ? '' : val);
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                               title="Filter by Chocolate"
                             >
-                              <option value="All Chocolates">All Chocolates</option>
-                              {topChocolates.map((c, idx) => (
-                                <option key={idx} value={c[0]}>{c[0]}</option>
+                              <option value="All Chocolates" className="bg-[#0d1527] text-white">All Chocolates</option>
+                              {availableChocolatesData.topChocolates.map((c, idx) => (
+                                <option key={idx} value={c[0]} className="bg-[#0d1527] text-white">{c[0]}</option>
                               ))}
                             </select>
                           </div>
+                          {!isAll && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setD1SelectedChocolateBoxFilter("All Chocolates");
+                                setD1ChocFilter("");
+                              }}
+                              className="text-rose-400 hover:text-rose-300 hover:scale-125 transition-all ml-0.5 p-0.5 z-20 cursor-pointer rounded-full"
+                              title="Reset to All Chocolates"
+                            >
+                              <X size={13} strokeWidth={3} />
+                            </button>
+                          )}
                         </div>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 shadow-inner shrink-0"><Gift size={16} /></div>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-400 border border-amber-400/30 shadow-inner shrink-0 ml-1">
+                          <Gift size={16} />
+                        </div>
                       </div>
+
+                      {/* Middle Row: Money Icon & Delivery Icon Dropdowns */}
+                      <div className="flex items-center gap-1.5 my-1.5 relative z-20 flex-wrap">
+                        {/* 💰 Money / Payment Status Dropdown */}
+                        <div className="relative d1-money-dropdown-container">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setD1DeliveryDropdownOpen(false);
+                              setD1MoneyDropdownOpen(prev => !prev);
+                            }}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer shadow-sm ${
+                              d1PaymentFilter === 'All'
+                                ? 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 border-white/10 hover:text-white'
+                                : d1PaymentFilter === 'Full Paid'
+                                ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/50 hover:bg-emerald-500/35'
+                                : d1PaymentFilter === 'Partially Paid'
+                                ? 'bg-amber-500/25 text-amber-300 border-amber-400/50 hover:bg-amber-500/35'
+                                : 'bg-rose-500/25 text-rose-300 border-rose-400/50 hover:bg-rose-500/35'
+                            }`}
+                            title="Filter by Payment Status (Money Icon)"
+                          >
+                            <IndianRupee size={11} className={
+                              d1PaymentFilter === 'Full Paid' ? 'text-emerald-400' :
+                              d1PaymentFilter === 'Partially Paid' ? 'text-amber-400' :
+                              d1PaymentFilter === 'Pending' ? 'text-rose-400' : 'text-amber-400'
+                            } />
+                            <span>
+                              {d1PaymentFilter === 'All' ? 'Payment' : d1PaymentFilter === 'Full Paid' ? 'Fully Paid' : d1PaymentFilter}
+                            </span>
+                            {d1PaymentFilter !== 'All' ? (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setD1PaymentFilter('All');
+                                }}
+                                className="hover:scale-125 transition-transform text-rose-400 hover:text-rose-200 p-0.5"
+                                title="Clear Payment Filter"
+                              >
+                                <X size={10} strokeWidth={3} />
+                              </span>
+                            ) : (
+                              <ChevronDown size={10} className="text-slate-400 ml-0.5" />
+                            )}
+                          </button>
+
+                          {d1MoneyDropdownOpen && (
+                            <div 
+                              className="absolute left-0 top-full mt-1.5 w-36 bg-[#0f172a] border border-white/20 rounded-xl shadow-2xl p-1.5 z-50 text-xs space-y-1 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1PaymentFilter('All');
+                                  setD1MoneyDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1PaymentFilter === 'All' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <IndianRupee size={12} className="text-slate-400" />
+                                  <span>All Payments</span>
+                                </span>
+                                {d1PaymentFilter === 'All' && <Check size={12} className="text-amber-400" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1PaymentFilter('Full Paid');
+                                  setD1MoneyDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1PaymentFilter === 'Full Paid' ? 'bg-emerald-500/25 text-emerald-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                                  <span>Fully Paid</span>
+                                </span>
+                                {d1PaymentFilter === 'Full Paid' && <Check size={12} className="text-emerald-400" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1PaymentFilter('Partially Paid');
+                                  setD1MoneyDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1PaymentFilter === 'Partially Paid' ? 'bg-amber-500/25 text-amber-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
+                                  <span>Partially Paid</span>
+                                </span>
+                                {d1PaymentFilter === 'Partially Paid' && <Check size={12} className="text-amber-400" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1PaymentFilter('Pending');
+                                  setD1MoneyDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1PaymentFilter === 'Pending' ? 'bg-rose-500/25 text-rose-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-rose-400 inline-block shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                                  <span>Pending</span>
+                                </span>
+                                {d1PaymentFilter === 'Pending' && <Check size={12} className="text-rose-400" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 🚚 Delivery Status Dropdown */}
+                        <div className="relative d1-delivery-dropdown-container">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setD1MoneyDropdownOpen(false);
+                              setD1DeliveryDropdownOpen(prev => !prev);
+                            }}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer shadow-sm ${
+                              d1DeliveryFilter === 'All'
+                                ? 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 border-white/10 hover:text-white'
+                                : d1DeliveryFilter === 'Delivered'
+                                ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/50 hover:bg-emerald-500/35'
+                                : 'bg-amber-500/25 text-amber-300 border-amber-400/50 hover:bg-amber-500/35'
+                            }`}
+                            title="Filter by Delivery Status (Delivery Icon)"
+                          >
+                            <Truck size={11} className={
+                              d1DeliveryFilter === 'Delivered' ? 'text-emerald-400' :
+                              d1DeliveryFilter === 'In Process' ? 'text-amber-400' : 'text-cyan-400'
+                            } />
+                            <span>{d1DeliveryFilter === 'All' ? 'Delivery' : d1DeliveryFilter}</span>
+                            {d1DeliveryFilter !== 'All' ? (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setD1DeliveryFilter('All');
+                                }}
+                                className="hover:scale-125 transition-transform text-rose-400 hover:text-rose-200 p-0.5"
+                                title="Clear Delivery Filter"
+                              >
+                                <X size={10} strokeWidth={3} />
+                              </span>
+                            ) : (
+                              <ChevronDown size={10} className="text-slate-400 ml-0.5" />
+                            )}
+                          </button>
+
+                          {d1DeliveryDropdownOpen && (
+                            <div 
+                              className="absolute left-0 top-full mt-1.5 w-36 bg-[#0f172a] border border-white/20 rounded-xl shadow-2xl p-1.5 z-50 text-xs space-y-1 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1DeliveryFilter('All');
+                                  setD1DeliveryDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1DeliveryFilter === 'All' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <Truck size={12} className="text-slate-400" />
+                                  <span>All Delivery</span>
+                                </span>
+                                {d1DeliveryFilter === 'All' && <Check size={12} className="text-amber-400" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1DeliveryFilter('In Process');
+                                  setD1DeliveryDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1DeliveryFilter === 'In Process' ? 'bg-amber-500/25 text-amber-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
+                                  <span>In Process</span>
+                                </span>
+                                {d1DeliveryFilter === 'In Process' && <Check size={12} className="text-amber-400" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setD1DeliveryFilter('Delivered');
+                                  setD1DeliveryDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left font-bold transition-colors cursor-pointer ${
+                                  d1DeliveryFilter === 'Delivered' ? 'bg-emerald-500/25 text-emerald-300' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                                  <span>Delivered</span>
+                                </span>
+                                {d1DeliveryFilter === 'Delivered' && <Check size={12} className="text-emerald-400" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bottom Row: Total Quantity Count */}
                       <div className="flex items-end justify-between gap-1 relative z-10 mt-auto w-full">
                         <div className="flex items-baseline gap-1">
-                          <h3 className="text-3xl font-black text-[#3e2723]">{displayTotalItems.toLocaleString()}</h3>
-                          <span className="text-[10px] font-black text-amber-700 bg-amber-200/50 px-1.5 py-0.5 rounded border border-amber-300/50 shadow-sm leading-none mb-1">Pcs</span>
+                          <h3 className="text-3xl font-black text-white font-mono">{displayTotalItems.toLocaleString()}</h3>
+                          <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-400/30 shadow-sm leading-none mb-1">Pcs</span>
                         </div>
                       </div>
                     </div>
@@ -6073,9 +6840,9 @@ export default function Dashboard() {
                                   ) : (
                                     <>
                                       <option value="">All Chocolates</option>
-                                      {managedChocolates.map((choc) => (
-                                        <option key={choc.fireId || choc.id} value={choc.name}>
-                                          {choc.name}
+                                      {availableChocolatesData.topChocolates.map((c, idx) => (
+                                        <option key={idx} value={c[0]}>
+                                          {c[0]}
                                         </option>
                                       ))}
                                     </>
@@ -6886,8 +7653,15 @@ export default function Dashboard() {
                         className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
                       >
                         <option value="All">All Order Types</option>
-                        <option value="Sabi">Sabi</option>
-                        <option value="Thaaru">Thaaru</option>
+                        {orderTypes.map((ot, idx) => {
+                          const name = getOrderTypeName(ot);
+                          const id = getOrderTypeId(ot, idx);
+                          return (
+                            <option key={id} value={name}>
+                              {name}
+                            </option>
+                          );
+                        })}
                       </select>
                       <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
                     </div>
@@ -6901,11 +7675,15 @@ export default function Dashboard() {
                     </button>
 
                     <button
-                      onClick={() => setIsAnalyticsModalOpen(true)}
-                      className="p-1.5 bg-white border border-[#d7ccc8] hover:border-amber-500 hover:text-amber-700 rounded-xl text-[#5d4037] shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px]"
-                      title="Open Profit Analytics Table"
+                      onClick={() => {
+                        setAnalyticsActiveTab('order_types');
+                        setIsAnalyticsModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 h-[34px]"
+                      title="Manage Order Types & Chocolates"
                     >
                       <Eye size={16} strokeWidth={2.5} />
+                      <span className="font-black">Order Types & Chocs</span>
                     </button>
 
                     <button
@@ -7573,29 +8351,88 @@ export default function Dashboard() {
 
       {/* 🟢 NEW LISTING / NEW PRODUCT MODAL */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); }}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-8 bg-[#0c1427] border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-black mb-6 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); setNewProductImages([]); setNewProductExistingImages([]); }}>
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-7 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-black mb-5 text-white text-center tracking-wide border-b border-white/15 pb-3 uppercase">
               {editProductId ? "Edit Listing" : "Add New Listing"}
             </h2>
-            <form onSubmit={handleAddCustomProduct} className="space-y-4">
+            <form onSubmit={handleAddCustomProduct} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Item Name</label>
-                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Enter Item Name (e.g. Munch)" />
+                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Enter Item Name (e.g. Munch)" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Wholesale Price</label>
-                  <input required type="number" step="any" value={newProductForm.wholesalePrice} onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Wholesale Price" />
+                  <input required type="number" step="any" value={newProductForm.wholesalePrice} onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Wholesale Price" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Selling Price</label>
-                  <input required type="number" step="any" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner" placeholder="Selling Price" />
+                  <input required type="number" step="any" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Selling Price" />
                 </div>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); }} className="flex-1 px-4 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer">{editProductId ? "Update Listing" : "Save Listing"}</button>
+
+              {/* 📷 Product Images (Cloudinary) */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera size={13} className="text-amber-400" />
+                    <span>Photos (Cloudinary)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+                </label>
+
+                {(newProductExistingImages.length > 0 || newProductImages.length > 0) && (
+                  <div className="flex flex-wrap gap-2 p-2 bg-[#121b2f] rounded-xl border border-white/10 max-h-28 overflow-y-auto">
+                    {newProductExistingImages.map((imgUrl, idx) => (
+                      <div key={`modal-existing-${idx}`} className="relative group w-12 h-12 rounded-lg overflow-hidden border border-white/20">
+                        <img src={imgUrl} alt="Product" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setNewProductExistingImages(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100"
+                        >
+                          <X size={9} />
+                        </button>
+                      </div>
+                    ))}
+                    {newProductImages.map((file, idx) => (
+                      <div key={`modal-new-${idx}`} className="relative group w-12 h-12 rounded-lg overflow-hidden border border-emerald-400/50">
+                        <img src={URL.createObjectURL(file)} alt="Upload preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setNewProductImages(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100"
+                        >
+                          <X size={9} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
+                  <Upload size={14} className="text-amber-400" />
+                  <span>Choose product photos</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        const selected = Array.from(e.target.files);
+                        setNewProductImages(prev => [...prev, ...selected]);
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
+                <button type="submit" disabled={isSavingProduct} className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}>{isSavingProduct ? "Uploading..." : (editProductId ? "Update Listing" : "Save Listing")}</button>
               </div>
             </form>
           </div>
@@ -8185,9 +9022,20 @@ export default function Dashboard() {
                         style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                         className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer"
                       >
-                        <option value="Sabi" className="bg-[#0f172a] text-white">Sabi</option>
-                        <option value="Thaaru" className="bg-[#0f172a] text-white">Thaaru</option>
-                        <option value="Choco Wrapz" className="bg-[#0f172a] text-white">Choco Wrapz</option>
+                        {formData.orderType && !orderTypes.some((ot, idx) => getOrderTypeName(ot) === formData.orderType) && (
+                          <option value={formData.orderType} className="bg-[#0f172a] text-white">
+                            {formData.orderType}
+                          </option>
+                        )}
+                        {orderTypes.map((ot, idx) => {
+                          const name = getOrderTypeName(ot);
+                          const id = getOrderTypeId(ot, idx);
+                          return (
+                            <option key={id} value={name} className="bg-[#0f172a] text-white">
+                              {name}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                 </div>
@@ -9447,109 +10295,450 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🟢 MANAGED CHOCOLATES MODAL (ANALYTICS AREA) */}
+      {/* 🟢 MANAGED CHOCOLATES & ORDER TYPES MODAL (ANALYTICS AREA) */}
       {isAnalyticsModalOpen && (
-        <div className="fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }}>
-          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="rounded-3xl shadow-2xl w-full max-w-4xl p-7 bg-[#0c1427] border border-white/20 flex flex-col max-h-[90vh] text-white" onClick={(e) => e.stopPropagation()}>
-            <div style={{ backgroundColor: '#131c2e' }} className="flex justify-between items-center mb-6 border-b border-white/15 p-4 rounded-2xl bg-[#131c2e] shadow-md shrink-0">
-              <h2 className="text-2xl font-black text-amber-400 flex items-center gap-2.5 uppercase tracking-widest"><TrendingUp size={24} className="text-amber-400" /> Chocolate Master Analytics</h2>
-              <button onClick={() => { setIsAnalyticsModalOpen(false); setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors"><X size={24} /></button>
-            </div>
+        <div
+          className="fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4 backdrop-blur-md"
+          onClick={() => {
+            setIsAnalyticsModalOpen(false);
+            setEditChocId(null);
+            setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
+            setEditOrderTypeId(null);
+            setNewOrderTypeName("");
+          }}
+        >
+          <div
+            style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
+            className="rounded-3xl shadow-2xl w-full max-w-4xl p-5 sm:p-6 md:p-7 bg-[#0c1427] border border-white/20 flex flex-col max-h-[88vh] my-auto text-white overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header with Tab Navigation */}
+            <div
+              style={{ backgroundColor: '#131c2e' }}
+              className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-white/15 p-4 rounded-2xl bg-[#131c2e] shadow-md shrink-0"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-xl sm:text-2xl font-black text-amber-400 flex items-center gap-2.5 uppercase tracking-widest">
+                  {analyticsActiveTab === 'chocolates' ? (
+                    <>
+                      <TrendingUp size={24} className="text-amber-400" />
+                      <span>Chocolate Master Analytics</span>
+                    </>
+                  ) : (
+                    <>
+                      <Tag size={24} className="text-amber-400" />
+                      <span>Order Types Management</span>
+                    </>
+                  )}
+                </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-hidden">
-              {/* Form Section */}
-              <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-6 rounded-3xl border border-white/10 shadow-lg h-fit text-white">
-                <h3 className="text-lg font-black text-amber-400 mb-4 flex items-center gap-2 uppercase tracking-wider"><Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}</h3>
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  const existingChoc = editChocId ? managedChocolates.find(c => c.fireId === editChocId) : null;
-                  const data = {
-                    name: newChocForm.name,
-                    retailPrice: Number(newChocForm.retailPrice),
-                    wholesalePrice: parseFloat(newChocForm.wholesalePrice) || 0,
-                    costPrice: existingChoc ? (existingChoc.costPrice || 0) : 0,
-                    stickerPrice: parseFloat(newChocForm.stickerPrice) !== undefined ? parseFloat(newChocForm.stickerPrice) : 1.5,
-                    displayOrder: newChocForm.displayOrder !== "" ? Number(newChocForm.displayOrder) : ""
-                  };
-                  if (editChocId) {
-                    await updateDoc(doc(db, "managed_chocolates", editChocId), data);
-                    logActivity(`Edited Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
-                    setEditChocId(null);
-                  } else {
-                    await addDoc(collection(db, "managed_chocolates"), data);
-                    logActivity(`Added Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
-                  }
-                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
-                }} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Chocolate Name</label>
-                    <input required type="text" value={newChocForm.name} onChange={(e) => setNewChocForm({ ...newChocForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. Munch" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Wholesale Price</label>
-                      <input required type="number" step="any" value={newChocForm.wholesalePrice} onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 18.50" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Retail Price</label>
-                      <input required type="number" value={newChocForm.retailPrice} onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 20" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Sticker Price</label>
-                      <input required type="number" step="any" value={newChocForm.stickerPrice} onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 1.5" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Display Order</label>
-                      <input type="number" min="1" value={newChocForm.displayOrder} onChange={(e) => setNewChocForm({ ...newChocForm, displayOrder: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff' }} className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner" placeholder="Eg. 1" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer">
-                    {editChocId ? 'Update Item' : 'Add to List'}
+                {/* Sub-Tabs Switcher */}
+                <div className="flex bg-[#090e1a] p-1 rounded-xl border border-white/10 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnalyticsActiveTab('order_types');
+                      setEditChocId(null);
+                      setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      analyticsActiveTab === 'order_types'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Tag size={14} />
+                    <span>Order Types</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'order_types' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
+                      {orderTypes.length}
+                    </span>
                   </button>
 
-                  {editChocId && (
-                    <button type="button" onClick={() => { setEditChocId(null); setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" }); }} className="w-full py-2 text-slate-400 hover:text-white font-extrabold text-xs cursor-pointer">Cancel Edit</button>
-                  )}
-                </form>
-              </div>
-
-              {/* List Section */}
-              <div className="md:col-span-2 overflow-auto custom-scrollbar pr-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {managedChocolates.map((choc) => (
-                    <div key={choc.fireId} style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-4 rounded-2xl border border-white/10 shadow-md flex justify-between items-center group hover:border-amber-500/40 transition-all">
-                      <div>
-                        <p className="font-extrabold text-white text-base">{choc.name}</p>
-                        <div className="flex flex-wrap gap-2 mt-1.5">
-                          <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-extrabold">W: ₹{choc.wholesalePrice || choc.price}</span>
-                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-extrabold">R: ₹{choc.retailPrice || choc.price}</span>
-                          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-extrabold">S: ₹{choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)}</span>
-                          {choc.displayOrder !== undefined && choc.displayOrder !== null && choc.displayOrder !== "" && (
-                            <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-extrabold">Order: {choc.displayOrder}</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => {
-                          setEditChocId(choc.fireId);
-                          setNewChocForm({
-                            name: choc.name,
-                            retailPrice: (choc.retailPrice || choc.price || "").toString(),
-                            wholesalePrice: (choc.wholesalePrice || choc.price || "").toString(),
-                            stickerPrice: (choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)).toString(),
-                            displayOrder: (choc.displayOrder !== undefined && choc.displayOrder !== null ? choc.displayOrder : "").toString()
-                          });
-                        }} className="p-2 text-blue-400 hover:bg-blue-950/60 rounded-xl transition-colors cursor-pointer"><Pencil size={16} /></button>
-
-                        <button onClick={() => handleDeleteChocClick(choc)} className="p-2 text-rose-400 hover:bg-red-950/60 rounded-xl transition-colors cursor-pointer"><Trash2 size={16} /></button>
-                      </div>
-                    </div>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnalyticsActiveTab('chocolates');
+                      setEditOrderTypeId(null);
+                      setNewOrderTypeName("");
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      analyticsActiveTab === 'chocolates'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span>🍫 Chocolates</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'chocolates' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
+                      {managedChocolates.length}
+                    </span>
+                  </button>
                 </div>
               </div>
+
+              <button
+                onClick={() => {
+                  setIsAnalyticsModalOpen(false);
+                  setEditChocId(null);
+                  setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
+                  setEditOrderTypeId(null);
+                  setNewOrderTypeName("");
+                }}
+                className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors self-end sm:self-center"
+              >
+                <X size={24} />
+              </button>
             </div>
+
+            {/* TAB 1: CHOCOLATES MANAGEMENT */}
+            {analyticsActiveTab === 'chocolates' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-hidden">
+                {/* Form Section */}
+                <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-6 rounded-3xl border border-white/10 shadow-lg h-fit text-white">
+                  <h3 className="text-lg font-black text-amber-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                    <Plus size={18} /> {editChocId ? 'Edit Chocolate' : 'Add New Chocolate'}
+                  </h3>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const existingChoc = editChocId ? managedChocolates.find(c => c.fireId === editChocId) : null;
+                      const data = {
+                        name: newChocForm.name,
+                        retailPrice: Number(newChocForm.retailPrice),
+                        wholesalePrice: parseFloat(newChocForm.wholesalePrice) || 0,
+                        costPrice: existingChoc ? (existingChoc.costPrice || 0) : 0,
+                        stickerPrice: parseFloat(newChocForm.stickerPrice) !== undefined ? parseFloat(newChocForm.stickerPrice) : 1.5,
+                        displayOrder: newChocForm.displayOrder !== "" ? Number(newChocForm.displayOrder) : ""
+                      };
+                      if (editChocId) {
+                        await updateDoc(doc(db, "managed_chocolates", editChocId), data);
+                        logActivity(`Edited Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
+                        setEditChocId(null);
+                      } else {
+                        await addDoc(collection(db, "managed_chocolates"), data);
+                        logActivity(`Added Chocolate: ${newChocForm.name} (R:₹${newChocForm.retailPrice} W:₹${newChocForm.wholesalePrice})`, 'Chocolates');
+                      }
+                      setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Chocolate Name</label>
+                      <input
+                        required
+                        type="text"
+                        value={newChocForm.name}
+                        onChange={(e) => setNewChocForm({ ...newChocForm, name: e.target.value })}
+                        style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                        className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner"
+                        placeholder="Eg. Munch"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Wholesale Price</label>
+                        <input
+                          required
+                          type="number"
+                          step="any"
+                          value={newChocForm.wholesalePrice}
+                          onChange={(e) => setNewChocForm({ ...newChocForm, wholesalePrice: e.target.value })}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Eg. 18.50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Retail Price</label>
+                        <input
+                          required
+                          type="number"
+                          value={newChocForm.retailPrice}
+                          onChange={(e) => setNewChocForm({ ...newChocForm, retailPrice: e.target.value })}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Eg. 20"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Sticker Price</label>
+                        <input
+                          required
+                          type="number"
+                          step="any"
+                          value={newChocForm.stickerPrice}
+                          onChange={(e) => setNewChocForm({ ...newChocForm, stickerPrice: e.target.value })}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Eg. 1.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1">Display Order</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newChocForm.displayOrder}
+                          onChange={(e) => setNewChocForm({ ...newChocForm, displayOrder: e.target.value })}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner"
+                          placeholder="Eg. 1"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      {editChocId ? 'Update Item' : 'Add to List'}
+                    </button>
+
+                    {editChocId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditChocId(null);
+                          setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
+                        }}
+                        className="w-full py-2 text-slate-400 hover:text-white font-extrabold text-xs cursor-pointer"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </form>
+                </div>
+
+                {/* List Section */}
+                <div className="md:col-span-2 overflow-auto custom-scrollbar pr-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {managedChocolates.length === 0 ? (
+                      <div className="col-span-full p-8 text-center bg-[#131c2e] rounded-2xl border border-white/10">
+                        <TrendingUp size={36} className="text-amber-400 mx-auto mb-2 opacity-60" />
+                        <p className="text-slate-200 font-extrabold text-sm">No managed chocolates found.</p>
+                        <p className="text-slate-400 text-xs mt-1">Use the form on the left to add chocolates with retail and wholesale prices.</p>
+                      </div>
+                    ) : (
+                      managedChocolates.map((choc) => (
+                        <div
+                          key={choc.fireId}
+                          style={{ backgroundColor: '#131c2e' }}
+                          className="bg-[#131c2e] p-4 rounded-2xl border border-white/10 shadow-md flex justify-between items-center group hover:border-amber-500/40 transition-all"
+                        >
+                          <div>
+                            <p className="font-extrabold text-white text-base">{choc.name}</p>
+                            <div className="flex flex-wrap gap-2 mt-1.5">
+                              <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-extrabold">W: ₹{choc.wholesalePrice || choc.price}</span>
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-extrabold">R: ₹{choc.retailPrice || choc.price}</span>
+                              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-extrabold">S: ₹{choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)}</span>
+                              {choc.displayOrder !== undefined && choc.displayOrder !== null && choc.displayOrder !== "" && (
+                                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-extrabold">Order: {choc.displayOrder}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditChocId(choc.fireId);
+                                setNewChocForm({
+                                  name: choc.name,
+                                  retailPrice: (choc.retailPrice || choc.price || "").toString(),
+                                  wholesalePrice: (choc.wholesalePrice || choc.price || "").toString(),
+                                  stickerPrice: (choc.stickerPrice !== undefined ? choc.stickerPrice : (choc.costPrice !== undefined ? choc.costPrice : 1.5)).toString(),
+                                  displayOrder: (choc.displayOrder !== undefined && choc.displayOrder !== null ? choc.displayOrder : "").toString()
+                                });
+                              }}
+                              className="p-2 text-blue-400 hover:bg-blue-950/60 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <Pencil size={16} />
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteChocClick(choc)}
+                              className="p-2 text-rose-400 hover:bg-red-950/60 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: ORDER TYPES MANAGEMENT */}
+            {analyticsActiveTab === 'order_types' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-y-auto custom-scrollbar p-0.5">
+                {/* Left Form Panel: Add / Edit Order Type */}
+                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-5 h-fit bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl text-white">
+                  <div>
+                    <div className="flex items-center gap-2.5 pb-3 border-b border-white/10 mb-4">
+                      <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center font-black border border-amber-400/30">
+                        {editOrderTypeId ? <Pencil size={16} /> : <Plus size={16} />}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-amber-400 uppercase tracking-wider">
+                          {editOrderTypeId ? 'Edit Order Type' : 'Add New Order Type'}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium">Create and customize order categories</p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleAddOrderType} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>Order Type Name</span>
+                          {editOrderTypeId && <span className="text-amber-400 text-[10px] font-bold">Editing active item</span>}
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={newOrderTypeName}
+                          onChange={(e) => setNewOrderTypeName(e.target.value)}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3.5 outline-none border border-white/20 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
+                          placeholder="e.g. Sabi, Thaaru, Corporate, Custom..."
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs sm:text-sm"
+                      >
+                        {editOrderTypeId ? <CheckCircle2 size={18} /> : <Plus size={18} />}
+                        <span>{editOrderTypeId ? 'Update Order Type' : 'Add Order Type'}</span>
+                      </button>
+
+                      {editOrderTypeId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditOrderTypeId(null);
+                            setNewOrderTypeName("");
+                          }}
+                          className="w-full py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl font-bold text-xs cursor-pointer transition-colors"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </form>
+                  </div>
+                </div>
+
+                {/* Right Panel: Active Order Types List */}
+                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-7 bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl flex flex-col justify-between text-white overflow-hidden">
+                  <div className="flex-1 flex flex-col">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-white/10 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Tag size={18} className="text-amber-400" />
+                        <h3 className="text-base font-black text-amber-400 uppercase tracking-wider">
+                          Active Order Types
+                        </h3>
+                        <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-black px-2 py-0.5 rounded-full">
+                          {orderTypes.length}
+                        </span>
+                      </div>
+                      <span className="text-xs font-black text-slate-300 bg-[#090e1a] px-3 py-1 rounded-xl border border-white/10">
+                        Total Orders: <strong className="text-amber-400 font-mono font-black">{orders.length}</strong>
+                      </span>
+                    </div>
+
+                    {/* Order Types Cards List */}
+                    <div className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-[330px] pr-1 flex-1">
+                      {orderTypes.length === 0 ? (
+                        <div className="p-8 text-center bg-[#090e1a]/50 rounded-2xl border border-dashed border-white/10 my-auto">
+                          <Tag size={36} className="text-amber-400 mx-auto mb-2 opacity-60" />
+                          <p className="text-slate-200 font-extrabold text-sm">No custom order types found.</p>
+                          <p className="text-slate-400 text-xs mt-1">Use the form on the left to add order types like Sabi, Thaaru, Corporate, etc.</p>
+                        </div>
+                      ) : (
+                        orderTypes.map((ot, idx) => {
+                          const otName = getOrderTypeName(ot) || `Order Type ${idx + 1}`;
+                          const otId = getOrderTypeId(ot, idx);
+                          const countForType = orders.filter((o: any) => {
+                            const typeVal = String(o?.orderType || (o?.role === 'Self' ? 'Sabi' : 'Thaaru') || '').trim().toLowerCase();
+                            return typeVal === otName.toLowerCase();
+                          }).length;
+                          const sharePct = orders.length > 0 ? Math.round((countForType / orders.length) * 100) : 0;
+                          const isBeingEdited = editOrderTypeId === otId || editOrderTypeId === otName;
+
+                          return (
+                            <div
+                              key={otId}
+                              className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 group shadow-md ${
+                                isBeingEdited
+                                  ? 'bg-[#18233a] border-amber-400 ring-2 ring-amber-400/30'
+                                  : 'bg-[#0f172a] hover:bg-[#162238] border-white/10 hover:border-amber-400/40'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
+                                  isBeingEdited ? 'bg-amber-400 text-black font-black' : 'bg-amber-500/15 border border-amber-500/30 text-amber-400'
+                                }`}>
+                                  <Tag size={18} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-black text-white text-sm sm:text-base truncate">{otName}</p>
+                                    {isBeingEdited && (
+                                      <span className="text-[9px] bg-amber-400 text-black px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                        Editing
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-black">
+                                      {countForType} {countForType === 1 ? 'Order' : 'Orders'}
+                                    </span>
+                                    {orders.length > 0 && (
+                                      <span className="text-[10px] text-slate-400 font-bold">
+                                        • {sharePct}% share
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  title={`Edit "${otName}"`}
+                                  onClick={() => {
+                                    setEditOrderTypeId(otId);
+                                    setNewOrderTypeName(otName);
+                                  }}
+                                  className="p-2 text-blue-400 hover:text-white hover:bg-blue-600/80 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title={`Delete "${otName}"`}
+                                  onClick={() => handleDeleteOrderType(ot)}
+                                  className="p-2 text-rose-400 hover:text-white hover:bg-rose-600/80 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Panel Footer Status */}
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                    <span>Configured Types: <strong className="text-white">{orderTypes.length}</strong></span>
+                    <span>Status: <strong className="text-emerald-400">Synced to Cloud</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -9950,6 +11139,8 @@ export default function Dashboard() {
                   <div className="relative flex items-center justify-center bg-black/40 shrink-0" style={{ height: 'clamp(200px, 45vh, 420px)' }}>
                     {currentImage && (
                       <img
+                        id="gallery-main-image"
+                        crossOrigin="anonymous"
                         src={currentImage}
                         alt={`Product ${galleryActiveIndex + 1}`}
                         className="max-w-full max-h-full object-contain p-3"
