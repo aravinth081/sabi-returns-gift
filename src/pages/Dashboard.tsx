@@ -901,59 +901,33 @@ export default function Dashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Store original image as-is — no compression, no resize, preserves full quality & original aspect ratio
     const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 800;
-        let width = img.width;
-        let height = img.height;
+      const originalBase64 = event.target?.result as string;
+      if (!originalBase64) return;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-
-          if (target === 'd1') {
-            setD1Wallpaper(compressedBase64);
-            localStorage.setItem('sabi_wallpaper_dashboard1', compressedBase64);
-            toast.success("Dashboard 1 background updated!");
-          } else if (target === 'd2') {
-            setD2Wallpaper(compressedBase64);
-            localStorage.setItem('sabi_wallpaper_dashboard2', compressedBase64);
-            toast.success("Dashboard 2 background updated!");
-          } else if (target === 'inventories') {
-            setInvWallpaper(compressedBase64);
-            localStorage.setItem('sabi_wallpaper_inventories', compressedBase64);
-            toast.success("Inventories background updated!");
-          } else if (target === 'tracking') {
-            setTrackWallpaper(compressedBase64);
-            localStorage.setItem('sabi_wallpaper_tracking', compressedBase64);
-            toast.success("Orders Tracking background updated!");
-          } else if (target === 'reports') {
-            setReportsWallpaper(compressedBase64);
-            localStorage.setItem('sabi_wallpaper_reports', compressedBase64);
-            toast.success("Reports background updated!");
-          }
-        }
-      };
-      img.src = event.target?.result as string;
+      if (target === 'd1') {
+        setD1Wallpaper(originalBase64);
+        localStorage.setItem('sabi_wallpaper_dashboard1', originalBase64);
+        toast.success("Dashboard 1 background updated!");
+      } else if (target === 'd2') {
+        setD2Wallpaper(originalBase64);
+        localStorage.setItem('sabi_wallpaper_dashboard2', originalBase64);
+        toast.success("Dashboard 2 background updated!");
+      } else if (target === 'inventories') {
+        setInvWallpaper(originalBase64);
+        localStorage.setItem('sabi_wallpaper_inventories', originalBase64);
+        toast.success("Inventories background updated!");
+      } else if (target === 'tracking') {
+        setTrackWallpaper(originalBase64);
+        localStorage.setItem('sabi_wallpaper_tracking', originalBase64);
+        toast.success("Orders Tracking background updated!");
+      } else if (target === 'reports') {
+        setReportsWallpaper(originalBase64);
+        localStorage.setItem('sabi_wallpaper_reports', originalBase64);
+        toast.success("Reports background updated!");
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -3406,12 +3380,13 @@ export default function Dashboard() {
   // --- PRODUCT IMAGE HANDLERS ---
   const handleImageUpload = async (productFireId: string, files: FileList) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const toastId = toast.loading('Uploading images...');
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const toastId = toast.loading(`Processing ${files.length} image(s)...`);
     setImageUploadingFor(productFireId);
 
     try {
-      const newImages: string[] = [];
+      // Validate and filter files first
+      const validFiles: File[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!validTypes.includes(file.type)) {
@@ -3419,28 +3394,37 @@ export default function Dashboard() {
           continue;
         }
         if (file.size > maxSize) {
-          toast.error(`${file.name}: File too large. Max 5MB.`);
+          toast.error(`${file.name}: File too large. Max 10MB.`);
           continue;
         }
-        // Convert to base64
-        const base64 = await new Promise<string>((resolve, reject) => {
+        validFiles.push(file);
+      }
+
+      if (validFiles.length === 0) {
+        toast.dismiss(toastId);
+        setImageUploadingFor(null);
+        return;
+      }
+
+      // Read ALL files in parallel for maximum speed
+      toast.loading(`Reading ${validFiles.length} image(s)...`, { id: toastId });
+      const readPromises = validFiles.map(file =>
+        new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
           reader.readAsDataURL(file);
-        });
-        newImages.push(base64);
-      }
+        })
+      );
+      const newImages = await Promise.all(readPromises);
 
-      if (newImages.length > 0) {
-        const product = customProducts.find(p => p.fireId === productFireId);
-        const existingImages = product?.images || [];
-        const updatedImages = [...existingImages, ...newImages];
-        await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
-        toast.success(`${newImages.length} image(s) uploaded!`, { id: toastId });
-      } else {
-        toast.dismiss(toastId);
-      }
+      // Save to Firestore
+      toast.loading('Saving...', { id: toastId });
+      const product = customProducts.find(p => p.fireId === productFireId);
+      const existingImages = product?.images || [];
+      const updatedImages = [...existingImages, ...newImages];
+      await updateDoc(doc(db, "products", productFireId), { images: updatedImages });
+      toast.success(`${newImages.length} image(s) uploaded!`, { id: toastId });
     } catch (err) {
       console.error("Image upload error:", err);
       toast.error("Failed to upload images.", { id: toastId });
@@ -3472,43 +3456,40 @@ export default function Dashboard() {
 
   const handleCopyImage = async (imageUrl: string) => {
     try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = imageUrl;
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
+      // Fast copy: convert base64/data URL directly to blob
+      const response = await fetch(imageUrl);
+      const originalBlob = await response.blob();
 
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("No canvas context");
-      
-      ctx.drawImage(img, 0, 0);
-      
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast.error("Failed to copy image data.");
-          return;
-        }
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              "image/png": blob
-            })
-          ]);
-          toast.success("Image copied to clipboard!");
-        } catch (err) {
-          console.error("Clipboard write error:", err);
-          toast.error("Failed to copy. Browser may have blocked it.");
-        }
-      }, "image/png");
+      // If already PNG, use directly; otherwise convert via canvas
+      if (originalBlob.type === 'image/png') {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': originalBlob })
+        ]);
+        toast.success('Image copied to clipboard!');
+      } else {
+        // Convert to PNG for clipboard compatibility
+        const img = new Image();
+        img.src = imageUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('No canvas context');
+        ctx.drawImage(img, 0, 0);
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Failed to create blob');
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        toast.success('Image copied to clipboard!');
+      }
     } catch (err) {
-      console.error("Copy image error:", err);
-      toast.error("Failed to load image for copying.");
+      console.error('Copy image error:', err);
+      toast.error('Failed to copy. Browser may have blocked it.');
     }
   };
 
@@ -4591,17 +4572,17 @@ export default function Dashboard() {
 
                                 {/* Actions */}
                                 <td className="py-3.5 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                  <div className="inline-grid grid-cols-2 gap-1.5">
                                     <button
                                       type="button"
                                       onClick={() => handleEditProductClick(prod)}
-                                      className="p-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                                       title="Edit Listing"
                                     >
                                       <Pencil size={15} />
                                     </button>
                                     <label
-                                      className={`p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer inline-flex ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
+                                      className={`w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
                                       title="Upload Images"
                                     >
                                       <ImageIcon size={15} />
@@ -4618,25 +4599,29 @@ export default function Dashboard() {
                                         }}
                                       />
                                     </label>
-                                    {prod.images && prod.images.length > 0 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (prod.images && prod.images.length > 0) {
                                           setImageGalleryProduct(prod);
                                           setGalleryActiveIndex(0);
                                           setIsImageGalleryOpen(true);
-                                        }}
-                                        className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer relative"
-                                        title={`View ${prod.images.length} Image(s)`}
-                                      >
-                                        <Eye size={15} />
-                                        <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black rounded-full w-3.5 h-3.5 flex items-center justify-center">{prod.images.length}</span>
-                                      </button>
-                                    )}
+                                        } else {
+                                          toast('No images uploaded yet', { icon: '📷' });
+                                        }
+                                      }}
+                                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer relative hover:scale-110 active:scale-95"
+                                      title={prod.images && prod.images.length > 0 ? `View ${prod.images.length} Image(s)` : 'No images yet'}
+                                    >
+                                      <Eye size={15} />
+                                      {prod.images && prod.images.length > 0 && (
+                                        <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-lg shadow-amber-500/40 ring-2 ring-[#0d1527]">{prod.images.length}</span>
+                                      )}
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteProductClick(prod.fireId)}
-                                      className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                                       title="Delete Listing"
                                     >
                                       <Trash2 size={15} />
@@ -9937,15 +9922,15 @@ export default function Dashboard() {
         const currentImage = images[galleryActiveIndex];
         return (
           <div
-            className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md"
+            className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-3 backdrop-blur-xl"
             onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }}
           >
             <div
-              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden border border-white/15 flex flex-col"
+              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-white/15 flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 shrink-0">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
                 <h3 className="text-sm font-black text-white uppercase tracking-wider">{imageGalleryProduct.name} — Images ({images.length})</h3>
                 <button onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }} className="text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"><X size={18} /></button>
               </div>
@@ -9961,68 +9946,71 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Main Image Display */}
-                  <div className="relative flex-1 flex items-center justify-center bg-black/30 min-h-[300px] max-h-[50vh]">
+                  {/* Main Image Display with Overlay Buttons */}
+                  <div className="relative flex items-center justify-center bg-black/40 shrink-0" style={{ height: 'clamp(200px, 45vh, 420px)' }}>
                     {currentImage && (
                       <img
                         src={currentImage}
                         alt={`Product ${galleryActiveIndex + 1}`}
-                        className="max-w-full max-h-full object-contain p-4"
+                        className="max-w-full max-h-full object-contain p-3"
                       />
                     )}
+
                     {/* Nav Arrows */}
                     {images.length > 1 && (
                       <>
                         <button
                           onClick={() => setGalleryActiveIndex(prev => prev === 0 ? images.length - 1 : prev - 1)}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors cursor-pointer"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2.5 rounded-full transition-colors cursor-pointer shadow-lg"
                         >
                           <ChevronLeft size={20} />
                         </button>
                         <button
                           onClick={() => setGalleryActiveIndex(prev => prev === images.length - 1 ? 0 : prev + 1)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors cursor-pointer"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2.5 rounded-full transition-colors cursor-pointer shadow-lg"
                         >
                           <ChevronRight size={20} />
                         </button>
                       </>
                     )}
-                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[10px] font-bold px-3 py-1 rounded-full">{galleryActiveIndex + 1} / {images.length}</span>
+                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-3 py-1 rounded-full">{galleryActiveIndex + 1} / {images.length}</span>
                   </div>
 
                   {/* Thumbnails */}
-                  <div className="px-4 py-3 border-t border-white/10 shrink-0">
-                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
-                      {images.map((img: string, idx: number) => (
-                        <button
-                          key={idx}
-                          onClick={() => setGalleryActiveIndex(idx)}
-                          className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === galleryActiveIndex ? 'border-amber-400 shadow-lg shadow-amber-400/30' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'}`}
-                        >
-                          <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
+                  {images.length > 1 && (
+                    <div className="px-4 py-2.5 border-t border-white/10 shrink-0">
+                      <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                        {images.map((img: string, idx: number) => (
+                          <button
+                            key={idx}
+                            onClick={() => setGalleryActiveIndex(idx)}
+                            className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === galleryActiveIndex ? 'border-amber-400 shadow-lg shadow-amber-400/30 scale-110' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'}`}
+                          >
+                            <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Action Buttons */}
-                  <div className="px-5 py-3 border-t border-white/10 flex items-center justify-between shrink-0 gap-3 flex-wrap">
-                    <label className="px-3 py-2 bg-amber-500/15 text-amber-400 font-bold text-xs rounded-xl cursor-pointer hover:bg-amber-500/30 transition-colors flex items-center gap-1.5">
-                      <Upload size={13} /> Add More
+                  {/* Bottom Action Bar - always visible */}
+                  <div className="px-5 py-3 border-t border-white/10 flex items-center justify-between shrink-0 gap-3 bg-[#0a1020]">
+                    <label className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 font-black text-xs rounded-xl cursor-pointer transition-all hover:scale-105 active:scale-95 border border-amber-500/20">
+                      <Upload size={14} /> Add More Images
                       <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
                     </label>
                     <div className="flex gap-2">
                       <button
                         onClick={() => currentImage && handleCopyImage(currentImage)}
-                        className="px-3 py-2 bg-blue-500/15 text-blue-400 font-bold text-xs rounded-xl hover:bg-blue-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
                       >
-                        <ClipboardList size={13} /> Copy Image
+                        <ClipboardList size={14} /> Copy Image
                       </button>
                       <button
-                        onClick={() => setDeleteImageConfirm({ productFireId: imageGalleryProduct.fireId, imageIndex: galleryActiveIndex })}
-                        className="px-3 py-2 bg-rose-500/15 text-rose-400 font-bold text-xs rounded-xl hover:bg-rose-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                        onClick={() => handleDeleteImage(imageGalleryProduct.fireId, galleryActiveIndex)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
                       >
-                        <Trash2 size={13} /> Delete
+                        <Trash2 size={14} /> Delete
                       </button>
                     </div>
                   </div>
@@ -10033,30 +10021,7 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* === DELETE IMAGE CONFIRMATION === */}
-      {deleteImageConfirm && (
-        <div className="fixed inset-0 bg-black/60 z-[210] flex items-center justify-center p-4" onClick={() => setDeleteImageConfirm(null)}>
-          <div className="bg-[#0b1329] rounded-2xl p-6 max-w-sm w-full border border-white/15 shadow-2xl text-center" onClick={(e) => e.stopPropagation()}>
-            <Trash2 size={36} className="text-rose-400 mx-auto mb-3" />
-            <h4 className="text-white font-black text-sm mb-2">Delete this image?</h4>
-            <p className="text-slate-400 text-xs mb-5 font-medium">This action cannot be undone. The image will be permanently removed from this product.</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteImageConfirm(null)}
-                className="flex-1 px-4 py-2.5 bg-[#1e293b] text-white font-bold text-xs rounded-xl border border-white/15 hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteImage(deleteImageConfirm.productFireId, deleteImageConfirm.imageIndex)}
-                className="flex-1 px-4 py-2.5 bg-rose-600 text-white font-black text-xs rounded-xl hover:bg-rose-500 transition-colors cursor-pointer"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
     </div>
   );
