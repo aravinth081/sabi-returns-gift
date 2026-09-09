@@ -163,23 +163,24 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
     <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-[850px] mx-auto border border-gray-300 font-sans text-black">
 
       {/* Top Action Bar */}
-      <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center print:hidden">
-        <div className="flex gap-2">
-          <button onClick={handleDownload} className="flex items-center gap-2 bg-[#1a365d] text-white px-5 py-2 rounded-lg font-bold hover:bg-[#2c5282] transition-all text-sm">
+      <div className="bg-gray-50 p-3 sm:p-4 border-b border-gray-200 flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 print:hidden">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+          <button onClick={handleDownload} className="flex items-center gap-2 bg-[#1a365d] text-white px-4 sm:px-5 py-2 rounded-lg font-bold hover:bg-[#2c5282] transition-all text-xs sm:text-sm cursor-pointer shadow-sm">
             <Download size={16} /> Download Invoice
           </button>
-          <button onClick={handleCopyAsImage} className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold transition-all text-sm ${isCopied ? 'bg-green-600 text-white' : 'bg-gray-800 text-white hover:bg-black'}`}>
+          <button onClick={handleCopyAsImage} className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-lg font-bold transition-all text-xs sm:text-sm cursor-pointer shadow-sm ${isCopied ? 'bg-green-600 text-white' : 'bg-gray-800 text-white hover:bg-black'}`}>
             {isCopied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
             {isCopied ? 'Copied!' : 'Copy Image'}
           </button>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-all text-gray-700">
-          <X size={24} />
+        <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-all text-gray-700 cursor-pointer" title="Close">
+          <X size={22} />
         </button>
       </div>
 
-      {/* Invoice Main Content */}
-      <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-4 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px]">
+      {/* Invoice Main Content Wrapped for Mobile Responsiveness */}
+      <div className="w-full overflow-x-auto custom-scrollbar responsive-table-container flex justify-center p-2 sm:p-4 bg-gray-100/50 print:p-0 print:bg-white print:overflow-visible">
+        <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-4 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px] shadow-sm print:shadow-none">
 
         {/* Header Section */}
         <div className="flex justify-between items-start mb-6">
@@ -364,6 +365,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
         </div>
 
       </div>
+    </div>
     </div>
   );
 }

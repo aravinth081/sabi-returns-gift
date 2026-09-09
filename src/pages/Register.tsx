@@ -50,51 +50,52 @@ const Register = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background p-3 sm:p-6 select-none overflow-y-auto">
+      <Card className="w-full max-w-md my-auto shadow-2xl border-white/15">
+        <CardHeader className="text-center p-5 sm:p-6">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
             <MessageCircle className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>Join the conversation</CardDescription>
+          <CardTitle className="text-xl sm:text-2xl font-bold">Create Account</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Join the conversation</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Choose a username" required />
+          <CardContent className="space-y-4 p-5 sm:p-6 pt-0 sm:pt-0">
+            <div className="space-y-1.5">
+              <Label htmlFor="username" className="text-xs font-bold uppercase tracking-wider">Username</Label>
+              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Choose a username" className="h-11 sm:h-12 text-sm sm:text-base touch-friendly-input" required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="aadhaar">Aadhaar Number</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="aadhaar" className="text-xs font-bold uppercase tracking-wider">Aadhaar Number</Label>
               <Input
                 id="aadhaar"
                 value={aadhaar}
                 onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, "").slice(0, 12))}
                 placeholder="12-digit Aadhaar number"
                 maxLength={12}
+                className="h-11 sm:h-12 text-sm sm:text-base touch-friendly-input"
                 required
               />
               {aadhaar.length > 0 && !validateAadhaar(aadhaar) && (
                 <p className="text-xs text-destructive">Must be exactly 12 digits</p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" required />
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider">Password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" className="h-11 sm:h-12 text-sm sm:text-base touch-friendly-input" required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required />
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmPassword" className="text-xs font-bold uppercase tracking-wider">Confirm Password</Label>
+              <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" className="h-11 sm:h-12 text-sm sm:text-base touch-friendly-input" required />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={isLoading}>
+          <CardFooter className="flex flex-col gap-3 p-5 sm:p-6 pt-0 sm:pt-0">
+            <Button type="submit" className="w-full h-11 sm:h-12 min-h-[44px] text-sm sm:text-base font-bold touch-friendly-btn" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Create Account"}
             </Button>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground text-center">
               Already have an account?{" "}
-              <Link to="/login" className="text-primary hover:underline">Sign In</Link>
+              <Link to="/login" className="text-primary hover:underline font-semibold">Sign In</Link>
             </p>
           </CardFooter>
         </form>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { collection, getDocs, doc, updateDoc, addDoc, query } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, addDoc, query, where } from "firebase/firestore";
 import { db } from "@/firebase";
 
 interface LoginProps {
@@ -31,7 +31,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
-
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -66,45 +65,65 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      // 2. Firebase Employee Check
+      // 2. Firebase Employee Check (Targeted query for maximum concurrency & low latency)
       try {
-        const q = query(collection(db, "employees"));
-        const snap = await getDocs(q);
-        const employeesList = snap.docs.map((docSnap) => ({
-          fireId: docSnap.id,
-          ...docSnap.data(),
-        })) as any[];
+        let matchedDoc: any = null;
+        
+        // Fast targeted lookup for lowercase username
+        const qLower = query(collection(db, "employees"), where("username", "==", inputUser));
+        const snapLower = await getDocs(qLower);
+        if (!snapLower.empty) {
+          const docSnap = snapLower.docs.find(d => d.data().password === inputPass);
+          if (docSnap) matchedDoc = { fireId: docSnap.id, ...docSnap.data() };
+        }
 
-        const matchedEmp = employeesList.find(
-          (emp) =>
-            emp.username &&
-            emp.username.toLowerCase() === inputUser &&
-            emp.password === inputPass
-        );
+        // Secondary lookup for exact typed casing if not matched
+        if (!matchedDoc && inputUser !== username.trim()) {
+          const qExact = query(collection(db, "employees"), where("username", "==", username.trim()));
+          const snapExact = await getDocs(qExact);
+          if (!snapExact.empty) {
+            const docSnap = snapExact.docs.find(d => d.data().password === inputPass);
+            if (docSnap) matchedDoc = { fireId: docSnap.id, ...docSnap.data() };
+          }
+        }
 
-        if (matchedEmp) {
-          if (matchedEmp.status === "Approved") {
-            updateDoc(doc(db, "employees", matchedEmp.fireId), {
+        // Fallback scan only if indexed queries didn't match (for legacy untrimmed records)
+        if (!matchedDoc) {
+          const q = query(collection(db, "employees"));
+          const snap = await getDocs(q);
+          matchedDoc = snap.docs
+            .map((docSnap) => ({ fireId: docSnap.id, ...docSnap.data() } as any))
+            .find(
+              (emp) =>
+                emp.username &&
+                emp.username.toLowerCase() === inputUser &&
+                emp.password === inputPass
+            );
+        }
+
+        if (matchedDoc) {
+          if (matchedDoc.status === "Approved") {
+            updateDoc(doc(db, "employees", matchedDoc.fireId), {
               isLive: true,
               lastLoginAt: new Date().toISOString(),
             }).catch((err) => console.error("Error setting live status:", err));
 
             localStorage.setItem("isLoggedIn", "true");
-            localStorage.setItem("loggedInName", matchedEmp.name || matchedEmp.username);
+            localStorage.setItem("loggedInName", matchedDoc.name || matchedDoc.username);
             localStorage.setItem("role", "Employee");
-            localStorage.setItem("employeeId", matchedEmp.fireId);
+            localStorage.setItem("employeeId", matchedDoc.fireId);
             localStorage.setItem("loginTimestamp", Date.now().toString());
 
             toast({
-              title: `Welcome, ${matchedEmp.name}!`,
+              title: `Welcome, ${matchedDoc.name}!`,
               description: "Logged in successfully",
             });
 
             if (onLoginSuccess) {
               onLoginSuccess({
                 role: 'Employee',
-                name: matchedEmp.name || matchedEmp.username,
-                employeeId: matchedEmp.fireId
+                name: matchedDoc.name || matchedDoc.username,
+                employeeId: matchedDoc.fireId
               });
             } else {
               navigate("/dashboard");
@@ -185,7 +204,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4 md:p-8 select-none relative overflow-hidden"
+      className="min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 md:p-8 select-none relative overflow-x-hidden overflow-y-auto"
       style={{
         backgroundColor: "#060a14",
         backgroundImage: `
@@ -196,10 +215,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }}
     >
       {/* Main Split Card Container */}
-      <div className="w-full max-w-[1040px] min-h-[580px] md:min-h-[610px] rounded-[2.25rem] shadow-[0_25px_80px_rgba(0,0,0,0.65),0_0_50px_rgba(0,0,0,0.4)] flex flex-col md:flex-row overflow-hidden border border-white/15 relative z-10 transition-all duration-300">
+      <div className="w-full max-w-[1040px] min-h-[540px] md:min-h-[610px] rounded-2xl sm:rounded-[2.25rem] shadow-[0_25px_80px_rgba(0,0,0,0.65),0_0_50px_rgba(0,0,0,0.4)] flex flex-col md:flex-row overflow-hidden border border-white/15 relative z-10 my-auto transition-all duration-300">
         
         {/* ================= LEFT SIDE (Rich Champagne Gold Branding: #D9A928) ================= */}
-        <div className="w-full md:w-1/2 relative bg-[#D9A928] flex flex-col items-center justify-center p-8 sm:p-10 md:p-12 text-center overflow-hidden min-h-[380px] md:min-h-auto">
+        <div className="w-full md:w-1/2 relative bg-[#D9A928] flex flex-col items-center justify-center p-6 sm:p-8 md:p-12 text-center overflow-hidden min-h-[220px] sm:min-h-[280px] md:min-h-auto">
           
           {/* Subtle Dynamic Bottom Waves: #E4BE5C */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -243,28 +262,28 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           {/* Left Panel Content */}
           <div className="relative z-10 flex flex-col items-center max-w-[360px]">
             {/* Logo Badge Container */}
-            <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] md:w-[220px] md:h-[220px] p-2 flex items-center justify-center mb-6 rounded-[1.75rem] overflow-hidden shadow-[0_16px_35px_rgba(0,0,0,0.32)] bg-black border border-[#F1D27A]/30 relative group transition-transform duration-500 hover:scale-[1.02]">
+            <div className="w-[110px] h-[110px] sm:w-[160px] sm:h-[160px] md:w-[220px] md:h-[220px] p-2 flex items-center justify-center mb-3 sm:mb-6 rounded-2xl sm:rounded-[1.75rem] overflow-hidden shadow-[0_16px_35px_rgba(0,0,0,0.32)] bg-black border border-[#F1D27A]/30 relative group transition-transform duration-500 hover:scale-[1.02]">
               <img 
                 src="/logo.jpeg" 
                 alt="Sabi Return Gifts" 
-                className="w-full h-full object-cover rounded-[1.4rem]" 
+                className="w-full h-full object-cover rounded-xl sm:rounded-[1.4rem]" 
               />
             </div>
             
             {/* Brand Titles: Ivory White #F8F5ED */}
-            <h1 className="text-2xl sm:text-3xl md:text-[34px] font-serif font-bold text-[#F8F5ED] tracking-wider mb-1.5 drop-shadow-md">
+            <h1 className="text-xl sm:text-2xl md:text-[34px] font-serif font-bold text-[#F8F5ED] tracking-wider mb-1 drop-shadow-md">
               SABI RETURNS
             </h1>
             {/* Subtitle: Soft White #E8EAF0 */}
-            <p className="text-[11px] sm:text-xs font-bold tracking-[0.3em] text-[#E8EAF0] mb-4 uppercase drop-shadow-sm opacity-95">
+            <p className="text-[10px] sm:text-xs font-bold tracking-[0.25em] sm:tracking-[0.3em] text-[#E8EAF0] mb-2 sm:mb-4 uppercase drop-shadow-sm opacity-95">
               PREMIUM GIFTING SOLUTIONS
             </p>
             
             {/* Decorative Line: Champagne #F1D27A */}
-            <div className="w-12 h-[2px] bg-[#F1D27A] mb-4 rounded-full shadow-sm"></div>
+            <div className="w-10 sm:w-12 h-[2px] bg-[#F1D27A] mb-2 sm:mb-4 rounded-full shadow-sm"></div>
             
             {/* Tagline: Soft White #E8EAF0 */}
-            <p className="text-[#E8EAF0] text-xs sm:text-[13px] font-medium px-3 leading-relaxed drop-shadow-sm opacity-95 max-w-[320px]">
+            <p className="text-[#E8EAF0] text-[11px] sm:text-[13px] font-medium px-2 sm:px-3 leading-relaxed drop-shadow-sm opacity-95 max-w-[320px]">
               Empowering your celebrations with elegant,<br className="hidden sm:inline" /> secure, and seamless return gift solutions.
             </p>
           </div>
@@ -276,12 +295,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <div className={`book-card-inner ${isFlipped ? "is-flipped" : ""}`}>
             
             {/* ---------------- FRONT PAGE: LOGIN ---------------- */}
-            <div className="book-face p-6 sm:p-10 md:p-12 lg:p-14">
-              <div className="max-w-[400px] w-full mx-auto space-y-7">
+            <div className="book-face p-5 sm:p-8 md:p-10 lg:p-12">
+              <div className="max-w-[400px] w-full mx-auto space-y-5 sm:space-y-7">
                 
                 {/* Header: Ivory White #F8F5ED & Muted Blue-Gray #9DAAC2 */}
-                <div className="text-center space-y-1.5">
-                  <h2 className="text-3xl sm:text-4xl md:text-[42px] font-serif font-bold text-[#F8F5ED] tracking-wide drop-shadow-md">
+                <div className="text-center space-y-1">
+                  <h2 className="text-2xl sm:text-3xl md:text-[38px] font-serif font-bold text-[#F8F5ED] tracking-wide drop-shadow-md">
                     Login
                   </h2>
                   <p className="text-[#9DAAC2] text-xs sm:text-sm font-medium">
@@ -375,7 +394,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <Button 
                       type="submit" 
                       disabled={isLoading}
-                      className="w-52 h-12 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer"
+                      className="w-full sm:w-52 h-12 min-h-[44px] bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer flex items-center justify-center touch-friendly-btn"
                     >
                       {isLoading ? "Logging In..." : "Log In"}
                     </Button>
@@ -386,12 +405,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             </div>
 
             {/* ---------------- BACK PAGE: REGISTER (3D Book Turned View) ---------------- */}
-            <div className="book-face-back p-6 sm:p-10 md:p-12 lg:p-14">
-              <div className="max-w-[400px] w-full mx-auto space-y-6">
+            <div className="book-face-back p-5 sm:p-8 md:p-10 lg:p-12">
+              <div className="max-w-[400px] w-full mx-auto space-y-5 sm:space-y-6">
                 
                 {/* Header: Ivory White #F8F5ED */}
-                <div className="text-center space-y-1.5">
-                  <h2 className="text-3xl sm:text-4xl md:text-[42px] font-serif font-bold text-[#F8F5ED] tracking-wide drop-shadow-md">
+                <div className="text-center space-y-1">
+                  <h2 className="text-2xl sm:text-3xl md:text-[38px] font-serif font-bold text-[#F8F5ED] tracking-wide drop-shadow-md">
                     Register
                   </h2>
                   <p className="text-[#9DAAC2] text-xs sm:text-sm font-medium">
@@ -487,7 +506,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <Button 
                       type="submit" 
                       disabled={isRegistering}
-                      className="w-52 h-12 bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer"
+                      className="w-full sm:w-52 h-12 min-h-[44px] bg-[#D9A628] hover:bg-[#E8BD45] text-white font-bold rounded-full shadow-[0_8px_25px_rgba(217,166,40,0.5)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm sm:text-base tracking-wide border-none cursor-pointer flex items-center justify-center touch-friendly-btn"
                     >
                       {isRegistering ? "Creating..." : "Create Account"}
                     </Button>

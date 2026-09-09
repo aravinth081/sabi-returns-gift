@@ -8,19 +8,20 @@
 // ==========================================
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
-// --- FIREBASE IMPORTS ADDED ---
-import { initializeApp } from "firebase/app";
+// --- FIREBASE SINGLETON & CONCURRENCY IMPORTS ---
+import { db } from "@/firebase";
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc
+  collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc
 } from "firebase/firestore";
-// ------------------------------
+import { useDebounce } from "@/hooks/useDebounce";
+import { getNextSequentialOrderId } from "@/lib/concurrency";
+// -----------------------------------------------
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
-// Removed: import sabiLogo from "../assets/sabi-logo.png";
 import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
 import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
@@ -33,19 +34,6 @@ import { format } from "date-fns";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadToCloudinary, uploadMultipleToCloudinary } from "@/lib/cloudinary";
-
-// --- FIREBASE SETUP ---
-const firebaseConfig = {
-  apiKey: "AIzaSyA2zPg2iKK5oTYqctmqQt3N5wUNOoZ8Kp8",
-  authDomain: "sabireturngifts-4d5ae.firebaseapp.com",
-  projectId: "sabireturngifts-4d5ae",
-  storageBucket: "sabireturngifts-4d5ae.firebasestorage.app",
-  messagingSenderId: "414247562076",
-  appId: "1:414247562076:web:cca1d1ce00849d851cef99"
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-// ----------------------
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
 
@@ -869,6 +857,7 @@ export default function Dashboard() {
     (localStorage.getItem('activeTab') as any) || 'dashboard1'
   );
   const [productSearchQuery, setProductSearchQuery] = useState("");
+  const debouncedProductSearch = useDebounce(productSearchQuery, 300);
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -1170,7 +1159,8 @@ export default function Dashboard() {
     };
   }, []);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 1024 : true));
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   // --- INDEPENDENT FILTER STATES PER TAB ---
   // Dashboard 1 filters
@@ -1300,6 +1290,7 @@ export default function Dashboard() {
 
   // Tracking filters
   const [trkSearch, setTrkSearch] = useState("");
+  const debouncedTrkSearch = useDebounce(trkSearch, 300);
   const [trkPaymentFilter, setTrkPaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
   const [trkDeliveryFilter, setTrkDeliveryFilter] = useState<'All' | 'Delivered' | 'In Process'>('All');
   const [trkOrderStatusFilter, setTrkOrderStatusFilter] = useState<string>('All');
@@ -1345,6 +1336,7 @@ export default function Dashboard() {
   const setCountFilter = activeTab === 'dashboard2' ? setD2CountFilter : setD1CountFilter;
   const dashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
   const setDashboardSearch = activeTab === 'dashboard2' ? setD2DashboardSearch : setD1DashboardSearch;
+  const debouncedDashboardSearch = useDebounce(dashboardSearch, 300);
   const functionDates = activeTab === 'dashboard2' ? d2FunctionDates : d1FunctionDates;
   const setFunctionDates = activeTab === 'dashboard2' ? setD2FunctionDates : setD1FunctionDates;
   const deliveryDates = activeTab === 'dashboard2' ? d2DeliveryDates : d1DeliveryDates;
@@ -2034,7 +2026,7 @@ export default function Dashboard() {
     const curRevenueDateType = activeTab === 'dashboard2' ? d2RevenueDateType : d1RevenueDateType;
     const curFunctionDates = activeTab === 'dashboard2' ? d2FunctionDates : d1FunctionDates;
     const curDeliveryDates = activeTab === 'dashboard2' ? d2DeliveryDates : d1DeliveryDates;
-    const curDashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
+    const curDashboardSearch = debouncedDashboardSearch;
     const curCountFilter = activeTab === 'dashboard2' ? d2CountFilter : d1CountFilter;
     const curTableTypeFilter = activeTab === 'dashboard2' ? d2TableTypeFilter : d1TableTypeFilter;
     const curLocationFilter = activeTab === 'dashboard2' ? d2LocationFilter : d1LocationFilter;
@@ -2099,23 +2091,12 @@ export default function Dashboard() {
 
       const countMatch = curCountFilter === 'All' || order.count.toString() === curCountFilter;
       const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
-
-      let locationMatch = true;
-      if (curLocationFilter === 'Chennai') {
-        locationMatch = order.isChennai === true || String(order.location || "").toLowerCase() === 'chennai';
-      } else if (curLocationFilter === 'Kerala') {
-        locationMatch = String(order.location || "").toLowerCase() === 'kerala';
-      } else if (curLocationFilter === 'Others') {
-        locationMatch = String(order.location || "").toLowerCase() === 'others' || (!order.isChennai && String(order.location || "").toLowerCase() !== 'chennai' && String(order.location || "").toLowerCase() !== 'kerala');
-      }
-
-      const isProduct = order.category === 'product';
-      const categoryMatch = activeTab === 'dashboard2' ? isProduct : !isProduct;
-
-      let roleMatch = true;
-      if (curRoleFilter !== 'All') {
-        roleMatch = order.role === curRoleFilter;
-      }
+      const categoryMatch = activeTab === 'dashboard2' ? order.category === 'product' : order.category !== 'product';
+      const locationMatch = curLocationFilter === 'All' || 
+        (curLocationFilter === 'Chennai' && order.isChennai) ||
+        (curLocationFilter === 'Kerala' && !order.isChennai && (order.location?.toLowerCase() === 'kerala' || order.address?.toLowerCase().includes('kerala'))) ||
+        (curLocationFilter === 'Others' && !order.isChennai && order.location?.toLowerCase() !== 'kerala' && !order.address?.toLowerCase().includes('kerala'));
+      const roleMatch = curRoleFilter === 'All' || order.role === curRoleFilter;
 
       let duplicateMatch = true;
       if (curDuplicateFilter !== 'All') {
@@ -2130,7 +2111,7 @@ export default function Dashboard() {
 
       return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && categoryMatch && locationMatch && roleMatch && duplicateMatch;
     });
-  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, d1DashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2DashboardSearch, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts]);
+  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, debouncedDashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts]);
 
   const availableChocolatesData = useMemo(() => {
     const chocolateCounts: Record<string, number> = {};
@@ -2387,8 +2368,8 @@ export default function Dashboard() {
       result = result.filter(o => (o.orderStatus || "image edited (not paid)") === trkOrderStatusFilter);
     }
 
-    if (trkSearch.trim()) {
-      const lowerSearch = trkSearch.toLowerCase().trim();
+    if (debouncedTrkSearch.trim()) {
+      const lowerSearch = debouncedTrkSearch.toLowerCase().trim();
       result = result.filter(o => {
         const serialNo = getSerial(o.id).toLowerCase();
         const chocName = String(o.chocolate || o.productName || "").toLowerCase();
@@ -2402,7 +2383,7 @@ export default function Dashboard() {
     }
 
     return result;
-  }, [orders, orderSerialMap, trkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter]);
+  }, [orders, orderSerialMap, debouncedTrkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter]);
 
   const sortedDashboardOrders = useMemo(() => {
     let sortable = [...filteredDashboardOrders];
@@ -3261,6 +3242,8 @@ export default function Dashboard() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingOrder) return;
+    setIsSavingOrder(true);
 
     const priceData = calculatePriceInfo(formData.chocolate, formData.count, formData.discount, formData.isDeliveryFree || formData.isChennai, formData.paymentStatus, formData.category, customPricesMap, formData.manualDeliveryFee, formData.orderStatus, managedChocPricesMap, formData.pricingType, formData.manualProductPrice);
 
@@ -3336,7 +3319,7 @@ export default function Dashboard() {
           redoStackRef.current = [];
         }
       } else {
-        const nextId = orders.length > 0 ? Math.max(...orders.map(o => Number(o.id) || 0)) + 1 : 1;
+        const nextId = await getNextSequentialOrderId(db, orders);
         formattedOrder.id = nextId;
         delete formattedOrder.fireId;
 
@@ -3418,6 +3401,8 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Error saving:", err);
       toast.error("Failed to save order. Please check console.");
+    } finally {
+      setIsSavingOrder(false);
     }
   };
 
@@ -4531,7 +4516,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`flex h-screen font-sans bg-[#0b1329] text-slate-100 relative ${isExportPreviewOpen || isReportPreviewOpen ? 'print:hidden' : ''} ${isWallpaperActive ? 'wallpaper-active' : ''}`}>
+    <div className={`flex h-[100dvh] min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden font-sans bg-[#0b1329] text-slate-100 relative ${isExportPreviewOpen || isReportPreviewOpen ? 'print:hidden' : ''} ${isWallpaperActive ? 'wallpaper-active' : ''}`}>
 
       <datalist id="discount-suggestions">
         <option value="0" />
@@ -4543,14 +4528,14 @@ export default function Dashboard() {
       </datalist>
 
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/40 z-20 md:hidden print:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/60 z-20 lg:hidden print:hidden backdrop-blur-xs" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`bg-[#1c2230] border-r border-slate-800 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute md:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0'}`}>
+      <aside className={`bg-[#1c2230] border-r border-slate-800 transition-all duration-300 ease-in-out print:hidden flex-shrink-0 absolute lg:relative z-30 h-full overflow-hidden ${isSidebarOpen ? 'w-56' : 'w-0'}`}>
         <div className="w-56 h-full flex flex-col justify-between">
           <div className="overflow-y-auto flex-1 select-none">
             <div className={`p-6 flex flex-col items-center border-b border-slate-700/60 relative`}>
-              <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 md:hidden p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg">
+              <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 lg:hidden p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg">
                 <X size={20} />
               </button>
               <div className="relative w-20 h-20 mb-3 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-[0_0_15px_rgba(59,130,246,0.8)] flex items-center justify-center">
@@ -4572,21 +4557,21 @@ export default function Dashboard() {
 
             <nav className="p-4 space-y-2.5 mt-3">
               <button
-                onClick={() => { setActiveTab('dashboard1'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { setActiveTab('dashboard1'); setShowSidebarHighlight(true); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard1' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <Home size={18} className={showSidebarHighlight && activeTab === 'dashboard1' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Dashboard 1</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('daily_tasks'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { setActiveTab('daily_tasks'); setShowSidebarHighlight(true); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'daily_tasks' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <ClipboardList size={18} className={showSidebarHighlight && activeTab === 'daily_tasks' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Daily Tasks</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('dashboard2'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { setActiveTab('dashboard2'); setShowSidebarHighlight(true); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'dashboard2' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <Package size={18} className={showSidebarHighlight && activeTab === 'dashboard2' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Dashboard 2</span>
@@ -4594,14 +4579,14 @@ export default function Dashboard() {
 
               {/* Products Section directly under Dashboard 2 */}
               <button
-                onClick={() => { setActiveTab('products'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { setActiveTab('products'); setShowSidebarHighlight(true); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'products' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <ShoppingBag size={18} className={showSidebarHighlight && activeTab === 'products' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Products</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('inventories'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { setActiveTab('inventories'); setShowSidebarHighlight(true); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'inventories' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <Archive size={18} className={showSidebarHighlight && activeTab === 'inventories' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Inventories</span>
@@ -4612,7 +4597,7 @@ export default function Dashboard() {
                   setIsReportsAuthModalOpen(true);
                   setReportsPassword("");
                   setReportsAuthError("");
-                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                  if (window.innerWidth < 1024) setIsSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'reports' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <TrendingUp size={18} className={showSidebarHighlight && activeTab === 'reports' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
@@ -4620,7 +4605,7 @@ export default function Dashboard() {
               </button>
 
               <button
-                onClick={() => { setActiveTab('attendance'); setShowSidebarHighlight(true); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                onClick={() => { setActiveTab('attendance'); setShowSidebarHighlight(true); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${showSidebarHighlight && activeTab === 'attendance' ? 'bg-[#292e42] border border-blue-500/50 border-l-4 border-l-blue-500 text-white font-extrabold shadow-lg shadow-indigo-950/50 scale-[1.02]' : 'bg-[#2a303c] hover:bg-[#343c4b] text-slate-100 hover:text-white border border-slate-700/50 font-bold'}`}>
                 <Calendar size={18} className={showSidebarHighlight && activeTab === 'attendance' ? 'text-blue-400 drop-shadow-md' : 'text-slate-300'} />
                 <span>Attendance Log</span>
@@ -4635,7 +4620,7 @@ export default function Dashboard() {
                 setIsHistoryAuthModalOpen(true);
                 setHistoryPassword("");
                 setHistoryAuthError("");
-                if (window.innerWidth < 768) setIsSidebarOpen(false);
+                if (window.innerWidth < 1024) setIsSidebarOpen(false);
               }}
               className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-purple-200 bg-[#2b274c] hover:bg-[#383363] hover:text-white border border-purple-500/40 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
             >
@@ -4644,7 +4629,7 @@ export default function Dashboard() {
             <button
               onClick={() => {
                 setIsTrashOpen(true);
-                if (window.innerWidth < 768) setIsSidebarOpen(false);
+                if (window.innerWidth < 1024) setIsSidebarOpen(false);
               }}
               className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-amber-200 bg-[#3a3028] hover:bg-[#4a3e33] hover:text-white border border-amber-500/40 hover:shadow-md active:scale-95 font-bold transition-all duration-300 shadow-sm cursor-pointer"
             >
@@ -4714,16 +4699,16 @@ export default function Dashboard() {
         )}
 
         {showHeader && (
-          <header className="bg-[#0e1628] border-b border-blue-900/50 px-4 md:px-8 py-4 flex justify-between items-center shadow-md relative z-50 print:hidden">
-            <div className="flex items-center gap-3 md:gap-5">
-              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60" title="Toggle Menu">
-                <Menu size={24} />
+          <header className="bg-[#0e1628] border-b border-blue-900/50 px-3 sm:px-4 md:px-8 py-3 sm:py-4 flex justify-between items-center shadow-md relative z-50 print:hidden gap-3 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-5 min-w-0">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60 shrink-0 cursor-pointer" title="Toggle Menu">
+                <Menu size={22} />
               </button>
-              <button onClick={() => setShowHeader(false)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60" title="Hide Header">
-                <EyeOff size={24} />
+              <button onClick={() => setShowHeader(false)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60 shrink-0 cursor-pointer" title="Hide Header">
+                <EyeOff size={22} />
               </button>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black text-white">
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl md:text-2xl lg:text-3xl font-black text-white truncate max-w-[200px] sm:max-w-md lg:max-w-none">
                   {activeTab === 'dashboard1' && 'Order Management (Chocolates)'}
                   {activeTab === 'dashboard2' && 'Order Management (Products)'}
                   {activeTab === 'products' && 'Products Management'}
@@ -4733,7 +4718,7 @@ export default function Dashboard() {
                   {activeTab === 'daily_tasks' && 'Daily Task Management Board'}
                   {activeTab === 'random_picker' && 'Monthly Winner Picker'}
                 </h1>
-                <p className="hidden md:block text-sm text-blue-300 font-medium">
+                <p className="hidden md:block text-xs sm:text-sm text-blue-300 font-medium truncate">
                   {(activeTab === 'dashboard1' || activeTab === 'dashboard2') && 'Track your deliveries and statuses securely.'}
                   {activeTab === 'products' && 'Manage all products, selling prices, wholesale costs, and profit margins.'}
                   {activeTab === 'tracking' && 'Search and trace live order statuses.'}
@@ -4745,17 +4730,15 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-
-
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
               <div className="hidden sm:block text-right">
-                <p className="text-2xl font-black text-white tracking-wide uppercase">Sabi</p>
-                <p className="text-sm font-bold text-blue-400 tracking-widest uppercase">return Gifts</p>
+                <p className="text-xl sm:text-2xl font-black text-white tracking-wide uppercase leading-none">Sabi</p>
+                <p className="text-xs font-bold text-blue-400 tracking-widest uppercase">return Gifts</p>
               </div>
               <div
-                className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-md flex items-center justify-center select-none"
+                className="w-10 h-10 sm:w-14 sm:h-14 rounded-full p-0.5 sm:p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-md flex items-center justify-center select-none shrink-0"
               >
-                <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-slate-900 shadow-inner">
+                <div className="w-full h-full rounded-full border sm:border-2 border-white overflow-hidden bg-slate-900 shadow-inner">
                   <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
@@ -5020,7 +5003,7 @@ export default function Dashboard() {
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {orderedProducts
-                          .filter(p => !productSearchQuery.trim() || (p.name && p.name.toLowerCase().includes(productSearchQuery.toLowerCase())))
+                          .filter(p => !debouncedProductSearch.trim() || (p.name && p.name.toLowerCase().includes(debouncedProductSearch.toLowerCase())))
                           .map((prod, index) => {
                             const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
                             const wholePrice = Number(prod.wholesalePrice) || 0;
@@ -6515,7 +6498,7 @@ export default function Dashboard() {
                         }
                       }
                     }}
-                    className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}
+                    className={`shadow-inner bg-white/50 custom-scrollbar left-scrollbar responsive-table-container relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 overflow-x-auto overflow-y-auto lg:max-h-none lg:h-full lg:flex-1 lg:min-h-0'}`}
                   >
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
@@ -8632,12 +8615,12 @@ export default function Dashboard() {
       {/* 🟢 MODALS (ADD/EDIT) */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
-          onClick={() => setIsModalOpen(false)}
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 print:hidden backdrop-blur-sm"
+          onClick={() => !isSavingOrder && setIsModalOpen(false)}
         >
           <div
             style={{ backgroundColor: '#0b1329', borderColor: 'rgba(255, 255, 255, 0.15)', color: '#ffffff' }}
-            className="rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.85)] w-full max-w-[800px] p-6 overflow-y-auto max-h-[95vh] border custom-scrollbar"
+            className="rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.85)] w-full max-w-[800px] p-4 sm:p-6 overflow-y-auto max-h-[90dvh] border custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative border-b border-white/10 pb-3 mb-4 flex items-center justify-between">
@@ -9177,19 +9160,28 @@ export default function Dashboard() {
                   <div className="flex gap-2.5 pt-2">
                     <button
                       type="button"
+                      disabled={isSavingOrder}
                       onClick={() => setIsModalOpen(false)}
                       style={{ backgroundColor: '#1e293b', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)', fontWeight: 800 }}
-                      className="flex-1 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider cursor-pointer hover:bg-slate-700 transition-colors"
+                      className={`flex-1 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider cursor-pointer hover:bg-slate-700 transition-colors ${isSavingOrder ? 'opacity-50 cursor-not-allowed' : ''}`}
                       fire-id="cancel-btn"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
+                      disabled={isSavingOrder}
                       style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', color: '#000000', fontWeight: 900 }}
-                      className="flex-1 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                      className={`flex-1 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 ${isSavingOrder ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                      Save Order
+                      {isSavingOrder ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        formData.id ? "Update Order" : "Save Order"
+                      )}
                     </button>
                   </div>
                 </div>
@@ -9204,23 +9196,23 @@ export default function Dashboard() {
         const previewPrice = calculatePriceInfo(previewData.chocolate, previewData.count, previewData.discount, previewData.isDeliveryFree, previewData.paymentStatus, previewData.category, customPricesMap, previewData.manualDeliveryFee, previewData.orderStatus, managedChocPricesMap, previewData.pricingType, previewData.manualProductPrice);
         return (
           <div
-            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 print:hidden backdrop-blur-sm"
             onClick={() => setIsPreviewOpen(false)}
           >
             <div
-              className="rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-[500px] p-6 text-center bg-[#fffcf9] max-h-[95vh] overflow-y-auto relative border border-amber-100"
+              className="rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-[600px] p-4 sm:p-6 text-center bg-[#fffcf9] max-h-[90dvh] overflow-y-auto overflow-x-auto relative border border-amber-100 custom-scrollbar"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={handleCapturePreview}
-                className="absolute top-4 right-4 p-2.5 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-full transition-transform hover:scale-110 z-20 shadow-sm"
+                className="absolute top-4 right-4 p-2.5 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-full transition-transform hover:scale-110 z-20 shadow-sm cursor-pointer"
                 title="Copy Receipt Screenshot to Clipboard"
               >
                 <Camera size={18} />
               </button>
 
               {/* CAPTURE AREA */}
-              <div id="preview-modal-content" className="bg-[#fffcf9] p-5 rounded-xl mx-auto" style={{ width: '550px', minHeight: '450px' }}>
+              <div id="preview-modal-content" className="bg-[#fffcf9] p-4 sm:p-5 rounded-xl mx-auto" style={{ minWidth: '300px', maxWidth: '550px', width: '100%', minHeight: '450px' }}>
 
 
                 <div className="flex justify-between items-center mb-4 border-b-2 border-dashed border-[#d7ccc8] pb-4 pt-1">
@@ -9397,17 +9389,17 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: SHIPPING LABEL MODAL */}
       {isShippingOpen && shippingOrder && (
-        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 print:hidden" onClick={() => setIsShippingOpen(false)}>
-          <div className="rounded-3xl shadow-2xl w-full max-w-2xl bg-gray-100 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-3 sm:p-4 print:hidden backdrop-blur-sm" onClick={() => setIsShippingOpen(false)}>
+          <div className="rounded-3xl shadow-2xl w-full max-w-2xl bg-gray-100 flex flex-col max-h-[90dvh]" onClick={(e) => e.stopPropagation()}>
 
             <div className="p-4 flex justify-between bg-white border-b border-gray-200 rounded-t-3xl items-center">
-              <h2 className="text-xl font-extrabold text-black">Shipping Label Preview</h2>
-              <button onClick={() => setIsShippingOpen(false)} className="text-gray-500 hover:text-red-600 transition-colors bg-gray-100 p-2 rounded-full"><X size={20} /></button>
+              <h2 className="text-lg sm:text-xl font-extrabold text-black">Shipping Label Preview</h2>
+              <button onClick={() => setIsShippingOpen(false)} className="text-gray-500 hover:text-red-600 transition-colors bg-gray-100 p-2 rounded-full cursor-pointer"><X size={20} /></button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 flex justify-center bg-gray-100">
+            <div className="p-3 sm:p-6 overflow-y-auto overflow-x-auto flex-1 flex justify-center bg-gray-100 custom-scrollbar responsive-table-container">
 
-              <div id="shipping-label-content" className="bg-white p-8 w-full max-w-xl text-black font-sans shadow-lg border border-gray-200 h-max shrink-0">
+              <div id="shipping-label-content" className="bg-white p-4 sm:p-8 w-full max-w-xl text-black font-sans shadow-lg border border-gray-200 h-max shrink-0">
                 <div className="flex justify-between items-start pb-4 border-b-2 border-black">
                   <div className="flex-1 pt-2">
                     <h3 className="text-base font-extrabold text-black tracking-wide mb-3">Shipping Label</h3>
@@ -9461,12 +9453,12 @@ export default function Dashboard() {
       {/* 🟢 TRASH BIN MODAL */}
       {isTrashOpen && (
         <div
-          className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md cursor-pointer"
+          className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-3 sm:p-4 backdrop-blur-md cursor-pointer"
           onClick={() => setIsTrashOpen(false)}
         >
           <div
             style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
-            className="rounded-3xl shadow-2xl w-full max-w-4xl p-7 bg-[#0c1427] border border-white/20 overflow-y-auto max-h-[90vh] relative flex flex-col gap-4 text-white cursor-default"
+            className="rounded-3xl shadow-2xl w-full max-w-4xl p-4 sm:p-7 bg-[#0c1427] border border-white/20 overflow-y-auto max-h-[90dvh] relative flex flex-col gap-4 text-white cursor-default custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -9594,11 +9586,11 @@ export default function Dashboard() {
       {/* 🟣 HISTORY MODAL */}
       {isHistoryOpen && (
         <div
-          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 print:hidden backdrop-blur-sm"
           onClick={() => setIsHistoryOpen(false)}
         >
           <div
-            className="rounded-2xl shadow-2xl w-full max-w-4xl bg-[#0f172a] overflow-hidden border border-indigo-900/60 relative flex flex-col max-h-[90vh]"
+            className="rounded-2xl shadow-2xl w-full max-w-4xl bg-[#0f172a] overflow-hidden border border-indigo-900/60 relative flex flex-col max-h-[90dvh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -9891,14 +9883,14 @@ export default function Dashboard() {
 
       {/* 🟢 NEW: REPORT PREVIEW & DOWNLOAD MODAL */}
       {isReportPreviewOpen && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsReportPreviewOpen(false)}>
-          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
-            <div style={{ backgroundColor: '#131c2e' }} className="p-5 border-b border-white/15 flex justify-between items-center bg-[#131c2e] shadow-md">
-              <h2 className="text-2xl font-black text-amber-400 uppercase tracking-widest">Sales Report Preview</h2>
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm" onClick={() => setIsReportPreviewOpen(false)}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90dvh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-4 sm:p-5 border-b border-white/15 flex justify-between items-center bg-[#131c2e] shadow-md">
+              <h2 className="text-xl sm:text-2xl font-black text-amber-400 uppercase tracking-widest">Sales Report Preview</h2>
               <button onClick={() => setIsReportPreviewOpen(false)} className="text-slate-300 hover:bg-red-950/60 hover:text-red-400 p-2 rounded-full transition-colors cursor-pointer"><X size={22} /></button>
             </div>
 
-            <div id="final-report-document" style={{ backgroundColor: '#090e1a', color: '#ffffff' }} className="p-8 overflow-auto bg-[#090e1a] flex-1 relative custom-scrollbar">
+            <div id="final-report-document" style={{ backgroundColor: '#090e1a', color: '#ffffff' }} className="p-4 sm:p-8 overflow-auto bg-[#090e1a] flex-1 relative custom-scrollbar responsive-table-container">
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-black text-amber-400 uppercase tracking-wider drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">Sabi Return Gifts</h1>
                 <h2 className="text-lg font-extrabold text-slate-200 mt-1">Official Sales & Analytics Report</h2>
@@ -10786,14 +10778,14 @@ export default function Dashboard() {
 
       {/* 🟢 PROFIT TABLE MODAL */}
       {isProfitModalOpen && (
-        <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setIsProfitModalOpen(false)}>
-          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
-            <div style={{ backgroundColor: '#131c2e' }} className="p-6 bg-[#131c2e] border-b border-white/15 flex justify-between items-center shadow-md">
-              <h2 className="text-2xl font-black text-amber-400 uppercase tracking-widest flex items-center gap-2.5"><DollarSign className="text-amber-400" /> Profit Analytics Table</h2>
+        <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-3 sm:p-4 backdrop-blur-md" onClick={() => setIsProfitModalOpen(false)}>
+          <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90dvh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
+            <div style={{ backgroundColor: '#131c2e' }} className="p-4 sm:p-6 bg-[#131c2e] border-b border-white/15 flex justify-between items-center shadow-md">
+              <h2 className="text-xl sm:text-2xl font-black text-amber-400 uppercase tracking-widest flex items-center gap-2.5"><DollarSign className="text-amber-400" /> Profit Analytics Table</h2>
               <button onClick={() => setIsProfitModalOpen(false)} className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors"><X size={24} /></button>
             </div>
 
-            <div className="overflow-auto flex-1 px-4 py-0 bg-[#090e1a] custom-scrollbar">
+            <div className="overflow-auto flex-1 px-2 sm:px-4 py-0 bg-[#090e1a] custom-scrollbar responsive-table-container">
               <table className="w-full text-left border-collapse">
                 <thead style={{ backgroundColor: '#162035' }} className="sticky top-0 z-30 bg-[#162035] text-amber-400 shadow-md border-b-2 border-amber-500/30">
                   <tr className="text-xs uppercase tracking-wider text-amber-400">
@@ -10918,17 +10910,17 @@ export default function Dashboard() {
       {/* 🟣 ORDER DETAILS & ACTIVITY TIMELINE MODAL */}
       {historyDetailOrder && (
         <div
-          className="fixed inset-0 bg-black/70 z-[210] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300"
+          className="fixed inset-0 bg-black/70 z-[210] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300"
           onClick={() => setHistoryDetailOrder(null)}
         >
           <div
-            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden border border-amber-100 flex flex-col transform transition-all animate-in zoom-in-95 ease-out duration-300"
+            className="bg-[#fffcf9] rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[90dvh] overflow-hidden border border-amber-100 flex flex-col transform transition-all animate-in zoom-in-95 ease-out duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-amber-950 to-amber-900 p-6 text-white flex justify-between items-center border-b-4 border-amber-800 shrink-0">
+            <div className="bg-gradient-to-r from-amber-950 to-amber-900 p-4 sm:p-6 text-white flex justify-between items-center border-b-4 border-amber-800 shrink-0">
               <div>
-                <h2 className="text-xl font-black tracking-wide flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-black tracking-wide flex items-center gap-2">
                   <History size={20} className="text-amber-400" />
                   Order Detail & History
                 </h2>
@@ -10939,14 +10931,14 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => setHistoryDetailOrder(null)}
-                className="text-amber-100 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                className="text-amber-100 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 custom-scrollbar">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 custom-scrollbar">
 
               {/* Left Column: Order details Card */}
               <div className="space-y-4">
@@ -11115,7 +11107,7 @@ export default function Dashboard() {
             onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }}
           >
             <div
-              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-white/15 flex flex-col"
+              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90dvh] overflow-hidden border border-white/15 flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}

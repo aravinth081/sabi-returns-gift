@@ -2387,7 +2387,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       {/* EXCEL SPREADSHEET MAIN CONTAINER */}
       <div className={`daily-tasks-table-container border rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all ${dailyTasksWallpaper ? 'bg-[#0b1329]/35 backdrop-blur-xl border-white/15' : 'bg-[#0b1329] border-slate-800'}`}>
         {/* SPREADSHEET TABLE GRID (Scrollable) */}
-        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar border-b border-slate-800 max-h-[600px] min-h-[420px]">
+        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar responsive-table-container border-b border-slate-800 max-h-[600px] min-h-[420px]">
           <table className="w-full border-collapse text-left text-xs sm:text-sm select-none">
             {/* TABLE HEADER (Cyan Excel Style like 2nd image) */}
             <thead className="sticky top-0 z-20 shadow-md">

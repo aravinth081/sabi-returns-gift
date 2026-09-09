@@ -1,9 +1,9 @@
 // src/firebase.js
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore"; // Ithu database-kaga add pandrom
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
-// Unga Database Secret Keys
-const firebaseConfig = {
+// Firebase configuration
+export const firebaseConfig = {
   apiKey: "AIzaSyA2zPg2iKK5oTYqctmqQt3N5wUNOoZ8Kp8",
   authDomain: "sabireturngifts-4d5ae.firebaseapp.com",
   projectId: "sabireturngifts-4d5ae",
@@ -12,8 +12,8 @@ const firebaseConfig = {
   appId: "1:414247562076:web:cca1d1ce00849d851cef99"
 };
 
-// Firebase-a start pandrom
-const app = initializeApp(firebaseConfig);
+// Singleton App Instance to prevent duplicate WebSocket connections and memory leaks
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Database-a export pandrom (Itha vachi thaan namma data save pannuvom)
+// Singleton Firestore instance
 export const db = getFirestore(app);
