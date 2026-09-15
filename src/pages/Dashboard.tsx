@@ -164,20 +164,16 @@ const calculatePriceInfo = (chocolateString: string, count: number | string, dis
 
   const rawTotal = Math.max(0, baseChocolatePrice + baseDeliveryCharge - baseDiscountAmt);
 
-  // Multiplier logic for perfectly scaling the prices up/down based on payment and status
-  let multiplier = 1;
-  if (paymentStatus === 'Partially Paid') multiplier = 0.5;
-  else if (paymentStatus === 'Pending') multiplier = 0;
+  // Cancelled orders should show zero prices
+  const isCancelled = orderStatus === 'cancelled';
 
-  if (orderStatus === 'cancelled') multiplier = 0;
-
-  const chocolatePrice = Math.round(baseChocolatePrice * multiplier);
-  const deliveryCharge = Math.round(baseDeliveryCharge * multiplier);
-  const discount = Math.round(baseDiscountAmt * multiplier);
-  const finalTotal = Math.round(rawTotal * multiplier);
+  const chocolatePrice = isCancelled ? 0 : Math.round(baseChocolatePrice);
+  const deliveryCharge = isCancelled ? 0 : Math.round(baseDeliveryCharge);
+  const discount = isCancelled ? 0 : Math.round(baseDiscountAmt);
+  const finalTotal = isCancelled ? 0 : Math.round(rawTotal);
 
   const rawRevenue = Math.max(0, baseChocolatePrice - baseDiscountAmt);
-  const revenue = Math.round(rawRevenue * multiplier);
+  const revenue = isCancelled ? 0 : Math.round(rawRevenue);
   const fullRevenue = Math.round(rawRevenue);
 
   return {
@@ -2180,7 +2176,17 @@ export default function Dashboard() {
       const priceInfo = calculatePriceInfo(o.chocolate, o.count, o.discount, o.isDeliveryFree || o.isChennai, o.paymentStatus, o.category, customPricesMap, o.manualDeliveryFee, o.orderStatus, managedChocPricesMap, o.pricingType, o.manualProductPrice);
 
       netRevenue += priceInfo.revenue;
-      const orderPending = Math.max(0, priceInfo.fullTotalPrice - priceInfo.totalPrice);
+
+      // Calculate pending from actual payment status and advance amount
+      let orderPending = 0;
+      if (o.paymentStatus === 'Full Paid') {
+        orderPending = 0;
+      } else if (o.paymentStatus === 'Partially Paid') {
+        orderPending = Math.max(0, priceInfo.fullTotalPrice - Number(o.advanceAmount || 0));
+      } else {
+        // Pending = full amount
+        orderPending = priceInfo.fullTotalPrice;
+      }
       pendingSum += orderPending;
 
       if (o.paymentStatus !== 'Pending') {
@@ -3292,6 +3298,7 @@ export default function Dashboard() {
         Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
 
         await updateDoc(doc(db, "orders", formData.fireId), dataToUpdate);
+        // Fire-and-forget: logActivity is non-critical
         logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
         toast.success("Order updated successfully!");
 
@@ -3327,6 +3334,7 @@ export default function Dashboard() {
         Object.keys(formattedOrder).forEach(key => formattedOrder[key] === undefined && delete formattedOrder[key]);
 
         const newDocRef = await addDoc(collection(db, "orders"), formattedOrder);
+        // Fire-and-forget: logActivity is non-critical
         logActivity(`Added New Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
         toast.success("Order added successfully!");
 
@@ -3348,7 +3356,12 @@ export default function Dashboard() {
         redoStackRef.current = [];
       }
 
-      // Automatically move card from 'forward to print' to 'order completed' in Daily Tasks board if it matches phone number
+      // Close modal and reset form immediately after main DB write
+      setIsModalOpen(false);
+      const today = new Date().toISOString().split('T')[0];
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+
+      // Fire-and-forget: Board card auto-move is non-critical
       if (formData.phone) {
         const normalizePhoneStr = (p: string) => {
           if (!p) return "";
@@ -3364,15 +3377,9 @@ export default function Dashboard() {
           if (printList && printList.cards && printList.cards.length > 0) {
             const matchingCards = printList.cards.filter((c: any) => normalizePhoneStr(c.phoneNumber) === normInput);
             if (matchingCards.length > 0) {
-              // Remove matching cards from print list
               printList.cards = printList.cards.filter((c: any) => normalizePhoneStr(c.phoneNumber) !== normInput);
-
-              // Move them to completed list
               const completedList = updatedLists.find(l => l.title.trim().toLowerCase() === 'order completed');
-              const cardsToMove = matchingCards.map((c: any) => ({
-                ...c,
-                status: 'Order Completed'
-              }));
+              const cardsToMove = matchingCards.map((c: any) => ({ ...c, status: 'Order Completed' }));
 
               if (completedList) {
                 if (!completedList.cards) completedList.cards = [];
@@ -3382,21 +3389,13 @@ export default function Dashboard() {
                 updatedLists[0].cards.push(...cardsToMove);
               }
 
-              // Save updated board lists back to Firestore
               const boardDocRef = doc(db, 'daily_tasks_board', 'board_data');
-              await setDoc(boardDocRef, {
-                lists: updatedLists,
-                updatedAt: new Date().toISOString()
-              }, { merge: true });
+              // Don't await — fire-and-forget
+              setDoc(boardDocRef, { lists: updatedLists, updatedAt: new Date().toISOString() }, { merge: true }).catch(e => console.error('Board update error:', e));
             }
           }
         }
       }
-
-      setIsModalOpen(false);
-
-      const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
 
     } catch (err) {
       console.error("Error saving:", err);
@@ -5484,11 +5483,10 @@ export default function Dashboard() {
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-1 lg:min-h-0">
                 <div className={`grid grid-cols-1 sm:grid-cols-2 ${showHeader
-                    ? (activeTab === 'dashboard2' ? 'lg:grid-cols-2' : 'lg:grid-cols-4')
+                    ? 'lg:grid-cols-4'
                     : 'hidden'
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
-                  {activeTab !== 'dashboard2' && (
                   <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
                     <div className="flex justify-between items-start mb-1 relative z-10">
                       <p className="text-sm font-black text-amber-400 tracking-wide uppercase">Filtered Orders</p>
@@ -5515,9 +5513,105 @@ export default function Dashboard() {
                       </select>
                     </div>
                   </div>
-                  )}
 
-                  {activeTab !== 'dashboard2' && (() => {
+                  {(() => {
+                    if (activeTab === 'dashboard2') {
+                      // Dashboard 2: Total Items Sold with Payment/Delivery/Product dropdowns
+                      const d2TotalItemsSold = filteredDashboardOrders.reduce((sum, o) => {
+                        const counts = String(o.count || 0).split(',').map(c => Number(c.trim()) || 0);
+                        return sum + counts.reduce((s, val) => s + val, 0);
+                      }, 0);
+
+                      const uniqueProductNames = Array.from(new Set(
+                        orders.filter(o => o.category === 'product')
+                          .map(o => String(o.productName || o.chocolate || '').trim())
+                          .filter(Boolean)
+                      )).sort();
+
+                      return (
+                        <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
+                          <div className="flex justify-between items-start mb-1 relative z-10">
+                            <div className="flex items-center gap-1 group relative flex-1 min-w-0">
+                              <p className="text-[12px] font-black text-white tracking-wide uppercase leading-tight truncate max-w-[110px] sm:max-w-[140px]" title="Total Items Sold">
+                                TOTAL<br/>ITEMS SOLD
+                              </p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-400 border border-amber-400/30 shadow-inner shrink-0 ml-1">
+                              <Gift size={16} />
+                            </div>
+                          </div>
+
+                          {/* Dropdown Filters: Payment, Delivery, Product Name */}
+                          <div className="flex items-center gap-1.5 my-1.5 relative z-20 flex-wrap">
+                            {/* Payment Dropdown */}
+                            <select
+                              value={d2PaymentFilter}
+                              onChange={(e) => setD2PaymentFilter(e.target.value as any)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer shadow-sm ${
+                                d2PaymentFilter === 'All'
+                                  ? 'bg-slate-800/90 text-slate-300 border-white/10'
+                                  : d2PaymentFilter === 'Full Paid'
+                                  ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/50'
+                                  : d2PaymentFilter === 'Partially Paid'
+                                  ? 'bg-amber-500/25 text-amber-300 border-amber-400/50'
+                                  : 'bg-rose-500/25 text-rose-300 border-rose-400/50'
+                              }`}
+                              title="Filter by Payment Status"
+                            >
+                              <option value="All" className="bg-[#0d1527] text-white">₹ Payment</option>
+                              <option value="Full Paid" className="bg-[#0d1527] text-white">Full Paid</option>
+                              <option value="Partially Paid" className="bg-[#0d1527] text-white">Partially Paid</option>
+                              <option value="Pending" className="bg-[#0d1527] text-white">Pending</option>
+                            </select>
+
+                            {/* Delivery Dropdown */}
+                            <select
+                              value={d2DeliveryFilter}
+                              onChange={(e) => setD2DeliveryFilter(e.target.value as any)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer shadow-sm ${
+                                d2DeliveryFilter === 'All'
+                                  ? 'bg-slate-800/90 text-slate-300 border-white/10'
+                                  : d2DeliveryFilter === 'Delivered'
+                                  ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/50'
+                                  : 'bg-amber-500/25 text-amber-300 border-amber-400/50'
+                              }`}
+                              title="Filter by Delivery Status"
+                            >
+                              <option value="All" className="bg-[#0d1527] text-white">🚚 Delivery</option>
+                              <option value="In Process" className="bg-[#0d1527] text-white">In Process</option>
+                              <option value="Delivered" className="bg-[#0d1527] text-white">Delivered</option>
+                            </select>
+
+                            {/* Product Name Dropdown */}
+                            <select
+                              value={d2ChocFilter}
+                              onChange={(e) => setD2ChocFilter(e.target.value)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer shadow-sm max-w-[100px] truncate ${
+                                d2ChocFilter
+                                  ? 'bg-amber-500/25 text-amber-300 border-amber-400/50'
+                                  : 'bg-slate-800/90 text-slate-300 border-white/10'
+                              }`}
+                              title="Filter by Product Name"
+                            >
+                              <option value="" className="bg-[#0d1527] text-white">All Products</option>
+                              {uniqueProductNames.map((pName, idx) => (
+                                <option key={idx} value={pName} className="bg-[#0d1527] text-white">{pName}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Total Quantity Count */}
+                          <div className="flex items-end justify-between gap-1 relative z-10 mt-auto w-full">
+                            <div className="flex items-baseline gap-1">
+                              <h3 className="text-3xl font-black text-white font-mono">{d2TotalItemsSold.toLocaleString()}</h3>
+                              <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-400/30 shadow-sm leading-none mb-1">Pcs</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Dashboard 1: Total Chocolates with existing chocolate filter
                     const isAll = !d1SelectedChocolateBoxFilter || d1SelectedChocolateBoxFilter === "All Chocolates";
                     const displayTotalItems = isAll
                       ? availableChocolatesData.preChocTotalItems
@@ -6779,27 +6873,7 @@ export default function Dashboard() {
                             </div>
                           </th>
 
-                          {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
-                          {!isScreenshotMode && activeTab === 'dashboard2' && (
-                            <th className="py-3 px-4 font-bold align-top min-w-[150px]">
-                              <div className="flex items-center gap-1 group">
-                                <span>Order Status</span>
-                                <div className="relative inline-flex items-center justify-center w-5 h-5 rounded-md cursor-pointer transition-colors" title="Filter by Type (Sabi/Thaaru/Others)">
-                                  <ChevronDown size={14} className={tableTypeFilter !== 'All' ? 'text-amber-800' : 'text-amber-800/30 group-hover:text-amber-800 transition-opacity'} />
-                                  <select
-                                    value={tableTypeFilter}
-                                    onChange={(e) => setTableTypeFilter(e.target.value)}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  >
-                                    <option value="All">All Types</option>
-                                    <option value="Sabi">Sabi</option>
-                                    <option value="Thaaru">Thaaru</option>
-                                    <option value="Self">Others</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </th>
-                          )}
+                          {/* ORDER STATUS removed from Dashboard 2 */}
 
                           <th className="py-3 px-4 font-bold align-top min-w-[150px] text-center">
                             <div className="flex items-center justify-center gap-1.5 group">
@@ -7146,32 +7220,7 @@ export default function Dashboard() {
                                 {!isScreenshotMode && <td className={`py-2.5 px-4 font-medium text-amber-800 print:text-gray-800 align-middle`}>{order.functionDate}</td>}
                                 <td className={`py-2.5 px-4 font-bold text-orange-900 print:text-black align-middle`}>{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
 
-                                {/* 🟢 ORDER STATUS VISIBLE ONLY FOR DASHBOARD 2 */}
-                                {!isScreenshotMode && activeTab === 'dashboard2' && (
-                                  <td className="py-2.5 px-4 text-center align-middle">
-                                    <div className="print:hidden">
-                                      <select
-                                        value={order.orderStatus || "image edited (not paid)"}
-                                        onChange={(e) => handleOrderStatusUpdate(order.id, order.fireId, e.target.value)}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black border-2 outline-none cursor-pointer transition-colors shadow-sm uppercase tracking-wider ${order.orderStatus === 'image edited (not paid)' ? 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]' :
-                                          order.orderStatus === 'forward to print (paid)' ? 'bg-[#e6f7ec] text-[#047857] border-[#9fe2bf]' :
-                                            order.orderStatus === 'cancelled' ? 'bg-[#fee2e2] text-[#b91c1c] border-[#fca5a5]' :
-                                              order.orderStatus === 'order complete' ? 'bg-[#e0f2fe] text-[#0369a1] border-[#7dd3fc]' :
-                                                'bg-[#f3e8ff] text-[#7e22ce] border-[#e9d5ff]'
-                                          }`}
-                                      >
-                                        <option value="image edited (not paid)">I E (Not Paid)</option>
-                                        <option value="forward to print (paid)">F 2 P (Paid)</option>
-                                        <option value="order complete">Order Complete</option>
-                                        <option value="cancelled">Cancelled</option>
-                                      </select>
-
-                                    </div>
-                                    <span className="hidden print:inline text-[10px] font-bold text-black uppercase">
-                                      {(order.orderStatus || "image edited (not paid)") === 'image edited (not paid)' ? 'I E (Not Paid)' : (order.orderStatus === 'forward to print (paid)' ? 'F 2 P (Paid)' : order.orderStatus)}
-                                    </span>
-                                  </td>
-                                )}
+                                {/* ORDER STATUS removed from Dashboard 2 */}
 
                                 <td className={`py-2.5 px-4 print:text-gray-800 align-middle text-center`}>
                                   {renderChocolateBadges(order.chocolate)}
