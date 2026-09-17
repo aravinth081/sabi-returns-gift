@@ -19,7 +19,7 @@ import { getNextSequentialOrderId } from "@/lib/concurrency";
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -488,7 +488,8 @@ export default function Dashboard() {
 
   const [customProducts, setCustomProducts] = useState<any[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
-  const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "" });
+  const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
+  const [productTypeFilter, setProductTypeFilter] = useState<string>("all");
   const [newProductImages, setNewProductImages] = useState<File[]>([]);
   const [newProductExistingImages, setNewProductExistingImages] = useState<string[]>([]);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -1543,6 +1544,27 @@ export default function Dashboard() {
       return tA - tB;
     });
   }, [customProducts]);
+
+  const singleProductsCount = useMemo(() => {
+    return orderedProducts.filter(p => (p.productType || "Single product") === "Single product").length;
+  }, [orderedProducts]);
+
+  const comboSetsCount = useMemo(() => {
+    return orderedProducts.filter(p => p.productType === "Combo set").length;
+  }, [orderedProducts]);
+
+  const filteredProducts = useMemo(() => {
+    return orderedProducts.filter(p => {
+      const pType = p.productType || "Single product";
+      if (productTypeFilter !== 'all' && pType !== productTypeFilter) {
+        return false;
+      }
+      if (debouncedProductSearch.trim() && (!p.name || !p.name.toLowerCase().includes(debouncedProductSearch.toLowerCase()))) {
+        return false;
+      }
+      return true;
+    });
+  }, [orderedProducts, productTypeFilter, debouncedProductSearch]);
 
   const monthWiseReportData = useMemo(() => {
     const monthsMap: Record<string, { monthKey: string; monthName: string; totalRevenue: number; totalCost: number; netProfit: number }> = {};
@@ -3469,12 +3491,14 @@ export default function Dashboard() {
       }
 
       const combinedImages = [...newProductExistingImages, ...uploadedImageUrls];
+      const productType = newProductForm.productType || "Single product";
 
       const dataToSave = {
         name: newProductForm.name,
         price: Number(newProductForm.price),
         sellingPrice: Number(newProductForm.price),
         wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
+        productType: productType,
         createdAt: new Date().toISOString(),
         images: combinedImages
       };
@@ -3485,17 +3509,18 @@ export default function Dashboard() {
           price: Number(newProductForm.price),
           sellingPrice: Number(newProductForm.price),
           wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
+          productType: productType,
           images: combinedImages
         });
         toast.success("Listing updated successfully!");
-        logActivity(`Edited Listing: ${newProductForm.name} (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
+        logActivity(`Edited Listing: ${newProductForm.name} [${productType}] (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       } else {
         await addDoc(collection(db, "products"), dataToSave);
         toast.success("Product listing added successfully!");
-        logActivity(`Added New Listing: ${newProductForm.name} (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
+        logActivity(`Added New Listing: ${newProductForm.name} [${productType}] (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       }
       setIsAddProductModalOpen(false);
-      setNewProductForm({ name: "", wholesalePrice: "", price: "" });
+      setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
       setNewProductImages([]);
       setNewProductExistingImages([]);
       setEditProductId(null);
@@ -3511,7 +3536,8 @@ export default function Dashboard() {
     setNewProductForm({ 
       name: prod.name, 
       wholesalePrice: String(prod.wholesalePrice !== undefined && prod.wholesalePrice !== null ? prod.wholesalePrice : ""), 
-      price: String(prod.price ?? prod.sellingPrice ?? "") 
+      price: String(prod.price ?? prod.sellingPrice ?? ""),
+      productType: prod.productType || "Single product"
     });
     setNewProductExistingImages(prod.images || []);
     setNewProductImages([]);
@@ -4780,9 +4806,32 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-[#162035] border border-white/10 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300">
-                  <Package size={16} className="text-blue-400" />
-                  <span>Total Items: <strong className="text-white text-sm">{orderedProducts.length}</strong></span>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Top Section Product Type Filter Dropdown */}
+                  <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                    <Filter size={14} className="text-amber-400 shrink-0" />
+                    <span className="text-slate-400 text-xs hidden xs:inline">Type:</span>
+                    <div className="relative">
+                      <select
+                        aria-label="Filter products by type"
+                        value={productTypeFilter}
+                        onChange={(e) => setProductTypeFilter(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
+                      >
+                        <option value="all" className="bg-[#162035] text-white">All Products ({orderedProducts.length})</option>
+                        <option value="Single product" className="bg-[#162035] text-cyan-300">Single Products ({singleProductsCount})</option>
+                        <option value="Combo set" className="bg-[#162035] text-purple-300">Combo Sets ({comboSetsCount})</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                        <ChevronDown size={12} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-[#162035] border border-white/10 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300">
+                    <Package size={16} className="text-blue-400" />
+                    <span>Total Items: <strong className="text-white text-sm">{orderedProducts.length}</strong></span>
+                  </div>
                 </div>
               </div>
 
@@ -4800,19 +4849,41 @@ export default function Dashboard() {
                 </div>
 
                 <form onSubmit={handleAddCustomProduct} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                      Item Name
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      value={newProductForm.name}
-                      onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
-                      style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                      className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                      placeholder="Enter Item Name (e.g. Munch)"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
+                        Item Name
+                      </label>
+                      <input
+                        required
+                        type="text"
+                        value={newProductForm.name}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
+                        placeholder="Enter Item Name (e.g. Munch)"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
+                        Product Type
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={newProductForm.productType || "Single product"}
+                          onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value })}
+                          style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-9"
+                        >
+                          <option value="Single product" className="bg-[#151f36] text-white">Single product</option>
+                          <option value="Combo set" className="bg-[#151f36] text-white">Combo set</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                          <ChevronDown size={16} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -4935,7 +5006,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        setNewProductForm({ name: "", wholesalePrice: "", price: "" });
+                        setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
                         setNewProductImages([]);
                         setNewProductExistingImages([]);
                         setEditProductId(null);
@@ -4957,27 +5028,51 @@ export default function Dashboard() {
 
               {/* 🟢 DEDICATED PRODUCTS TABLE (Chronological Order Added, Profit Calculation) */}
               <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 text-white">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5 pb-4 border-b border-white/10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 pb-4 border-b border-white/10">
                   <div>
                     <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
                       <ShoppingBag className="text-blue-400" size={20} />
-                      <span>Product Listings Table ({orderedProducts.length})</span>
+                      <span>Product Listings Table ({filteredProducts.length})</span>
+                      {productTypeFilter !== 'all' && (
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${productTypeFilter === 'Combo set' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'}`}>
+                          {productTypeFilter}
+                        </span>
+                      )}
                     </h3>
                     <p className="text-xs text-slate-400 font-medium mt-0.5">
                       Items are shown in the exact order added with auto-calculated profit margins.
                     </p>
                   </div>
 
-                  {/* Search Filter */}
-                  <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                    <input
-                      type="text"
-                      placeholder="Search product name..."
-                      value={productSearchQuery}
-                      onChange={(e) => setProductSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 transition-colors"
-                    />
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                    {/* Top Section Product Type Filter Dropdown */}
+                    <div className="relative">
+                      <select
+                        aria-label="Filter products list by type"
+                        value={productTypeFilter}
+                        onChange={(e) => setProductTypeFilter(e.target.value)}
+                        className="w-full sm:w-auto pl-3 pr-8 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-amber-400 cursor-pointer appearance-none transition-colors"
+                      >
+                        <option value="all" className="bg-[#15213b] text-white">All Types ({orderedProducts.length})</option>
+                        <option value="Single product" className="bg-[#15213b] text-cyan-300">Single Products ({singleProductsCount})</option>
+                        <option value="Combo set" className="bg-[#15213b] text-purple-300">Combo Sets ({comboSetsCount})</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
+                        <ChevronDown size={14} />
+                      </div>
+                    </div>
+
+                    {/* Search Filter */}
+                    <div className="relative w-full sm:w-60">
+                      <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                      <input
+                        type="text"
+                        placeholder="Search product name..."
+                        value={productSearchQuery}
+                        onChange={(e) => setProductSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 transition-colors"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -4987,6 +5082,24 @@ export default function Dashboard() {
                     <p className="text-lg font-bold text-slate-400">No product listings added yet.</p>
                     <p className="text-xs text-slate-500">Fill in the "ADD NEW LISTING" form above to create your first product.</p>
                   </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="py-16 text-center space-y-3">
+                    <Package size={48} className="mx-auto text-slate-600 animate-pulse" />
+                    <p className="text-lg font-bold text-slate-300">No matching products found</p>
+                    <p className="text-xs text-slate-500">
+                      {productTypeFilter !== 'all' ? `No products matching "${productTypeFilter}".` : 'Try adjusting your search criteria.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductTypeFilter('all');
+                        setProductSearchQuery('');
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
                 ) : (
                   <div className="overflow-x-auto rounded-2xl border border-white/10 shadow-inner">
                     <table className="w-full text-left border-collapse text-xs md:text-sm">
@@ -4994,6 +5107,7 @@ export default function Dashboard() {
                         <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
                           <th className="py-3.5 px-4 text-center w-16">#</th>
                           <th className="py-3.5 px-4">Item Name</th>
+                          <th className="py-3.5 px-4 text-center w-36">Product Type</th>
                           <th className="py-3.5 px-4 text-right">Wholesale Price (₹)</th>
                           <th className="py-3.5 px-4 text-right">Selling Price (₹)</th>
                           <th className="py-3.5 px-4 text-right">Profit (₹)</th>
@@ -5001,14 +5115,13 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {orderedProducts
-                          .filter(p => !debouncedProductSearch.trim() || (p.name && p.name.toLowerCase().includes(debouncedProductSearch.toLowerCase())))
-                          .map((prod, index) => {
+                        {filteredProducts.map((prod, index) => {
                             const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
                             const wholePrice = Number(prod.wholesalePrice) || 0;
                             const profit = sellPrice - wholePrice;
                             const marginPct = wholePrice > 0 ? Math.round((profit / wholePrice) * 100) : 100;
                             const isCurrentlyEditing = editProductId === prod.fireId;
+                            const pType = prod.productType || "Single product";
 
                             return (
                               <tr
@@ -5044,6 +5157,21 @@ export default function Dashboard() {
                                       {prod.name}
                                     </span>
                                   </div>
+                                </td>
+
+                                {/* Product Type */}
+                                <td className="py-3.5 px-4 text-center">
+                                  {pType === "Combo set" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm">
+                                      <Boxes size={12} className="text-purple-400" />
+                                      Combo set
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm">
+                                      <Package size={12} className="text-cyan-400" />
+                                      Single product
+                                    </span>
+                                  )}
                                 </td>
 
                                 {/* Wholesale Price */}
@@ -5131,16 +5259,19 @@ export default function Dashboard() {
                           })}
                       </tbody>
                       {/* Summary Row */}
-                      {orderedProducts.length > 0 && (() => {
-                        const totalWholesale = orderedProducts.reduce((sum, p) => sum + (Number(p.wholesalePrice) || 0), 0);
-                        const totalSelling = orderedProducts.reduce((sum, p) => sum + (Number(p.price ?? p.sellingPrice) || 0), 0);
+                      {filteredProducts.length > 0 && (() => {
+                        const totalWholesale = filteredProducts.reduce((sum, p) => sum + (Number(p.wholesalePrice) || 0), 0);
+                        const totalSelling = filteredProducts.reduce((sum, p) => sum + (Number(p.price ?? p.sellingPrice) || 0), 0);
                         const totalProfit = totalSelling - totalWholesale;
                         const avgMarginPct = totalWholesale > 0 ? Math.round((totalProfit / totalWholesale) * 100) : 0;
                         return (
                           <tfoot>
                             <tr className="bg-[#121a2d] border-t-2 border-white/15 font-black text-xs md:text-sm">
                               <td className="py-3.5 px-4 text-center text-amber-400">Total</td>
-                              <td className="py-3.5 px-4 text-slate-300">{orderedProducts.length} Listings</td>
+                              <td className="py-3.5 px-4 text-slate-300 font-bold">{filteredProducts.length} Listings</td>
+                              <td className="py-3.5 px-4 text-center text-slate-400 text-xs font-semibold">
+                                {productTypeFilter === 'all' ? `${singleProductsCount} Single / ${comboSetsCount} Combo` : productTypeFilter}
+                              </td>
                               <td className="py-3.5 px-4 text-right text-blue-400">₹{totalWholesale.toLocaleString()}</td>
                               <td className="py-3.5 px-4 text-right text-emerald-400">₹{totalSelling.toLocaleString()}</td>
                               <td className="py-3.5 px-4 text-right">
@@ -8383,7 +8514,7 @@ export default function Dashboard() {
 
       {/* 🟢 NEW LISTING / NEW PRODUCT MODAL */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); setNewProductImages([]); setNewProductExistingImages([]); }}>
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" }); setNewProductImages([]); setNewProductExistingImages([]); }}>
           <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-7 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-2xl font-black mb-5 text-white text-center tracking-wide border-b border-white/15 pb-3 uppercase">
               {editProductId ? "Edit Listing" : "Add New Listing"}
@@ -8393,6 +8524,25 @@ export default function Dashboard() {
                 <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Item Name</label>
                 <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Enter Item Name (e.g. Munch)" />
               </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Product Type</label>
+                <div className="relative">
+                  <select
+                    value={newProductForm.productType || "Single product"}
+                    onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value })}
+                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-8"
+                  >
+                    <option value="Single product" className="bg-[#162035] text-white">Single product</option>
+                    <option value="Combo set" className="bg-[#162035] text-white">Combo set</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                    <ChevronDown size={15} />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Wholesale Price</label>
@@ -8463,7 +8613,7 @@ export default function Dashboard() {
               </div>
 
               <div className="flex gap-3 pt-3">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "" }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
+                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
                 <button type="submit" disabled={isSavingProduct} className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}>{isSavingProduct ? "Uploading..." : (editProductId ? "Update Listing" : "Save Listing")}</button>
               </div>
             </form>
