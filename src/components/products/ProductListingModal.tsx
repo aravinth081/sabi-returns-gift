@@ -20,8 +20,7 @@ import {
 } from 'lucide-react';
 import { AddCategoryModal } from './AddCategoryModal';
 import { uploadMultipleToCloudinary } from '@/lib/cloudinary';
-import toast from 'react-hot-toast';
-
+import { toast } from 'sonner';
 export type ProductType = 'Single product' | 'Combo set';
 export type ProductStatus = 'Active' | 'Draft' | 'Out of Stock' | 'Inactive';
 
