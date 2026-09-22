@@ -1153,9 +1153,9 @@ main {
   box-shadow: none !important;
 }
 
-/* Position the vertical scrollbar on the left side next to Serial Number column */
+/* Ensure standard natural LTR direction so mouse-wheel, trackpad, and touch scrolling work smoothly across all viewports */
 .left-scrollbar {
-  direction: rtl !important;
+  direction: ltr !important;
 }
 
 .left-scrollbar > * {
