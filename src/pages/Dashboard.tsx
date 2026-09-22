@@ -19,7 +19,7 @@ import { getNextSequentialOrderId } from "@/lib/concurrency";
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, Copy
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, Copy, FolderTree
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -34,6 +34,8 @@ import { format } from "date-fns";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadToCloudinary, uploadMultipleToCloudinary } from "@/lib/cloudinary";
+import { ProductListingModal } from "@/components/products/ProductListingModal";
+import { CategoryManagementModal, CategoryItem } from "@/components/products/CategoryManagementModal";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
 
@@ -486,17 +488,42 @@ export default function Dashboard() {
     }
   };
 
+  const DEFAULT_PRODUCT_CATEGORIES = [
+    "Toys",
+    "Electronics",
+    "Home & Kitchen",
+    "Fashion",
+    "Gifts",
+    "Chocolates",
+    "Snacks",
+    "Beverages",
+    "Stationery",
+    "Other"
+  ];
+
+  const [productCategories, setProductCategories] = useState<CategoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_product_categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_PRODUCT_CATEGORIES.map((cat, idx) => ({
+      id: `cat-init-${idx + 1}`,
+      name: cat,
+      description: `Default ${cat} category`,
+    }));
+  });
+
   const [customProducts, setCustomProducts] = useState<any[]>([]);
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
-  const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] as string[] });
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingProductItem, setEditingProductItem] = useState<any | null>(null);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [productTypeFilter, setProductTypeFilter] = useState<string>("all");
-  const [comboSearchQuery, setComboSearchQuery] = useState("");
   const [productSortOrder, setProductSortOrder] = useState<'none' | 'a-z' | 'z-a'>('none');
   const [productCategoryFilter, setProductCategoryFilter] = useState<string>('all');
-  const [newProductImages, setNewProductImages] = useState<File[]>([]);
-  const [newProductExistingImages, setNewProductExistingImages] = useState<string[]>([]);
-  const [isSavingProduct, setIsSavingProduct] = useState(false);
-  const [editProductId, setEditProductId] = useState<string | null>(null);
   const [continuousVisibleCount, setContinuousVisibleCount] = useState(10);
 
   const DEFAULT_CHOCOLATES = [
@@ -825,7 +852,35 @@ export default function Dashboard() {
       }
     });
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); };
+    const unsubProductCategories = onSnapshot(collection(db, "product_categories"), (snapshot) => {
+      let list: CategoryItem[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CategoryItem));
+      if (list.length === 0) {
+        DEFAULT_PRODUCT_CATEGORIES.forEach(cat => {
+          addDoc(collection(db, "product_categories"), {
+            name: cat,
+            description: `Default ${cat} category`,
+            createdAt: new Date().toISOString()
+          }).catch(() => {});
+        });
+        const initialList = DEFAULT_PRODUCT_CATEGORIES.map((c, i) => ({
+          id: `cat-init-${i + 1}`,
+          name: c,
+          description: `Default ${c} category`,
+        }));
+        setProductCategories(initialList);
+        try {
+          localStorage.setItem('sabi_product_categories', JSON.stringify(initialList));
+        } catch (e) {}
+      } else {
+        list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setProductCategories(list);
+        try {
+          localStorage.setItem('sabi_product_categories', JSON.stringify(list));
+        } catch (e) {}
+      }
+    });
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); unsubProductCategories(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -1594,16 +1649,19 @@ export default function Dashboard() {
     return finalMap;
   }, [orders, customProducts]);
 
-  // Available categories: predefined + any custom from products
+  // Available categories: synchronized categories + any custom from products
   const availableCategories = useMemo(() => {
-    const predefined = new Set(["Chocolates", "Snacks", "Beverages", "Gifts", "Toys", "Stationery", "Other"]);
+    const set = new Set<string>();
+    productCategories.forEach(c => {
+      if (c.name && c.name.trim()) set.add(c.name.trim());
+    });
     customProducts.forEach(p => {
       if (p.category && typeof p.category === 'string' && p.category.trim()) {
-        predefined.add(p.category.trim());
+        set.add(p.category.trim());
       }
     });
-    return Array.from(predefined);
-  }, [customProducts]);
+    return Array.from(set);
+  }, [productCategories, customProducts]);
 
   const filteredProducts = useMemo(() => {
     let result = orderedProducts.filter(p => {
@@ -3564,111 +3622,134 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddCustomProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const isCombo = (newProductForm.productType || "Single product") === "Combo set";
-    if (!newProductForm.name) return;
-    if (!isCombo && !newProductForm.price) return;
-    if (!newProductForm.category) {
-      toast.error("Please select a category before saving.");
-      return;
-    }
-    if (isCombo && newProductForm.comboProductIds.length === 0) {
-      toast.error("Please select at least one product for the Combo Set.");
-      return;
-    }
+  const handleSaveProductListing = async (productData: any, isDraft = false) => {
     try {
       setIsSavingProduct(true);
-      let uploadedImageUrls: string[] = [];
+      const actionName = editingProductItem ? 'Edited' : 'Added New';
+      const typeLabel = productData.productType || 'Single product';
 
-      if (newProductImages.length > 0) {
-        const toastId = toast.loading(`Uploading ${newProductImages.length} product image(s) to Cloudinary...`);
-        try {
-          uploadedImageUrls = await uploadMultipleToCloudinary(newProductImages);
-          toast.success(`${uploadedImageUrls.length} image(s) uploaded to Cloudinary!`, { id: toastId });
-        } catch (uploadErr: any) {
-          toast.error(uploadErr?.message || "Cloudinary image upload failed", { id: toastId });
-          setIsSavingProduct(false);
-          return;
-        }
-      }
-
-      const combinedImages = [...newProductExistingImages, ...uploadedImageUrls];
-      const productType = newProductForm.productType || "Single product";
-
-      const dataToSave: any = {
-        name: newProductForm.name,
-        price: Number(newProductForm.price) || 0,
-        sellingPrice: Number(newProductForm.price) || 0,
-        wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
-        productType: productType,
-        description: newProductForm.description || "",
-        category: newProductForm.category || "",
-        createdAt: new Date().toISOString(),
-        images: combinedImages
-      };
-
-      if (isCombo) {
-        dataToSave.comboProductIds = newProductForm.comboProductIds;
-      }
-
-      if (editProductId) {
-        const updateData: any = {
-          name: newProductForm.name,
-          price: Number(newProductForm.price) || 0,
-          sellingPrice: Number(newProductForm.price) || 0,
-          wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
-          productType: productType,
-          description: newProductForm.description || "",
-          category: newProductForm.category || "",
-          images: combinedImages
-        };
-        if (isCombo) {
-          updateData.comboProductIds = newProductForm.comboProductIds;
-        }
-        await updateDoc(doc(db, "products", editProductId), updateData);
-        toast.success("Listing updated successfully!");
-        logActivity(`Edited Listing: ${newProductForm.name} [${productType}] (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
+      if (editingProductItem) {
+        await updateDoc(doc(db, "products", editingProductItem.fireId), productData);
+        toast.success(isDraft ? "Listing saved as Draft!" : "Listing updated successfully!");
+        logActivity(`${actionName} Listing: ${productData.name} [${typeLabel}] (Selling: ₹${productData.price}, Wholesale: ₹${productData.wholesalePrice || 0})`, 'Products');
       } else {
-        await addDoc(collection(db, "products"), dataToSave);
-        toast.success("Product listing added successfully!");
-        logActivity(`Added New Listing: ${newProductForm.name} [${productType}] (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
+        await addDoc(collection(db, "products"), productData);
+        toast.success(isDraft ? "Listing saved as Draft!" : "Product listing added successfully!");
+        logActivity(`Added New Listing: ${productData.name} [${typeLabel}] (Selling: ₹${productData.price}, Wholesale: ₹${productData.wholesalePrice || 0})`, 'Products');
       }
-      setIsAddProductModalOpen(false);
-      setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] });
-      setNewProductImages([]);
-      setNewProductExistingImages([]);
-      setEditProductId(null);
-      setComboSearchQuery("");
+      setIsProductModalOpen(false);
+      setEditingProductItem(null);
     } catch (err: any) {
-      console.error("Error saving product:", err);
-      toast.error(err?.message || "Error saving product.");
+      console.error("Error saving product listing:", err);
+      toast.error(err?.message || "Error saving product listing.");
+      throw err;
     } finally {
       setIsSavingProduct(false);
     }
   };
 
   const handleEditProductClick = (prod: any) => {
-    setNewProductForm({ 
-      name: prod.name, 
-      wholesalePrice: String(prod.wholesalePrice !== undefined && prod.wholesalePrice !== null ? prod.wholesalePrice : ""), 
-      price: String(prod.price ?? prod.sellingPrice ?? ""),
-      productType: prod.productType || "Single product",
-      description: prod.description || "",
-      category: prod.category || "",
-      comboProductIds: prod.comboProductIds || []
-    });
-    setNewProductExistingImages(prod.images || []);
-    setNewProductImages([]);
-    setEditProductId(prod.fireId);
-    setComboSearchQuery("");
-    if (activeTab === 'products') {
-      const formEl = document.getElementById("product-inline-form");
-      if (formEl) {
-        formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setEditingProductItem(prod);
+    setIsProductModalOpen(true);
+  };
+
+  const handleAddCategory = async (name: string, description?: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    try {
+      const docRef = await addDoc(collection(db, "product_categories"), {
+        name: trimmed,
+        description: description || '',
+        createdAt: new Date().toISOString()
+      });
+      const newCat: CategoryItem = {
+        id: docRef.id,
+        name: trimmed,
+        description: description || '',
+        createdAt: new Date().toISOString()
+      };
+      setProductCategories(prev => {
+        const updated = [...prev.filter(c => c.id !== newCat.id), newCat].sort((a, b) => a.name.localeCompare(b.name));
+        try { localStorage.setItem('sabi_product_categories', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      logActivity(`Added Category: ${trimmed}`, 'Products');
+      toast.success(`Category "${trimmed}" added!`);
+      return true;
+    } catch (err: any) {
+      console.error("Error adding category:", err);
+      toast.error(err?.message || "Failed to add category");
+      return false;
+    }
+  };
+
+  const handleEditCategory = async (id: string, oldName: string, newName: string, description?: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return false;
+    try {
+      if (!id.startsWith('cat-init-')) {
+        await updateDoc(doc(db, "product_categories", id), {
+          name: trimmed,
+          description: description || ''
+        });
+      } else {
+        const docRef = await addDoc(collection(db, "product_categories"), {
+          name: trimmed,
+          description: description || '',
+          createdAt: new Date().toISOString()
+        });
+        id = docRef.id;
       }
-    } else {
-      setIsAddProductModalOpen(true);
+
+      // Cascade update to existing products using the old category name
+      if (oldName !== trimmed) {
+        const matchingProds = customProducts.filter(p => p.category?.trim().toLowerCase() === oldName.trim().toLowerCase());
+        for (const mp of matchingProds) {
+          if (mp.fireId) {
+            await updateDoc(doc(db, "products", mp.fireId), { category: trimmed });
+          }
+        }
+      }
+
+      setProductCategories(prev => {
+        const updated = prev.map(c => c.id === id || c.name === oldName ? { ...c, id, name: trimmed, description: description || '' } : c)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        try { localStorage.setItem('sabi_product_categories', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      logActivity(`Edited Category: ${oldName} → ${trimmed}`, 'Products');
+      toast.success(`Category updated to "${trimmed}"!`);
+      return true;
+    } catch (err: any) {
+      console.error("Error updating category:", err);
+      toast.error(err?.message || "Failed to update category");
+      return false;
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    const isUsed = customProducts.some(p => p.category?.trim().toLowerCase() === name.trim().toLowerCase());
+    if (isUsed) {
+      toast.error(`Cannot delete "${name}". It is currently assigned to one or more active products.`);
+      return false;
+    }
+
+    try {
+      if (!id.startsWith('cat-init-')) {
+        await deleteDoc(doc(db, "product_categories", id));
+      }
+      setProductCategories(prev => {
+        const updated = prev.filter(c => c.id !== id && c.name.toLowerCase() !== name.toLowerCase());
+        try { localStorage.setItem('sabi_product_categories', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      logActivity(`Deleted Category: ${name}`, 'Products');
+      toast.success(`Category "${name}" deleted!`);
+      return true;
+    } catch (err: any) {
+      console.error("Error deleting category:", err);
+      toast.error(err?.message || "Failed to delete category");
+      return false;
     }
   };
 
@@ -4990,485 +5071,139 @@ export default function Dashboard() {
           {activeTab === 'products' && (
             <div className="space-y-8 print:hidden animate-in fade-in duration-300 pb-12">
               
-              {/* Top Control Header Card — SaaS-style Layout */}
-              <div className="bg-[#0d1527] p-5 md:p-6 rounded-3xl shadow-2xl border border-white/15">
-                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-                  {/* LEFT: Products title + Dynamic result count */}
-                  <div className="flex items-center gap-3.5 shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/50 shrink-0">
-                      <ShoppingBag size={24} />
-                    </div>
-                    <div>
-                      <h2 className="text-xl md:text-2xl font-black text-white tracking-wide">
-                        Products
-                      </h2>
-                      <p className="text-xs md:text-sm text-slate-400 font-medium">
-                        {productCountDisplay}
-                      </p>
-                    </div>
+              {/* Top Products Header Bar with Prominent [+ New Listing] and [📂 Manage Categories] */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#0d1527] p-5 md:p-6 rounded-3xl shadow-2xl border border-white/15">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/50 shrink-0">
+                    <ShoppingBag size={24} />
                   </div>
-
-                  {/* CENTER: Prominent Large Horizontally Centered Search Bar */}
-                  <div className="w-full lg:max-w-xl mx-auto">
-                    <div className="relative w-full">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                      <input
-                        type="text"
-                        placeholder="Search Products..."
-                        value={productSearchQuery}
-                        onChange={(e) => setProductSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-10 py-3.5 bg-[#151f36] border-2 border-white/15 rounded-2xl text-sm font-bold text-white placeholder:text-slate-500 outline-none focus:border-blue-500 transition-all shadow-inner hover:border-white/25"
-                      />
-                      {productSearchQuery && (
-                        <button
-                          onClick={() => setProductSearchQuery('')}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-white tracking-wide">
+                      Products
+                    </h2>
+                    <p className="text-xs md:text-sm text-slate-400 font-medium">
+                      {productCountDisplay}
+                    </p>
                   </div>
+                </div>
 
-                  {/* RIGHT: Category dropdown, Sort dropdown, and Type filter */}
-                  <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2.5 shrink-0">
-                    {/* Category Filter */}
-                    <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
-                      <Tag size={13} className="text-emerald-400 shrink-0" />
-                      <span className="text-slate-400 text-xs hidden sm:inline">Category:</span>
-                      <div className="relative">
-                        <select
-                          aria-label="Filter by category"
-                          value={productCategoryFilter}
-                          onChange={(e) => setProductCategoryFilter(e.target.value)}
-                          className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
-                        >
-                          <option value="all" className="bg-[#162035] text-white">All Categories</option>
-                          {availableCategories.map(cat => (
-                            <option key={cat} value={cat} className="bg-[#162035] text-white">{cat}</option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
-                          <ChevronDown size={12} />
-                        </div>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryModalOpen(true)}
+                    className="px-4 py-2.5 bg-[#15213b] hover:bg-[#1a2948] text-slate-200 hover:text-white border border-white/15 rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    <FolderTree size={15} className="text-emerald-400" />
+                    <span>Manage Categories</span>
+                  </button>
 
-                    {/* Sort Dropdown */}
-                    <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
-                      <Layers size={13} className="text-purple-400 shrink-0" />
-                      <span className="text-slate-400 text-xs hidden sm:inline">Sort:</span>
-                      <div className="relative">
-                        <select
-                          aria-label="Sort products"
-                          value={productSortOrder}
-                          onChange={(e) => setProductSortOrder(e.target.value as any)}
-                          className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
-                        >
-                          <option value="none" className="bg-[#162035] text-white">Default</option>
-                          <option value="a-z" className="bg-[#162035] text-white">A → Z</option>
-                          <option value="z-a" className="bg-[#162035] text-white">Z → A</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
-                          <ChevronDown size={12} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Product Type Filter */}
-                    <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
-                      <Filter size={13} className="text-amber-400 shrink-0" />
-                      <span className="text-slate-400 text-xs hidden sm:inline">Type:</span>
-                      <div className="relative">
-                        <select
-                          aria-label="Filter products by type"
-                          value={productTypeFilter}
-                          onChange={(e) => setProductTypeFilter(e.target.value)}
-                          className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
-                        >
-                          <option value="all" className="bg-[#162035] text-white">All Types</option>
-                          <option value="Single product" className="bg-[#162035] text-cyan-300">Single</option>
-                          <option value="Combo set" className="bg-[#162035] text-purple-300">Combo</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
-                          <ChevronDown size={12} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProductItem(null);
+                      setIsProductModalOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/40 hover:shadow-xl hover:shadow-blue-600/50 flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+                  >
+                    <Plus size={16} />
+                    <span>+ New Listing</span>
+                  </button>
                 </div>
               </div>
 
-
-              {/* 🟢 INLINE "ADD NEW LISTING" FORM (Directly on Page - NO POPUP MODAL) */}
-              <div id="product-inline-form" className="bg-[#0c1427] border border-white/15 rounded-[2rem] p-6 md:p-8 max-w-xl mx-auto shadow-2xl text-white">
-                <div className="flex items-center justify-between border-b border-white/15 pb-4 mb-6">
-                  <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider">
-                    {editProductId ? "Edit Listing" : "Add New Listing"}
-                  </h3>
-                  {editProductId && (
-                    <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-400/50 px-3 py-1 rounded-full font-bold">
-                      Editing Mode
-                    </span>
-                  )}
+              {/* Search and Filters Bar */}
+              <div className="bg-[#0d1527] p-4 md:p-5 rounded-3xl shadow-xl border border-white/15 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                {/* Search Bar */}
+                <div className="w-full lg:max-w-xl">
+                  <div className="relative w-full">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Search Products by name, category, SKU, brand..."
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      className="w-full pl-11 pr-10 py-3 bg-[#151f36] border-2 border-white/15 rounded-2xl text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-blue-500 transition-all shadow-inner hover:border-white/25"
+                    />
+                    {productSearchQuery && (
+                      <button
+                        onClick={() => setProductSearchQuery('')}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <form onSubmit={handleAddCustomProduct} className="space-y-4">
-                  {/* Row 1: Name/Combo Name + Product Type */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        {(newProductForm.productType || "Single product") === "Combo set" ? "Combo Set Name" : "Item Name"}
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={newProductForm.name}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder={(newProductForm.productType || "Single product") === "Combo set" ? "e.g. Chocolate Festival Combo" : "Enter Item Name (e.g. Munch)"}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Listing Type
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={newProductForm.productType || "Single product"}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value, comboProductIds: e.target.value === "Single product" ? [] : newProductForm.comboProductIds })}
-                          style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                          className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-9"
-                        >
-                          <option value="Single product" className="bg-[#151f36] text-white">Single product</option>
-                          <option value="Combo set" className="bg-[#151f36] text-white">Combo set</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                          <ChevronDown size={16} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Category (Mandatory) */}
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                      Category <span className="text-rose-400">*</span>
-                    </label>
+                {/* Filters */}
+                <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2.5 shrink-0">
+                  {/* Category Filter */}
+                  <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                    <Tag size={13} className="text-emerald-400 shrink-0" />
+                    <span className="text-slate-400 text-xs hidden sm:inline">Category:</span>
                     <div className="relative">
                       <select
-                        required
-                        value={newProductForm.category}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: newProductForm.category ? '#ffffff' : '#94a3b8', borderColor: !newProductForm.category ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-9"
+                        aria-label="Filter by category"
+                        value={productCategoryFilter}
+                        onChange={(e) => setProductCategoryFilter(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
                       >
-                        <option value="" className="bg-[#151f36] text-slate-400">Select Category...</option>
-                        {PRODUCT_CATEGORIES.map(cat => (
-                          <option key={cat} value={cat} className="bg-[#151f36] text-white">{cat}</option>
+                        <option value="all" className="bg-[#162035] text-white">All Categories</option>
+                        {availableCategories.map(cat => (
+                          <option key={cat} value={cat} className="bg-[#162035] text-white">{cat}</option>
                         ))}
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                        <ChevronDown size={16} />
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                        <ChevronDown size={12} />
                       </div>
                     </div>
                   </div>
 
-                  {/* Combo Set: Select Products */}
-                  {(newProductForm.productType || "Single product") === "Combo set" && (
-                    <div className="space-y-3">
-                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Boxes size={13} className="text-purple-400" />
-                        Select Products for Combo
-                        <span className="text-rose-400">*</span>
-                        {newProductForm.comboProductIds.length > 0 && (
-                          <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full ml-auto">
-                            {newProductForm.comboProductIds.length} selected
-                          </span>
-                        )}
-                      </label>
-
-                      {/* Search for products */}
-                      <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          placeholder="Search existing products..."
-                          value={comboSearchQuery}
-                          onChange={(e) => setComboSearchQuery(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2.5 bg-[#151f36] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-purple-400 transition-colors"
-                        />
-                      </div>
-
-                      {/* Available products list */}
-                      <div className="max-h-44 overflow-y-auto custom-scrollbar bg-[#121b2f] rounded-xl border border-white/10 divide-y divide-white/5">
-                        {customProducts
-                          .filter(p => (p.productType || "Single product") === "Single product")
-                          .filter(p => !comboSearchQuery.trim() || (p.name && p.name.toLowerCase().includes(comboSearchQuery.toLowerCase())))
-                          .map(p => {
-                            const isSelected = newProductForm.comboProductIds.includes(p.fireId);
-                            const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
-                            return (
-                              <div
-                                key={p.fireId}
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((id: string) => id !== p.fireId) });
-                                  } else {
-                                    setNewProductForm({ ...newProductForm, comboProductIds: [...newProductForm.comboProductIds, p.fireId] });
-                                  }
-                                }}
-                                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all text-xs ${isSelected ? 'bg-purple-500/15 border-l-2 border-l-purple-400' : 'hover:bg-white/5'}`}
-                              >
-                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-purple-500 border-purple-400' : 'border-white/20'}`}>
-                                  {isSelected && <Check size={12} className="text-white" />}
-                                </div>
-                                {p.images && p.images.length > 0 ? (
-                                  <img src={p.images[0]} alt={p.name} className="w-8 h-8 rounded-lg object-cover border border-white/20 shrink-0" />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-[10px] border border-blue-500/30 shrink-0">
-                                    {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
-                                  </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <span className="font-extrabold text-white truncate block">{p.name}</span>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    {p.category && <span className="text-[10px] text-slate-400">{p.category}</span>}
-                                    <span className="text-[10px] text-amber-400 font-semibold">Sold: {pSoldCount}</span>
-                                  </div>
-                                </div>
-                                {(p.price || p.sellingPrice) && (
-                                  <span className="text-emerald-400 font-bold text-[11px] shrink-0">₹{Number(p.price ?? p.sellingPrice).toLocaleString()}</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        {customProducts.filter(p => (p.productType || "Single product") === "Single product").length === 0 && (
-                          <div className="px-3 py-4 text-center text-xs text-slate-500 font-medium">No single products available. Create single products first.</div>
-                        )}
-                      </div>
-
-                      {/* Selected products preview list with image, name, category, sold count, remove */}
-                      {newProductForm.comboProductIds.length > 0 && (
-                        <div className="space-y-2 pt-1">
-                          <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider block">Selected Items:</span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {newProductForm.comboProductIds.map((id: string) => {
-                              const p = customProducts.find(pr => pr.fireId === id);
-                              if (!p) return null;
-                              const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
-                              return (
-                                <div key={id} className="flex items-center gap-2.5 bg-[#15213b] border border-purple-500/30 rounded-xl p-2 shadow-sm">
-                                  {p.images && p.images.length > 0 ? (
-                                    <img src={p.images[0]} alt={p.name} className="w-9 h-9 rounded-lg object-cover border border-white/20 shrink-0" />
-                                  ) : (
-                                    <div className="w-9 h-9 rounded-lg bg-purple-500/30 text-purple-300 flex items-center justify-center text-xs font-black shrink-0">
-                                      {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
-                                    </div>
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-xs font-bold text-white truncate block">{p.name}</span>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      {p.category && (
-                                        <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-semibold border border-blue-500/30">
-                                          {p.category}
-                                        </span>
-                                      )}
-                                      <span className="text-[10px] text-amber-400 font-semibold">
-                                        Sold: {pSoldCount}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((cid: string) => cid !== id) })}
-                                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                                    title="Remove from combo"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Price Fields */}
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Wholesale Price
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={newProductForm.wholesalePrice}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder="Wholesale Price"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Selling Price
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={newProductForm.price}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder="Selling Price"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Description Textarea with bullet point helper */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Book size={12} className="text-blue-400" />
-                        Description
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const current = newProductForm.description || "";
-                          const next = current ? (current.endsWith('\n') ? `${current}• ` : `${current}\n• `) : "• ";
-                          setNewProductForm({ ...newProductForm, description: next });
-                        }}
-                        className="text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  {/* Sort Dropdown */}
+                  <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                    <Layers size={13} className="text-purple-400 shrink-0" />
+                    <span className="text-slate-400 text-xs hidden sm:inline">Sort:</span>
+                    <div className="relative">
+                      <select
+                        aria-label="Sort products"
+                        value={productSortOrder}
+                        onChange={(e) => setProductSortOrder(e.target.value as any)}
+                        className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
                       >
-                        + Bullet Point
-                      </button>
+                        <option value="none" className="bg-[#162035] text-white">Default</option>
+                        <option value="a-z" className="bg-[#162035] text-white">A → Z</option>
+                        <option value="z-a" className="bg-[#162035] text-white">Z → A</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                        <ChevronDown size={12} />
+                      </div>
                     </div>
-                    <textarea
-                      value={newProductForm.description}
-                      onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
-                      style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                      className="w-full font-medium rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm resize-y leading-relaxed font-sans"
-                      placeholder={"Description\n\n• Premium quality chocolate\n• Suitable for gifting\n• Individually packed\n• Best for birthday celebrations\n• Multiple flavours available"}
-                      rows={5}
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">Supports normal text, product highlights, and bullet points (• or -)</p>
                   </div>
 
-                  {/* 📷 Product Images Uploader (Cloudinary) */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Camera size={13} className="text-amber-400" />
-                        <span>Product Photos (Saved to Cloudinary)</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-normal">Optional</span>
-                    </label>
-
-                    {/* Previews of Existing & Selected Images */}
-                    {(newProductExistingImages.length > 0 || newProductImages.length > 0) && (
-                      <div className="flex flex-wrap gap-2 p-2.5 bg-[#121b2f] rounded-xl border border-white/10">
-                        {/* Saved Cloudinary Images */}
-                        {newProductExistingImages.map((imgUrl, idx) => (
-                          <div key={`existing-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-white/20 shadow-sm">
-                            <img src={imgUrl} alt="Product" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => setNewProductExistingImages(prev => prev.filter((_, i) => i !== idx))}
-                              className="absolute top-0.5 right-0.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              <X size={10} />
-                            </button>
-                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] text-center text-slate-300 font-bold">Saved</span>
-                          </div>
-                        ))}
-
-                        {/* Selected New Images to Upload */}
-                        {newProductImages.map((file, idx) => (
-                          <div key={`new-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-emerald-400/50 shadow-sm">
-                            <img src={URL.createObjectURL(file)} alt="New upload" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => setNewProductImages(prev => prev.filter((_, i) => i !== idx))}
-                              className="absolute top-0.5 right-0.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              <X size={10} />
-                            </button>
-                            <span className="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-[8px] text-center text-white font-bold">Ready</span>
-                          </div>
-                        ))}
+                  {/* Product Type Filter */}
+                  <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3 py-2 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                    <Filter size={13} className="text-amber-400 shrink-0" />
+                    <span className="text-slate-400 text-xs hidden sm:inline">Type:</span>
+                    <div className="relative">
+                      <select
+                        aria-label="Filter products by type"
+                        value={productTypeFilter}
+                        onChange={(e) => setProductTypeFilter(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
+                      >
+                        <option value="all" className="bg-[#162035] text-white">All Types</option>
+                        <option value="Single product" className="bg-[#162035] text-cyan-300">Single</option>
+                        <option value="Combo set" className="bg-[#162035] text-purple-300">Combo</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                        <ChevronDown size={12} />
                       </div>
-                    )}
-
-                    <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
-                      <Upload size={15} className="text-amber-400" />
-                      <span>Click to select product photos</span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            const selected = Array.from(e.target.files);
-                            setNewProductImages(prev => [...prev, ...selected]);
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
+                    </div>
                   </div>
-
-                  {/* Dynamic Real-time Profit Indicator inside the Form */}
-                  {(newProductForm.price || newProductForm.wholesalePrice) && (() => {
-                    const sp = Number(newProductForm.price) || 0;
-                    const wp = Number(newProductForm.wholesalePrice) || 0;
-                    const profit = sp - wp;
-                    const marginPct = wp > 0 ? Math.round((profit / wp) * 100) : 100;
-                    return (
-                      <div className="bg-[#151f36]/80 border border-white/10 rounded-xl p-3 flex items-center justify-between text-xs animate-in fade-in">
-                        <span className="text-slate-300 font-semibold">Calculated Profit (Selling - Wholesale):</span>
-                        <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          ₹{profit.toLocaleString()} {wp > 0 ? `(${marginPct}%)` : ''}
-                        </span>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] });
-                        setNewProductImages([]);
-                        setNewProductExistingImages([]);
-                        setEditProductId(null);
-                        setComboSearchQuery("");
-                      }}
-                      className="flex-1 px-5 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-all cursor-pointer text-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingProduct}
-                      className={`flex-1 px-5 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/40 hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}
-                    >
-                      {isSavingProduct ? "Uploading to Cloudinary..." : (editProductId ? "Update Listing" : "Save Listing")}
-                    </button>
-                  </div>
-                </form>
+                </div>
               </div>
 
-              {/* 🟢 DEDICATED PRODUCTS TABLE (Chronological Order Added, Profit Calculation) */}
+              {/* 🟢 DEDICATED PRODUCTS TABLE */}
               <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 text-white">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 pb-4 border-b border-white/10">
                   <div>
@@ -5498,7 +5233,17 @@ export default function Dashboard() {
                   <div className="py-16 text-center space-y-3">
                     <Package size={48} className="mx-auto text-slate-600 animate-pulse" />
                     <p className="text-lg font-bold text-slate-400">No product listings added yet.</p>
-                    <p className="text-xs text-slate-500">Fill in the "ADD NEW LISTING" form above to create your first product.</p>
+                    <p className="text-xs text-slate-500">Click "+ New Listing" above to create your first product.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingProductItem(null);
+                        setIsProductModalOpen(true);
+                      }}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg cursor-pointer"
+                    >
+                      + Create First Listing
+                    </button>
                   </div>
                 ) : filteredProducts.length === 0 ? (
                   <div className="py-16 text-center space-y-3">
@@ -5525,24 +5270,26 @@ export default function Dashboard() {
                     <table className="w-full text-left border-collapse text-xs md:text-sm">
                       <thead>
                         <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
-                          <th className="py-3.5 px-4 text-center w-12">#</th>
+                          <th className="py-3.5 px-3 text-center w-10">#</th>
                           <th className="py-3.5 px-4">Item Name</th>
-                          <th className="py-3.5 px-4 text-center w-28">Type</th>
-                          <th className="py-3.5 px-4 text-center w-28">Category</th>
-                          <th className="py-3.5 px-4 text-right">Wholesale (₹)</th>
-                          <th className="py-3.5 px-4 text-right">Selling (₹)</th>
-                          <th className="py-3.5 px-4 text-right">Profit (₹)</th>
-                          <th className="py-3.5 px-4 text-center w-20">Sold</th>
+                          <th className="py-3.5 px-3 text-center w-28">Type</th>
+                          <th className="py-3.5 px-3 text-center w-28">Category</th>
+                          <th className="py-3.5 px-3 text-center w-24">Status</th>
+                          <th className="py-3.5 px-3 text-center w-20">Stock</th>
+                          <th className="py-3.5 px-3 text-right">Wholesale (₹)</th>
+                          <th className="py-3.5 px-3 text-right">Selling (₹)</th>
+                          <th className="py-3.5 px-3 text-right">Profit (₹)</th>
+                          <th className="py-3.5 px-3 text-center w-16">Sold</th>
                           <th className="py-3.5 px-4 text-center w-28">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {filteredProducts.map((prod, index) => {
                             const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
-                            const wholePrice = Number(prod.wholesalePrice) || 0;
+                            const wholePrice = Number(prod.discountPrice ?? prod.wholesalePrice) || 0;
                             const profit = sellPrice - wholePrice;
                             const marginPct = wholePrice > 0 ? Math.round((profit / wholePrice) * 100) : 100;
-                            const isCurrentlyEditing = editProductId === prod.fireId;
+                            const isCurrentlyEditing = editingProductItem?.fireId === prod.fireId;
                             const pType = prod.productType || "Single product";
 
                             return (
@@ -5551,7 +5298,7 @@ export default function Dashboard() {
                                 className={`hover:bg-[#15213b]/60 transition-colors ${isCurrentlyEditing ? 'bg-amber-500/15 border-l-4 border-l-amber-400' : ''}`}
                               >
                                 {/* # / Order Number */}
-                                <td className="py-3.5 px-4 text-center font-black text-amber-400">
+                                <td className="py-3.5 px-3 text-center font-black text-amber-400">
                                   {index + 1}
                                 </td>
 
@@ -5579,32 +5326,39 @@ export default function Dashboard() {
                                       <span className="font-extrabold text-white tracking-wide truncate">
                                         {prod.name}
                                       </span>
-                                      <span className="text-[11px] font-bold text-amber-400/90 flex items-center gap-1 mt-0.5">
-                                        Sold: {productSoldCountMap[(prod.name || '').trim().toLowerCase()] || 0}
-                                      </span>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        {prod.sku && (
+                                          <span className="text-[10px] font-mono text-blue-400">
+                                            {prod.sku}
+                                          </span>
+                                        )}
+                                        <span className="text-[10px] font-bold text-amber-400/90 flex items-center gap-1">
+                                          Sold: {productSoldCountMap[(prod.name || '').trim().toLowerCase()] || 0}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                 </td>
 
                                 {/* Product Type */}
-                                <td className="py-3.5 px-4 text-center">
+                                <td className="py-3.5 px-3 text-center">
                                   {pType === "Combo set" ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm">
-                                      <Boxes size={12} className="text-purple-400" />
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm">
+                                      <Boxes size={11} className="text-purple-400" />
                                       Combo set
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm">
-                                      <Package size={12} className="text-cyan-400" />
-                                      Single product
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm">
+                                      <Package size={11} className="text-cyan-400" />
+                                      Single
                                     </span>
                                   )}
                                 </td>
 
                                 {/* Category */}
-                                <td className="py-3.5 px-4 text-center">
+                                <td className="py-3.5 px-3 text-center">
                                   {prod.category ? (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 shadow-sm">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 shadow-sm">
                                       {prod.category}
                                     </span>
                                   ) : (
@@ -5612,34 +5366,61 @@ export default function Dashboard() {
                                   )}
                                 </td>
 
+                                {/* Status */}
+                                <td className="py-3.5 px-3 text-center">
+                                  {(() => {
+                                    const st = prod.status || 'Active';
+                                    let badgeStyle = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+                                    if (st === 'Draft') badgeStyle = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                                    else if (st === 'Out of Stock') badgeStyle = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                                    else if (st === 'Inactive') badgeStyle = 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+                                    return (
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black border ${badgeStyle}`}>
+                                        {st}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+
+                                {/* Stock */}
+                                <td className="py-3.5 px-3 text-center font-extrabold text-xs">
+                                  {prod.stock !== undefined && prod.stock !== null ? (
+                                    <span className={Number(prod.stock) <= 10 ? 'text-rose-400 font-black' : 'text-slate-200'}>
+                                      {prod.stock}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">—</span>
+                                  )}
+                                </td>
+
                                 {/* Wholesale Price */}
-                                <td className="py-3.5 px-4 text-right font-black text-blue-400">
+                                <td className="py-3.5 px-3 text-right font-black text-blue-400">
                                   ₹{wholePrice.toLocaleString()}
                                 </td>
 
                                 {/* Selling Price */}
-                                <td className="py-3.5 px-4 text-right font-black text-emerald-400">
+                                <td className="py-3.5 px-3 text-right font-black text-emerald-400">
                                   ₹{sellPrice.toLocaleString()}
                                 </td>
 
                                 {/* Profit = Selling Price - Wholesale Price */}
-                                <td className="py-3.5 px-4 text-right">
+                                <td className="py-3.5 px-3 text-right">
                                   <div className="flex flex-col items-end">
-                                    <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    <span className={`font-black text-xs md:text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                       ₹{profit.toLocaleString()}
                                     </span>
-                                    <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                                    <span className={`text-[9px] font-bold ${profit >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
                                       {marginPct}% margin
                                     </span>
                                   </div>
                                 </td>
 
                                 {/* Sold Count */}
-                                <td className="py-3.5 px-4 text-center">
+                                <td className="py-3.5 px-3 text-center">
                                   {(() => {
                                     const sCount = productSoldCountMap[(prod.name || '').trim().toLowerCase()] || 0;
                                     return (
-                                      <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-black min-w-[28px] ${sCount > 0 ? 'bg-amber-400/15 text-amber-300 border border-amber-400/30' : 'text-slate-500'}`}>
+                                      <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-black min-w-[24px] ${sCount > 0 ? 'bg-amber-400/15 text-amber-300 border border-amber-400/30' : 'text-slate-500'}`}>
                                         {sCount}
                                       </span>
                                     );
@@ -5706,30 +5487,33 @@ export default function Dashboard() {
                       </tbody>
                       {/* Summary Row */}
                       {filteredProducts.length > 0 && (() => {
-                        const totalWholesale = filteredProducts.reduce((sum, p) => sum + (Number(p.wholesalePrice) || 0), 0);
+                        const totalWholesale = filteredProducts.reduce((sum, p) => sum + (Number(p.discountPrice ?? p.wholesalePrice) || 0), 0);
                         const totalSelling = filteredProducts.reduce((sum, p) => sum + (Number(p.price ?? p.sellingPrice) || 0), 0);
                         const totalProfit = totalSelling - totalWholesale;
                         const avgMarginPct = totalWholesale > 0 ? Math.round((totalProfit / totalWholesale) * 100) : 0;
                         const totalSold = filteredProducts.reduce((sum, p) => sum + (productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0), 0);
+                        const totalStock = filteredProducts.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
                         return (
                           <tfoot>
                             <tr className="bg-[#121a2d] border-t-2 border-white/15 font-black text-xs md:text-sm">
-                              <td className="py-3.5 px-4 text-center text-amber-400">Total</td>
+                              <td className="py-3.5 px-3 text-center text-amber-400">Total</td>
                               <td className="py-3.5 px-4 text-slate-300 font-bold">{filteredProducts.length} Listings</td>
-                              <td className="py-3.5 px-4 text-center text-slate-400 text-xs font-semibold">
+                              <td className="py-3.5 px-3 text-center text-slate-400 text-xs font-semibold">
                                 {productTypeFilter === 'all' ? `${singleProductsCount} Single / ${comboSetsCount} Combo` : productTypeFilter}
                               </td>
-                              <td className="py-3.5 px-4 text-center text-slate-400 text-xs font-semibold">
+                              <td className="py-3.5 px-3 text-center text-slate-400 text-xs font-semibold">
                                 {productCategoryFilter === 'all' ? 'All Cats' : productCategoryFilter}
                               </td>
-                              <td className="py-3.5 px-4 text-right text-blue-400">₹{totalWholesale.toLocaleString()}</td>
-                              <td className="py-3.5 px-4 text-right text-emerald-400">₹{totalSelling.toLocaleString()}</td>
-                              <td className="py-3.5 px-4 text-right">
+                              <td className="py-3.5 px-3 text-center text-slate-400 text-xs">—</td>
+                              <td className="py-3.5 px-3 text-center text-slate-400 text-xs">{totalStock}</td>
+                              <td className="py-3.5 px-3 text-right text-blue-400">₹{totalWholesale.toLocaleString()}</td>
+                              <td className="py-3.5 px-3 text-right text-emerald-400">₹{totalSelling.toLocaleString()}</td>
+                              <td className="py-3.5 px-3 text-right">
                                 <span className={`text-sm ${totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                   ₹{totalProfit.toLocaleString()} ({avgMarginPct}%)
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 text-center text-amber-400 font-black">
+                              <td className="py-3.5 px-3 text-center text-amber-400 font-black">
                                 {totalSold}
                               </td>
                               <td className="py-3.5 px-4"></td>
@@ -8965,281 +8749,32 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* 🟢 NEW LISTING / NEW PRODUCT MODAL */}
-      {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] }); setNewProductImages([]); setNewProductExistingImages([]); }}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-lg p-6 md:p-7 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-black mb-5 text-white text-center tracking-wide border-b border-white/15 pb-3 uppercase">
-              {editProductId ? "Edit Listing" : "Add New Listing"}
-            </h2>
-            <form onSubmit={handleAddCustomProduct} className="space-y-4">
-              {/* Name & Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">
-                    {(newProductForm.productType || "Single product") === "Combo set" ? "Combo Set Name" : "Item Name"}
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={newProductForm.name}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
-                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                    placeholder={(newProductForm.productType || "Single product") === "Combo set" ? "e.g. Chocolate Festival Combo" : "Enter Item Name (e.g. Munch)"}
-                  />
-                </div>
+      {/* 🟢 REUSABLE PRODUCT LISTING MODAL */}
+      <ProductListingModal
+        isOpen={isProductModalOpen}
+        onClose={() => {
+          setIsProductModalOpen(false);
+          setEditingProductItem(null);
+        }}
+        editingProduct={editingProductItem}
+        categories={productCategories}
+        onAddCategory={handleAddCategory}
+        allSingleProducts={customProducts.filter(p => (p.productType || "Single product") === "Single product")}
+        productSoldCountMap={productSoldCountMap}
+        onSave={handleSaveProductListing}
+        isSaving={isSavingProduct}
+      />
 
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Listing Type</label>
-                  <div className="relative">
-                    <select
-                      value={newProductForm.productType || "Single product"}
-                      onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value, comboProductIds: e.target.value === "Single product" ? [] : newProductForm.comboProductIds })}
-                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                      className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-8"
-                    >
-                      <option value="Single product" className="bg-[#162035] text-white">Single product</option>
-                      <option value="Combo set" className="bg-[#162035] text-white">Combo set</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                      <ChevronDown size={15} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Category (Mandatory) */}
-              <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">
-                  Category <span className="text-rose-400">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    required
-                    value={newProductForm.category}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
-                    style={{ backgroundColor: '#162035', color: newProductForm.category ? '#ffffff' : '#94a3b8', borderColor: !newProductForm.category ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)' }}
-                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-8"
-                  >
-                    <option value="" className="bg-[#162035] text-slate-400">Select Category...</option>
-                    {PRODUCT_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat} className="bg-[#162035] text-white">{cat}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                    <ChevronDown size={15} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Combo Set: Select Products */}
-              {/* Combo Set: Select Products */}
-              {(newProductForm.productType || "Single product") === "Combo set" && (
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <Boxes size={13} className="text-purple-400" />
-                    Select Products for Combo
-                    <span className="text-rose-400">*</span>
-                    {newProductForm.comboProductIds.length > 0 && (
-                      <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full ml-auto">
-                        {newProductForm.comboProductIds.length} selected
-                      </span>
-                    )}
-                  </label>
-
-                  {/* Search for products */}
-                  <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search existing products..."
-                      value={comboSearchQuery}
-                      onChange={(e) => setComboSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-[#162035] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-purple-400 transition-colors"
-                    />
-                  </div>
-
-                  {/* Available products list */}
-                  <div className="max-h-36 overflow-y-auto custom-scrollbar bg-[#121b2f] rounded-xl border border-white/10 divide-y divide-white/5">
-                    {customProducts
-                      .filter(p => (p.productType || "Single product") === "Single product")
-                      .filter(p => !comboSearchQuery.trim() || (p.name && p.name.toLowerCase().includes(comboSearchQuery.toLowerCase())))
-                      .map(p => {
-                        const isSelected = newProductForm.comboProductIds.includes(p.fireId);
-                        const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
-                        return (
-                          <div
-                            key={p.fireId}
-                            onClick={() => {
-                              if (isSelected) {
-                                setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((id: string) => id !== p.fireId) });
-                              } else {
-                                setNewProductForm({ ...newProductForm, comboProductIds: [...newProductForm.comboProductIds, p.fireId] });
-                              }
-                            }}
-                            className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all text-xs ${isSelected ? 'bg-purple-500/15 border-l-2 border-l-purple-400' : 'hover:bg-white/5'}`}
-                          >
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-purple-500 border-purple-400' : 'border-white/20'}`}>
-                              {isSelected && <Check size={10} className="text-white" />}
-                            </div>
-                            <span className="font-extrabold text-white truncate flex-1">{p.name}</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {p.category && <span className="text-[10px] text-slate-400">{p.category}</span>}
-                              <span className="text-[10px] text-amber-400 font-semibold">Sold: {pSoldCount}</span>
-                            </div>
-                            {(p.price || p.sellingPrice) && (
-                              <span className="text-emerald-400 font-bold text-[11px] shrink-0">₹{Number(p.price ?? p.sellingPrice).toLocaleString()}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-
-                  {/* Selected products cards */}
-                  {newProductForm.comboProductIds.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block">Selected Items:</span>
-                      <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar">
-                        {newProductForm.comboProductIds.map((id: string) => {
-                          const p = customProducts.find(pr => pr.fireId === id);
-                          if (!p) return null;
-                          const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
-                          return (
-                            <div key={id} className="flex items-center gap-2 bg-[#162035] border border-purple-500/30 rounded-lg p-1.5 text-xs">
-                              {p.images && p.images.length > 0 ? (
-                                <img src={p.images[0]} alt={p.name} className="w-6 h-6 rounded object-cover border border-white/20 shrink-0" />
-                              ) : (
-                                <div className="w-6 h-6 rounded bg-purple-500/30 text-purple-300 flex items-center justify-center text-[10px] font-black shrink-0">
-                                  {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
-                                </div>
-                              )}
-                              <span className="font-bold text-white truncate flex-1">{p.name}</span>
-                              {p.category && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded border border-blue-500/30">{p.category}</span>}
-                              <span className="text-[9px] text-amber-400 font-semibold">Sold: {pSoldCount}</span>
-                              <button
-                                type="button"
-                                onClick={() => setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((cid: string) => cid !== id) })}
-                                className="text-rose-400 hover:text-rose-300 cursor-pointer p-0.5 ml-1"
-                              >
-                                <X size={12} />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Price Fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Wholesale Price</label>
-                  <input required type="number" step="any" value={newProductForm.wholesalePrice} onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Wholesale Price" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Selling Price</label>
-                  <input required type="number" step="any" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Selling Price" />
-                </div>
-              </div>
-
-              {/* Description with bullet point helper */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <Book size={12} className="text-blue-400" />
-                    Description
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const current = newProductForm.description || "";
-                      const next = current ? (current.endsWith('\n') ? `${current}• ` : `${current}\n• `) : "• ";
-                      setNewProductForm({ ...newProductForm, description: next });
-                    }}
-                    className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
-                  >
-                    + Bullet Point
-                  </button>
-                </div>
-                <textarea
-                  value={newProductForm.description}
-                  onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
-                  style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                  className="w-full font-medium rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm resize-y leading-relaxed font-sans"
-                  placeholder={"Description\n\n• Premium quality chocolate\n• Suitable for gifting\n• Individually packed"}
-                  rows={4}
-                />
-              </div>
-
-              {/* 📷 Product Images (Cloudinary) */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Camera size={13} className="text-amber-400" />
-                    <span>Photos (Cloudinary)</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-normal">Optional</span>
-                </label>
-
-                {(newProductExistingImages.length > 0 || newProductImages.length > 0) && (
-                  <div className="flex flex-wrap gap-2 p-2 bg-[#121b2f] rounded-xl border border-white/10 max-h-28 overflow-y-auto">
-                    {newProductExistingImages.map((imgUrl, idx) => (
-                      <div key={`modal-existing-${idx}`} className="relative group w-12 h-12 rounded-lg overflow-hidden border border-white/20">
-                        <img src={imgUrl} alt="Product" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setNewProductExistingImages(prev => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100"
-                        >
-                          <X size={9} />
-                        </button>
-                      </div>
-                    ))}
-                    {newProductImages.map((file, idx) => (
-                      <div key={`modal-new-${idx}`} className="relative group w-12 h-12 rounded-lg overflow-hidden border border-emerald-400/50">
-                        <img src={URL.createObjectURL(file)} alt="Upload preview" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setNewProductImages(prev => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100"
-                        >
-                          <X size={9} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
-                  <Upload size={14} className="text-amber-400" />
-                  <span>Choose product photos</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const selected = Array.from(e.target.files);
-                        setNewProductImages(prev => [...prev, ...selected]);
-                      }
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-              </div>
-
-              <div className="flex gap-3 pt-3">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
-                <button type="submit" disabled={isSavingProduct} className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}>{isSavingProduct ? "Uploading..." : (editProductId ? "Update Listing" : "Save Listing")}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* 🟢 CATEGORY MANAGEMENT MODAL */}
+      <CategoryManagementModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={productCategories}
+        products={customProducts}
+        onAddCategory={handleAddCategory}
+        onEditCategory={handleEditCategory}
+        onDeleteCategory={handleDeleteCategory}
+      />
 
       {/* 🟢 NEW: INVENTORY MODAL */}
       {isInvModalOpen && (
