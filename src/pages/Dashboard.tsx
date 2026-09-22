@@ -19,7 +19,7 @@ import { getNextSequentialOrderId } from "@/lib/concurrency";
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, Copy
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -488,8 +488,11 @@ export default function Dashboard() {
 
   const [customProducts, setCustomProducts] = useState<any[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
-  const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
+  const [newProductForm, setNewProductForm] = useState({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] as string[] });
   const [productTypeFilter, setProductTypeFilter] = useState<string>("all");
+  const [comboSearchQuery, setComboSearchQuery] = useState("");
+  const [productSortOrder, setProductSortOrder] = useState<'none' | 'a-z' | 'z-a'>('none');
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>('all');
   const [newProductImages, setNewProductImages] = useState<File[]>([]);
   const [newProductExistingImages, setNewProductExistingImages] = useState<string[]>([]);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -855,6 +858,8 @@ export default function Dashboard() {
   );
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const debouncedProductSearch = useDebounce(productSearchQuery, 300);
+
+  const PRODUCT_CATEGORIES = ["Chocolates", "Snacks", "Beverages", "Gifts", "Toys", "Stationery", "Other"];
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -1553,18 +1558,106 @@ export default function Dashboard() {
     return orderedProducts.filter(p => p.productType === "Combo set").length;
   }, [orderedProducts]);
 
+  // Compute sold counts from orders for each product by name, including combo sets
+  const productSoldCountMap = useMemo(() => {
+    const directMap: Record<string, number> = {};
+    orders.forEach((o: any) => {
+      const isCancelled = o.orderStatus?.toLowerCase() === 'cancelled' || o.status?.toLowerCase() === 'cancelled';
+      if (o.category === 'product' && o.chocolate && !isCancelled) {
+        const names = String(o.chocolate).split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+        const countParts = String(o.count || '0').split(',').map(c => Number(c.trim()) || 0);
+        names.forEach((name, idx) => {
+          const qty = countParts[idx] !== undefined ? countParts[idx] : (countParts[0] || 0);
+          directMap[name] = (directMap[name] || 0) + qty;
+        });
+      }
+    });
+
+    const finalMap: Record<string, number> = { ...directMap };
+
+    // For single products that are part of combo sets, also add combo sales
+    customProducts.forEach((prod: any) => {
+      const pName = (prod.name || '').trim().toLowerCase();
+      if (!pName) return;
+      if ((prod.productType || "Single product") === "Single product") {
+        let comboContribution = 0;
+        customProducts.forEach((combo: any) => {
+          if (combo.productType === "Combo set" && Array.isArray(combo.comboProductIds) && combo.comboProductIds.includes(prod.fireId)) {
+            const comboName = (combo.name || '').trim().toLowerCase();
+            comboContribution += (directMap[comboName] || 0);
+          }
+        });
+        finalMap[pName] = (directMap[pName] || 0) + comboContribution;
+      }
+    });
+
+    return finalMap;
+  }, [orders, customProducts]);
+
+  // Available categories: predefined + any custom from products
+  const availableCategories = useMemo(() => {
+    const predefined = new Set(["Chocolates", "Snacks", "Beverages", "Gifts", "Toys", "Stationery", "Other"]);
+    customProducts.forEach(p => {
+      if (p.category && typeof p.category === 'string' && p.category.trim()) {
+        predefined.add(p.category.trim());
+      }
+    });
+    return Array.from(predefined);
+  }, [customProducts]);
+
   const filteredProducts = useMemo(() => {
-    return orderedProducts.filter(p => {
+    let result = orderedProducts.filter(p => {
       const pType = p.productType || "Single product";
       if (productTypeFilter !== 'all' && pType !== productTypeFilter) {
         return false;
       }
-      if (debouncedProductSearch.trim() && (!p.name || !p.name.toLowerCase().includes(debouncedProductSearch.toLowerCase()))) {
-        return false;
+      // Category filter
+      if (productCategoryFilter !== 'all') {
+        if (!p.category || p.category.toLowerCase() !== productCategoryFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      // Search across name, combo set name, category, and referenced items in combo
+      if (debouncedProductSearch.trim()) {
+        const q = debouncedProductSearch.toLowerCase();
+        const nameMatch = p.name && p.name.toLowerCase().includes(q);
+        const categoryMatch = p.category && p.category.toLowerCase().includes(q);
+        const comboMatch = p.productType === "Combo set" && Array.isArray(p.comboProductIds) && p.comboProductIds.some((id: string) => {
+          const item = customProducts.find(pr => pr.fireId === id);
+          return item && item.name && item.name.toLowerCase().includes(q);
+        });
+        if (!nameMatch && !categoryMatch && !comboMatch) {
+          return false;
+        }
       }
       return true;
     });
-  }, [orderedProducts, productTypeFilter, debouncedProductSearch]);
+    // Sort: A → Z or Z → A based on Product Name or Combo Set Name
+    if (productSortOrder === 'a-z') {
+      result = [...result].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+    } else if (productSortOrder === 'z-a') {
+      result = [...result].sort((a, b) => (b.name || '').localeCompare(a.name || '', undefined, { sensitivity: 'base' }));
+    }
+    return result;
+  }, [orderedProducts, productTypeFilter, productCategoryFilter, debouncedProductSearch, productSortOrder, customProducts]);
+
+  // Dynamic Product Count Display based on current filtered dataset
+  const productCountDisplay = useMemo(() => {
+    const count = filteredProducts.length;
+    const isSearchActive = Boolean(productSearchQuery.trim());
+    const isCategoryActive = productCategoryFilter !== 'all';
+
+    if (isSearchActive) {
+      return `Showing ${count} matching product${count === 1 ? '' : 's'}`;
+    }
+    if (isCategoryActive) {
+      return `Showing ${count} ${productCategoryFilter}`;
+    }
+    if (productTypeFilter !== 'all') {
+      return `Showing ${count} ${productTypeFilter === 'Combo set' ? 'Combos' : 'Single Products'}`;
+    }
+    return `Total Products: ${count}`;
+  }, [filteredProducts.length, productSearchQuery, productCategoryFilter, productTypeFilter]);
 
   const monthWiseReportData = useMemo(() => {
     const monthsMap: Record<string, { monthKey: string; monthName: string; totalRevenue: number; totalCost: number; netProfit: number }> = {};
@@ -3473,7 +3566,17 @@ export default function Dashboard() {
 
   const handleAddCustomProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductForm.name || !newProductForm.price) return;
+    const isCombo = (newProductForm.productType || "Single product") === "Combo set";
+    if (!newProductForm.name) return;
+    if (!isCombo && !newProductForm.price) return;
+    if (!newProductForm.category) {
+      toast.error("Please select a category before saving.");
+      return;
+    }
+    if (isCombo && newProductForm.comboProductIds.length === 0) {
+      toast.error("Please select at least one product for the Combo Set.");
+      return;
+    }
     try {
       setIsSavingProduct(true);
       let uploadedImageUrls: string[] = [];
@@ -3493,25 +3596,37 @@ export default function Dashboard() {
       const combinedImages = [...newProductExistingImages, ...uploadedImageUrls];
       const productType = newProductForm.productType || "Single product";
 
-      const dataToSave = {
+      const dataToSave: any = {
         name: newProductForm.name,
-        price: Number(newProductForm.price),
-        sellingPrice: Number(newProductForm.price),
+        price: Number(newProductForm.price) || 0,
+        sellingPrice: Number(newProductForm.price) || 0,
         wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
         productType: productType,
+        description: newProductForm.description || "",
+        category: newProductForm.category || "",
         createdAt: new Date().toISOString(),
         images: combinedImages
       };
 
+      if (isCombo) {
+        dataToSave.comboProductIds = newProductForm.comboProductIds;
+      }
+
       if (editProductId) {
-        await updateDoc(doc(db, "products", editProductId), {
+        const updateData: any = {
           name: newProductForm.name,
-          price: Number(newProductForm.price),
-          sellingPrice: Number(newProductForm.price),
+          price: Number(newProductForm.price) || 0,
+          sellingPrice: Number(newProductForm.price) || 0,
           wholesalePrice: parseFloat(newProductForm.wholesalePrice) || 0,
           productType: productType,
+          description: newProductForm.description || "",
+          category: newProductForm.category || "",
           images: combinedImages
-        });
+        };
+        if (isCombo) {
+          updateData.comboProductIds = newProductForm.comboProductIds;
+        }
+        await updateDoc(doc(db, "products", editProductId), updateData);
         toast.success("Listing updated successfully!");
         logActivity(`Edited Listing: ${newProductForm.name} [${productType}] (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       } else {
@@ -3520,10 +3635,11 @@ export default function Dashboard() {
         logActivity(`Added New Listing: ${newProductForm.name} [${productType}] (Selling: ₹${newProductForm.price}, Wholesale: ₹${newProductForm.wholesalePrice || 0})`, 'Products');
       }
       setIsAddProductModalOpen(false);
-      setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
+      setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] });
       setNewProductImages([]);
       setNewProductExistingImages([]);
       setEditProductId(null);
+      setComboSearchQuery("");
     } catch (err: any) {
       console.error("Error saving product:", err);
       toast.error(err?.message || "Error saving product.");
@@ -3537,11 +3653,15 @@ export default function Dashboard() {
       name: prod.name, 
       wholesalePrice: String(prod.wholesalePrice !== undefined && prod.wholesalePrice !== null ? prod.wholesalePrice : ""), 
       price: String(prod.price ?? prod.sellingPrice ?? ""),
-      productType: prod.productType || "Single product"
+      productType: prod.productType || "Single product",
+      description: prod.description || "",
+      category: prod.category || "",
+      comboProductIds: prod.comboProductIds || []
     });
     setNewProductExistingImages(prod.images || []);
     setNewProductImages([]);
     setEditProductId(prod.fireId);
+    setComboSearchQuery("");
     if (activeTab === 'products') {
       const formEl = document.getElementById("product-inline-form");
       if (formEl) {
@@ -3922,16 +4042,96 @@ export default function Dashboard() {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob })
         ]);
-        toast.success('Image copied to clipboard!');
+        toast.success('Image copied');
       }
     } catch (err) {
       console.error('Copy image error:', err);
       // Fallback: copy image URL to clipboard
       try {
         await navigator.clipboard.writeText(imageUrl);
-        toast.success('Image URL copied to clipboard!');
+        toast.success('Image copied');
       } catch (clipboardErr) {
         toast.error('Failed to copy image.');
+      }
+    }
+  };
+
+  // Copy product description to clipboard
+  const handleCopyDescription = async (product: any) => {
+    const desc = product?.description || "";
+    if (!desc.trim()) {
+      toast.error("No description available to copy.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(desc);
+      toast.success("Description copied");
+    } catch (err) {
+      toast.error("Failed to copy description.");
+    }
+  };
+
+  // Copy ALL images of a product to clipboard
+  const handleCopyAllImages = async (images: string[]) => {
+    if (!images || images.length === 0) {
+      toast.error("No images to copy.");
+      return;
+    }
+    const toastId = toast.loading(`Copying ${images.length} image(s)...`);
+    try {
+      // Convert all images to PNG blobs preserving quality
+      const blobPromises = images.map(async (url) => {
+        try {
+          const response = await fetch(url, { cache: 'force-cache' });
+          const originalBlob = await response.blob();
+          if (originalBlob.type === 'image/png') return originalBlob;
+          // Convert to PNG
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          img.src = url;
+          await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          ctx.drawImage(img, 0, 0);
+          return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+        } catch { return null; }
+      });
+      const blobs = (await Promise.all(blobPromises)).filter(Boolean) as Blob[];
+      if (blobs.length === 0) throw new Error("No images could be processed");
+
+      // Clipboard API: write primary image to clipboard
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobs[0] })]);
+      } catch (clipErr) {
+        console.warn('Clipboard write fallback:', clipErr);
+      }
+
+      if (blobs.length > 1) {
+        // For multiple images, also trigger downloads so user retains all files locally
+        blobs.forEach((blob, idx) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `product-image-${idx + 1}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      }
+
+      toast.success("All images copied", { id: toastId });
+    } catch (err) {
+      console.error('Copy all images error:', err);
+      // Fallback: copy all image URLs
+      try {
+        await navigator.clipboard.writeText(images.join('\n'));
+        toast.success('All images copied', { id: toastId });
+      } catch {
+        toast.error('Failed to copy images.', { id: toastId });
       }
     }
   };
@@ -4724,7 +4924,7 @@ export default function Dashboard() {
         )}
 
         {showHeader && (
-          <header className="bg-[#0e1628] border-b border-blue-900/50 px-3 sm:px-4 md:px-8 py-3 sm:py-4 flex justify-between items-center shadow-md relative z-50 print:hidden gap-3 flex-wrap sm:flex-nowrap">
+          <header className="bg-[#0e1628] border-b border-blue-900/50 px-3 sm:px-5 md:px-6 py-2.5 sm:py-3 flex justify-between items-center shadow-md relative z-50 print:hidden gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-2 sm:gap-3 md:gap-5 min-w-0">
               <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60 shrink-0 cursor-pointer" title="Toggle Menu">
                 <Menu size={22} />
@@ -4772,9 +4972,9 @@ export default function Dashboard() {
         )}
 
         <div className={`flex-1 ${(activeTab === 'dashboard1' || activeTab === 'dashboard2')
-            ? 'overflow-y-auto lg:overflow-y-hidden lg:flex lg:flex-col lg:min-h-0'
+            ? 'laptop-dashboard-scroll'
             : 'overflow-y-auto'
-          } custom-scrollbar p-2 md:p-4 print:p-0 print:overflow-visible`}>
+          } custom-scrollbar p-2 sm:p-3 md:p-4 print:p-0 print:overflow-visible`}>
 
           {activeTab === 'daily_tasks' && (
             <div className="w-full h-full animate-in fade-in duration-300">
@@ -4790,50 +4990,115 @@ export default function Dashboard() {
           {activeTab === 'products' && (
             <div className="space-y-8 print:hidden animate-in fade-in duration-300 pb-12">
               
-              {/* Top Control Header Card */}
-              <div className="bg-[#0d1527] p-5 md:p-6 rounded-3xl shadow-2xl border border-white/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/50 shrink-0">
-                    <ShoppingBag size={24} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
-                      Products Management & Inventory
-                    </h2>
-                    <p className="text-xs md:text-sm text-slate-300 font-medium">
-                      Create new listings, track wholesale costs, selling prices, and real-time profit margins.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {/* Top Section Product Type Filter Dropdown */}
-                  <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
-                    <Filter size={14} className="text-amber-400 shrink-0" />
-                    <span className="text-slate-400 text-xs hidden xs:inline">Type:</span>
-                    <div className="relative">
-                      <select
-                        aria-label="Filter products by type"
-                        value={productTypeFilter}
-                        onChange={(e) => setProductTypeFilter(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
-                      >
-                        <option value="all" className="bg-[#162035] text-white">All Products ({orderedProducts.length})</option>
-                        <option value="Single product" className="bg-[#162035] text-cyan-300">Single Products ({singleProductsCount})</option>
-                        <option value="Combo set" className="bg-[#162035] text-purple-300">Combo Sets ({comboSetsCount})</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
-                        <ChevronDown size={12} />
-                      </div>
+              {/* Top Control Header Card — SaaS-style Layout */}
+              <div className="bg-[#0d1527] p-5 md:p-6 rounded-3xl shadow-2xl border border-white/15">
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                  {/* LEFT: Products title + Dynamic result count */}
+                  <div className="flex items-center gap-3.5 shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/50 shrink-0">
+                      <ShoppingBag size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-black text-white tracking-wide">
+                        Products
+                      </h2>
+                      <p className="text-xs md:text-sm text-slate-400 font-medium">
+                        {productCountDisplay}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-[#162035] border border-white/10 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300">
-                    <Package size={16} className="text-blue-400" />
-                    <span>Total Items: <strong className="text-white text-sm">{orderedProducts.length}</strong></span>
+                  {/* CENTER: Prominent Large Horizontally Centered Search Bar */}
+                  <div className="w-full lg:max-w-xl mx-auto">
+                    <div className="relative w-full">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                      <input
+                        type="text"
+                        placeholder="Search Products..."
+                        value={productSearchQuery}
+                        onChange={(e) => setProductSearchQuery(e.target.value)}
+                        className="w-full pl-12 pr-10 py-3.5 bg-[#151f36] border-2 border-white/15 rounded-2xl text-sm font-bold text-white placeholder:text-slate-500 outline-none focus:border-blue-500 transition-all shadow-inner hover:border-white/25"
+                      />
+                      {productSearchQuery && (
+                        <button
+                          onClick={() => setProductSearchQuery('')}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Category dropdown, Sort dropdown, and Type filter */}
+                  <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2.5 shrink-0">
+                    {/* Category Filter */}
+                    <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                      <Tag size={13} className="text-emerald-400 shrink-0" />
+                      <span className="text-slate-400 text-xs hidden sm:inline">Category:</span>
+                      <div className="relative">
+                        <select
+                          aria-label="Filter by category"
+                          value={productCategoryFilter}
+                          onChange={(e) => setProductCategoryFilter(e.target.value)}
+                          className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
+                        >
+                          <option value="all" className="bg-[#162035] text-white">All Categories</option>
+                          {availableCategories.map(cat => (
+                            <option key={cat} value={cat} className="bg-[#162035] text-white">{cat}</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                          <ChevronDown size={12} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sort Dropdown */}
+                    <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                      <Layers size={13} className="text-purple-400 shrink-0" />
+                      <span className="text-slate-400 text-xs hidden sm:inline">Sort:</span>
+                      <div className="relative">
+                        <select
+                          aria-label="Sort products"
+                          value={productSortOrder}
+                          onChange={(e) => setProductSortOrder(e.target.value as any)}
+                          className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
+                        >
+                          <option value="none" className="bg-[#162035] text-white">Default</option>
+                          <option value="a-z" className="bg-[#162035] text-white">A → Z</option>
+                          <option value="z-a" className="bg-[#162035] text-white">Z → A</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                          <ChevronDown size={12} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Product Type Filter */}
+                    <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
+                      <Filter size={13} className="text-amber-400 shrink-0" />
+                      <span className="text-slate-400 text-xs hidden sm:inline">Type:</span>
+                      <div className="relative">
+                        <select
+                          aria-label="Filter products by type"
+                          value={productTypeFilter}
+                          onChange={(e) => setProductTypeFilter(e.target.value)}
+                          className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
+                        >
+                          <option value="all" className="bg-[#162035] text-white">All Types</option>
+                          <option value="Single product" className="bg-[#162035] text-cyan-300">Single</option>
+                          <option value="Combo set" className="bg-[#162035] text-purple-300">Combo</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
+                          <ChevronDown size={12} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+
 
               {/* 🟢 INLINE "ADD NEW LISTING" FORM (Directly on Page - NO POPUP MODAL) */}
               <div id="product-inline-form" className="bg-[#0c1427] border border-white/15 rounded-[2rem] p-6 md:p-8 max-w-xl mx-auto shadow-2xl text-white">
@@ -4849,10 +5114,11 @@ export default function Dashboard() {
                 </div>
 
                 <form onSubmit={handleAddCustomProduct} className="space-y-4">
+                  {/* Row 1: Name/Combo Name + Product Type */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Item Name
+                        {(newProductForm.productType || "Single product") === "Combo set" ? "Combo Set Name" : "Item Name"}
                       </label>
                       <input
                         required
@@ -4861,18 +5127,18 @@ export default function Dashboard() {
                         onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
                         style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                         className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder="Enter Item Name (e.g. Munch)"
+                        placeholder={(newProductForm.productType || "Single product") === "Combo set" ? "e.g. Chocolate Festival Combo" : "Enter Item Name (e.g. Munch)"}
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Product Type
+                        Listing Type
                       </label>
                       <div className="relative">
                         <select
                           value={newProductForm.productType || "Single product"}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value })}
+                          onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value, comboProductIds: e.target.value === "Single product" ? [] : newProductForm.comboProductIds })}
                           style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                           className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-9"
                         >
@@ -4886,13 +5152,159 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Category (Mandatory) */}
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
+                      Category <span className="text-rose-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        required
+                        value={newProductForm.category}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
+                        style={{ backgroundColor: '#151f36', color: newProductForm.category ? '#ffffff' : '#94a3b8', borderColor: !newProductForm.category ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-9"
+                      >
+                        <option value="" className="bg-[#151f36] text-slate-400">Select Category...</option>
+                        {PRODUCT_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat} className="bg-[#151f36] text-white">{cat}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                        <ChevronDown size={16} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Combo Set: Select Products */}
+                  {(newProductForm.productType || "Single product") === "Combo set" && (
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Boxes size={13} className="text-purple-400" />
+                        Select Products for Combo
+                        <span className="text-rose-400">*</span>
+                        {newProductForm.comboProductIds.length > 0 && (
+                          <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full ml-auto">
+                            {newProductForm.comboProductIds.length} selected
+                          </span>
+                        )}
+                      </label>
+
+                      {/* Search for products */}
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search existing products..."
+                          value={comboSearchQuery}
+                          onChange={(e) => setComboSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 bg-[#151f36] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-purple-400 transition-colors"
+                        />
+                      </div>
+
+                      {/* Available products list */}
+                      <div className="max-h-44 overflow-y-auto custom-scrollbar bg-[#121b2f] rounded-xl border border-white/10 divide-y divide-white/5">
+                        {customProducts
+                          .filter(p => (p.productType || "Single product") === "Single product")
+                          .filter(p => !comboSearchQuery.trim() || (p.name && p.name.toLowerCase().includes(comboSearchQuery.toLowerCase())))
+                          .map(p => {
+                            const isSelected = newProductForm.comboProductIds.includes(p.fireId);
+                            const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
+                            return (
+                              <div
+                                key={p.fireId}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((id: string) => id !== p.fireId) });
+                                  } else {
+                                    setNewProductForm({ ...newProductForm, comboProductIds: [...newProductForm.comboProductIds, p.fireId] });
+                                  }
+                                }}
+                                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all text-xs ${isSelected ? 'bg-purple-500/15 border-l-2 border-l-purple-400' : 'hover:bg-white/5'}`}
+                              >
+                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-purple-500 border-purple-400' : 'border-white/20'}`}>
+                                  {isSelected && <Check size={12} className="text-white" />}
+                                </div>
+                                {p.images && p.images.length > 0 ? (
+                                  <img src={p.images[0]} alt={p.name} className="w-8 h-8 rounded-lg object-cover border border-white/20 shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-[10px] border border-blue-500/30 shrink-0">
+                                    {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-extrabold text-white truncate block">{p.name}</span>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    {p.category && <span className="text-[10px] text-slate-400">{p.category}</span>}
+                                    <span className="text-[10px] text-amber-400 font-semibold">Sold: {pSoldCount}</span>
+                                  </div>
+                                </div>
+                                {(p.price || p.sellingPrice) && (
+                                  <span className="text-emerald-400 font-bold text-[11px] shrink-0">₹{Number(p.price ?? p.sellingPrice).toLocaleString()}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        {customProducts.filter(p => (p.productType || "Single product") === "Single product").length === 0 && (
+                          <div className="px-3 py-4 text-center text-xs text-slate-500 font-medium">No single products available. Create single products first.</div>
+                        )}
+                      </div>
+
+                      {/* Selected products preview list with image, name, category, sold count, remove */}
+                      {newProductForm.comboProductIds.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider block">Selected Items:</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {newProductForm.comboProductIds.map((id: string) => {
+                              const p = customProducts.find(pr => pr.fireId === id);
+                              if (!p) return null;
+                              const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
+                              return (
+                                <div key={id} className="flex items-center gap-2.5 bg-[#15213b] border border-purple-500/30 rounded-xl p-2 shadow-sm">
+                                  {p.images && p.images.length > 0 ? (
+                                    <img src={p.images[0]} alt={p.name} className="w-9 h-9 rounded-lg object-cover border border-white/20 shrink-0" />
+                                  ) : (
+                                    <div className="w-9 h-9 rounded-lg bg-purple-500/30 text-purple-300 flex items-center justify-center text-xs font-black shrink-0">
+                                      {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs font-bold text-white truncate block">{p.name}</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      {p.category && (
+                                        <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-semibold border border-blue-500/30">
+                                          {p.category}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-amber-400 font-semibold">
+                                        Sold: {pSoldCount}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((cid: string) => cid !== id) })}
+                                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+                                    title="Remove from combo"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Price Fields */}
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div>
                       <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
                         Wholesale Price
                       </label>
                       <input
-                        required
                         type="number"
                         step="any"
                         value={newProductForm.wholesalePrice}
@@ -4908,7 +5320,6 @@ export default function Dashboard() {
                         Selling Price
                       </label>
                       <input
-                        required
                         type="number"
                         step="any"
                         value={newProductForm.price}
@@ -4918,6 +5329,36 @@ export default function Dashboard() {
                         placeholder="Selling Price"
                       />
                     </div>
+                  </div>
+
+                  {/* Description Textarea with bullet point helper */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Book size={12} className="text-blue-400" />
+                        Description
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = newProductForm.description || "";
+                          const next = current ? (current.endsWith('\n') ? `${current}• ` : `${current}\n• `) : "• ";
+                          setNewProductForm({ ...newProductForm, description: next });
+                        }}
+                        className="text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        + Bullet Point
+                      </button>
+                    </div>
+                    <textarea
+                      value={newProductForm.description}
+                      onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
+                      style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full font-medium rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm resize-y leading-relaxed font-sans"
+                      placeholder={"Description\n\n• Premium quality chocolate\n• Suitable for gifting\n• Individually packed\n• Best for birthday celebrations\n• Multiple flavours available"}
+                      rows={5}
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Supports normal text, product highlights, and bullet points (• or -)</p>
                   </div>
 
                   {/* 📷 Product Images Uploader (Cloudinary) */}
@@ -5006,10 +5447,11 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
+                        setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] });
                         setNewProductImages([]);
                         setNewProductExistingImages([]);
                         setEditProductId(null);
+                        setComboSearchQuery("");
                       }}
                       className="flex-1 px-5 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-all cursor-pointer text-sm"
                     >
@@ -5032,47 +5474,23 @@ export default function Dashboard() {
                   <div>
                     <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
                       <ShoppingBag className="text-blue-400" size={20} />
-                      <span>Product Listings Table ({filteredProducts.length})</span>
+                      <span>Product Listings ({filteredProducts.length})</span>
                       {productTypeFilter !== 'all' && (
                         <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${productTypeFilter === 'Combo set' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'}`}>
                           {productTypeFilter}
                         </span>
                       )}
+                      {productCategoryFilter !== 'all' && (
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                          {productCategoryFilter}
+                        </span>
+                      )}
                     </h3>
                     <p className="text-xs text-slate-400 font-medium mt-0.5">
-                      Items are shown in the exact order added with auto-calculated profit margins.
+                      {filteredProducts.length !== orderedProducts.length
+                        ? `Showing ${filteredProducts.length} matching products out of ${orderedProducts.length} total`
+                        : 'Items with auto-calculated profit margins'}
                     </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-                    {/* Top Section Product Type Filter Dropdown */}
-                    <div className="relative">
-                      <select
-                        aria-label="Filter products list by type"
-                        value={productTypeFilter}
-                        onChange={(e) => setProductTypeFilter(e.target.value)}
-                        className="w-full sm:w-auto pl-3 pr-8 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-amber-400 cursor-pointer appearance-none transition-colors"
-                      >
-                        <option value="all" className="bg-[#15213b] text-white">All Types ({orderedProducts.length})</option>
-                        <option value="Single product" className="bg-[#15213b] text-cyan-300">Single Products ({singleProductsCount})</option>
-                        <option value="Combo set" className="bg-[#15213b] text-purple-300">Combo Sets ({comboSetsCount})</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
-                        <ChevronDown size={14} />
-                      </div>
-                    </div>
-
-                    {/* Search Filter */}
-                    <div className="relative w-full sm:w-60">
-                      <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                      <input
-                        type="text"
-                        placeholder="Search product name..."
-                        value={productSearchQuery}
-                        onChange={(e) => setProductSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 transition-colors"
-                      />
-                    </div>
                   </div>
                 </div>
 
@@ -5087,17 +5505,19 @@ export default function Dashboard() {
                     <Package size={48} className="mx-auto text-slate-600 animate-pulse" />
                     <p className="text-lg font-bold text-slate-300">No matching products found</p>
                     <p className="text-xs text-slate-500">
-                      {productTypeFilter !== 'all' ? `No products matching "${productTypeFilter}".` : 'Try adjusting your search criteria.'}
+                      {productTypeFilter !== 'all' || productCategoryFilter !== 'all' ? 'No products matching current filters.' : 'Try adjusting your search criteria.'}
                     </p>
                     <button
                       type="button"
                       onClick={() => {
                         setProductTypeFilter('all');
+                        setProductCategoryFilter('all');
                         setProductSearchQuery('');
+                        setProductSortOrder('none');
                       }}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                     >
-                      Reset Filters
+                      Reset All Filters
                     </button>
                   </div>
                 ) : (
@@ -5105,12 +5525,14 @@ export default function Dashboard() {
                     <table className="w-full text-left border-collapse text-xs md:text-sm">
                       <thead>
                         <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
-                          <th className="py-3.5 px-4 text-center w-16">#</th>
+                          <th className="py-3.5 px-4 text-center w-12">#</th>
                           <th className="py-3.5 px-4">Item Name</th>
-                          <th className="py-3.5 px-4 text-center w-36">Product Type</th>
-                          <th className="py-3.5 px-4 text-right">Wholesale Price (₹)</th>
-                          <th className="py-3.5 px-4 text-right">Selling Price (₹)</th>
+                          <th className="py-3.5 px-4 text-center w-28">Type</th>
+                          <th className="py-3.5 px-4 text-center w-28">Category</th>
+                          <th className="py-3.5 px-4 text-right">Wholesale (₹)</th>
+                          <th className="py-3.5 px-4 text-right">Selling (₹)</th>
                           <th className="py-3.5 px-4 text-right">Profit (₹)</th>
+                          <th className="py-3.5 px-4 text-center w-20">Sold</th>
                           <th className="py-3.5 px-4 text-center w-28">Actions</th>
                         </tr>
                       </thead>
@@ -5145,17 +5567,22 @@ export default function Dashboard() {
                                           setGalleryActiveIndex(0);
                                           setIsImageGalleryOpen(true);
                                         }}
-                                        className="w-9 h-9 rounded-lg object-cover border border-amber-400/40 shadow-sm cursor-pointer hover:scale-110 transition-transform shrink-0"
-                                        title="Click to view full photo gallery"
+                                        className="w-10 h-10 rounded-lg object-cover border border-amber-400/40 shadow-sm cursor-pointer hover:scale-110 transition-transform shrink-0"
+                                        title="Click to view details and photos"
                                       />
                                     ) : (
-                                      <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0">
+                                      <div className="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0">
                                         {prod.name ? prod.name.charAt(0).toUpperCase() : 'P'}
                                       </div>
                                     )}
-                                    <span className="font-extrabold text-white tracking-wide">
-                                      {prod.name}
-                                    </span>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-extrabold text-white tracking-wide truncate">
+                                        {prod.name}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-amber-400/90 flex items-center gap-1 mt-0.5">
+                                        Sold: {productSoldCountMap[(prod.name || '').trim().toLowerCase()] || 0}
+                                      </span>
+                                    </div>
                                   </div>
                                 </td>
 
@@ -5171,6 +5598,17 @@ export default function Dashboard() {
                                       <Package size={12} className="text-cyan-400" />
                                       Single product
                                     </span>
+                                  )}
+                                </td>
+
+                                {/* Category */}
+                                <td className="py-3.5 px-4 text-center">
+                                  {prod.category ? (
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 shadow-sm">
+                                      {prod.category}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-slate-500 italic">—</span>
                                   )}
                                 </td>
 
@@ -5194,6 +5632,18 @@ export default function Dashboard() {
                                       {marginPct}% margin
                                     </span>
                                   </div>
+                                </td>
+
+                                {/* Sold Count */}
+                                <td className="py-3.5 px-4 text-center">
+                                  {(() => {
+                                    const sCount = productSoldCountMap[(prod.name || '').trim().toLowerCase()] || 0;
+                                    return (
+                                      <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-black min-w-[28px] ${sCount > 0 ? 'bg-amber-400/15 text-amber-300 border border-amber-400/30' : 'text-slate-500'}`}>
+                                        {sCount}
+                                      </span>
+                                    );
+                                  })()}
                                 </td>
 
                                 {/* Actions */}
@@ -5228,16 +5678,12 @@ export default function Dashboard() {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (prod.images && prod.images.length > 0) {
-                                          setImageGalleryProduct(prod);
-                                          setGalleryActiveIndex(0);
-                                          setIsImageGalleryOpen(true);
-                                        } else {
-                                          toast('No images uploaded yet', { icon: '📷' });
-                                        }
+                                        setImageGalleryProduct(prod);
+                                        setGalleryActiveIndex(0);
+                                        setIsImageGalleryOpen(true);
                                       }}
                                       className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer relative hover:scale-110 active:scale-95"
-                                      title={prod.images && prod.images.length > 0 ? `View ${prod.images.length} Image(s)` : 'No images yet'}
+                                      title="View Listing Details & Photos"
                                     >
                                       <Eye size={15} />
                                       {prod.images && prod.images.length > 0 && (
@@ -5264,6 +5710,7 @@ export default function Dashboard() {
                         const totalSelling = filteredProducts.reduce((sum, p) => sum + (Number(p.price ?? p.sellingPrice) || 0), 0);
                         const totalProfit = totalSelling - totalWholesale;
                         const avgMarginPct = totalWholesale > 0 ? Math.round((totalProfit / totalWholesale) * 100) : 0;
+                        const totalSold = filteredProducts.reduce((sum, p) => sum + (productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0), 0);
                         return (
                           <tfoot>
                             <tr className="bg-[#121a2d] border-t-2 border-white/15 font-black text-xs md:text-sm">
@@ -5272,12 +5719,18 @@ export default function Dashboard() {
                               <td className="py-3.5 px-4 text-center text-slate-400 text-xs font-semibold">
                                 {productTypeFilter === 'all' ? `${singleProductsCount} Single / ${comboSetsCount} Combo` : productTypeFilter}
                               </td>
+                              <td className="py-3.5 px-4 text-center text-slate-400 text-xs font-semibold">
+                                {productCategoryFilter === 'all' ? 'All Cats' : productCategoryFilter}
+                              </td>
                               <td className="py-3.5 px-4 text-right text-blue-400">₹{totalWholesale.toLocaleString()}</td>
                               <td className="py-3.5 px-4 text-right text-emerald-400">₹{totalSelling.toLocaleString()}</td>
                               <td className="py-3.5 px-4 text-right">
                                 <span className={`text-sm ${totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                   ₹{totalProfit.toLocaleString()} ({avgMarginPct}%)
                                 </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-center text-amber-400 font-black">
+                                {totalSold}
                               </td>
                               <td className="py-3.5 px-4"></td>
                             </tr>
@@ -5618,7 +6071,7 @@ export default function Dashboard() {
                     : 'hidden'
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
-                  <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
+                  <div className="laptop-dashboard-metric-card relative bg-[#0d1527] p-3 md:p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[105px] md:min-h-[125px]">
                     <div className="flex justify-between items-start mb-1 relative z-10">
                       <p className="text-sm font-black text-amber-400 tracking-wide uppercase">Filtered Orders</p>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-400 border border-amber-400/30 shadow-inner"><ShoppingBag size={16} /></div>
@@ -5660,7 +6113,7 @@ export default function Dashboard() {
                       )).sort();
 
                       return (
-                        <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
+                        <div className="laptop-dashboard-metric-card relative bg-[#0d1527] p-3 md:p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[105px] md:min-h-[125px]">
                           <div className="flex justify-between items-start mb-1 relative z-10">
                             <div className="flex items-center gap-1 group relative flex-1 min-w-0">
                               <p className="text-[12px] font-black text-white tracking-wide uppercase leading-tight truncate max-w-[110px] sm:max-w-[140px]" title="Total Items Sold">
@@ -5750,7 +6203,7 @@ export default function Dashboard() {
                           ?? (availableChocolatesData.topChocolates.find(c => c[0].toLowerCase() === d1SelectedChocolateBoxFilter.toLowerCase())?.[1] || 0));
 
                     return (
-                    <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px]">
+                    <div className="laptop-dashboard-metric-card relative bg-[#0d1527] p-3 md:p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[105px] md:min-h-[125px]">
                       {/* Top Row: Title + Dropdown + Gift Icon */}
                       <div className="flex justify-between items-start mb-1 relative z-10">
                         <div className="flex items-center gap-1 group relative flex-1 min-w-0">
@@ -6034,7 +6487,7 @@ export default function Dashboard() {
                   })()}
 
 
-                  <div className="relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[135px] overflow-hidden group">
+                  <div className="laptop-dashboard-metric-card relative bg-[#0d1527] p-3 md:p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-white/20 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[105px] md:min-h-[125px] overflow-hidden group">
                     {/* Animated Liquid Wave Filling Background */}
                     <div 
                       className="absolute bottom-0 left-0 right-0 transition-all duration-700 ease-out z-0 pointer-events-none rounded-b-[1.3rem] overflow-hidden"
@@ -6164,7 +6617,7 @@ export default function Dashboard() {
                   </div>
 
 
-                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px]">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="laptop-dashboard-metric-card revenue-card-stat relative bg-[#0d1527] p-3 md:p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[105px] md:min-h-[120px]">
                     <div className="flex justify-between items-start w-full mb-1.5 relative z-10">
                       <div className="flex items-center gap-1 group relative">
                         <p className="text-[11px] font-black text-amber-400 tracking-wide leading-tight uppercase">Revenue <br />Filter</p>
@@ -8514,28 +8967,65 @@ export default function Dashboard() {
 
       {/* 🟢 NEW LISTING / NEW PRODUCT MODAL */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" }); setNewProductImages([]); setNewProductExistingImages([]); }}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-7 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] }); setNewProductImages([]); setNewProductExistingImages([]); }}>
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-lg p-6 md:p-7 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-2xl font-black mb-5 text-white text-center tracking-wide border-b border-white/15 pb-3 uppercase">
               {editProductId ? "Edit Listing" : "Add New Listing"}
             </h2>
-            <form onSubmit={handleAddCustomProduct} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Item Name</label>
-                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Enter Item Name (e.g. Munch)" />
+            <form onSubmit={handleAddCustomProduct} className="space-y-4">
+              {/* Name & Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">
+                    {(newProductForm.productType || "Single product") === "Combo set" ? "Combo Set Name" : "Item Name"}
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={newProductForm.name}
+                    onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
+                    placeholder={(newProductForm.productType || "Single product") === "Combo set" ? "e.g. Chocolate Festival Combo" : "Enter Item Name (e.g. Munch)"}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Listing Type</label>
+                  <div className="relative">
+                    <select
+                      value={newProductForm.productType || "Single product"}
+                      onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value, comboProductIds: e.target.value === "Single product" ? [] : newProductForm.comboProductIds })}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-8"
+                    >
+                      <option value="Single product" className="bg-[#162035] text-white">Single product</option>
+                      <option value="Combo set" className="bg-[#162035] text-white">Combo set</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                      <ChevronDown size={15} />
+                    </div>
+                  </div>
+                </div>
               </div>
 
+              {/* Category (Mandatory) */}
               <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Product Type</label>
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">
+                  Category <span className="text-rose-400">*</span>
+                </label>
                 <div className="relative">
                   <select
-                    value={newProductForm.productType || "Single product"}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value })}
-                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                    required
+                    value={newProductForm.category}
+                    onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
+                    style={{ backgroundColor: '#162035', color: newProductForm.category ? '#ffffff' : '#94a3b8', borderColor: !newProductForm.category ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.2)' }}
                     className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-8"
                   >
-                    <option value="Single product" className="bg-[#162035] text-white">Single product</option>
-                    <option value="Combo set" className="bg-[#162035] text-white">Combo set</option>
+                    <option value="" className="bg-[#162035] text-slate-400">Select Category...</option>
+                    {PRODUCT_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat} className="bg-[#162035] text-white">{cat}</option>
+                    ))}
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
                     <ChevronDown size={15} />
@@ -8543,6 +9033,107 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Combo Set: Select Products */}
+              {/* Combo Set: Select Products */}
+              {(newProductForm.productType || "Single product") === "Combo set" && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Boxes size={13} className="text-purple-400" />
+                    Select Products for Combo
+                    <span className="text-rose-400">*</span>
+                    {newProductForm.comboProductIds.length > 0 && (
+                      <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full ml-auto">
+                        {newProductForm.comboProductIds.length} selected
+                      </span>
+                    )}
+                  </label>
+
+                  {/* Search for products */}
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search existing products..."
+                      value={comboSearchQuery}
+                      onChange={(e) => setComboSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-[#162035] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-purple-400 transition-colors"
+                    />
+                  </div>
+
+                  {/* Available products list */}
+                  <div className="max-h-36 overflow-y-auto custom-scrollbar bg-[#121b2f] rounded-xl border border-white/10 divide-y divide-white/5">
+                    {customProducts
+                      .filter(p => (p.productType || "Single product") === "Single product")
+                      .filter(p => !comboSearchQuery.trim() || (p.name && p.name.toLowerCase().includes(comboSearchQuery.toLowerCase())))
+                      .map(p => {
+                        const isSelected = newProductForm.comboProductIds.includes(p.fireId);
+                        const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
+                        return (
+                          <div
+                            key={p.fireId}
+                            onClick={() => {
+                              if (isSelected) {
+                                setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((id: string) => id !== p.fireId) });
+                              } else {
+                                setNewProductForm({ ...newProductForm, comboProductIds: [...newProductForm.comboProductIds, p.fireId] });
+                              }
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all text-xs ${isSelected ? 'bg-purple-500/15 border-l-2 border-l-purple-400' : 'hover:bg-white/5'}`}
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-purple-500 border-purple-400' : 'border-white/20'}`}>
+                              {isSelected && <Check size={10} className="text-white" />}
+                            </div>
+                            <span className="font-extrabold text-white truncate flex-1">{p.name}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {p.category && <span className="text-[10px] text-slate-400">{p.category}</span>}
+                              <span className="text-[10px] text-amber-400 font-semibold">Sold: {pSoldCount}</span>
+                            </div>
+                            {(p.price || p.sellingPrice) && (
+                              <span className="text-emerald-400 font-bold text-[11px] shrink-0">₹{Number(p.price ?? p.sellingPrice).toLocaleString()}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Selected products cards */}
+                  {newProductForm.comboProductIds.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block">Selected Items:</span>
+                      <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar">
+                        {newProductForm.comboProductIds.map((id: string) => {
+                          const p = customProducts.find(pr => pr.fireId === id);
+                          if (!p) return null;
+                          const pSoldCount = productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0;
+                          return (
+                            <div key={id} className="flex items-center gap-2 bg-[#162035] border border-purple-500/30 rounded-lg p-1.5 text-xs">
+                              {p.images && p.images.length > 0 ? (
+                                <img src={p.images[0]} alt={p.name} className="w-6 h-6 rounded object-cover border border-white/20 shrink-0" />
+                              ) : (
+                                <div className="w-6 h-6 rounded bg-purple-500/30 text-purple-300 flex items-center justify-center text-[10px] font-black shrink-0">
+                                  {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
+                                </div>
+                              )}
+                              <span className="font-bold text-white truncate flex-1">{p.name}</span>
+                              {p.category && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded border border-blue-500/30">{p.category}</span>}
+                              <span className="text-[9px] text-amber-400 font-semibold">Sold: {pSoldCount}</span>
+                              <button
+                                type="button"
+                                onClick={() => setNewProductForm({ ...newProductForm, comboProductIds: newProductForm.comboProductIds.filter((cid: string) => cid !== id) })}
+                                className="text-rose-400 hover:text-rose-300 cursor-pointer p-0.5 ml-1"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Price Fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Wholesale Price</label>
@@ -8552,6 +9143,35 @@ export default function Dashboard() {
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Selling Price</label>
                   <input required type="number" step="any" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Selling Price" />
                 </div>
+              </div>
+
+              {/* Description with bullet point helper */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Book size={12} className="text-blue-400" />
+                    Description
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = newProductForm.description || "";
+                      const next = current ? (current.endsWith('\n') ? `${current}• ` : `${current}\n• `) : "• ";
+                      setNewProductForm({ ...newProductForm, description: next });
+                    }}
+                    className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                  >
+                    + Bullet Point
+                  </button>
+                </div>
+                <textarea
+                  value={newProductForm.description}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
+                  style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                  className="w-full font-medium rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm resize-y leading-relaxed font-sans"
+                  placeholder={"Description\n\n• Premium quality chocolate\n• Suitable for gifting\n• Individually packed"}
+                  rows={4}
+                />
               </div>
 
               {/* 📷 Product Images (Cloudinary) */}
@@ -8613,7 +9233,7 @@ export default function Dashboard() {
               </div>
 
               <div className="flex gap-3 pt-3">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
+                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product", description: "", category: "", comboProductIds: [] }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
                 <button type="submit" disabled={isSavingProduct} className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}>{isSavingProduct ? "Uploading..." : (editProductId ? "Update Listing" : "Save Listing")}</button>
               </div>
             </form>
@@ -11296,108 +11916,281 @@ export default function Dashboard() {
       )}
 
 
-      {/* === IMAGE GALLERY MODAL === */}
+      {/* === PRODUCT VIEW & IMAGE GALLERY MODAL === */}
       {isImageGalleryOpen && imageGalleryProduct && (() => {
         const images = imageGalleryProduct.images || [];
         const currentImage = images[galleryActiveIndex];
+        const pType = imageGalleryProduct.productType || "Single product";
+        const sellPrice = Number(imageGalleryProduct.price ?? imageGalleryProduct.sellingPrice) || 0;
+        const wholePrice = Number(imageGalleryProduct.wholesalePrice) || 0;
+        const profit = sellPrice - wholePrice;
+        const marginPct = wholePrice > 0 ? Math.round((profit / wholePrice) * 100) : 100;
+        const sCount = productSoldCountMap[(imageGalleryProduct.name || '').trim().toLowerCase()] || 0;
+        const isCombo = pType === "Combo set";
+        const comboItems = isCombo && Array.isArray(imageGalleryProduct.comboProductIds)
+          ? imageGalleryProduct.comboProductIds.map((id: string) => customProducts.find(pr => pr.fireId === id)).filter(Boolean)
+          : [];
+
         return (
           <div
             className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-3 backdrop-blur-xl"
             onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }}
           >
             <div
-              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90dvh] overflow-hidden border border-white/15 flex flex-col"
+              className="bg-[#0b1329] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92dvh] overflow-hidden border border-white/15 flex flex-col animate-in fade-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">{imageGalleryProduct.name} — Images ({images.length})</h3>
-                <button onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }} className="text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"><X size={18} /></button>
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 shrink-0 bg-[#0e172a]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-md shrink-0">
+                    <ShoppingBag size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base md:text-lg font-black text-white uppercase tracking-wider truncate">
+                        {imageGalleryProduct.name}
+                      </h3>
+                      <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-extrabold border ${isCombo ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'}`}>
+                        {pType}
+                      </span>
+                      {imageGalleryProduct.category && (
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                          {imageGalleryProduct.category}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-amber-400 font-bold mt-0.5 block">
+                      Units Sold: {sCount}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setIsImageGalleryOpen(false); setDeleteImageConfirm(null); }}
+                  className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              {images.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
-                  <ImageIcon size={48} className="text-slate-600 mb-3" />
-                  <p className="text-slate-400 font-bold text-sm">No images added yet.</p>
-                  <label className="mt-4 px-5 py-2.5 bg-amber-500 text-black font-black text-xs rounded-xl cursor-pointer hover:bg-amber-400 transition-colors">
-                    + Add Images
-                    <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
-                  </label>
+              {/* Modal Body - Scrollable */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
+                {/* Product Stats Banner */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#131c31] border border-white/10 rounded-2xl p-3 text-center">
+                  <div className="p-1.5">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Wholesale</span>
+                    <span className="text-sm font-black text-blue-400">₹{wholePrice.toLocaleString()}</span>
+                  </div>
+                  <div className="p-1.5">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Selling</span>
+                    <span className="text-sm font-black text-emerald-400">₹{sellPrice.toLocaleString()}</span>
+                  </div>
+                  <div className="p-1.5">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Profit</span>
+                    <span className={`text-sm font-black ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      ₹{profit.toLocaleString()} ({marginPct}%)
+                    </span>
+                  </div>
+                  <div className="p-1.5">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Total Sold</span>
+                    <span className="text-sm font-black text-amber-400">{sCount} pcs</span>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  {/* Main Image Display with Overlay Buttons */}
-                  <div className="relative flex items-center justify-center bg-black/40 shrink-0" style={{ height: 'clamp(200px, 45vh, 420px)' }}>
-                    {currentImage && (
-                      <img
-                        id="gallery-main-image"
-                        crossOrigin="anonymous"
-                        src={currentImage}
-                        alt={`Product ${galleryActiveIndex + 1}`}
-                        className="max-w-full max-h-full object-contain p-3"
-                      />
-                    )}
 
-                    {/* Nav Arrows */}
-                    {images.length > 1 && (
-                      <>
-                        <button
-                          onClick={() => setGalleryActiveIndex(prev => prev === 0 ? images.length - 1 : prev - 1)}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2.5 rounded-full transition-colors cursor-pointer shadow-lg"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                        <button
-                          onClick={() => setGalleryActiveIndex(prev => prev === images.length - 1 ? 0 : prev + 1)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2.5 rounded-full transition-colors cursor-pointer shadow-lg"
-                        >
-                          <ChevronRight size={20} />
-                        </button>
-                      </>
+                {/* If Combo Set: Display Included Products */}
+                {isCombo && comboItems.length > 0 && (
+                  <div className="bg-[#121a2d] border border-purple-500/20 rounded-2xl p-3.5 space-y-2.5">
+                    <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Boxes size={14} className="text-purple-400" />
+                      Included Products ({comboItems.length})
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {comboItems.map((item: any) => {
+                        const itemSoldCount = productSoldCountMap[(item.name || '').trim().toLowerCase()] || 0;
+                        return (
+                          <div key={item.fireId} className="flex items-center gap-2.5 bg-[#17223b] border border-white/10 rounded-xl p-2">
+                            {item.images && item.images.length > 0 ? (
+                              <img src={item.images[0]} alt={item.name} className="w-9 h-9 rounded-lg object-cover border border-white/20 shrink-0" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-black shrink-0">
+                                {item.name ? item.name.charAt(0).toUpperCase() : 'P'}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-bold text-white truncate block">{item.name}</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {item.category && (
+                                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-semibold border border-blue-500/30">
+                                    {item.category}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-amber-400 font-semibold">
+                                  Sold: {itemSoldCount}
+                                </span>
+                              </div>
+                            </div>
+                            {(item.price || item.sellingPrice) && (
+                              <span className="text-emerald-400 font-bold text-xs shrink-0">₹{Number(item.price ?? item.sellingPrice).toLocaleString()}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Product Description */}
+                <div className="bg-[#121a2d] border border-white/10 rounded-2xl p-4 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Book size={13} className="text-blue-400" />
+                      Description
+                    </span>
+                    {imageGalleryProduct.description && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyDescription(imageGalleryProduct)}
+                        className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy size={11} /> Copy Description
+                      </button>
                     )}
-                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-3 py-1 rounded-full">{galleryActiveIndex + 1} / {images.length}</span>
+                  </div>
+                  {imageGalleryProduct.description ? (
+                    <div className="text-xs text-slate-200 whitespace-pre-line leading-relaxed font-sans bg-[#0c1322] p-3 rounded-xl border border-white/5">
+                      {imageGalleryProduct.description}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">No description provided for this listing.</p>
+                  )}
+                </div>
+
+                {/* Product Images Gallery */}
+                <div className="bg-[#121a2d] border border-white/10 rounded-2xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <ImageIcon size={14} className="text-amber-400" />
+                      Product Photos ({images.length})
+                    </span>
+                    {images.length > 0 && (
+                      <span className="text-xs text-slate-400 font-medium">
+                        Photo {galleryActiveIndex + 1} of {images.length}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Thumbnails */}
-                  {images.length > 1 && (
-                    <div className="px-4 py-2.5 border-t border-white/10 shrink-0">
-                      <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
-                        {images.map((img: string, idx: number) => (
-                          <button
-                            key={idx}
-                            onClick={() => setGalleryActiveIndex(idx)}
-                            className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === galleryActiveIndex ? 'border-amber-400 shadow-lg shadow-amber-400/30 scale-110' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'}`}
-                          >
-                            <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
-                          </button>
-                        ))}
+                  {images.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-8 text-center bg-[#0c1322] rounded-xl border border-dashed border-white/15">
+                      <ImageIcon size={40} className="text-slate-600 mb-2" />
+                      <p className="text-slate-400 font-bold text-xs">No images uploaded yet.</p>
+                      <label className="mt-3 px-4 py-2 bg-amber-500 text-black font-black text-xs rounded-xl cursor-pointer hover:bg-amber-400 transition-colors">
+                        + Add Photos
+                        <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {/* Main Image Preview */}
+                      <div className="relative flex items-center justify-center bg-black/60 rounded-xl overflow-hidden" style={{ height: 'clamp(200px, 42vh, 380px)' }}>
+                        {currentImage && (
+                          <img
+                            id="gallery-main-image"
+                            crossOrigin="anonymous"
+                            src={currentImage}
+                            alt={`Product ${galleryActiveIndex + 1}`}
+                            className="max-w-full max-h-full object-contain p-2"
+                          />
+                        )}
+
+                        {images.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setGalleryActiveIndex(prev => prev === 0 ? images.length - 1 : prev - 1)}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 text-white p-2.5 rounded-full transition-colors cursor-pointer shadow-lg"
+                            >
+                              <ChevronLeft size={18} />
+                            </button>
+                            <button
+                              onClick={() => setGalleryActiveIndex(prev => prev === images.length - 1 ? 0 : prev + 1)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 text-white p-2.5 rounded-full transition-colors cursor-pointer shadow-lg"
+                            >
+                              <ChevronRight size={18} />
+                            </button>
+                          </>
+                        )}
+                        <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-3 py-1 rounded-full">
+                          {galleryActiveIndex + 1} / {images.length}
+                        </span>
                       </div>
+
+                      {/* Thumbnails */}
+                      {images.length > 1 && (
+                        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                          {images.map((img: string, idx: number) => (
+                            <button
+                              key={idx}
+                              onClick={() => setGalleryActiveIndex(idx)}
+                              className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === galleryActiveIndex ? 'border-amber-400 shadow-lg shadow-amber-400/30 scale-105' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'}`}
+                            >
+                              <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
+                </div>
+              </div>
 
-                  {/* Bottom Action Bar - always visible */}
-                  <div className="px-5 py-3 border-t border-white/10 flex items-center justify-between shrink-0 gap-3 bg-[#0a1020]">
-                    <label className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 font-black text-xs rounded-xl cursor-pointer transition-all hover:scale-105 active:scale-95 border border-amber-500/20">
-                      <Upload size={14} /> Add More Images
-                      <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => currentImage && handleCopyImage(currentImage)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
-                      >
-                        <ClipboardList size={14} /> Copy Image
-                      </button>
-                      <button
-                        onClick={() => handleDeleteImage(imageGalleryProduct.fireId, galleryActiveIndex)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+              {/* Modal Footer / Action Bar */}
+              <div className="px-5 py-3.5 border-t border-white/10 flex flex-wrap items-center justify-between shrink-0 gap-2 bg-[#0a1020]">
+                <label className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 font-black text-xs rounded-xl cursor-pointer transition-all hover:scale-105 active:scale-95 border border-amber-500/20">
+                  <Upload size={13} /> Add More Photos
+                  <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden" onChange={(e) => { if (e.target.files) handleImageUpload(imageGalleryProduct.fireId, e.target.files); e.target.value = ''; }} />
+                </label>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyDescription(imageGalleryProduct)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600/90 hover:bg-indigo-600 text-white font-black text-xs rounded-xl shadow-lg shadow-indigo-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    title="Copy only product description to clipboard"
+                  >
+                    <Book size={13} /> Copy Description
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!currentImage}
+                    onClick={() => currentImage && handleCopyImage(currentImage)}
+                    className={`flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95 ${!currentImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Copy currently displayed image to clipboard"
+                  >
+                    <ClipboardList size={13} /> Copy Image
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={images.length === 0}
+                    onClick={() => handleCopyAllImages(images)}
+                    className={`flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95 ${images.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Copy all product images"
+                  >
+                    <Copy size={13} /> Copy All
+                  </button>
+
+                  {images.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteImage(imageGalleryProduct.fireId, galleryActiveIndex)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-rose-600/80 hover:bg-rose-600 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-900/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                      title="Delete current image"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         );
