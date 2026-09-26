@@ -6322,12 +6322,12 @@ export default function Dashboard() {
                     </div>
 
                     {/* Card Header: Title + Month/Year Picker + Target Edit Trigger */}
-                    <div className="flex justify-between items-center mb-1 relative z-10">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-black text-amber-400 tracking-wide uppercase drop-shadow-sm">Targets</p>
+                    <div className="flex justify-between items-center mb-1 relative z-10 gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <p className="text-xs font-black text-amber-400 tracking-wide uppercase drop-shadow-sm shrink-0">Targets</p>
                         
                         {/* Month & Year Editable Picker Badge */}
-                        <div className="relative">
+                        <div className="relative shrink-0">
                           <input
                             type="month"
                             value={targetMonthKey}
@@ -6339,10 +6339,10 @@ export default function Dashboard() {
                           />
                           <button
                             type="button"
-                            className="flex items-center gap-1 text-xs font-black text-amber-300 bg-slate-900/90 hover:bg-slate-900 px-2.5 py-1 rounded-xl border border-amber-400/50 shadow-md cursor-pointer transition-all hover:scale-105"
+                            className="flex items-center gap-1 text-[10px] font-black text-amber-300 bg-slate-900/90 hover:bg-slate-900 px-2 py-0.5 rounded-lg border border-amber-400/50 shadow-md cursor-pointer transition-all hover:scale-105 whitespace-nowrap shrink-0"
                           >
-                            <span>{format(new Date(targetMonthKey + "-01"), "MMM yyyy")}</span>
-                            <Pencil size={11} className="text-amber-400 ml-0.5" />
+                            <span className="whitespace-nowrap">{format(new Date(targetMonthKey + "-01"), "MMM yyyy")}</span>
+                            <Pencil size={9} className="text-amber-400 ml-0.5 shrink-0" />
                           </button>
                         </div>
                       </div>
