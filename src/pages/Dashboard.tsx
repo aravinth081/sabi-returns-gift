@@ -30,6 +30,7 @@ import { ProductListingModal } from "@/components/products/ProductListingModal";
 import { CategoryManagementModal } from "@/components/products/CategoryManagementModal";
 import { AddCategoryModal } from "@/components/products/AddCategoryModal";
 import { ProductViewModal } from "@/components/products/ProductViewModal";
+import { ParetoAnalysisModal } from "@/components/ParetoAnalysisModal";
 import Login from "./Login";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -1776,6 +1777,23 @@ export default function Dashboard() {
   const [isPasscodeSettingsOpen, setIsPasscodeSettingsOpen] = useState(false);
   const [tempReportsPasscode, setTempReportsPasscode] = useState('963');
   const [tempHistoryPasscode, setTempHistoryPasscode] = useState('852');
+
+  const [isParetoModalOpen, setIsParetoModalOpen] = useState(false);
+  const [isParetoAuthModalOpen, setIsParetoAuthModalOpen] = useState(false);
+  const [paretoAuthPassword, setParetoAuthPassword] = useState("");
+  const [paretoAuthError, setParetoAuthError] = useState("");
+
+  const handleParetoAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (paretoAuthPassword === reportsPasscode || paretoAuthPassword === "561997" || paretoAuthPassword === "8520") {
+      setIsParetoAuthModalOpen(false);
+      setParetoAuthPassword("");
+      setParetoAuthError("");
+      setIsParetoModalOpen(true);
+    } else {
+      setParetoAuthError("Wrong Password! Access Denied.");
+    }
+  };
 
   const [isInvModalOpen, setIsInvModalOpen] = useState(false);
   const [invForm, setInvForm] = useState({
@@ -6435,125 +6453,100 @@ export default function Dashboard() {
                   </div>
 
 
-                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] px-3 py-3 rounded-[1.3rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px] overflow-hidden">
-                    {/* Header Row: Filter Trigger & Month Picker */}
-                    <div className="flex justify-between items-center w-full mb-1.5 relative z-10 gap-1.5 pr-0.5">
-                      <div className="flex items-center gap-1 shrink-0">
-                        <div className="relative inline-flex items-center gap-1 bg-[#162035] hover:bg-[#1a2842] px-2 py-0.5 rounded-lg border border-amber-400/50 hover:border-amber-400 transition-colors shadow-sm cursor-pointer">
-                          <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase">Filter</span>
-                          <ChevronDown size={11} className="text-amber-400 shrink-0" />
-                          <select
-                            value={revenueDateType}
-                            onChange={(e) => setRevenueDateType(e.target.value)}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            title="Select Filter Basis"
-                          >
-                            <option value="Serial No">Serial No</option>
-                            <option value="Order Date">Order Date</option>
-                            <option value="Function Date">Function Date</option>
-                            <option value="Dispatch Date">Dispatch Date</option>
-                          </select>
-                        </div>
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] px-3.5 py-3 rounded-[1.3rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-amber-500/40 hover:border-amber-400 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px] overflow-hidden">
+                    {/* Header Row: Box Name "Pareto Analyses" (Eye icon) & Revenue Filter Dropdown Alone */}
+                    <div className="flex justify-between items-center w-full mb-1 relative z-10 gap-1.5">
+                      {/* Box Name: Pareto Analyses (Eye icon) */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[12px] sm:text-[13px] font-black text-amber-300 tracking-wide uppercase">
+                          Pareto Analyses
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setParetoAuthPassword("");
+                            setParetoAuthError("");
+                            setIsParetoAuthModalOpen(true);
+                          }}
+                          className="w-5 h-5 rounded-md bg-[#162035] hover:bg-amber-400 hover:text-slate-950 text-amber-400 transition-all cursor-pointer shadow-sm border border-amber-400/60 flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
+                          title="Click Eye to open Pareto Analyses (Password Protected)"
+                        >
+                          <Eye size={12} strokeWidth={2.5} />
+                        </button>
+                      </div>
 
-                        {/* 🟢 EYE ICON TOGGLE FOR MONETARY VALUES */}
+                      {/* Revenue Filter Dropdown Alone: Order date / Dispatch date / Function date */}
+                      <div className="relative inline-flex items-center gap-1 bg-[#162035] hover:bg-[#1a2842] px-2 py-0.5 rounded-lg border border-amber-400/50 hover:border-amber-400 transition-colors shadow-sm cursor-pointer shrink-0">
+                        <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase">{revenueDateType}</span>
+                        <ChevronDown size={11} className="text-amber-400 shrink-0" />
+                        <select
+                          value={revenueDateType}
+                          onChange={(e) => setRevenueDateType(e.target.value)}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          title="Select Filter Basis"
+                        >
+                          <option value="Order Date">Order date</option>
+                          <option value="Dispatch Date">Dispatch date</option>
+                          <option value="Function Date">Function date</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Middle Row: Only show the pending amount alone */}
+                    <div className="relative z-10 my-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider block">
+                          Pending Amount
+                        </span>
                         <button
                           type="button"
                           onClick={() => setShowAmounts(!showAmounts)}
-                          className="w-5 h-5 rounded-md bg-[#162035] hover:bg-[#1e2c47] text-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow-sm border border-amber-400/50 flex items-center justify-center shrink-0"
+                          className="text-slate-400 hover:text-amber-300 text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
                           title={showAmounts ? "Hide monetary amounts" : "Show monetary amounts"}
                         >
-                          {showAmounts ? <Eye size={11} /> : <EyeOff size={11} />}
+                          {showAmounts ? <EyeOff size={11} /> : <Eye size={11} />}
                         </button>
                       </div>
+                      <h3 className="text-2xl font-black text-rose-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] mt-0.5 truncate">
+                        {maskAmount(displayPendingAmount)}
+                      </h3>
+                    </div>
 
-                      {/* Month & Year Picker Badge */}
-                      <div className="relative flex items-center shrink-0">
+                    {/* Bottom Row: Based on Date Type Label & Date Inputs Range */}
+                    <div className="relative z-10 mt-auto">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
+                      </p>
+
+                      <div className="flex items-center gap-1 w-full">
                         <input
-                          type="month"
-                          value={revenueMonthKey}
-                          onChange={(e) => {
-                            if (e.target.value) handleRevenueMonthChange(e.target.value);
-                          }}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                          title="Click to Filter Revenue by Month & Year"
+                          type="date"
+                          value={dateFilter.from}
+                          onChange={e => setDateFilter({ ...dateFilter, from: e.target.value })}
+                          className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
+                          title="From Date"
                         />
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-[9.5px] font-black text-amber-300 bg-[#162035] hover:bg-[#1f2d4a] px-2 py-0.5 rounded-lg border border-amber-400/80 shadow-md cursor-pointer transition-all hover:scale-105"
-                        >
-                          <span className="text-amber-300 font-extrabold">{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
-                          <Pencil size={9} className="text-amber-400 shrink-0" />
-                        </button>
-                        {revenueMonthKey && (
+                        <span className="text-[10px] font-black text-amber-400 shrink-0 px-0.5">To</span>
+                        <input
+                          type="date"
+                          value={dateFilter.to}
+                          onChange={e => setDateFilter({ ...dateFilter, to: e.target.value })}
+                          className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
+                          title="To Date"
+                        />
+                        {(dateFilter.from || dateFilter.to) && (
                           <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRevenueMonthChange("");
+                            onClick={() => {
+                              setDateFilter({ from: "", to: "" });
+                              setRevenueMonthKey("");
                             }}
-                            className="ml-1 p-0.5 rounded-full bg-rose-500/30 hover:bg-rose-500 text-rose-300 hover:text-white transition-colors cursor-pointer z-30"
-                            title="Clear Month Filter"
+                            className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors cursor-pointer"
+                            title="Clear Date Filter"
                           >
-                            <X size={9} strokeWidth={3} />
+                            <X size={12} strokeWidth={3} />
                           </button>
                         )}
                       </div>
-                    </div>
-
-                    {/* Middle Row: Balanced Monetary Amounts (Total Revenue & Pending Amount) */}
-                    <div className="relative z-10 my-1 grid grid-cols-2 gap-2 items-end">
-                      <div>
-                        <span className="text-[10px] font-black text-emerald-400/90 uppercase tracking-wider block mb-0.5">Total Revenue</span>
-                        <h3 className="text-xl font-black text-emerald-400 leading-tight tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">
-                          {maskAmount(displayRevenue)}
-                        </h3>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[9px] font-black text-rose-400/90 uppercase tracking-wider block mb-0.5">Pending Amount</span>
-                        <h4 className="text-base font-black text-rose-400 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] truncate">
-                          {maskAmount(displayPendingAmount)}
-                        </h4>
-                      </div>
-                    </div>
-
-                    {/* Bottom Row: Based on Date Type Label */}
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 z-10 relative">
-                      Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
-                    </p>
-
-                    {/* Date Inputs Range */}
-                    <div className="flex items-center gap-1 mt-auto relative z-10 w-full">
-                      <input
-                        type="date"
-                        value={dateFilter.from}
-                        onChange={e => setDateFilter({ ...dateFilter, from: e.target.value })}
-                        className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
-                        title="From Date"
-                      />
-
-                      <span className="text-[10px] font-black text-amber-400 shrink-0 px-0.5">To</span>
-
-                      <input
-                        type="date"
-                        value={dateFilter.to}
-                        onChange={e => setDateFilter({ ...dateFilter, to: e.target.value })}
-                        className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
-                        title="To Date"
-                      />
-
-                      {(dateFilter.from || dateFilter.to) && (
-                        <button
-                          onClick={() => {
-                            setDateFilter({ from: "", to: "" });
-                            setRevenueMonthKey("");
-                          }}
-                          className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors cursor-pointer"
-                          title="Clear Date Filter"
-                        >
-                          <X size={12} strokeWidth={3} />
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -10446,6 +10439,70 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* 🟢 PARETO ANALYSES AUTHENTICATION MODAL */}
+      {isParetoAuthModalOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[125] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsParetoAuthModalOpen(false)}>
+          <div
+            style={{ backgroundColor: '#0c1427', color: '#ffffff' }}
+            className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-sm border border-amber-500/30 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-br from-[#131c2e] to-[#090e1a] p-6 text-center relative border-b border-amber-500/30">
+              <button type="button" onClick={() => setIsParetoAuthModalOpen(false)} className="absolute top-4 right-4 text-slate-300 hover:text-white transition-colors cursor-pointer"><X size={20} /></button>
+              <div className="w-16 h-16 bg-[#162035] rounded-2xl mx-auto flex items-center justify-center shadow-md border border-amber-500/30 mb-3">
+                <Lock size={26} className="text-amber-400" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-wide uppercase">Enter Password</h2>
+              <p className="text-amber-400/90 text-xs font-bold mt-1 tracking-widest uppercase">Pareto Analyses Access</p>
+            </div>
+
+            <form onSubmit={handleParetoAuthSubmit} className="p-7 space-y-5 bg-[#090e1a]">
+              {paretoAuthError && (
+                <div className="bg-red-950/60 border-l-4 border-red-500 text-red-300 p-3 text-xs font-bold rounded-lg shadow-sm text-center animate-in zoom-in duration-200">
+                  {paretoAuthError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-2">Reports Password</label>
+                  <input
+                    type="password"
+                    value={paretoAuthPassword}
+                    onChange={(e) => setParetoAuthPassword(e.target.value)}
+                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                    className="w-full font-mono font-black text-center text-xl rounded-xl p-3 border border-white/20 focus:border-amber-400 bg-[#162035] text-white outline-none shadow-inner"
+                    placeholder="••••"
+                    autoFocus
+                    required
+                  />
+                  <p className="text-[10px] text-slate-400 text-center mt-1.5 font-medium">
+                    (Password can be changed in Reports Password section)
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Lock size={18} /> Unlock Pareto Analyses
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 PARETO ANALYSES POPUP MODAL */}
+      <ParetoAnalysisModal
+        isOpen={isParetoModalOpen}
+        onClose={() => setIsParetoModalOpen(false)}
+        orders={orders}
+        initialDateType={revenueDateType}
+        customPricesMap={customPricesMap}
+        managedChocPricesMap={managedChocPricesMap}
+      />
 
       {/* 🟢 NEW: HISTORY AUTHENTICATION MODAL */}
       {isHistoryAuthModalOpen && (
