@@ -5344,7 +5344,7 @@ export default function Dashboard() {
                           <th className="py-3.5 px-4 text-right">Wholesale (₹)</th>
                           <th className="py-3.5 px-4 text-right">Selling (₹)</th>
                           <th className="py-3.5 px-4 text-right min-w-[120px]">Profit (₹)</th>
-                          <th className="py-3.5 px-4 text-center w-32">Actions</th>
+                          <th className="py-3.5 px-3 text-center min-w-[170px] whitespace-nowrap">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
@@ -5464,13 +5464,13 @@ export default function Dashboard() {
                               </td>
 
                               {/* Actions: View (Eye), Edit (Pencil), Upload (Image), Delete (Trash) */}
-                              <td className="py-3.5 px-4 text-center">
-                                <div className="inline-grid grid-cols-4 gap-1.5">
+                              <td className="py-3.5 px-3 text-center min-w-[170px] whitespace-nowrap">
+                                <div className="inline-flex items-center justify-center gap-2">
                                   {/* View Button (Requirement 17: Opens rich View Modal with Copy Description, Copy Image, Copy All) */}
                                   <button
                                     type="button"
                                     onClick={() => setProductViewModalProduct(prod)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                                     title="View listing details, description & photos"
                                   >
                                     <Eye size={15} />
@@ -5480,7 +5480,7 @@ export default function Dashboard() {
                                   <button
                                     type="button"
                                     onClick={() => handleEditProductClick(prod)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                                     title="Edit Listing"
                                   >
                                     <Pencil size={15} />
@@ -5488,7 +5488,7 @@ export default function Dashboard() {
 
                                   {/* Upload Images Button */}
                                   <label
-                                    className={`w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
+                                    className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
                                     title="Upload Additional Photos"
                                   >
                                     <ImageIcon size={15} />
@@ -5510,7 +5510,7 @@ export default function Dashboard() {
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteProductClick(prod.fireId)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                                     title="Delete Listing"
                                   >
                                     <Trash2 size={15} />
@@ -5550,7 +5550,7 @@ export default function Dashboard() {
                                   ₹{totalProfit.toLocaleString()} ({avgMarginPct}%)
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4"></td>
+                              <td className="py-3.5 px-3 min-w-[170px]"></td>
                             </tr>
                           </tfoot>
                         );
