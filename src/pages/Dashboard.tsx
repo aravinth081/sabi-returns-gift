@@ -6436,12 +6436,12 @@ export default function Dashboard() {
 
 
                   <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px]">
-                    <div className="flex justify-between items-start w-full mb-1.5 relative z-10">
-                      <div className="flex items-center gap-1 group relative">
-                        <p className="text-[11px] font-black text-amber-400 tracking-wide leading-tight uppercase">Revenue <br />Filter</p>
-
-                        <div className="relative inline-block">
-                          <ChevronDown size={14} className="text-amber-400 cursor-pointer hover:scale-125 transition-transform" />
+                    {/* Header Row: Filter Trigger & Month Picker */}
+                    <div className="flex justify-between items-center w-full mb-1.5 relative z-10 gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="relative inline-flex items-center gap-1 bg-[#162035] hover:bg-[#1a2842] px-2 py-1 rounded-xl border border-amber-400/50 hover:border-amber-400 transition-colors shadow-sm cursor-pointer">
+                          <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase">Revenue Filter</span>
+                          <ChevronDown size={12} className="text-amber-400 shrink-0" />
                           <select
                             value={revenueDateType}
                             onChange={(e) => setRevenueDateType(e.target.value)}
@@ -6459,60 +6459,70 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => setShowAmounts(!showAmounts)}
-                          className="ml-1 p-1 rounded-lg bg-[#162035] hover:bg-[#1e2c47] text-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow-sm border border-amber-400/60 flex items-center justify-center shrink-0"
+                          className="w-6 h-6 rounded-lg bg-[#162035] hover:bg-[#1e2c47] text-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow-sm border border-amber-400/50 flex items-center justify-center shrink-0"
                           title={showAmounts ? "Hide monetary amounts" : "Show monetary amounts"}
                         >
-                          {showAmounts ? <Eye size={13} /> : <EyeOff size={13} />}
+                          {showAmounts ? <Eye size={12} /> : <EyeOff size={12} />}
                         </button>
                       </div>
 
-                      <div className="text-right">
-                        <div className="flex items-center justify-end gap-1.5 mb-1">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 text-[10px] font-black uppercase tracking-wider shadow-sm">Revenue</span>
-                          
-                          {/* Month & Year Picker Badge - High contrast dark slate pill with gold typography */}
-                          <div className="relative flex items-center">
-                            <input
-                              type="month"
-                              value={revenueMonthKey}
-                              onChange={(e) => {
-                                if (e.target.value) handleRevenueMonthChange(e.target.value);
-                              }}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                              title="Click to Filter Revenue by Month & Year"
-                            />
-                            <button
-                              type="button"
-                              className="flex items-center gap-1.5 text-[10px] font-black text-amber-300 bg-[#162035] hover:bg-[#1f2d4a] px-2.5 py-1 rounded-lg border border-amber-400/90 shadow-md cursor-pointer transition-all hover:scale-105"
-                            >
-                              <span className="text-amber-300 font-extrabold">{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
-                              <Pencil size={10} className="text-amber-400 shrink-0" />
-                            </button>
-                            {revenueMonthKey && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRevenueMonthChange("");
-                                }}
-                                className="ml-1 p-0.5 rounded-full bg-rose-500/30 hover:bg-rose-500 text-rose-300 hover:text-white transition-colors cursor-pointer z-30"
-                                title="Clear Month Filter"
-                              >
-                                <X size={10} strokeWidth={3} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <h3 className="text-2xl font-black text-emerald-400 leading-tight tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">{maskAmount(displayRevenue)}</h3>
-                        <div className="text-[9px] font-bold text-rose-400/90 uppercase tracking-wider mt-1">Pending Amount</div>
-                        <h4 className="text-base font-black text-rose-400 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{maskAmount(displayPendingAmount)}</h4>
+                      {/* Month & Year Picker Badge */}
+                      <div className="relative flex items-center shrink-0">
+                        <input
+                          type="month"
+                          value={revenueMonthKey}
+                          onChange={(e) => {
+                            if (e.target.value) handleRevenueMonthChange(e.target.value);
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                          title="Click to Filter Revenue by Month & Year"
+                        />
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-[10px] font-black text-amber-300 bg-[#162035] hover:bg-[#1f2d4a] px-2.5 py-1 rounded-xl border border-amber-400/80 shadow-md cursor-pointer transition-all hover:scale-105"
+                        >
+                          <span className="text-amber-300 font-extrabold">{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
+                          <Pencil size={10} className="text-amber-400 shrink-0" />
+                        </button>
+                        {revenueMonthKey && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRevenueMonthChange("");
+                            }}
+                            className="ml-1 p-0.5 rounded-full bg-rose-500/30 hover:bg-rose-500 text-rose-300 hover:text-white transition-colors cursor-pointer z-30"
+                            title="Clear Month Filter"
+                          >
+                            <X size={10} strokeWidth={3} />
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider -mt-1 mb-1.5 z-10 relative">
+                    {/* Middle Row: Balanced Monetary Amounts (Total Revenue & Pending Amount) */}
+                    <div className="relative z-10 my-1 grid grid-cols-2 gap-2 items-end">
+                      <div>
+                        <span className="text-[10px] font-black text-emerald-400/90 uppercase tracking-wider block mb-0.5">Total Revenue</span>
+                        <h3 className="text-xl font-black text-emerald-400 leading-tight tracking-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] truncate">
+                          {maskAmount(displayRevenue)}
+                        </h3>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[9px] font-black text-rose-400/90 uppercase tracking-wider block mb-0.5">Pending Amount</span>
+                        <h4 className="text-base font-black text-rose-400 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] truncate">
+                          {maskAmount(displayPendingAmount)}
+                        </h4>
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Based on Date Type Label */}
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 z-10 relative">
                       Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
                     </p>
 
+                    {/* Date Inputs Range */}
                     <div className="flex items-center gap-1 mt-auto relative z-10 w-full">
                       <input
                         type="date"
