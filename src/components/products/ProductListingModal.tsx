@@ -266,7 +266,7 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
     }
 
     if (!formData.category) {
-      toast.error('Please select a Category before saving.');
+      toast.error('Please select a category.');
       return;
     }
 
@@ -1078,15 +1078,17 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
             </button>
 
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
-              {/* Save as Draft */}
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={(e) => handleSubmit(e, true)}
-                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors cursor-pointer text-xs disabled:opacity-50"
-              >
-                Save as Draft
-              </button>
+              {/* Save as Draft (Only shown for new listing per Requirement 23) */}
+              {!editingProduct && (
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={(e) => handleSubmit(e, true)}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors cursor-pointer text-xs disabled:opacity-50"
+                >
+                  Save as Draft
+                </button>
+              )}
 
               {/* Primary Action: Create Listing or Save Changes */}
               <button

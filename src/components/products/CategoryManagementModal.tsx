@@ -147,7 +147,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
     const usedCount = productCountByCategory[cat.name.trim().toLowerCase()] || 0;
     if (usedCount > 0) {
       setError(
-        `Cannot delete "${cat.name}". It is currently assigned to ${usedCount} active product(s). Reassign those products first.`
+        `This category is currently being used by ${usedCount} listings. Please reassign those listings before deleting this category.`
       );
       return;
     }

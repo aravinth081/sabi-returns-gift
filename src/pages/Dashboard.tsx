@@ -26,6 +26,10 @@ import OrderInvoiceView from "@/components/OrderInvoiceView";
 import DailyTasksBoard from "@/components/DailyTasksBoard";
 import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
 import AttendanceLog from "@/components/AttendanceLog";
+import { ProductListingModal } from "@/components/products/ProductListingModal";
+import { CategoryManagementModal } from "@/components/products/CategoryManagementModal";
+import { AddCategoryModal } from "@/components/products/AddCategoryModal";
+import { ProductViewModal } from "@/components/products/ProductViewModal";
 import Login from "./Login";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -496,6 +500,16 @@ export default function Dashboard() {
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [continuousVisibleCount, setContinuousVisibleCount] = useState(10);
 
+  // 🟢 Category & Products Management State
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>("all");
+  const [productSortFilter, setProductSortFilter] = useState<'default' | 'az' | 'za'>("default");
+  const [firestoreCategories, setFirestoreCategories] = useState<any[]>([]);
+  const [isProductListingModalOpen, setIsProductListingModalOpen] = useState(false);
+  const [selectedEditingProduct, setSelectedEditingProduct] = useState<any | null>(null);
+  const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
+  const [isQuickAddCategoryOpen, setIsQuickAddCategoryOpen] = useState(false);
+  const [productViewModalProduct, setProductViewModalProduct] = useState<any | null>(null);
+
   const DEFAULT_CHOCOLATES = [
     { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 1 },
     { name: "10 rs Kitkat", retailPrice: 20, wholesalePrice: 20, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 2 },
@@ -675,6 +689,9 @@ export default function Dashboard() {
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
       setCustomProducts(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
     });
+    const unsubCategories = onSnapshot(collection(db, "categories"), (snapshot) => {
+      setFirestoreCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
     const unsubManagedChocs = onSnapshot(collection(db, "managed_chocolates"), (snapshot) => {
       let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
 
@@ -822,7 +839,7 @@ export default function Dashboard() {
       }
     });
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); };
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -1369,7 +1386,12 @@ export default function Dashboard() {
       roleFilter !== 'All' ||
       deliveryDates.length > 0 ||
       functionDates.length > 0 ||
-      Boolean(dashboardSearch)
+      Boolean(dashboardSearch) ||
+      Boolean(revenueMonthKey) ||
+      Boolean(productSearchQuery) ||
+      productCategoryFilter !== 'all' ||
+      productSortFilter !== 'default' ||
+      productTypeFilter !== 'all'
     );
   }, [
     paymentFilter,
@@ -1386,6 +1408,11 @@ export default function Dashboard() {
     deliveryDates,
     functionDates,
     dashboardSearch,
+    revenueMonthKey,
+    productSearchQuery,
+    productCategoryFilter,
+    productSortFilter,
+    productTypeFilter,
     activeTab,
   ]);
 
@@ -1417,6 +1444,17 @@ export default function Dashboard() {
     setD2FunctionDates([]);
     setD1DashboardSearch('');
     setD2DashboardSearch('');
+
+    // 🟢 REVENUE MONTH FILTER RESET (Requirement 20!)
+    setD1RevenueMonthKey('');
+    setD2RevenueMonthKey('');
+
+    // 🟢 PRODUCTS MANAGEMENT FILTERS RESET (Requirement 20!)
+    setProductSearchQuery('');
+    setProductCategoryFilter('all');
+    setProductSortFilter('default');
+    setProductTypeFilter('all');
+
     toast.success('All active filters reset to default');
   };
 
@@ -1545,26 +1583,143 @@ export default function Dashboard() {
     });
   }, [customProducts]);
 
+  // 🟢 DEFAULT PRODUCT CATEGORIES (Persistent SaaS Catalog)
+  const DEFAULT_PRODUCT_CATEGORIES = useMemo(() => [
+    { id: 'cat-chocolates', name: 'Chocolates', description: 'Assorted chocolates and chocolate gifts' },
+    { id: 'cat-snacks', name: 'Snacks', description: 'Packaged snacks, munchies, and sweets' },
+    { id: 'cat-beverages', name: 'Beverages', description: 'Drinks, juices, and beverage items' },
+    { id: 'cat-gifts', name: 'Gifts', description: 'Return gift items and celebration combos' },
+    { id: 'cat-toys', name: 'Toys', description: 'Fun toys and play items for kids' },
+    { id: 'cat-stationery', name: 'Stationery', description: 'School, art, and office stationery items' },
+    { id: 'cat-other', name: 'Other', description: 'General and miscellaneous items' },
+  ], []);
+
+  // Merged Categories: Default + Firestore dynamically added categories
+  const productCategories = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; description?: string }>();
+    DEFAULT_PRODUCT_CATEGORIES.forEach(c => map.set(c.name.toLowerCase(), c));
+    firestoreCategories.forEach(c => {
+      if (c.name && typeof c.name === 'string') {
+        map.set(c.name.toLowerCase(), {
+          id: c.id || c.fireId,
+          name: c.name,
+          description: c.description || ''
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [DEFAULT_PRODUCT_CATEGORIES, firestoreCategories]);
+
+  // Real Sold Count Map from Orders Collection (Requirement 18: actual sales data, never hardcoded)
+  const productSoldCountMap = useMemo(() => {
+    const counts: Record<string, number> = {};
+    orders.forEach((order: any) => {
+      if (order.status === 'Cancelled') return;
+
+      // 1. If order contains multi-product array
+      if (order.products && Array.isArray(order.products)) {
+        order.products.forEach((p: any) => {
+          const pName = (p.productName || p.name || '').trim().toLowerCase();
+          if (pName) {
+            counts[pName] = (counts[pName] || 0) + (Number(p.count || p.quantity) || 1);
+          }
+        });
+      }
+
+      // 2. Order main item (single or comma-separated list of items)
+      const mainName = String(order.productName || order.chocolate || '').trim();
+      if (mainName) {
+        const parts = mainName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+        const orderQty = Number(order.count) || 1;
+        parts.forEach((part: string) => {
+          counts[part] = (counts[part] || 0) + orderQty;
+        });
+      }
+    });
+    return counts;
+  }, [orders]);
+
+  // All Single Products (for combo set product picker references)
+  const allSingleProducts = useMemo(() => {
+    return customProducts.filter(p => (p.productType || "Single product") === "Single product");
+  }, [customProducts]);
+
   const singleProductsCount = useMemo(() => {
-    return orderedProducts.filter(p => (p.productType || "Single product") === "Single product").length;
-  }, [orderedProducts]);
+    return allSingleProducts.length;
+  }, [allSingleProducts]);
 
   const comboSetsCount = useMemo(() => {
-    return orderedProducts.filter(p => p.productType === "Combo set").length;
-  }, [orderedProducts]);
+    return customProducts.filter(p => p.productType === "Combo set").length;
+  }, [customProducts]);
 
+  // Dynamically Filtered and Sorted Products List
   const filteredProducts = useMemo(() => {
-    return orderedProducts.filter(p => {
-      const pType = p.productType || "Single product";
-      if (productTypeFilter !== 'all' && pType !== productTypeFilter) {
-        return false;
-      }
-      if (debouncedProductSearch.trim() && (!p.name || !p.name.toLowerCase().includes(debouncedProductSearch.toLowerCase()))) {
-        return false;
-      }
-      return true;
-    });
-  }, [orderedProducts, productTypeFilter, debouncedProductSearch]);
+    let result = [...customProducts];
+
+    // 1. Type Filter
+    if (productTypeFilter !== 'all') {
+      result = result.filter(p => (p.productType || "Single product") === productTypeFilter);
+    }
+
+    // 2. Category Filter (Requirement 4)
+    if (productCategoryFilter !== 'all') {
+      result = result.filter(p => (p.category || '').toLowerCase() === productCategoryFilter.toLowerCase());
+    }
+
+    // 3. Search Filter across: Product Name, Combo Name, Category, Subcategory, SKU, Brand, Description (Requirement 2 & 3)
+    if (debouncedProductSearch.trim()) {
+      const q = debouncedProductSearch.toLowerCase().trim();
+      result = result.filter(p => {
+        const nameMatch = (p.name || '').toLowerCase().includes(q);
+        const catMatch = (p.category || '').toLowerCase().includes(q);
+        const subCatMatch = (p.subcategory || '').toLowerCase().includes(q);
+        const skuMatch = (p.sku || '').toLowerCase().includes(q);
+        const brandMatch = (p.brand || '').toLowerCase().includes(q);
+        const descMatch = (p.description || '').toLowerCase().includes(q);
+        const comboMatch = p.comboProducts && Array.isArray(p.comboProducts) && p.comboProducts.some((ci: any) => (ci.name || '').toLowerCase().includes(q));
+        return nameMatch || catMatch || subCatMatch || skuMatch || brandMatch || descMatch || comboMatch;
+      });
+    }
+
+    // 4. Sort Dropdown (Requirement 5: A -> Z, Z -> A; for Combo Sets based on Combo Set Name)
+    if (productSortFilter === 'az') {
+      result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (productSortFilter === 'za') {
+      result.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    } else {
+      // Default: order added
+      result.sort((a, b) => {
+        const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tA - tB;
+      });
+    }
+
+    return result;
+  }, [customProducts, productTypeFilter, productCategoryFilter, debouncedProductSearch, productSortFilter]);
+
+  // Dynamic result count display (Requirement 19)
+  const productCountDisplay = useMemo(() => {
+    const total = customProducts.length;
+    const count = filteredProducts.length;
+    const hasSearch = Boolean(debouncedProductSearch.trim());
+    const hasCategory = productCategoryFilter !== 'all';
+    const hasType = productTypeFilter !== 'all';
+
+    if (hasSearch && hasCategory) {
+      return `Showing ${count} matching in ${productCategoryFilter}`;
+    }
+    if (hasSearch) {
+      return `Showing ${count} matching ${count === 1 ? 'product' : 'products'}`;
+    }
+    if (hasCategory) {
+      return `Showing ${count} ${productCategoryFilter}`;
+    }
+    if (hasType) {
+      return `Showing ${count} ${productTypeFilter === 'Combo set' ? 'Combo Sets' : 'Single Products'}`;
+    }
+    return `Showing ${count} of ${total} ${total === 1 ? 'product' : 'products'}`;
+  }, [customProducts.length, filteredProducts.length, debouncedProductSearch, productCategoryFilter, productTypeFilter]);
 
   const monthWiseReportData = useMemo(() => {
     const monthsMap: Record<string, { monthKey: string; monthName: string; totalRevenue: number; totalCost: number; netProfit: number }> = {};
@@ -3532,24 +3687,152 @@ export default function Dashboard() {
     }
   };
 
-  const handleEditProductClick = (prod: any) => {
-    setNewProductForm({ 
-      name: prod.name, 
-      wholesalePrice: String(prod.wholesalePrice !== undefined && prod.wholesalePrice !== null ? prod.wholesalePrice : ""), 
-      price: String(prod.price ?? prod.sellingPrice ?? ""),
-      productType: prod.productType || "Single product"
-    });
-    setNewProductExistingImages(prod.images || []);
-    setNewProductImages([]);
-    setEditProductId(prod.fireId);
-    if (activeTab === 'products') {
-      const formEl = document.getElementById("product-inline-form");
-      if (formEl) {
-        formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // 🟢 CATEGORY MANAGEMENT HANDLERS (Requirement 6, 7, 8)
+  const handleAddCategory = async (name: string, description?: string) => {
+    try {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        toast.error("Category name is required.");
+        return false;
       }
-    } else {
-      setIsAddProductModalOpen(true);
+      const isDuplicate = productCategories.some(
+        c => c.name.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (isDuplicate) {
+        toast.error(`Category "${trimmed}" already exists.`);
+        return false;
+      }
+
+      await addDoc(collection(db, "categories"), {
+        name: trimmed,
+        description: description?.trim() || "",
+        createdAt: new Date().toISOString()
+      });
+      logActivity(`Created Category: ${trimmed}`, 'Products');
+      toast.success(`Category "${trimmed}" added successfully!`);
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add category");
+      return false;
     }
+  };
+
+  const handleEditCategory = async (id: string, oldName: string, newName: string, description?: string) => {
+    try {
+      const trimmed = newName.trim();
+      if (!trimmed) {
+        toast.error("Category name cannot be empty.");
+        return false;
+      }
+      const isDuplicate = productCategories.some(
+        c => c.id !== id && c.name.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (isDuplicate) {
+        toast.error(`Category "${trimmed}" already exists.`);
+        return false;
+      }
+
+      const foundInDb = firestoreCategories.find(
+        c => c.id === id || c.name.toLowerCase() === oldName.toLowerCase()
+      );
+      if (foundInDb) {
+        await updateDoc(doc(db, "categories", foundInDb.id), {
+          name: trimmed,
+          description: description?.trim() || "",
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await addDoc(collection(db, "categories"), {
+          name: trimmed,
+          description: description?.trim() || "",
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // Update all products in customProducts that use oldName (Requirement 7)
+      const productsToUpdate = customProducts.filter(
+        p => p.category && p.category.toLowerCase() === oldName.toLowerCase()
+      );
+      for (const prod of productsToUpdate) {
+        await updateDoc(doc(db, "products", prod.fireId), {
+          category: trimmed
+        });
+      }
+
+      logActivity(`Updated Category: ${oldName} -> ${trimmed}`, 'Products');
+      toast.success(`Category "${trimmed}" updated successfully!`);
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update category");
+      return false;
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    try {
+      // Data Protection Rule (Requirement 8)
+      const usedProducts = customProducts.filter(
+        p => p.category && p.category.toLowerCase() === name.toLowerCase()
+      );
+      if (usedProducts.length > 0) {
+        toast.error(
+          `This category is currently being used by ${usedProducts.length} listings. Please reassign those listings before deleting this category.`
+        );
+        return false;
+      }
+
+      const foundInDb = firestoreCategories.find(
+        c => c.id === id || c.name.toLowerCase() === name.toLowerCase()
+      );
+      if (foundInDb) {
+        await deleteDoc(doc(db, "categories", foundInDb.id));
+      }
+      logActivity(`Deleted Category: ${name}`, 'Products');
+      toast.success(`Category "${name}" deleted successfully!`);
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete category");
+      return false;
+    }
+  };
+
+  // 🟢 REUSABLE PRODUCT LISTING MODAL SAVE (Requirement 10, 12, 13, 22)
+  const handleSaveListingModal = async (productData: any, isDraft = false) => {
+    try {
+      setIsSavingProduct(true);
+      const finalStatus = isDraft ? 'Draft' : (productData.status || 'Active');
+      const payload = {
+        ...productData,
+        status: finalStatus,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (selectedEditingProduct) {
+        await updateDoc(doc(db, "products", selectedEditingProduct.fireId), payload);
+        toast.success("Listing updated successfully!");
+        logActivity(`Edited Listing: ${payload.name} [${payload.productType}] (Selling: ₹${payload.price}, Wholesale: ₹${payload.wholesalePrice || 0})`, 'Products');
+      } else {
+        await addDoc(collection(db, "products"), {
+          ...payload,
+          createdAt: new Date().toISOString(),
+        });
+        toast.success(isDraft ? "Draft saved successfully!" : "Listing created successfully!");
+        logActivity(`Added New Listing: ${payload.name} [${payload.productType}] (Selling: ₹${payload.price}, Wholesale: ₹${payload.wholesalePrice || 0})`, 'Products');
+      }
+      setIsProductListingModalOpen(false);
+      setSelectedEditingProduct(null);
+    } catch (err: any) {
+      console.error("Error saving listing:", err);
+      toast.error(err?.message || "Failed to save listing");
+      throw err;
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
+  const handleEditProductClick = (prod: any) => {
+    setSelectedEditingProduct(prod);
+    setIsProductListingModalOpen(true);
   };
 
   const handleDeleteProductClick = async (fireId: string) => {
@@ -4785,489 +5068,480 @@ export default function Dashboard() {
 
           {/* ================= PRODUCTS MANAGEMENT SECTION ================= */}
           {activeTab === 'products' && (
-            <div className="space-y-8 print:hidden animate-in fade-in duration-300 pb-12">
+            <div className="space-y-6 print:hidden animate-in fade-in duration-300 pb-16">
               
-              {/* Top Control Header Card */}
-              <div className="bg-[#0d1527] p-5 md:p-6 rounded-3xl shadow-2xl border border-white/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/50 shrink-0">
-                    <ShoppingBag size={24} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
-                      Products Management & Inventory
-                    </h2>
-                    <p className="text-xs md:text-sm text-slate-300 font-medium">
-                      Create new listings, track wholesale costs, selling prices, and real-time profit margins.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {/* Top Section Product Type Filter Dropdown */}
-                  <div className="flex items-center gap-2 bg-[#162035] border border-white/15 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-300 shadow-inner">
-                    <Filter size={14} className="text-amber-400 shrink-0" />
-                    <span className="text-slate-400 text-xs hidden xs:inline">Type:</span>
-                    <div className="relative">
-                      <select
-                        aria-label="Filter products by type"
-                        value={productTypeFilter}
-                        onChange={(e) => setProductTypeFilter(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-5 appearance-none focus:text-amber-300"
-                      >
-                        <option value="all" className="bg-[#162035] text-white">All Products ({orderedProducts.length})</option>
-                        <option value="Single product" className="bg-[#162035] text-cyan-300">Single Products ({singleProductsCount})</option>
-                        <option value="Combo set" className="bg-[#162035] text-purple-300">Combo Sets ({comboSetsCount})</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-slate-400">
-                        <ChevronDown size={12} />
+              {/* 🟢 TOP SAAS PRODUCTS HEADER (Requirements 2, 3, 4, 5, 9, 25) */}
+              <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 flex flex-col gap-4">
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                  {/* LEFT: Title & Dynamic Current Result Count (Requirement 2 & 19) */}
+                  <div className="flex items-center gap-3.5 shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center text-white shadow-xl shadow-blue-950/60 shrink-0">
+                      <ShoppingBag size={24} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <h2 className="text-xl md:text-2xl font-black text-white tracking-wide">
+                          Products
+                        </h2>
+                        {productTypeFilter !== 'all' && (
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${productTypeFilter === 'Combo set' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'}`}>
+                            {productTypeFilter}
+                          </span>
+                        )}
                       </div>
+                      <p className="text-xs md:text-sm text-slate-300 font-semibold mt-0.5 flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>{productCountDisplay}</span>
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-[#162035] border border-white/10 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300">
-                    <Package size={16} className="text-blue-400" />
-                    <span>Total Items: <strong className="text-white text-sm">{orderedProducts.length}</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 🟢 INLINE "ADD NEW LISTING" FORM (Directly on Page - NO POPUP MODAL) */}
-              <div id="product-inline-form" className="bg-[#0c1427] border border-white/15 rounded-[2rem] p-6 md:p-8 max-w-xl mx-auto shadow-2xl text-white">
-                <div className="flex items-center justify-between border-b border-white/15 pb-4 mb-6">
-                  <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider">
-                    {editProductId ? "Edit Listing" : "Add New Listing"}
-                  </h3>
-                  {editProductId && (
-                    <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-400/50 px-3 py-1 rounded-full font-bold">
-                      Editing Mode
-                    </span>
-                  )}
-                </div>
-
-                <form onSubmit={handleAddCustomProduct} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Item Name
-                      </label>
+                  {/* CENTER: Large Horizontally Centered Search Bar (Requirement 2 & 3) */}
+                  <div className="flex-1 max-w-xl mx-auto w-full">
+                    <div className="relative group">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-400 transition-colors" size={18} />
                       <input
-                        required
                         type="text"
-                        value={newProductForm.name}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder="Enter Item Name (e.g. Munch)"
+                        placeholder="Search Products (name, combo, category, SKU)..."
+                        value={productSearchQuery}
+                        onChange={(e) => setProductSearchQuery(e.target.value)}
+                        className="w-full pl-11 pr-10 py-3 bg-[#15213b] border border-white/20 hover:border-white/30 rounded-2xl text-sm font-semibold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Product Type
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={newProductForm.productType || "Single product"}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value })}
-                          style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                          className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-9"
+                      {productSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setProductSearchQuery('')}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                         >
-                          <option value="Single product" className="bg-[#151f36] text-white">Single product</option>
-                          <option value="Combo set" className="bg-[#151f36] text-white">Combo set</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                          <ChevronDown size={16} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Wholesale Price
-                      </label>
-                      <input
-                        required
-                        type="number"
-                        step="any"
-                        value={newProductForm.wholesalePrice}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder="Wholesale Price"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-slate-300 uppercase tracking-wider">
-                        Selling Price
-                      </label>
-                      <input
-                        required
-                        type="number"
-                        step="any"
-                        value={newProductForm.price}
-                        onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })}
-                        style={{ backgroundColor: '#151f36', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-3 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm"
-                        placeholder="Selling Price"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 📷 Product Images Uploader (Cloudinary) */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Camera size={13} className="text-amber-400" />
-                        <span>Product Photos (Saved to Cloudinary)</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-normal">Optional</span>
-                    </label>
-
-                    {/* Previews of Existing & Selected Images */}
-                    {(newProductExistingImages.length > 0 || newProductImages.length > 0) && (
-                      <div className="flex flex-wrap gap-2 p-2.5 bg-[#121b2f] rounded-xl border border-white/10">
-                        {/* Saved Cloudinary Images */}
-                        {newProductExistingImages.map((imgUrl, idx) => (
-                          <div key={`existing-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-white/20 shadow-sm">
-                            <img src={imgUrl} alt="Product" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => setNewProductExistingImages(prev => prev.filter((_, i) => i !== idx))}
-                              className="absolute top-0.5 right-0.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              <X size={10} />
-                            </button>
-                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] text-center text-slate-300 font-bold">Saved</span>
-                          </div>
-                        ))}
-
-                        {/* Selected New Images to Upload */}
-                        {newProductImages.map((file, idx) => (
-                          <div key={`new-${idx}`} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-emerald-400/50 shadow-sm">
-                            <img src={URL.createObjectURL(file)} alt="New upload" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => setNewProductImages(prev => prev.filter((_, i) => i !== idx))}
-                              className="absolute top-0.5 right-0.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              <X size={10} />
-                            </button>
-                            <span className="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-[8px] text-center text-white font-bold">Ready</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
-                      <Upload size={15} className="text-amber-400" />
-                      <span>Click to select product photos</span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            const selected = Array.from(e.target.files);
-                            setNewProductImages(prev => [...prev, ...selected]);
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  </div>
-
-                  {/* Dynamic Real-time Profit Indicator inside the Form */}
-                  {(newProductForm.price || newProductForm.wholesalePrice) && (() => {
-                    const sp = Number(newProductForm.price) || 0;
-                    const wp = Number(newProductForm.wholesalePrice) || 0;
-                    const profit = sp - wp;
-                    const marginPct = wp > 0 ? Math.round((profit / wp) * 100) : 100;
-                    return (
-                      <div className="bg-[#151f36]/80 border border-white/10 rounded-xl p-3 flex items-center justify-between text-xs animate-in fade-in">
-                        <span className="text-slate-300 font-semibold">Calculated Profit (Selling - Wholesale):</span>
-                        <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          ₹{profit.toLocaleString()} {wp > 0 ? `(${marginPct}%)` : ''}
-                        </span>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" });
-                        setNewProductImages([]);
-                        setNewProductExistingImages([]);
-                        setEditProductId(null);
-                      }}
-                      className="flex-1 px-5 py-3 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-all cursor-pointer text-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingProduct}
-                      className={`flex-1 px-5 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/40 hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}
-                    >
-                      {isSavingProduct ? "Uploading to Cloudinary..." : (editProductId ? "Update Listing" : "Save Listing")}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* 🟢 DEDICATED PRODUCTS TABLE (Chronological Order Added, Profit Calculation) */}
-              <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 text-white">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 pb-4 border-b border-white/10">
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
-                      <ShoppingBag className="text-blue-400" size={20} />
-                      <span>Product Listings Table ({filteredProducts.length})</span>
-                      {productTypeFilter !== 'all' && (
-                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${productTypeFilter === 'Combo set' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'}`}>
-                          {productTypeFilter}
-                        </span>
+                          <X size={15} />
+                        </button>
                       )}
-                    </h3>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">
-                      Items are shown in the exact order added with auto-calculated profit margins.
-                    </p>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-                    {/* Top Section Product Type Filter Dropdown */}
+                  {/* RIGHT: Category Filter, Sort, Category Management, + New Listing (Requirement 2, 4, 5, 9) */}
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0 justify-end">
+                    {/* Category Filter Dropdown (Requirement 4) */}
                     <div className="relative">
                       <select
-                        aria-label="Filter products list by type"
-                        value={productTypeFilter}
-                        onChange={(e) => setProductTypeFilter(e.target.value)}
-                        className="w-full sm:w-auto pl-3 pr-8 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-amber-400 cursor-pointer appearance-none transition-colors"
+                        aria-label="Filter products by category"
+                        value={productCategoryFilter}
+                        onChange={(e) => {
+                          if (e.target.value === '__manage__') {
+                            setIsCategoryManagementOpen(true);
+                          } else if (e.target.value === '__add_new__') {
+                            setIsQuickAddCategoryOpen(true);
+                          } else {
+                            setProductCategoryFilter(e.target.value);
+                          }
+                        }}
+                        className="pl-3.5 pr-8 py-2.5 bg-[#15213b] border border-white/20 hover:border-white/30 rounded-xl text-xs font-bold text-white outline-none focus:border-blue-400 cursor-pointer appearance-none transition-colors shadow-sm"
                       >
-                        <option value="all" className="bg-[#15213b] text-white">All Types ({orderedProducts.length})</option>
-                        <option value="Single product" className="bg-[#15213b] text-cyan-300">Single Products ({singleProductsCount})</option>
-                        <option value="Combo set" className="bg-[#15213b] text-purple-300">Combo Sets ({comboSetsCount})</option>
+                        <option value="all" className="bg-[#15213b] text-white">All Categories ({customProducts.length})</option>
+                        {productCategories.map((cat) => {
+                          const catCount = customProducts.filter(p => (p.category || '').toLowerCase() === cat.name.toLowerCase()).length;
+                          return (
+                            <option key={cat.id} value={cat.name} className="bg-[#15213b] text-white">
+                              {cat.name} ({catCount})
+                            </option>
+                          );
+                        })}
+                        <option value="__add_new__" className="bg-emerald-950 text-emerald-300 font-extrabold">+ Add New Category</option>
+                        <option value="__manage__" className="bg-slate-900 text-amber-300 font-extrabold">⚙️ Manage Categories</option>
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
                         <ChevronDown size={14} />
                       </div>
                     </div>
 
-                    {/* Search Filter */}
-                    <div className="relative w-full sm:w-60">
-                      <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                      <input
-                        type="text"
-                        placeholder="Search product name..."
-                        value={productSearchQuery}
-                        onChange={(e) => setProductSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 transition-colors"
-                      />
+                    {/* Sort Dropdown (Requirement 5) */}
+                    <div className="relative">
+                      <select
+                        aria-label="Sort products"
+                        value={productSortFilter}
+                        onChange={(e) => setProductSortFilter(e.target.value as any)}
+                        className="pl-3.5 pr-8 py-2.5 bg-[#15213b] border border-white/20 hover:border-white/30 rounded-xl text-xs font-bold text-white outline-none focus:border-blue-400 cursor-pointer appearance-none transition-colors shadow-sm"
+                      >
+                        <option value="default" className="bg-[#15213b] text-white">Sort: Order Added</option>
+                        <option value="az" className="bg-[#15213b] text-white">Sort: A → Z</option>
+                        <option value="za" className="bg-[#15213b] text-white">Sort: Z → A</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
+                        <ChevronDown size={14} />
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {orderedProducts.length === 0 ? (
-                  <div className="py-16 text-center space-y-3">
-                    <Package size={48} className="mx-auto text-slate-600 animate-pulse" />
-                    <p className="text-lg font-bold text-slate-400">No product listings added yet.</p>
-                    <p className="text-xs text-slate-500">Fill in the "ADD NEW LISTING" form above to create your first product.</p>
-                  </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div className="py-16 text-center space-y-3">
-                    <Package size={48} className="mx-auto text-slate-600 animate-pulse" />
-                    <p className="text-lg font-bold text-slate-300">No matching products found</p>
-                    <p className="text-xs text-slate-500">
-                      {productTypeFilter !== 'all' ? `No products matching "${productTypeFilter}".` : 'Try adjusting your search criteria.'}
-                    </p>
+                    {/* Type Filter Pill Dropdown */}
+                    <div className="relative">
+                      <select
+                        aria-label="Filter products by type"
+                        value={productTypeFilter}
+                        onChange={(e) => setProductTypeFilter(e.target.value)}
+                        className="pl-3 pr-7 py-2.5 bg-[#15213b] border border-white/20 rounded-xl text-xs font-bold text-white outline-none cursor-pointer appearance-none focus:border-amber-400 transition-colors"
+                      >
+                        <option value="all" className="bg-[#15213b] text-white">All Types</option>
+                        <option value="Single product" className="bg-[#15213b] text-cyan-300">Single Products ({singleProductsCount})</option>
+                        <option value="Combo set" className="bg-[#15213b] text-purple-300">Combo Sets ({comboSetsCount})</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                        <ChevronDown size={13} />
+                      </div>
+                    </div>
+
+                    {/* Manage Categories Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryManagementOpen(true)}
+                      className="px-3 py-2.5 bg-[#15213b] hover:bg-[#1d2b4d] border border-white/20 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Manage Product Categories"
+                    >
+                      <Tag size={14} className="text-emerald-400" />
+                      <span className="hidden sm:inline">Categories</span>
+                    </button>
+
+                    {/* 🟢 + NEW LISTING BUTTON (Requirement 9 & 10) */}
                     <button
                       type="button"
                       onClick={() => {
-                        setProductTypeFilter('all');
-                        setProductSearchQuery('');
+                        setSelectedEditingProduct(null);
+                        setIsProductListingModalOpen(true);
                       }}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 shrink-0"
                     >
-                      Reset Filters
+                      <Plus size={16} strokeWidth={3} />
+                      <span>+ New Listing</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Active Filters Summary Bar (if any product filter is active) */}
+                {(productCategoryFilter !== 'all' || productSearchQuery || productSortFilter !== 'default' || productTypeFilter !== 'all') && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-white/10 text-xs animate-in fade-in">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-slate-400 font-bold">Active Filters:</span>
+                      {productCategoryFilter !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[11px] font-bold">
+                          Category: {productCategoryFilter}
+                          <X size={12} className="cursor-pointer hover:text-white" onClick={() => setProductCategoryFilter('all')} />
+                        </span>
+                      )}
+                      {productSearchQuery && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold">
+                          Search: "{productSearchQuery}"
+                          <X size={12} className="cursor-pointer hover:text-white" onClick={() => setProductSearchQuery('')} />
+                        </span>
+                      )}
+                      {productTypeFilter !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[11px] font-bold">
+                          Type: {productTypeFilter}
+                          <X size={12} className="cursor-pointer hover:text-white" onClick={() => setProductTypeFilter('all')} />
+                        </span>
+                      )}
+                      {productSortFilter !== 'default' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold">
+                          Sort: {productSortFilter === 'az' ? 'A → Z' : 'Z → A'}
+                          <X size={12} className="cursor-pointer hover:text-white" onClick={() => setProductSortFilter('default')} />
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductSearchQuery('');
+                        setProductCategoryFilter('all');
+                        setProductSortFilter('default');
+                        setProductTypeFilter('all');
+                      }}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 underline font-bold cursor-pointer"
+                    >
+                      Clear Product Filters
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 🟢 PRODUCTS TABLE & LISTING (Requirements 13, 14, 17, 18, 24) */}
+              <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 text-white">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-5 pb-4 border-b border-white/10">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
+                      <ShoppingBag className="text-blue-400" size={20} />
+                      <span>Product Listings Catalog ({filteredProducts.length})</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      SaaS catalog with real sold units, category tracking, and auto-calculated profit margins.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 font-semibold">
+                      Total Listings: <strong className="text-white">{customProducts.length}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Empty State when no products exist at all */}
+                {customProducts.length === 0 ? (
+                  <div className="py-20 text-center space-y-4">
+                    <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto text-blue-400 shadow-xl">
+                      <Package size={36} />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-white">No products in your catalog yet</h4>
+                      <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                        Get started by adding your first single product listing or combo gift set.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEditingProduct(null);
+                        setIsProductListingModalOpen(true);
+                      }}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus size={15} />
+                      <span>+ Create First Listing</span>
+                    </button>
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  /* Empty State when filtered results = 0 (Requirement 24) */
+                  <div className="py-20 text-center space-y-4">
+                    <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400 shadow-xl">
+                      <Package size={36} />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-white">No products found</h4>
+                      <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                        No product listings match your current search criteria or category filter.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductSearchQuery('');
+                        setProductCategoryFilter('all');
+                        setProductSortFilter('default');
+                        setProductTypeFilter('all');
+                      }}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Clear Filters</span>
                     </button>
                   </div>
                 ) : (
+                  /* Products Table */
                   <div className="overflow-x-auto rounded-2xl border border-white/10 shadow-inner">
                     <table className="w-full text-left border-collapse text-xs md:text-sm">
                       <thead>
                         <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
-                          <th className="py-3.5 px-4 text-center w-16">#</th>
-                          <th className="py-3.5 px-4">Item Name</th>
-                          <th className="py-3.5 px-4 text-center w-36">Product Type</th>
-                          <th className="py-3.5 px-4 text-right">Wholesale Price (₹)</th>
-                          <th className="py-3.5 px-4 text-right">Selling Price (₹)</th>
-                          <th className="py-3.5 px-4 text-right">Profit (₹)</th>
-                          <th className="py-3.5 px-4 text-center w-28">Actions</th>
+                          <th className="py-3.5 px-4 text-center w-14">#</th>
+                          <th className="py-3.5 px-4 min-w-[220px]">Item / Combo Name</th>
+                          <th className="py-3.5 px-3.5 text-center min-w-[120px]">Category</th>
+                          <th className="py-3.5 px-3 text-center min-w-[110px]">Type</th>
+                          <th className="py-3.5 px-3.5 text-center min-w-[90px]">Units Sold</th>
+                          <th className="py-3.5 px-4 text-right">Wholesale (₹)</th>
+                          <th className="py-3.5 px-4 text-right">Selling (₹)</th>
+                          <th className="py-3.5 px-4 text-right min-w-[120px]">Profit (₹)</th>
+                          <th className="py-3.5 px-4 text-center w-32">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {filteredProducts.map((prod, index) => {
-                            const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
-                            const wholePrice = Number(prod.wholesalePrice) || 0;
-                            const profit = sellPrice - wholePrice;
-                            const marginPct = wholePrice > 0 ? Math.round((profit / wholePrice) * 100) : 100;
-                            const isCurrentlyEditing = editProductId === prod.fireId;
-                            const pType = prod.productType || "Single product";
+                          const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
+                          const wholePrice = Number(prod.wholesalePrice ?? prod.discountPrice) || 0;
+                          const profit = sellPrice - wholePrice;
+                          const marginPct = wholePrice > 0 ? Math.round((profit / wholePrice) * 100) : 100;
+                          const pType = prod.productType || "Single product";
+                          const isComboItem = pType === "Combo set";
+                          const sold = productSoldCountMap[(prod.name || '').trim().toLowerCase()] || 0;
 
-                            return (
-                              <tr
-                                key={prod.fireId || index}
-                                className={`hover:bg-[#15213b]/60 transition-colors ${isCurrentlyEditing ? 'bg-amber-500/15 border-l-4 border-l-amber-400' : ''}`}
-                              >
-                                {/* # / Order Number */}
-                                <td className="py-3.5 px-4 text-center font-black text-amber-400">
-                                  {index + 1}
-                                </td>
+                          return (
+                            <tr
+                              key={prod.fireId || index}
+                              className="hover:bg-[#15213b]/60 transition-colors"
+                            >
+                              {/* # / Index */}
+                              <td className="py-3.5 px-4 text-center font-black text-amber-400">
+                                {index + 1}
+                              </td>
 
-                                {/* Item Name */}
-                                <td className="py-3.5 px-4">
-                                  <div className="flex items-center gap-3">
-                                    {prod.images && prod.images.length > 0 ? (
-                                      <img
-                                        src={prod.images[0]}
-                                        alt={prod.name}
-                                        onClick={() => {
-                                          setImageGalleryProduct(prod);
-                                          setGalleryActiveIndex(0);
-                                          setIsImageGalleryOpen(true);
-                                        }}
-                                        className="w-9 h-9 rounded-lg object-cover border border-amber-400/40 shadow-sm cursor-pointer hover:scale-110 transition-transform shrink-0"
-                                        title="Click to view full photo gallery"
-                                      />
-                                    ) : (
-                                      <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0">
-                                        {prod.name ? prod.name.charAt(0).toUpperCase() : 'P'}
-                                      </div>
-                                    )}
-                                    <span className="font-extrabold text-white tracking-wide">
-                                      {prod.name}
-                                    </span>
-                                  </div>
-                                </td>
-
-                                {/* Product Type */}
-                                <td className="py-3.5 px-4 text-center">
-                                  {pType === "Combo set" ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm">
-                                      <Boxes size={12} className="text-purple-400" />
-                                      Combo set
-                                    </span>
+                              {/* Item / Combo Name with Primary Image */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-3">
+                                  {prod.images && prod.images.length > 0 ? (
+                                    <img
+                                      src={prod.images[0]}
+                                      alt={prod.name}
+                                      onClick={() => setProductViewModalProduct(prod)}
+                                      className="w-10 h-10 rounded-xl object-cover border border-white/20 shadow-sm cursor-pointer hover:scale-110 transition-transform shrink-0"
+                                      title="Click to view product details and images"
+                                    />
                                   ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm">
-                                      <Package size={12} className="text-cyan-400" />
-                                      Single product
-                                    </span>
+                                    <div
+                                      onClick={() => setProductViewModalProduct(prod)}
+                                      className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-black text-xs border border-blue-500/30 shrink-0 cursor-pointer"
+                                    >
+                                      {prod.name ? prod.name.charAt(0).toUpperCase() : 'P'}
+                                    </div>
                                   )}
-                                </td>
-
-                                {/* Wholesale Price */}
-                                <td className="py-3.5 px-4 text-right font-black text-blue-400">
-                                  ₹{wholePrice.toLocaleString()}
-                                </td>
-
-                                {/* Selling Price */}
-                                <td className="py-3.5 px-4 text-right font-black text-emerald-400">
-                                  ₹{sellPrice.toLocaleString()}
-                                </td>
-
-                                {/* Profit = Selling Price - Wholesale Price */}
-                                <td className="py-3.5 px-4 text-right">
-                                  <div className="flex flex-col items-end">
-                                    <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                      ₹{profit.toLocaleString()}
-                                    </span>
-                                    <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
-                                      {marginPct}% margin
-                                    </span>
-                                  </div>
-                                </td>
-
-                                {/* Actions */}
-                                <td className="py-3.5 px-4 text-center">
-                                  <div className="inline-grid grid-cols-2 gap-1.5">
+                                  <div className="min-w-0">
                                     <button
                                       type="button"
-                                      onClick={() => handleEditProductClick(prod)}
-                                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                                      title="Edit Listing"
+                                      onClick={() => setProductViewModalProduct(prod)}
+                                      className="font-extrabold text-white tracking-wide text-left truncate block hover:text-blue-300 transition-colors cursor-pointer"
                                     >
-                                      <Pencil size={15} />
+                                      {prod.name}
                                     </button>
-                                    <label
-                                      className={`w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
-                                      title="Upload Images"
-                                    >
-                                      <ImageIcon size={15} />
-                                      <input
-                                        type="file"
-                                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                                        multiple
-                                        className="hidden"
-                                        onChange={(e) => {
-                                          if (e.target.files && e.target.files.length > 0) {
-                                            handleImageUpload(prod.fireId, e.target.files);
-                                          }
-                                          e.target.value = '';
-                                        }}
-                                      />
-                                    </label>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (prod.images && prod.images.length > 0) {
-                                          setImageGalleryProduct(prod);
-                                          setGalleryActiveIndex(0);
-                                          setIsImageGalleryOpen(true);
-                                        } else {
-                                          toast('No images uploaded yet', { icon: '📷' });
-                                        }
-                                      }}
-                                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer relative hover:scale-110 active:scale-95"
-                                      title={prod.images && prod.images.length > 0 ? `View ${prod.images.length} Image(s)` : 'No images yet'}
-                                    >
-                                      <Eye size={15} />
-                                      {prod.images && prod.images.length > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-lg shadow-amber-500/40 ring-2 ring-[#0d1527]">{prod.images.length}</span>
+                                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+                                      {prod.sku && <span className="font-mono text-cyan-300">{prod.sku}</span>}
+                                      {isComboItem && prod.comboProducts && (
+                                        <span className="text-purple-300 font-semibold">
+                                          ({prod.comboProducts.length} items bundled)
+                                        </span>
                                       )}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteProductClick(prod.fireId)}
-                                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                                      title="Delete Listing"
-                                    >
-                                      <Trash2 size={15} />
-                                    </button>
+                                    </div>
                                   </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                                </div>
+                              </td>
+
+                              {/* Category Badge (Requirement 4 & 16) */}
+                              <td className="py-3.5 px-3.5 text-center">
+                                {prod.category ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#1a2642] text-slate-200 border border-white/10 shadow-sm">
+                                    <Tag size={11} className="text-amber-400" />
+                                    {prod.category}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 text-[11px] italic">Unassigned</span>
+                                )}
+                              </td>
+
+                              {/* Product Type (Requirement 11) */}
+                              <td className="py-3.5 px-3 text-center">
+                                {isComboItem ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm">
+                                    <Boxes size={12} className="text-purple-400" />
+                                    Combo set
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm">
+                                    <Package size={12} className="text-cyan-400" />
+                                    Single product
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Units Sold Count (Requirement 18: actual sales from orders, never hardcoded) */}
+                              <td className="py-3.5 px-3.5 text-center">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                  <ShoppingBag size={11} className="text-amber-400" />
+                                  Sold: {sold}
+                                </span>
+                              </td>
+
+                              {/* Wholesale Price */}
+                              <td className="py-3.5 px-4 text-right font-black text-blue-400">
+                                ₹{wholePrice.toLocaleString()}
+                              </td>
+
+                              {/* Selling Price */}
+                              <td className="py-3.5 px-4 text-right font-black text-emerald-400">
+                                ₹{sellPrice.toLocaleString()}
+                              </td>
+
+                              {/* Profit & Margin */}
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className={`font-black text-sm ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    ₹{profit.toLocaleString()}
+                                  </span>
+                                  <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                                    {marginPct}% margin
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Actions: View (Eye), Edit (Pencil), Upload (Image), Delete (Trash) */}
+                              <td className="py-3.5 px-4 text-center">
+                                <div className="inline-grid grid-cols-4 gap-1.5">
+                                  {/* View Button (Requirement 17: Opens rich View Modal with Copy Description, Copy Image, Copy All) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setProductViewModalProduct(prod)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    title="View listing details, description & photos"
+                                  >
+                                    <Eye size={15} />
+                                  </button>
+
+                                  {/* Edit Button (Requirement 10 & 22: Opens reusable ProductListingModal) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditProductClick(prod)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 hover:text-blue-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    title="Edit Listing"
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+
+                                  {/* Upload Images Button */}
+                                  <label
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 ${imageUploadingFor === prod.fireId ? 'animate-pulse' : ''}`}
+                                    title="Upload Additional Photos"
+                                  >
+                                    <ImageIcon size={15} />
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                                      multiple
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files.length > 0) {
+                                          handleImageUpload(prod.fireId, e.target.files);
+                                        }
+                                        e.target.value = '';
+                                      }}
+                                    />
+                                  </label>
+
+                                  {/* Delete Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteProductClick(prod.fireId)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    title="Delete Listing"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
+
                       {/* Summary Row */}
                       {filteredProducts.length > 0 && (() => {
-                        const totalWholesale = filteredProducts.reduce((sum, p) => sum + (Number(p.wholesalePrice) || 0), 0);
+                        const totalWholesale = filteredProducts.reduce((sum, p) => sum + (Number(p.wholesalePrice ?? p.discountPrice) || 0), 0);
                         const totalSelling = filteredProducts.reduce((sum, p) => sum + (Number(p.price ?? p.sellingPrice) || 0), 0);
                         const totalProfit = totalSelling - totalWholesale;
                         const avgMarginPct = totalWholesale > 0 ? Math.round((totalProfit / totalWholesale) * 100) : 0;
+                        const totalSold = filteredProducts.reduce((sum, p) => sum + (productSoldCountMap[(p.name || '').trim().toLowerCase()] || 0), 0);
                         return (
                           <tfoot>
                             <tr className="bg-[#121a2d] border-t-2 border-white/15 font-black text-xs md:text-sm">
                               <td className="py-3.5 px-4 text-center text-amber-400">Total</td>
                               <td className="py-3.5 px-4 text-slate-300 font-bold">{filteredProducts.length} Listings</td>
-                              <td className="py-3.5 px-4 text-center text-slate-400 text-xs font-semibold">
-                                {productTypeFilter === 'all' ? `${singleProductsCount} Single / ${comboSetsCount} Combo` : productTypeFilter}
+                              <td className="py-3.5 px-3.5 text-center text-slate-400 text-xs font-semibold">
+                                {productCategoryFilter === 'all' ? 'All Categories' : productCategoryFilter}
+                              </td>
+                              <td className="py-3.5 px-3 text-center text-slate-400 text-xs font-semibold">
+                                {singleProductsCount} Single / {comboSetsCount} Combo
+                              </td>
+                              <td className="py-3.5 px-3.5 text-center text-amber-400 font-bold">
+                                {totalSold} Sold
                               </td>
                               <td className="py-3.5 px-4 text-right text-blue-400">₹{totalWholesale.toLocaleString()}</td>
                               <td className="py-3.5 px-4 text-right text-emerald-400">₹{totalSelling.toLocaleString()}</td>
@@ -8509,114 +8783,56 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* 🟢 NEW LISTING / NEW PRODUCT MODAL */}
-      {isAddProductModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" }); setNewProductImages([]); setNewProductExistingImages([]); }}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-sm p-7 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-black mb-5 text-white text-center tracking-wide border-b border-white/15 pb-3 uppercase">
-              {editProductId ? "Edit Listing" : "Add New Listing"}
-            </h2>
-            <form onSubmit={handleAddCustomProduct} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Item Name</label>
-                <input required type="text" value={newProductForm.name} onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Enter Item Name (e.g. Munch)" />
-              </div>
+      {/* 🟢 REUSABLE PRODUCT LISTING MODAL (Requirement 10, 11, 12, 13, 14, 15, 16, 22, 23) */}
+      <ProductListingModal
+        isOpen={isProductListingModalOpen || isAddProductModalOpen}
+        onClose={() => {
+          setIsProductListingModalOpen(false);
+          setIsAddProductModalOpen(false);
+          setSelectedEditingProduct(null);
+        }}
+        editingProduct={selectedEditingProduct}
+        categories={productCategories}
+        onAddCategory={handleAddCategory}
+        allSingleProducts={allSingleProducts}
+        productSoldCountMap={productSoldCountMap}
+        onSave={handleSaveListingModal}
+        isSaving={isSavingProduct}
+      />
 
-              <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Product Type</label>
-                <div className="relative">
-                  <select
-                    value={newProductForm.productType || "Single product"}
-                    onChange={(e) => setNewProductForm({ ...newProductForm, productType: e.target.value })}
-                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-sm cursor-pointer appearance-none pr-8"
-                  >
-                    <option value="Single product" className="bg-[#162035] text-white">Single product</option>
-                    <option value="Combo set" className="bg-[#162035] text-white">Combo set</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                    <ChevronDown size={15} />
-                  </div>
-                </div>
-              </div>
+      {/* 🟢 CATEGORY MANAGEMENT MODAL (Requirement 6, 7, 8) */}
+      <CategoryManagementModal
+        isOpen={isCategoryManagementOpen}
+        onClose={() => setIsCategoryManagementOpen(false)}
+        categories={productCategories}
+        products={customProducts}
+        onAddCategory={handleAddCategory}
+        onEditCategory={handleEditCategory}
+        onDeleteCategory={handleDeleteCategory}
+      />
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Wholesale Price</label>
-                  <input required type="number" step="any" value={newProductForm.wholesalePrice} onChange={(e) => setNewProductForm({ ...newProductForm, wholesalePrice: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Wholesale Price" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Selling Price</label>
-                  <input required type="number" step="any" value={newProductForm.price} onChange={(e) => setNewProductForm({ ...newProductForm, price: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-sm" placeholder="Selling Price" />
-                </div>
-              </div>
+      {/* 🟢 QUICK ADD CATEGORY MODAL */}
+      <AddCategoryModal
+        isOpen={isQuickAddCategoryOpen}
+        onClose={() => setIsQuickAddCategoryOpen(false)}
+        onSave={handleAddCategory}
+        existingCategories={productCategories.map(c => c.name)}
+      />
 
-              {/* 📷 Product Images (Cloudinary) */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Camera size={13} className="text-amber-400" />
-                    <span>Photos (Cloudinary)</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-normal">Optional</span>
-                </label>
-
-                {(newProductExistingImages.length > 0 || newProductImages.length > 0) && (
-                  <div className="flex flex-wrap gap-2 p-2 bg-[#121b2f] rounded-xl border border-white/10 max-h-28 overflow-y-auto">
-                    {newProductExistingImages.map((imgUrl, idx) => (
-                      <div key={`modal-existing-${idx}`} className="relative group w-12 h-12 rounded-lg overflow-hidden border border-white/20">
-                        <img src={imgUrl} alt="Product" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setNewProductExistingImages(prev => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100"
-                        >
-                          <X size={9} />
-                        </button>
-                      </div>
-                    ))}
-                    {newProductImages.map((file, idx) => (
-                      <div key={`modal-new-${idx}`} className="relative group w-12 h-12 rounded-lg overflow-hidden border border-emerald-400/50">
-                        <img src={URL.createObjectURL(file)} alt="Upload preview" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setNewProductImages(prev => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 cursor-pointer opacity-80 group-hover:opacity-100"
-                        >
-                          <X size={9} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
-                  <Upload size={14} className="text-amber-400" />
-                  <span>Choose product photos</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const selected = Array.from(e.target.files);
-                        setNewProductImages(prev => [...prev, ...selected]);
-                      }
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-              </div>
-
-              <div className="flex gap-3 pt-3">
-                <button type="button" onClick={() => { setIsAddProductModalOpen(false); setEditProductId(null); setNewProductForm({ name: "", wholesalePrice: "", price: "", productType: "Single product" }); setNewProductImages([]); setNewProductExistingImages([]); }} className="flex-1 px-4 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 hover:text-white transition-colors cursor-pointer text-sm">Cancel</button>
-                <button type="submit" disabled={isSavingProduct} className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg hover:shadow-xl transition-all cursor-pointer text-sm ${isSavingProduct ? 'opacity-70 cursor-not-allowed' : ''}`}>{isSavingProduct ? "Uploading..." : (editProductId ? "Update Listing" : "Save Listing")}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* 🟢 PRODUCT VIEW DETAILS & GALLERY MODAL (Requirement 17: Copy Description, Copy Image, Copy All) */}
+      <ProductViewModal
+        isOpen={Boolean(productViewModalProduct)}
+        onClose={() => setProductViewModalProduct(null)}
+        product={productViewModalProduct}
+        soldCount={productViewModalProduct ? (productSoldCountMap[(productViewModalProduct.name || '').trim().toLowerCase()] || 0) : 0}
+        onEdit={(prod) => {
+          setProductViewModalProduct(null);
+          setSelectedEditingProduct(prod);
+          setIsProductListingModalOpen(true);
+        }}
+        onImageUpload={handleImageUpload}
+        onDeleteImage={handleDeleteImage}
+      />
 
       {/* 🟢 NEW: INVENTORY MODAL */}
       {isInvModalOpen && (
