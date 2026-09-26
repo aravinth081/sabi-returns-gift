@@ -6435,13 +6435,13 @@ export default function Dashboard() {
                   </div>
 
 
-                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] p-3.5 rounded-[1.5rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px]">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] px-3 py-3 rounded-[1.3rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-emerald-500/40 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px] overflow-hidden">
                     {/* Header Row: Filter Trigger & Month Picker */}
-                    <div className="flex justify-between items-center w-full mb-1.5 relative z-10 gap-2">
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="relative inline-flex items-center gap-1 bg-[#162035] hover:bg-[#1a2842] px-2 py-1 rounded-xl border border-amber-400/50 hover:border-amber-400 transition-colors shadow-sm cursor-pointer">
-                          <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase">Revenue Filter</span>
-                          <ChevronDown size={12} className="text-amber-400 shrink-0" />
+                    <div className="flex justify-between items-center w-full mb-1.5 relative z-10 gap-1.5 pr-0.5">
+                      <div className="flex items-center gap-1 shrink-0">
+                        <div className="relative inline-flex items-center gap-1 bg-[#162035] hover:bg-[#1a2842] px-2 py-0.5 rounded-lg border border-amber-400/50 hover:border-amber-400 transition-colors shadow-sm cursor-pointer">
+                          <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase">Filter</span>
+                          <ChevronDown size={11} className="text-amber-400 shrink-0" />
                           <select
                             value={revenueDateType}
                             onChange={(e) => setRevenueDateType(e.target.value)}
@@ -6459,10 +6459,10 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => setShowAmounts(!showAmounts)}
-                          className="w-6 h-6 rounded-lg bg-[#162035] hover:bg-[#1e2c47] text-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow-sm border border-amber-400/50 flex items-center justify-center shrink-0"
+                          className="w-5 h-5 rounded-md bg-[#162035] hover:bg-[#1e2c47] text-amber-400 hover:text-amber-300 transition-all cursor-pointer shadow-sm border border-amber-400/50 flex items-center justify-center shrink-0"
                           title={showAmounts ? "Hide monetary amounts" : "Show monetary amounts"}
                         >
-                          {showAmounts ? <Eye size={12} /> : <EyeOff size={12} />}
+                          {showAmounts ? <Eye size={11} /> : <EyeOff size={11} />}
                         </button>
                       </div>
 
@@ -6479,10 +6479,10 @@ export default function Dashboard() {
                         />
                         <button
                           type="button"
-                          className="flex items-center gap-1.5 text-[10px] font-black text-amber-300 bg-[#162035] hover:bg-[#1f2d4a] px-2.5 py-1 rounded-xl border border-amber-400/80 shadow-md cursor-pointer transition-all hover:scale-105"
+                          className="flex items-center gap-1 text-[9.5px] font-black text-amber-300 bg-[#162035] hover:bg-[#1f2d4a] px-2 py-0.5 rounded-lg border border-amber-400/80 shadow-md cursor-pointer transition-all hover:scale-105"
                         >
                           <span className="text-amber-300 font-extrabold">{revenueMonthKey ? format(new Date(revenueMonthKey + "-01"), "MMM yyyy") : "Select Month"}</span>
-                          <Pencil size={10} className="text-amber-400 shrink-0" />
+                          <Pencil size={9} className="text-amber-400 shrink-0" />
                         </button>
                         {revenueMonthKey && (
                           <button
@@ -6494,7 +6494,7 @@ export default function Dashboard() {
                             className="ml-1 p-0.5 rounded-full bg-rose-500/30 hover:bg-rose-500 text-rose-300 hover:text-white transition-colors cursor-pointer z-30"
                             title="Clear Month Filter"
                           >
-                            <X size={10} strokeWidth={3} />
+                            <X size={9} strokeWidth={3} />
                           </button>
                         )}
                       </div>
