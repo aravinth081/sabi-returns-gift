@@ -150,12 +150,13 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
     } else {
       setFormData({
         ...DEFAULT_FORM_DATA,
+        category: categories.length > 0 ? categories[0].name : '',
         sku: `SKU-${Math.floor(100000 + Math.random() * 900000)}`,
       });
       setNewImageFiles([]);
       setShowProductPicker(false);
     }
-  }, [editingProduct, isOpen, allSingleProducts]);
+  }, [editingProduct, isOpen, allSingleProducts, categories]);
 
   if (!isOpen) return null;
 

@@ -678,21 +678,21 @@ export default function Dashboard() {
       });
       ordersList.sort((a: any, b: any) => b.id - a.id);
       setOrders(ordersList);
-    });
+    }, (err) => console.warn("Firestore orders onSnapshot error:", err));
     const unsubEmployees = onSnapshot(collection(db, "employees"), (snapshot) => {
       setEmployees(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn("Firestore employees onSnapshot error:", err));
     const unsubInventory = onSnapshot(collection(db, "inventory"), (snapshot) => {
       const invList = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
       invList.sort((a: any, b: any) => b.timestamp - a.timestamp);
       setInventoryLogs(invList);
-    });
+    }, (err) => console.warn("Firestore inventory onSnapshot error:", err));
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
       setCustomProducts(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn("Firestore products onSnapshot error:", err));
     const unsubCategories = onSnapshot(collection(db, "categories"), (snapshot) => {
       setFirestoreCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn("Firestore categories onSnapshot error:", err));
     const unsubManagedChocs = onSnapshot(collection(db, "managed_chocolates"), (snapshot) => {
       let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
 
@@ -762,7 +762,7 @@ export default function Dashboard() {
           localStorage.setItem('sabi_managed_chocolates', JSON.stringify(list));
         } catch (e) {}
       }
-    });
+    }, (err) => console.warn("Firestore managed_chocolates onSnapshot error:", err));
 
     const unsubTrash = onSnapshot(collection(db, "trash_orders"), (snapshot) => {
       const trashList = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
@@ -781,13 +781,14 @@ export default function Dashboard() {
           }
         }
       });
-    });
+    }, (err) => console.warn("Firestore trash_orders onSnapshot error:", err));
 
     const unsubActivityLogs = onSnapshot(
       query(collection(db, "activity_logs"), orderBy("timestamp", "desc")),
       (snapshot) => {
         setActivityLogs(snapshot.docs.map(d => ({ fireId: d.id, ...d.data() })));
-      }
+      },
+      (err) => console.warn("Firestore activity_logs onSnapshot error:", err)
     );
 
     const unsubPasscodes = onSnapshot(doc(db, 'daily_tasks_board', 'passcodes'), (snapshot) => {
@@ -801,7 +802,7 @@ export default function Dashboard() {
           history: '852'
         }).catch(err => console.error("Failed to init Firestore passcodes:", err));
       }
-    });
+    }, (err) => console.warn("Firestore passcodes onSnapshot error:", err));
 
     const unsubIgnoredDups = onSnapshot(doc(db, 'app_settings', 'ignored_duplicates'), (snapshot) => {
       if (snapshot.exists()) {
@@ -810,7 +811,7 @@ export default function Dashboard() {
           setIgnoredDuplicatePhones(data.phoneNumbers);
         }
       }
-    });
+    }, (err) => console.warn("Firestore ignored_duplicates onSnapshot error:", err));
 
     const unsubOrderTypes = onSnapshot(collection(db, "order_types"), (snapshot) => {
       let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
@@ -838,7 +839,7 @@ export default function Dashboard() {
           localStorage.setItem('sabi_order_types', JSON.stringify(normalizedList));
         } catch (e) {}
       }
-    });
+    }, (err) => console.warn("Firestore order_types onSnapshot error:", err));
 
     return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); };
   }, []);
@@ -3013,6 +3014,7 @@ export default function Dashboard() {
   const handleEditClick = (order: any) => {
     const fallbackRole = order.orderType === 'Self' ? 'Self' : 'Others';
     const currentRole = order.role || fallbackRole;
+    const orderCat = order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate');
     setFormData({
       ...order,
       fireId: order.fireId, // 🟢 IMPORTANT: Ithu thaan edit aaga use aagum
@@ -3027,7 +3029,7 @@ export default function Dashboard() {
       orderType: order.orderType || "Thaaru",
       role: currentRole,
       orderStatus: order.orderStatus || "image edited (not paid)",
-      category: order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate'),
+      category: orderCat,
       manualDeliveryFee: order.manualDeliveryFee || "",
       advanceAmount: order.advanceAmount || "",
       manualProductPrice: order.manualProductPrice || "",
@@ -3042,6 +3044,27 @@ export default function Dashboard() {
       count: counts[idx] !== undefined ? counts[idx] : (counts[0] || "")
     }));
     setChocolateRows(rows.length > 0 ? rows : [{ chocolate: "", count: "" }]);
+
+    // Populate productRows for product category orders
+    if (orderCat === 'product') {
+      if (order.products && Array.isArray(order.products) && order.products.length > 0) {
+        const pRows = order.products.map((p: any) => ({
+          productName: p.productName || p.name || "",
+          quantity: String(p.quantity ?? "1"),
+          price: String(p.price ?? "")
+        }));
+        setProductRows(pRows);
+      } else {
+        const pRows = chocs.map((c, idx) => ({
+          productName: c,
+          quantity: counts[idx] !== undefined ? counts[idx] : (counts[0] || "1"),
+          price: String(order.manualProductPrice || "")
+        }));
+        setProductRows(pRows.length > 0 ? pRows : [{ productName: "", quantity: "", price: "" }]);
+      }
+    } else {
+      setProductRows([{ productName: "", quantity: "", price: "" }]);
+    }
 
     setOrderTypeOthersToggle(currentRole === 'Others');
     setIsModalOpen(true);
@@ -3489,10 +3512,24 @@ export default function Dashboard() {
         const previousOrder = orders.find(o => o.id === formData.id);
         const { fireId, ...dataToUpdate } = formattedOrder;
 
-        // 🛠️ Automatic-a undefined error-a thadukkum code
-        Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
+        // 🛠️ Automatic-a undefined error-a thadukkum code (deep clean)
+        const cleanOrderData = (obj: any): any => {
+          if (Array.isArray(obj)) {
+            return obj.map(cleanOrderData).filter(item => item !== undefined);
+          } else if (obj !== null && typeof obj === 'object') {
+            const res: Record<string, any> = {};
+            for (const [k, v] of Object.entries(obj)) {
+              if (v !== undefined) {
+                res[k] = cleanOrderData(v);
+              }
+            }
+            return res;
+          }
+          return obj;
+        };
 
-        await updateDoc(doc(db, "orders", formData.fireId), dataToUpdate);
+        const sanitizedDataToUpdate = cleanOrderData(dataToUpdate);
+        await setDoc(doc(db, "orders", formData.fireId), sanitizedDataToUpdate, { merge: true });
         // Fire-and-forget: logActivity is non-critical
         logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
         toast.success("Order updated successfully!");
@@ -3505,16 +3542,16 @@ export default function Dashboard() {
               const restored = { ...previousOrder };
               const fid = restored.fireId;
               delete restored.fireId;
-              Object.keys(restored).forEach(key => restored[key] === undefined && delete restored[key]);
-              await setDoc(doc(db, "orders", fid), restored);
+              const sanitizedRestored = cleanOrderData(restored);
+              await setDoc(doc(db, "orders", fid), sanitizedRestored);
               logActivity(`Restored Order: ${previousOrder.name} (${previousOrder.chocolate || 'Product'} x${previousOrder.count})`, moduleName);
             },
             redo: async () => {
               const updatedData = { ...formattedOrder };
               const fid = formData.fireId;
               delete (updatedData as any).fireId;
-              Object.keys(updatedData).forEach(key => updatedData[key] === undefined && delete updatedData[key]);
-              await setDoc(doc(db, "orders", fid), updatedData);
+              const sanitizedRedo = cleanOrderData(updatedData);
+              await setDoc(doc(db, "orders", fid), sanitizedRedo);
               logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count}) via Redo`, moduleName);
             }
           });
@@ -3525,10 +3562,23 @@ export default function Dashboard() {
         formattedOrder.id = nextId;
         delete formattedOrder.fireId;
 
-        // 🛠️ Automatic-a undefined error-a thadukkum code
-        Object.keys(formattedOrder).forEach(key => formattedOrder[key] === undefined && delete formattedOrder[key]);
+        const cleanOrderData = (obj: any): any => {
+          if (Array.isArray(obj)) {
+            return obj.map(cleanOrderData).filter(item => item !== undefined);
+          } else if (obj !== null && typeof obj === 'object') {
+            const res: Record<string, any> = {};
+            for (const [k, v] of Object.entries(obj)) {
+              if (v !== undefined) {
+                res[k] = cleanOrderData(v);
+              }
+            }
+            return res;
+          }
+          return obj;
+        };
+        const sanitizedFormattedOrder = cleanOrderData(formattedOrder);
 
-        const newDocRef = await addDoc(collection(db, "orders"), formattedOrder);
+        const newDocRef = await addDoc(collection(db, "orders"), sanitizedFormattedOrder);
         // Fire-and-forget: logActivity is non-critical
         logActivity(`Added New Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
         toast.success("Order added successfully!");
@@ -3819,24 +3869,56 @@ export default function Dashboard() {
     try {
       setIsSavingProduct(true);
       const finalStatus = isDraft ? 'Draft' : (productData.status || 'Active');
-      const payload = {
+      const payload: Record<string, any> = {
         ...productData,
         status: finalStatus,
         updatedAt: new Date().toISOString(),
       };
 
-      if (selectedEditingProduct) {
-        await updateDoc(doc(db, "products", selectedEditingProduct.fireId), payload);
+      // Ensure fireId is not stored inside document fields
+      delete payload.fireId;
+
+      // 🛠️ Remove any undefined properties recursively to prevent Firestore errors
+      const cleanData = (obj: any): any => {
+        if (Array.isArray(obj)) {
+          return obj.map(cleanData).filter(item => item !== undefined);
+        } else if (obj !== null && typeof obj === 'object') {
+          const res: Record<string, any> = {};
+          for (const [k, v] of Object.entries(obj)) {
+            if (v !== undefined) {
+              res[k] = cleanData(v);
+            }
+          }
+          return res;
+        }
+        return obj;
+      };
+      const sanitizedPayload = cleanData(payload);
+
+      if (selectedEditingProduct && selectedEditingProduct.fireId) {
+        await setDoc(doc(db, "products", selectedEditingProduct.fireId), sanitizedPayload, { merge: true });
         toast.success("Listing updated successfully!");
-        logActivity(`Edited Listing: ${payload.name} [${payload.productType}] (Selling: ₹${payload.price}, Wholesale: ₹${payload.wholesalePrice || 0})`, 'Products');
+        logActivity(`Edited Listing: ${sanitizedPayload.name} [${sanitizedPayload.productType}] (Selling: ₹${sanitizedPayload.price}, Wholesale: ₹${sanitizedPayload.wholesalePrice || 0})`, 'Products');
       } else {
         await addDoc(collection(db, "products"), {
-          ...payload,
+          ...sanitizedPayload,
           createdAt: new Date().toISOString(),
         });
         toast.success(isDraft ? "Draft saved successfully!" : "Listing created successfully!");
-        logActivity(`Added New Listing: ${payload.name} [${payload.productType}] (Selling: ₹${payload.price}, Wholesale: ₹${payload.wholesalePrice || 0})`, 'Products');
+        logActivity(`Added New Listing: ${sanitizedPayload.name} [${sanitizedPayload.productType}] (Selling: ₹${sanitizedPayload.price}, Wholesale: ₹${sanitizedPayload.wholesalePrice || 0})`, 'Products');
       }
+
+      // Auto-clear active filters so the new/edited product is visible immediately
+      if (productCategoryFilter !== 'all' && sanitizedPayload.category && productCategoryFilter.toLowerCase() !== sanitizedPayload.category.toLowerCase()) {
+        setProductCategoryFilter('all');
+      }
+      if (productSearchQuery) {
+        setProductSearchQuery('');
+      }
+      if (productTypeFilter !== 'all' && sanitizedPayload.productType && productTypeFilter !== sanitizedPayload.productType) {
+        setProductTypeFilter('all');
+      }
+
       setIsProductListingModalOpen(false);
       setSelectedEditingProduct(null);
     } catch (err: any) {
@@ -5006,17 +5088,17 @@ export default function Dashboard() {
       >
 
         {!showHeader && (
-          <div className="absolute top-4 left-4 z-50 flex items-center gap-2 print:hidden">
+          <div className="px-3 sm:px-4 md:px-6 pt-3 pb-1 flex items-center gap-2 print:hidden z-30 shrink-0">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg shadow-md transition-colors border border-blue-800/60 cursor-pointer flex items-center justify-center"
+              className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-xl shadow-md transition-colors border border-blue-800/60 cursor-pointer flex items-center justify-center"
               title="Toggle Menu"
             >
               <Menu size={18} />
             </button>
             <button
               onClick={() => setShowHeader(true)}
-              className="px-3 py-2 text-xs font-bold text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg shadow-md transition-colors border border-blue-800/60 cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-2 text-xs font-bold text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-xl shadow-md transition-colors border border-blue-800/60 cursor-pointer flex items-center gap-1.5"
               title="Show Header"
             >
               <Eye size={14} className="text-blue-400" /> Show Header
@@ -5089,16 +5171,17 @@ export default function Dashboard() {
             <div className="space-y-6 print:hidden animate-in fade-in duration-300 pb-16">
               
               {/* 🟢 TOP SAAS PRODUCTS HEADER (Requirements 2, 3, 4, 5, 9, 25) */}
-              <div className="bg-[#0d1527] p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 flex flex-col gap-4">
-                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+              <div className="bg-[#0d1527] p-4 sm:p-5 md:p-6 rounded-[2rem] shadow-2xl border border-white/15 flex flex-col gap-4">
+                {/* ROW 1: Title & Result Count on Left; Categories & New Listing on Right */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   {/* LEFT: Title & Dynamic Current Result Count (Requirement 2 & 19) */}
                   <div className="flex items-center gap-3.5 shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center text-white shadow-xl shadow-blue-950/60 shrink-0">
-                      <ShoppingBag size={24} />
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center text-white shadow-xl shadow-blue-950/60 shrink-0">
+                      <ShoppingBag size={22} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2.5">
-                        <h2 className="text-xl md:text-2xl font-black text-white tracking-wide">
+                        <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
                           Products
                         </h2>
                         {productTypeFilter !== 'all' && (
@@ -5107,38 +5190,68 @@ export default function Dashboard() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs md:text-sm text-slate-300 font-semibold mt-0.5 flex items-center gap-1.5">
+                      <p className="text-xs sm:text-sm text-slate-300 font-semibold mt-0.5 flex items-center gap-1.5">
                         <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                         <span>{productCountDisplay}</span>
                       </p>
                     </div>
                   </div>
 
-                  {/* CENTER: Large Horizontally Centered Search Bar (Requirement 2 & 3) */}
-                  <div className="flex-1 max-w-xl mx-auto w-full">
+                  {/* RIGHT: Categories Manager & + New Listing Action Buttons */}
+                  <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                    {/* Manage Categories Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryManagementOpen(true)}
+                      className="px-3.5 py-2.5 bg-[#15213b] hover:bg-[#1d2b4d] border border-white/20 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+                      title="Manage Product Categories"
+                    >
+                      <Tag size={15} className="text-emerald-400" />
+                      <span>Categories</span>
+                    </button>
+
+                    {/* 🟢 + NEW LISTING BUTTON (Requirement 9 & 10) - Single + icon */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEditingProduct(null);
+                        setIsProductListingModalOpen(true);
+                      }}
+                      className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                    >
+                      <Plus size={16} strokeWidth={3} />
+                      <span>New Listing</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* ROW 2: Horizontally Stretched Search Bar on Left + Filter Dropdowns on Right */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-3 border-t border-white/10">
+                  {/* Large Horizontally Stretched Search Bar (Requirement 2 & 3) */}
+                  <div className="flex-1 min-w-[240px]">
                     <div className="relative group">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-400 transition-colors" size={18} />
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-400 transition-colors" size={17} />
                       <input
                         type="text"
                         placeholder="Search Products (name, combo, category, SKU)..."
                         value={productSearchQuery}
                         onChange={(e) => setProductSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-10 py-3 bg-[#15213b] border border-white/20 hover:border-white/30 rounded-2xl text-sm font-semibold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
+                        className="w-full pl-11 pr-10 py-2.5 bg-[#15213b] border border-white/20 hover:border-white/30 rounded-xl text-xs sm:text-sm font-semibold text-white placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
                       />
                       {productSearchQuery && (
                         <button
                           type="button"
                           onClick={() => setProductSearchQuery('')}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                         >
-                          <X size={15} />
+                          <X size={14} />
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* RIGHT: Category Filter, Sort, Category Management, + New Listing (Requirement 2, 4, 5, 9) */}
-                  <div className="flex flex-wrap items-center gap-2.5 shrink-0 justify-end">
+                  {/* Filter Dropdowns Group (Category, Sort, Type) */}
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
                     {/* Category Filter Dropdown (Requirement 4) */}
                     <div className="relative">
                       <select
@@ -5205,30 +5318,6 @@ export default function Dashboard() {
                         <ChevronDown size={13} />
                       </div>
                     </div>
-
-                    {/* Manage Categories Action Button */}
-                    <button
-                      type="button"
-                      onClick={() => setIsCategoryManagementOpen(true)}
-                      className="px-3 py-2.5 bg-[#15213b] hover:bg-[#1d2b4d] border border-white/20 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-                      title="Manage Product Categories"
-                    >
-                      <Tag size={14} className="text-emerald-400" />
-                      <span className="hidden sm:inline">Categories</span>
-                    </button>
-
-                    {/* 🟢 + NEW LISTING BUTTON (Requirement 9 & 10) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedEditingProduct(null);
-                        setIsProductListingModalOpen(true);
-                      }}
-                      className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 shrink-0"
-                    >
-                      <Plus size={16} strokeWidth={3} />
-                      <span>+ New Listing</span>
-                    </button>
                   </div>
                 </div>
 
