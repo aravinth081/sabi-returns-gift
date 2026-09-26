@@ -19,7 +19,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import { AddCategoryModal } from './AddCategoryModal';
-import { uploadMultipleToCloudinary } from '@/lib/cloudinary';
+import {
+  uploadMultipleToCloudinary,
+  sanitizeAndCompressImages,
+  validateImageFile,
+  formatFileSize,
+} from '@/lib/cloudinary';
 import { toast } from 'sonner';
 export type ProductType = 'Single product' | 'Combo set';
 export type ProductStatus = 'Active' | 'Draft' | 'Out of Stock' | 'Inactive';
@@ -96,6 +101,15 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [comboSearchQuery, setComboSearchQuery] = useState('');
   const [showProductPicker, setShowProductPicker] = useState(false);
+
+  // Memoized object URLs for previews to prevent memory leaks and unnecessary recalculations
+  const newImagePreviews = useMemo(() => {
+    return newImageFiles.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+      sizeText: formatFileSize(file.size),
+    }));
+  }, [newImageFiles]);
 
   // Initialize or reset form data
   useEffect(() => {
@@ -279,17 +293,19 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
     try {
       let uploadedUrls: string[] = [];
       if (newImageFiles.length > 0) {
-        const toastId = toast.loading(`Uploading ${newImageFiles.length} image(s)...`);
+        const toastId = toast.loading(`Optimizing & saving ${newImageFiles.length} photo(s)...`);
         try {
           uploadedUrls = await uploadMultipleToCloudinary(newImageFiles);
-          toast.success(`${uploadedUrls.length} image(s) uploaded!`, { id: toastId });
+          toast.success(`${uploadedUrls.length} photo(s) optimized successfully!`, { id: toastId });
         } catch (uploadErr: any) {
-          toast.error(uploadErr?.message || 'Image upload failed', { id: toastId });
+          toast.error(uploadErr?.message || 'Photo optimization failed', { id: toastId });
           return;
         }
       }
 
-      const allImages = [...formData.images, ...uploadedUrls];
+      // Combine existing and new images, and guarantee total payload is safely under Firestore limit (<300KB)
+      const allRawImages = [...formData.images, ...uploadedUrls];
+      const allImages = await sanitizeAndCompressImages(allRawImages, 300000);
       const finalStatus: ProductStatus = isDraftAction ? 'Draft' : formData.status;
 
       const payload: any = {
@@ -319,7 +335,8 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
           quantity: ci.quantity,
           price: ci.price || 0,
           wholesalePrice: ci.wholesalePrice || 0,
-          image: ci.image || '',
+          // Only store remote URL if available; avoid duplicating massive base64 in combo doc
+          image: ci.image && ci.image.startsWith('http') ? ci.image : '',
           category: ci.category || '',
         }));
         payload.comboProductIds = formData.comboItems.map((ci) => ci.productId);
@@ -1016,13 +1033,13 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
                   ))}
 
                   {/* New Selected Files */}
-                  {newImageFiles.map((file, idx) => (
+                  {newImagePreviews.map((item, idx) => (
                     <div
                       key={`new-${idx}`}
-                      className="relative group w-16 h-16 rounded-xl overflow-hidden border border-emerald-400/50 shadow-md"
+                      className="relative group w-20 h-20 rounded-xl overflow-hidden border border-emerald-400/50 shadow-md bg-black/40"
                     >
                       <img
-                        src={URL.createObjectURL(file)}
+                        src={item.url}
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />
@@ -1036,9 +1053,9 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
                       >
                         <X size={10} />
                       </button>
-                      <span className="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-[8px] text-center text-white font-black uppercase tracking-wider">
-                        Ready
-                      </span>
+                      <div className="absolute bottom-0 inset-x-0 bg-black/80 px-1 py-0.5 text-[8px] text-center text-emerald-300 font-extrabold truncate">
+                        {item.sizeText}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1048,8 +1065,8 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
               <label className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-white/20 hover:border-amber-400/60 bg-[#151f36]/60 hover:bg-[#151f36] cursor-pointer transition-all text-xs font-bold text-slate-300 hover:text-white">
                 <Upload size={20} className="text-amber-400 mb-1.5" />
                 <span>Click to select product photos</span>
-                <span className="text-[10px] text-slate-400 font-normal mt-0.5">
-                  JPG, PNG, WEBP up to 10MB (First image will be used as primary thumbnail)
+                <span className="text-[10px] text-emerald-400/90 font-medium mt-0.5">
+                  JPG, PNG, WEBP of any size (50MB+ photos auto-compressed to crisp &lt;35KB format)
                 </span>
                 <input
                   type="file"
@@ -1058,8 +1075,19 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
-                      const files = Array.from(e.target.files);
-                      setNewImageFiles((prev) => [...prev, ...files]);
+                      const incomingFiles = Array.from(e.target.files);
+                      const validFiles: File[] = [];
+                      for (const file of incomingFiles) {
+                        const check = validateImageFile(file);
+                        if (!check.valid) {
+                          toast.error(check.error || `File ${file.name} is invalid`);
+                        } else {
+                          validFiles.push(file);
+                        }
+                      }
+                      if (validFiles.length > 0) {
+                        setNewImageFiles((prev) => [...prev, ...validFiles]);
+                      }
                     }
                     e.target.value = '';
                   }}

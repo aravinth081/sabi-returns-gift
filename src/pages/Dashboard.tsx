@@ -38,7 +38,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { uploadToCloudinary, uploadMultipleToCloudinary } from "@/lib/cloudinary";
+import { uploadToCloudinary, uploadMultipleToCloudinary, sanitizeAndCompressImages, compressImageToDataUrl } from "@/lib/cloudinary";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
 
@@ -3895,6 +3895,28 @@ export default function Dashboard() {
       };
       const sanitizedPayload = cleanData(payload);
 
+      // 🛡️ GUARANTEED FIRESTORE SAFETY:
+      // Ensure all images are compressed so total payload never exceeds 1MB Firestore limit (<300KB)
+      if (Array.isArray(sanitizedPayload.images) && sanitizedPayload.images.length > 0) {
+        sanitizedPayload.images = await sanitizeAndCompressImages(sanitizedPayload.images, 300000);
+      }
+
+      // Avoid duplicating massive base64 strings inside comboProducts
+      if (Array.isArray(sanitizedPayload.comboProducts)) {
+        sanitizedPayload.comboProducts = sanitizedPayload.comboProducts.map((cp: any) => {
+          if (typeof cp.image === 'string' && cp.image.startsWith('data:image/')) {
+            return { ...cp, image: '' };
+          }
+          return cp;
+        });
+      }
+
+      // Emergency double-check: verify total document byte size
+      const docSizeBytes = new Blob([JSON.stringify(sanitizedPayload)]).size;
+      if (docSizeBytes > 350000 && Array.isArray(sanitizedPayload.images)) {
+        sanitizedPayload.images = await sanitizeAndCompressImages(sanitizedPayload.images, 200000);
+      }
+
       if (selectedEditingProduct && selectedEditingProduct.fireId) {
         await setDoc(doc(db, "products", selectedEditingProduct.fireId), sanitizedPayload, { merge: true });
         toast.success("Listing updated successfully!");
@@ -4199,22 +4221,22 @@ export default function Dashboard() {
       setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: finalImages } : p));
     } catch (err: any) {
       console.error("Cloudinary upload background error:", err);
-      // Fallback: save to Firestore as base64 so it persists on refresh even if network hiccup
+      // Fallback: compress images safely so it NEVER exceeds Firestore 1MB limit (<300KB)
       try {
-        const base64List = await Promise.all(validFiles.map(f => {
-          return new Promise<string>((res) => {
-            const r = new FileReader();
-            r.onload = () => res(r.result as string);
-            r.readAsDataURL(f);
-          });
-        }));
-        const finalImages = [...existingImages, ...base64List];
+        const compressedBase64List = await Promise.all(
+          validFiles.map((f) => compressImageToDataUrl(f, 800, 35000))
+        );
+        const rawFinalImages = [...existingImages, ...compressedBase64List];
+        const finalImages = await sanitizeAndCompressImages(rawFinalImages, 300000);
         await updateDoc(doc(db, "products", productFireId), { images: finalImages });
         if (imageGalleryProduct?.fireId === productFireId) {
           setImageGalleryProduct({ ...imageGalleryProduct, images: finalImages });
         }
-        setCustomProducts(prev => prev.map(p => p.fireId === productFireId ? { ...p, images: finalImages } : p));
+        setCustomProducts((prev) =>
+          prev.map((p) => (p.fireId === productFireId ? { ...p, images: finalImages } : p))
+        );
       } catch (firestoreErr) {
+        console.error("Failed to save image to cloud database:", firestoreErr);
         toast.error("Failed to save image to cloud database.");
       }
     }
@@ -10589,8 +10611,11 @@ export default function Dashboard() {
         onClose={() => setIsParetoModalOpen(false)}
         orders={orders}
         initialDateType={revenueDateType}
+        initialRole={roleFilter !== 'All' ? roleFilter : 'All'}
+        initialType={tableTypeFilter !== 'All' ? tableTypeFilter : 'All'}
         customPricesMap={customPricesMap}
         managedChocPricesMap={managedChocPricesMap}
+        orderTypes={orderTypes}
       />
 
       {/* 🟢 NEW: HISTORY AUTHENTICATION MODAL */}

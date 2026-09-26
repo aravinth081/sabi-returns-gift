@@ -14,7 +14,10 @@ import {
   PieChart as PieChartIcon,
   HelpCircle,
   FileSpreadsheet,
-  Info
+  Info,
+  User,
+  Tag,
+  RotateCcw
 } from 'lucide-react';
 import {
   ComposedChart,
@@ -36,8 +39,11 @@ export interface ParetoAnalysisModalProps {
   onClose: () => void;
   orders: any[];
   initialDateType?: string;
+  initialRole?: string;
+  initialType?: string;
   customPricesMap?: Record<string, number>;
   managedChocPricesMap?: Record<string, { retail: number; wholesale: number }>;
+  orderTypes?: any[];
 }
 
 // Helper to normalize date strings to YYYY-MM-DD
@@ -76,8 +82,11 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
   onClose,
   orders,
   initialDateType = 'Dispatch Date',
+  initialRole = 'All',
+  initialType = 'All',
   customPricesMap = {},
-  managedChocPricesMap = {}
+  managedChocPricesMap = {},
+  orderTypes = []
 }) => {
   // Navigation / Tabs
   const [activeTab, setActiveTab] = useState<'pareto' | 'weekly' | 'overview'>('pareto');
@@ -117,6 +126,79 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
   // Filter 5: Date from and to selection
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
   const [isCustomRange, setIsCustomRange] = useState<boolean>(false);
+
+  // Filter 6: Role dropdown (All Roles, Self, Others, + custom)
+  const [selectedRole, setSelectedRole] = useState<string>(initialRole || 'All');
+
+  // Filter 7: Order Type dropdown (All Types, Sabi, Thaaru, Choco Wrapz, + custom)
+  const [selectedType, setSelectedType] = useState<string>(initialType || 'All');
+
+  // Sync initialRole and initialType when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialRole) setSelectedRole(initialRole);
+      if (initialType) setSelectedType(initialType);
+    }
+  }, [isOpen, initialRole, initialType]);
+
+  // Extract available roles dynamically from orders and defaults
+  const availableRoles = useMemo(() => {
+    const set = new Set<string>();
+    set.add('Self');
+    set.add('Others');
+
+    orders.forEach(o => {
+      if (o.role && typeof o.role === 'string') {
+        const trimmed = o.role.trim();
+        if (trimmed && trimmed.toLowerCase() !== 'all') {
+          const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+          set.add(capitalized);
+        }
+      }
+    });
+
+    return Array.from(set);
+  }, [orders]);
+
+  // Extract available order types dynamically from props, localStorage, and orders
+  const availableTypes = useMemo(() => {
+    const set = new Set<string>();
+
+    if (Array.isArray(orderTypes) && orderTypes.length > 0) {
+      orderTypes.forEach((ot: any) => {
+        const name = typeof ot === 'string' ? ot.trim() : String(ot?.name || ot?.orderType || '').trim();
+        if (name && name.toLowerCase() !== 'all') set.add(name);
+      });
+    }
+
+    try {
+      const saved = localStorage.getItem('sabi_order_types');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: any) => {
+            const name = typeof item === 'string' ? item.trim() : String(item?.name || item?.orderType || '').trim();
+            if (name && name.toLowerCase() !== 'all') set.add(name);
+          });
+        }
+      }
+    } catch (e) {}
+
+    orders.forEach(o => {
+      if (o.orderType && typeof o.orderType === 'string') {
+        const trimmed = o.orderType.trim();
+        if (trimmed && trimmed.toLowerCase() !== 'all') set.add(trimmed);
+      }
+    });
+
+    if (set.size === 0) {
+      set.add('Sabi');
+      set.add('Thaaru');
+      set.add('Choco Wrapz');
+    }
+
+    return Array.from(set);
+  }, [orderTypes, orders]);
 
   // Month names dictionary
   const monthsList = [
@@ -222,7 +304,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
     return parseToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
   };
 
-  // 1. FILTERED ORDERS for the active range
+  // 1. FILTERED ORDERS for the active range, role, and order type
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       if (order.status === 'Cancelled' || order.orderStatus === 'cancelled') return false;
@@ -232,9 +314,26 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
       if (dateRange.from && targetDate < dateRange.from) return false;
       if (dateRange.to && targetDate > dateRange.to) return false;
 
+      // Role filter check
+      if (selectedRole !== 'All') {
+        const fallbackRole = order.orderType === 'Self' ? 'Self' : 'Others';
+        const orderRole = order.role || fallbackRole;
+        if (String(orderRole).trim().toLowerCase() !== selectedRole.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Order Type filter check
+      if (selectedType !== 'All') {
+        const orderTypeVal = order.orderType || 'Thaaru';
+        if (String(orderTypeVal).trim().toLowerCase() !== selectedType.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [orders, dateType, dateRange]);
+  }, [orders, dateType, dateRange, selectedRole, selectedType]);
 
   // 2. PRODUCT-WISE PARETO ANALYSIS DATA
   const paretoData = useMemo(() => {
@@ -452,7 +551,26 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
         const dayStr = `${selectedYear}-${selectedMonth}-${String(day).padStart(2, '0')}`;
         const dayOrders = orders.filter(o => {
           if (o.status === 'Cancelled' || o.orderStatus === 'cancelled') return false;
-          return getOrderTargetDate(o) === dayStr;
+          if (getOrderTargetDate(o) !== dayStr) return false;
+
+          // Role filter check
+          if (selectedRole !== 'All') {
+            const fallbackRole = o.orderType === 'Self' ? 'Self' : 'Others';
+            const orderRole = o.role || fallbackRole;
+            if (String(orderRole).trim().toLowerCase() !== selectedRole.trim().toLowerCase()) {
+              return false;
+            }
+          }
+
+          // Order Type filter check
+          if (selectedType !== 'All') {
+            const orderTypeVal = o.orderType || 'Thaaru';
+            if (String(orderTypeVal).trim().toLowerCase() !== selectedType.trim().toLowerCase()) {
+              return false;
+            }
+          }
+
+          return true;
         });
 
         dayOrders.forEach(o => {
@@ -512,7 +630,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
       monthTotalCustomers,
       monthTotalSales
     };
-  }, [filteredOrders, orders, selectedYear, selectedMonth, selectedWeek, dateType]);
+  }, [filteredOrders, orders, selectedYear, selectedMonth, selectedWeek, dateType, selectedRole, selectedType]);
 
   if (!isOpen) return null;
 
@@ -570,8 +688,9 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
         </div>
 
         {/* ==================== CONTROL BAR: ALL REQUIRED DROPDOWNS ==================== */}
-        <div className="bg-[#0e162a] px-5 py-3 border-b border-white/10 shrink-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 items-end">
+        <div className="bg-[#0e162a] px-5 py-3.5 border-b border-white/10 shrink-0 space-y-3">
+          {/* Row 1: Date & Period Intelligence (4 balanced columns) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 items-end">
             {/* 1. Date Basis Dropdown */}
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
@@ -653,30 +772,104 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                 <ChevronDown size={14} className="text-emerald-400 absolute right-3 top-2.5 pointer-events-none" />
               </div>
             </div>
+          </div>
 
-            {/* 5. Date Range (From & To) */}
+          {/* Row 2: Roles, Types & Date Range (3 spacious columns) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end pt-2 border-t border-white/5">
+            {/* 5. Role Selection Dropdown */}
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Date (From & To)</span>
-                {isCustomRange && (
+                <span className="flex items-center gap-1 text-rose-300">
+                  <User size={11} className="text-rose-400" /> Roles Dropdown
+                </span>
+                {selectedRole !== 'All' && (
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 uppercase">
+                    Active
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedRole}
+                  onChange={e => setSelectedRole(e.target.value)}
+                  className={`w-full bg-[#162035] font-bold text-xs rounded-xl px-3 py-2 border outline-none cursor-pointer appearance-none shadow-sm transition-all ${
+                    selectedRole !== 'All'
+                      ? 'border-rose-400 text-rose-300 ring-1 ring-rose-400/30'
+                      : 'border-rose-400/40 text-rose-300 focus:border-rose-400'
+                  }`}
+                  title="Filter Pareto Analysis by Role (Self / Others / All)"
+                >
+                  <option value="All">All Roles</option>
+                  {availableRoles.map(r => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="text-rose-400 absolute right-3 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 6. Order Types Selection Dropdown */}
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-sky-300">
+                  <Tag size={11} className="text-sky-400" /> Types Dropdown
+                </span>
+                {selectedType !== 'All' && (
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 uppercase">
+                    Active
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedType}
+                  onChange={e => setSelectedType(e.target.value)}
+                  className={`w-full bg-[#162035] font-bold text-xs rounded-xl px-3 py-2 border outline-none cursor-pointer appearance-none shadow-sm transition-all ${
+                    selectedType !== 'All'
+                      ? 'border-sky-400 text-sky-300 ring-1 ring-sky-400/30'
+                      : 'border-sky-400/40 text-sky-300 focus:border-sky-400'
+                  }`}
+                  title="Filter Pareto Analysis by Order Type (Sabi / Thaaru / Choco Wrapz / All)"
+                >
+                  <option value="All">All Types</option>
+                  {availableTypes.map(t => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="text-sky-400 absolute right-3 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 7. Date Range (From & To) */}
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span>Date Range (From & To)</span>
+                {(isCustomRange || selectedRole !== 'All' || selectedType !== 'All') && (
                   <button
                     type="button"
                     onClick={() => {
                       setIsCustomRange(false);
+                      setSelectedRole('All');
+                      setSelectedType('All');
                       updateRangeFromDropdowns(selectedYear, selectedMonth, selectedWeek);
                     }}
-                    className="text-[9px] text-amber-400 hover:underline cursor-pointer"
+                    className="text-[9px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Reset all filters to default"
                   >
-                    Reset
+                    <RotateCcw size={10} /> Reset Filters
                   </button>
                 )}
               </label>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <input
                   type="date"
                   value={dateRange.from}
                   onChange={e => handleFromDateChange(e.target.value)}
-                  className="w-1/2 bg-[#162035] text-white font-mono text-[11px] font-bold rounded-lg px-2 py-1.5 border border-white/20 focus:border-amber-400 outline-none shadow-inner"
+                  className="w-1/2 bg-[#162035] text-white font-mono text-[11px] font-bold rounded-xl px-2.5 py-1.5 border border-white/20 focus:border-amber-400 outline-none shadow-inner"
                   title="From Date"
                 />
                 <span className="text-[10px] text-amber-400 font-black">To</span>
@@ -684,7 +877,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                   type="date"
                   value={dateRange.to}
                   onChange={e => handleToDateChange(e.target.value)}
-                  className="w-1/2 bg-[#162035] text-white font-mono text-[11px] font-bold rounded-lg px-2 py-1.5 border border-white/20 focus:border-amber-400 outline-none shadow-inner"
+                  className="w-1/2 bg-[#162035] text-white font-mono text-[11px] font-bold rounded-xl px-2.5 py-1.5 border border-white/20 focus:border-amber-400 outline-none shadow-inner"
                   title="To Date"
                 />
               </div>
@@ -693,7 +886,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
         </div>
 
         {/* ==================== TABS NAVIGATION ==================== */}
-        <div className="bg-[#090e1a] px-5 pt-3 pb-2 border-b border-white/10 flex items-center justify-between gap-3 shrink-0">
+        <div className="bg-[#090e1a] px-5 pt-3 pb-2.5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -735,11 +928,44 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
             </button>
           </div>
 
-          <div className="text-right hidden sm:block">
-            <span className="text-[11px] font-bold text-slate-400">
-              Active Range: <span className="text-amber-300 font-mono">{dateRange.from || 'Start'}</span> to{' '}
-              <span className="text-amber-300 font-mono">{dateRange.to || 'End'}</span> ({filteredOrders.length} Orders)
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedRole !== 'All' && (
+              <span className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black flex items-center gap-1.5 animate-in fade-in">
+                <User size={11} className="text-rose-400" />
+                <span>Role: {selectedRole}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('All')}
+                  className="hover:text-white cursor-pointer ml-0.5 text-xs font-black leading-none"
+                  title="Clear Role Filter"
+                >
+                  &times;
+                </button>
+              </span>
+            )}
+
+            {selectedType !== 'All' && (
+              <span className="px-2.5 py-0.5 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[11px] font-black flex items-center gap-1.5 animate-in fade-in">
+                <Tag size={11} className="text-sky-400" />
+                <span>Type: {selectedType}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedType('All')}
+                  className="hover:text-white cursor-pointer ml-0.5 text-xs font-black leading-none"
+                  title="Clear Type Filter"
+                >
+                  &times;
+                </button>
+              </span>
+            )}
+
+            <div className="text-right">
+              <span className="text-[11px] font-bold text-slate-400">
+                Range: <span className="text-amber-300 font-mono">{dateRange.from || 'Start'}</span> to{' '}
+                <span className="text-amber-300 font-mono">{dateRange.to || 'End'}</span> (
+                <span className="text-emerald-400 font-mono font-black">{filteredOrders.length}</span> Orders)
+              </span>
+            </div>
           </div>
         </div>
 
@@ -921,8 +1147,8 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
 
                 {paretoData.items.length === 0 ? (
                   <div className="h-64 flex flex-col items-center justify-center text-slate-500">
-                    <p className="font-bold text-sm">No chocolate sales recorded in this date range.</p>
-                    <p className="text-xs mt-1">Try switching weeks or adjusting the month/year filter.</p>
+                    <p className="font-bold text-sm">No chocolate sales recorded matching this filter.</p>
+                    <p className="text-xs mt-1">Try switching roles, types, weeks or adjusting the date range.</p>
                   </div>
                 ) : (
                   <div className="h-80 w-full">
@@ -1420,7 +1646,9 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                     Pareto 80/20 & Weekly Demand Insights
                   </h2>
                   <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                    Based on your selected timeframe ({dateRange.from || 'Start'} to {dateRange.to || 'End'}),
+                    Based on your selected timeframe ({dateRange.from || 'Start'} to {dateRange.to || 'End'})
+                    {selectedRole !== 'All' ? ` • Role: ${selectedRole}` : ''}
+                    {selectedType !== 'All' ? ` • Type: ${selectedType}` : ''},
                     your top <strong>{paretoData.groupA.count} chocolate varieties</strong> account for{' '}
                     <strong className="text-amber-400">{paretoData.groupA.percent}% of total volume</strong>.
                     Maintaining optimal stock on these core varieties prevents stock-outs and accelerates order fulfillment.
@@ -1474,7 +1702,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
           <div className="flex items-center gap-2 text-slate-400 font-semibold">
             <Info size={14} className="text-amber-400" />
             <span>
-              Values automatically update according to Year, Month, Week, Date Range & Date Basis dropdowns.
+              Values automatically update according to Year, Month, Week, Roles, Types, Date Range & Date Basis dropdowns.
             </span>
           </div>
           <button
