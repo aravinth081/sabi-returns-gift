@@ -11,14 +11,14 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 // --- FIREBASE SINGLETON & CONCURRENCY IMPORTS ---
 import { db } from "@/firebase";
 import {
-  collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc
+  collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, writeBatch
 } from "firebase/firestore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getNextSequentialOrderId } from "@/lib/concurrency";
 // -----------------------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
   Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
@@ -510,6 +510,12 @@ export default function Dashboard() {
   const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
   const [isQuickAddCategoryOpen, setIsQuickAddCategoryOpen] = useState(false);
   const [productViewModalProduct, setProductViewModalProduct] = useState<any | null>(null);
+
+  // 🟢 Product Manual Reordering State
+  const [editingOrderProductFireId, setEditingOrderProductFireId] = useState<string | null>(null);
+  const [targetPositionInput, setTargetPositionInput] = useState<string>('');
+  const [draggedProductIndex, setDraggedProductIndex] = useState<number | null>(null);
+  const [dragOverProductIndex, setDragOverProductIndex] = useState<number | null>(null);
 
   const DEFAULT_CHOCOLATES = [
     { name: "10 rs 5 Star", retailPrice: 22, wholesalePrice: 9, costPrice: 9.5, stickerPrice: 1.5, displayOrder: 1 },
@@ -1689,8 +1695,11 @@ export default function Dashboard() {
     } else if (productSortFilter === 'za') {
       result.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
     } else {
-      // Default: order added
+      // Default: manual orderIndex if available, fallback to createdAt
       result.sort((a, b) => {
+        const orderA = typeof a.orderIndex === 'number' ? a.orderIndex : Infinity;
+        const orderB = typeof b.orderIndex === 'number' ? b.orderIndex : Infinity;
+        if (orderA !== orderB) return orderA - orderB;
         const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return tA - tB;
@@ -3922,8 +3931,10 @@ export default function Dashboard() {
         toast.success("Listing updated successfully!");
         logActivity(`Edited Listing: ${sanitizedPayload.name} [${sanitizedPayload.productType}] (Selling: ₹${sanitizedPayload.price}, Wholesale: ₹${sanitizedPayload.wholesalePrice || 0})`, 'Products');
       } else {
+        const maxOrder = customProducts.reduce((max, p) => Math.max(max, typeof p.orderIndex === 'number' ? p.orderIndex : 0), 0);
         await addDoc(collection(db, "products"), {
           ...sanitizedPayload,
+          orderIndex: maxOrder + 1,
           createdAt: new Date().toISOString(),
         });
         toast.success(isDraft ? "Draft saved successfully!" : "Listing created successfully!");
@@ -3949,6 +3960,50 @@ export default function Dashboard() {
       throw err;
     } finally {
       setIsSavingProduct(false);
+    }
+  };
+
+  // 🟢 MANUAL PRODUCT REORDERING (Drag & Drop, Arrow Buttons, or Direct Rank Input)
+  const handleMoveProduct = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    if (fromIndex >= filteredProducts.length || toIndex >= filteredProducts.length) return;
+
+    if (productSortFilter !== 'default') {
+      setProductSortFilter('default');
+    }
+
+    const newFiltered = [...filteredProducts];
+    const [movedProduct] = newFiltered.splice(fromIndex, 1);
+    newFiltered.splice(toIndex, 0, movedProduct);
+
+    // 1. Instant 0ms optimistic UI update in React state
+    const orderMap = new Map<string, number>();
+    newFiltered.forEach((p, idx) => {
+      if (p.fireId) orderMap.set(p.fireId, idx + 1);
+    });
+
+    setCustomProducts((prev) => {
+      return prev.map((p) => {
+        if (p.fireId && orderMap.has(p.fireId)) {
+          return { ...p, orderIndex: orderMap.get(p.fireId)! };
+        }
+        return p;
+      });
+    });
+
+    // 2. Persist orderIndex to Firestore in background with batch update
+    try {
+      const batch = writeBatch(db);
+      newFiltered.forEach((p, idx) => {
+        if (p.fireId) {
+          batch.update(doc(db, "products", p.fireId), { orderIndex: idx + 1 });
+        }
+      });
+      await batch.commit();
+      toast.success(`Moved "${movedProduct.name}" to position #${toIndex + 1}`);
+    } catch (err: any) {
+      console.error("Failed to persist product order in Firestore:", err);
+      toast.error("Failed to save product order to database.");
     }
   };
 
@@ -5315,7 +5370,7 @@ export default function Dashboard() {
                         onChange={(e) => setProductSortFilter(e.target.value as any)}
                         className="pl-3.5 pr-8 py-2.5 bg-[#15213b] border border-white/20 hover:border-white/30 rounded-xl text-xs font-bold text-white outline-none focus:border-blue-400 cursor-pointer appearance-none transition-colors shadow-sm"
                       >
-                        <option value="default" className="bg-[#15213b] text-white">Sort: Order Added</option>
+                        <option value="default" className="bg-[#15213b] text-white">Sort: Manual / Order Added</option>
                         <option value="az" className="bg-[#15213b] text-white">Sort: A → Z</option>
                         <option value="za" className="bg-[#15213b] text-white">Sort: Z → A</option>
                       </select>
@@ -5465,7 +5520,12 @@ export default function Dashboard() {
                     <table className="w-full text-left border-collapse text-xs md:text-sm">
                       <thead>
                         <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
-                          <th className="py-3.5 px-4 text-center w-14">#</th>
+                          <th className="py-3.5 px-3 text-center w-28 select-none">
+                            <div className="flex items-center justify-center gap-1 text-[10px] text-amber-300/90 font-black" title="Drag rows, click number, or use arrows to reorder">
+                              <GripVertical size={12} className="text-slate-400" />
+                              <span># ORDER</span>
+                            </div>
+                          </th>
                           <th className="py-3.5 px-4 min-w-[220px]">Item / Combo Name</th>
                           <th className="py-3.5 px-3.5 text-center min-w-[120px]">Category</th>
                           <th className="py-3.5 px-3 text-center min-w-[110px]">Type</th>
@@ -5489,11 +5549,127 @@ export default function Dashboard() {
                           return (
                             <tr
                               key={prod.fireId || index}
-                              className="hover:bg-[#15213b]/60 transition-colors"
+                              draggable={productSortFilter === 'default'}
+                              onDragStart={(e) => {
+                                setDraggedProductIndex(index);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (dragOverProductIndex !== index) {
+                                  setDragOverProductIndex(index);
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedProductIndex !== null && draggedProductIndex !== index) {
+                                  handleMoveProduct(draggedProductIndex, index);
+                                }
+                                setDraggedProductIndex(null);
+                                setDragOverProductIndex(null);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedProductIndex(null);
+                                setDragOverProductIndex(null);
+                              }}
+                              className={`hover:bg-[#15213b]/60 transition-all ${
+                                dragOverProductIndex === index ? 'bg-blue-600/25 border-y-2 border-amber-400 shadow-md' : ''
+                              } ${draggedProductIndex === index ? 'opacity-30' : ''}`}
                             >
-                              {/* # / Index */}
-                              <td className="py-3.5 px-4 text-center font-black text-amber-400">
-                                {index + 1}
+                              {/* # / Index with Manual Reorder Controls */}
+                              <td className="py-3.5 px-2.5 text-center">
+                                {editingOrderProductFireId === prod.fireId ? (
+                                  <div className="inline-flex items-center justify-center gap-1 bg-[#090e1a] p-1 rounded-xl border border-amber-400 shadow-xl animate-in zoom-in-95 duration-150">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={filteredProducts.length}
+                                      value={targetPositionInput}
+                                      onChange={(e) => setTargetPositionInput(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          const target = parseInt(targetPositionInput, 10);
+                                          if (!isNaN(target) && target >= 1 && target <= filteredProducts.length) {
+                                            handleMoveProduct(index, target - 1);
+                                          }
+                                          setEditingOrderProductFireId(null);
+                                        } else if (e.key === 'Escape') {
+                                          setEditingOrderProductFireId(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="w-10 px-1 py-1 text-center text-xs font-black bg-[#15213b] text-amber-300 rounded-lg border border-amber-500/50 outline-none focus:border-amber-400"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const target = parseInt(targetPositionInput, 10);
+                                        if (!isNaN(target) && target >= 1 && target <= filteredProducts.length) {
+                                          handleMoveProduct(index, target - 1);
+                                        }
+                                        setEditingOrderProductFireId(null);
+                                      }}
+                                      className="p-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 transition-colors cursor-pointer"
+                                      title="Confirm order move"
+                                    >
+                                      <Check size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingOrderProductFireId(null)}
+                                      className="p-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition-colors cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center justify-center gap-1.5 select-none">
+                                    {/* Drag Grip Handle */}
+                                    <div
+                                      className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-amber-400 p-0.5 rounded transition-colors"
+                                      title="Drag to reorder row"
+                                    >
+                                      <GripVertical size={13} />
+                                    </div>
+
+                                    {/* Clickable Order Number Badge */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingOrderProductFireId(prod.fireId);
+                                        setTargetPositionInput(String(index + 1));
+                                      }}
+                                      className="min-w-[28px] h-7 px-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-black text-xs transition-all cursor-pointer flex items-center justify-center shadow-sm group"
+                                      title={`Click to change position directly (Currently #${index + 1})`}
+                                    >
+                                      <span>{index + 1}</span>
+                                    </button>
+
+                                    {/* Up / Down Micro Arrows */}
+                                    <div className="flex flex-col gap-0.5">
+                                      <button
+                                        type="button"
+                                        disabled={index === 0}
+                                        onClick={() => handleMoveProduct(index, index - 1)}
+                                        className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                                        title="Move Up 1 position"
+                                      >
+                                        <ChevronUp size={11} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={index === filteredProducts.length - 1}
+                                        onClick={() => handleMoveProduct(index, index + 1)}
+                                        className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                                        title="Move Down 1 position"
+                                      >
+                                        <ChevronDown size={11} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </td>
 
                               {/* Item / Combo Name with Primary Image */}
