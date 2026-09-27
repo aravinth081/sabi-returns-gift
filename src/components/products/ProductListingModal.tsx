@@ -310,9 +310,9 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
         }
       }
 
-      // Combine existing and new images, and guarantee total payload is safely under Firestore limit (<300KB)
+      // Combine existing and new images (leaves images <= 1MB uncompressed; total doc safe up to 900KB)
       const allRawImages = [...formData.images, ...uploadedUrls];
-      const allImages = await sanitizeAndCompressImages(allRawImages, 300000);
+      const allImages = await sanitizeAndCompressImages(allRawImages, 900000);
       const finalStatus: ProductStatus = isDraftAction ? 'Draft' : formData.status;
 
       const payload: any = {
@@ -525,6 +525,11 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
                           {cat.name}
                         </option>
                       ))}
+                      {formData.category && !categories.some(c => c.name.toLowerCase() === formData.category.toLowerCase()) && (
+                        <option value={formData.category} className="bg-[#151f36] text-white">
+                          {formData.category}
+                        </option>
+                      )}
                       <option
                         value="__add_new__"
                         className="bg-emerald-950/80 text-emerald-300 font-black"

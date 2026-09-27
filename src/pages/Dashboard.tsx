@@ -1592,15 +1592,7 @@ export default function Dashboard() {
   }, [customProducts]);
 
   // 🟢 DEFAULT PRODUCT CATEGORIES (Persistent SaaS Catalog)
-  const DEFAULT_PRODUCT_CATEGORIES = useMemo(() => [
-    { id: 'cat-chocolates', name: 'Chocolates', description: 'Assorted chocolates and chocolate gifts' },
-    { id: 'cat-snacks', name: 'Snacks', description: 'Packaged snacks, munchies, and sweets' },
-    { id: 'cat-beverages', name: 'Beverages', description: 'Drinks, juices, and beverage items' },
-    { id: 'cat-gifts', name: 'Gifts', description: 'Return gift items and celebration combos' },
-    { id: 'cat-toys', name: 'Toys', description: 'Fun toys and play items for kids' },
-    { id: 'cat-stationery', name: 'Stationery', description: 'School, art, and office stationery items' },
-    { id: 'cat-other', name: 'Other', description: 'General and miscellaneous items' },
-  ], []);
+  const DEFAULT_PRODUCT_CATEGORIES = useMemo<any[]>(() => [], []);
 
   // Merged Categories: Default + Firestore dynamically added categories
   const productCategories = useMemo(() => {
@@ -3847,15 +3839,18 @@ export default function Dashboard() {
 
   const handleDeleteCategory = async (id: string, name: string) => {
     try {
-      // Data Protection Rule (Requirement 8)
+      // Find all products assigned to this category and unassign them
       const usedProducts = customProducts.filter(
         p => p.category && p.category.toLowerCase() === name.toLowerCase()
       );
       if (usedProducts.length > 0) {
-        toast.error(
-          `This category is currently being used by ${usedProducts.length} listings. Please reassign those listings before deleting this category.`
-        );
-        return false;
+        for (const prod of usedProducts) {
+          if (prod.fireId) {
+            await updateDoc(doc(db, "products", prod.fireId), {
+              category: ""
+            });
+          }
+        }
       }
 
       const foundInDb = firestoreCategories.find(
@@ -3905,9 +3900,10 @@ export default function Dashboard() {
       const sanitizedPayload = cleanData(payload);
 
       // 🛡️ GUARANTEED FIRESTORE SAFETY:
-      // Ensure all images are compressed so total payload never exceeds 1MB Firestore limit (<300KB)
+      // Ensure all images safely fit within Firestore 1MB document limit (<= 900KB total images budget).
+      // Individual images <= 1MB remain completely uncompressed at 100% original quality.
       if (Array.isArray(sanitizedPayload.images) && sanitizedPayload.images.length > 0) {
-        sanitizedPayload.images = await sanitizeAndCompressImages(sanitizedPayload.images, 300000);
+        sanitizedPayload.images = await sanitizeAndCompressImages(sanitizedPayload.images, 900000);
       }
 
       // Avoid duplicating massive base64 strings inside comboProducts
@@ -3920,10 +3916,10 @@ export default function Dashboard() {
         });
       }
 
-      // Emergency double-check: verify total document byte size
+      // Emergency double-check: verify total document byte size against Firestore 1,048,576 byte hard limit
       const docSizeBytes = new Blob([JSON.stringify(sanitizedPayload)]).size;
-      if (docSizeBytes > 350000 && Array.isArray(sanitizedPayload.images)) {
-        sanitizedPayload.images = await sanitizeAndCompressImages(sanitizedPayload.images, 200000);
+      if (docSizeBytes > 950000 && Array.isArray(sanitizedPayload.images)) {
+        sanitizedPayload.images = await sanitizeAndCompressImages(sanitizedPayload.images, 800000);
       }
 
       if (selectedEditingProduct && selectedEditingProduct.fireId) {
@@ -4278,11 +4274,11 @@ export default function Dashboard() {
       console.error("Cloudinary upload background error:", err);
       // Fallback: compress images safely so it NEVER exceeds Firestore 1MB limit (<300KB)
       try {
-        const compressedBase64List = await Promise.all(
-          validFiles.map((f) => compressImageToDataUrl(f, 800, 35000))
+        const processedImages = await Promise.all(
+          validFiles.map((f) => uploadToCloudinary(f))
         );
-        const rawFinalImages = [...existingImages, ...compressedBase64List];
-        const finalImages = await sanitizeAndCompressImages(rawFinalImages, 300000);
+        const rawFinalImages = [...existingImages, ...processedImages];
+        const finalImages = await sanitizeAndCompressImages(rawFinalImages, 900000);
         await updateDoc(doc(db, "products", productFireId), { images: finalImages });
         if (imageGalleryProduct?.fireId === productFireId) {
           setImageGalleryProduct({ ...imageGalleryProduct, images: finalImages });
@@ -4329,64 +4325,38 @@ export default function Dashboard() {
     }
   };
 
-  // ⚡ INSTANT 0ms DOM COPY IMAGE
+  // ⚡ CRYSTAL-CLEAR FULL-RESOLUTION COPY IMAGE
   const handleCopyImage = async (imageUrl: string) => {
     try {
-      // 1. Try instant copy directly from decoded DOM Image (0ms, no network fetch!)
-      const domImg = document.getElementById("gallery-main-image") as HTMLImageElement;
-      if (domImg && domImg.complete && domImg.naturalWidth > 0) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = domImg.naturalWidth;
-          canvas.height = domImg.naturalHeight;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(domImg, 0, 0);
-            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/png"));
-            if (blob) {
-              await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-              toast.success("Image copied to clipboard!");
-              return;
-            }
-          }
-        } catch (canvasErr) {
-          // If tainted canvas due to cross-origin, fall through to fetch
-        }
-      }
-
-      // 2. Fast fetch copy with caching
-      const response = await fetch(imageUrl, { cache: 'force-cache' });
-      const originalBlob = await response.blob();
-
-      if (originalBlob.type === 'image/png') {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': originalBlob })
-        ]);
-        toast.success('Image copied to clipboard!');
-      } else {
-        const img = new Image();
+      const img = new Image();
+      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
         img.crossOrigin = 'anonymous';
-        img.src = imageUrl;
+      }
+      img.src = imageUrl;
+      if (typeof img.decode === 'function') {
+        await img.decode();
+      } else {
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
         });
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('No canvas context');
-        ctx.drawImage(img, 0, 0);
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-        if (!blob) throw new Error('Failed to create blob');
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        toast.success('Image copied to clipboard!');
       }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No canvas context');
+      ctx.drawImage(img, 0, 0);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Failed to create blob');
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      toast.success('Image copied to clipboard!');
     } catch (err) {
       console.error('Copy image error:', err);
-      // Fallback: copy image URL to clipboard
       try {
         await navigator.clipboard.writeText(imageUrl);
         toast.success('Image URL copied to clipboard!');

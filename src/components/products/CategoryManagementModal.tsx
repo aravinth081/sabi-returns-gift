@@ -144,13 +144,6 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
   };
 
   const handleDeletePrompt = (cat: CategoryItem) => {
-    const usedCount = productCountByCategory[cat.name.trim().toLowerCase()] || 0;
-    if (usedCount > 0) {
-      setError(
-        `This category is currently being used by ${usedCount} listings. Please reassign those listings before deleting this category.`
-      );
-      return;
-    }
     setError('');
     setDeleteConfirmCat(cat);
   };
@@ -436,16 +429,8 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                     <button
                       type="button"
                       onClick={() => handleDeletePrompt(cat)}
-                      className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                        usedCount > 0
-                          ? 'text-slate-600 hover:text-slate-500 cursor-not-allowed'
-                          : 'text-slate-400 hover:text-rose-400 hover:bg-rose-500/15'
-                      }`}
-                      title={
-                        usedCount > 0
-                          ? `Cannot delete (used by ${usedCount} product${usedCount > 1 ? 's' : ''})`
-                          : 'Delete Category'
-                      }
+                      className="p-2 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-rose-400 hover:bg-rose-500/15"
+                      title="Delete Category"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -491,11 +476,22 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                   <p className="text-[11px] text-rose-300">Permanent action</p>
                 </div>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Are you sure you want to delete category{' '}
-                <strong className="text-white font-bold">"{deleteConfirmCat.name}"</strong>?
-                This category is not used by any active product.
-              </p>
+              {(() => {
+                const usedCount = deleteConfirmCat ? (productCountByCategory[deleteConfirmCat.name.trim().toLowerCase()] || 0) : 0;
+                return (
+                  <div className="space-y-2.5">
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Are you sure you want to delete category{' '}
+                      <strong className="text-white font-bold">"{deleteConfirmCat.name}"</strong>?
+                    </p>
+                    {usedCount > 0 && (
+                      <p className="text-xs text-amber-300 bg-amber-500/10 p-3 rounded-xl border border-amber-500/25 leading-relaxed">
+                        ⚠️ <strong>Notice:</strong> This category is currently assigned to <strong>{usedCount} listing{usedCount > 1 ? 's' : ''}</strong>. Deleting it will unassign those listings (they will become Uncategorized).
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"

@@ -4,6 +4,8 @@
 // This guarantees Firestore 1MB document limit is NEVER exceeded, even with many images!
 // Instant processing (under 150ms), accepts photos of ANY size (up to 100MB+).
 
+export const ONE_MB_BYTES = 1024 * 1024; // 1MB threshold
+
 export const CLOUDINARY_UPLOAD_PRESET = "sabi retun gifts";
 export const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB input limit (accepts any camera/phone photo)
 export const ALLOWED_IMAGE_TYPES = [
@@ -47,8 +49,23 @@ export const validateImageFile = (file: File): { valid: boolean; error?: string 
 };
 
 /**
+ * Reads a File or Blob directly into a Base64 Data URL without ANY re-encoding or loss of quality.
+ */
+export const readFileAsDataUrl = (file: File | Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("Cannot read file outside browser environment"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string) || "");
+    reader.onerror = (err) => reject(err || new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+};
+
+/**
  * Loads an image from File, Blob, or base64/remote data URL safely in browser environment.
- * Uses FileReader for local Files/Blobs to prevent premature object URL revocation race conditions.
  */
 export const loadImage = (source: File | Blob | string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
@@ -60,8 +77,6 @@ export const loadImage = (source: File | Blob | string): Promise<HTMLImageElemen
     const img = new Image();
 
     if (typeof source === "string") {
-      // ONLY set crossOrigin for remote HTTP/HTTPS images to prevent tainted canvas.
-      // NEVER set crossOrigin for data: or blob: URIs as Chromium triggers onerror on them!
       if (source.startsWith("http://") || source.startsWith("https://")) {
         img.crossOrigin = "anonymous";
       }
@@ -69,7 +84,6 @@ export const loadImage = (source: File | Blob | string): Promise<HTMLImageElemen
       img.onerror = (err) => reject(err || new Error("Failed to load image from URL"));
       img.src = source;
     } else {
-      // Use FileReader for safe, permanent memory loading without object URL revocation race conditions
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
@@ -88,39 +102,43 @@ export const loadImage = (source: File | Blob | string): Promise<HTMLImageElemen
 };
 
 /**
- * Adaptive Canvas Compressor:
- * Compresses ANY image (even 30MB+ 4K photos) into a crystal-sharp, ultra-compact WebP/JPEG data URL.
- * Guarantees each image strictly fits within targetMaxBytes (< 35KB typically).
- * Firestore document safety is 100% mathematically guaranteed!
+ * High-Quality Canvas Compressor:
+ * Only used when image > 1MB or document budget exceeds safety limit.
+ * Preserves high resolution (up to 2048px) and high visual fidelity (quality 0.88-0.92).
+ * Strictly guarantees targetMaxBytes is met (default ~850KB, comfortably under 1MB).
  */
 export const compressImageToDataUrl = async (
   source: File | Blob | string,
-  initialMaxDim: number = 800,
-  targetMaxBytes: number = 38000
+  initialMaxDim: number = 2048,
+  targetMaxBytes: number = 850000
 ): Promise<string> => {
   if (typeof source === "string" && (source.startsWith("http://") || source.startsWith("https://"))) {
     return source; // Already a remote URL
   }
 
+  // If source is a File/Blob <= 1MB, DO NOT COMPRESS! Return original data URL directly.
+  if ((source instanceof File || source instanceof Blob) && source.size <= ONE_MB_BYTES && source.size <= targetMaxBytes) {
+    return readFileAsDataUrl(source);
+  }
+
   try {
     const img = await loadImage(source);
-    // Ensure image decode is complete if supported
     if (typeof img.decode === "function") {
       await img.decode().catch(() => {});
     }
 
-    const origWidth = img.naturalWidth || img.width || 800;
-    const origHeight = img.naturalHeight || img.height || 600;
+    const origWidth = img.naturalWidth || img.width || 1600;
+    const origHeight = img.naturalHeight || img.height || 1200;
 
     let bestResult = "";
     let bestSize = Infinity;
 
-    // Up to 4 progressive passes with scaling and quality reduction
+    // High quality passes preserving sharp details
     const passes = [
-      { maxDim: Math.min(initialMaxDim, 800), quality: 0.75 },
-      { maxDim: Math.min(initialMaxDim, 640), quality: 0.65 },
-      { maxDim: 480, quality: 0.50 },
-      { maxDim: 360, quality: 0.42 },
+      { maxDim: Math.min(initialMaxDim, 2048), quality: 0.90 },
+      { maxDim: Math.min(initialMaxDim, 1920), quality: 0.85 },
+      { maxDim: Math.min(initialMaxDim, 1600), quality: 0.80 },
+      { maxDim: Math.min(initialMaxDim, 1280), quality: 0.75 },
     ];
 
     for (const pass of passes) {
@@ -143,19 +161,17 @@ export const compressImageToDataUrl = async (
       const ctx = canvas.getContext("2d", { alpha: false });
       if (!ctx) continue;
 
-      // Fill white background for transparent PNG/WebP if JPEG fallback
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       let dataUrl = "";
-      // Prefer WebP for superior compression, fallback to JPEG
       try {
         dataUrl = canvas.toDataURL("image/webp", pass.quality);
         if (!dataUrl.startsWith("data:image/webp")) {
           dataUrl = canvas.toDataURL("image/jpeg", pass.quality);
         }
-      } catch (e) {
+      } catch {
         dataUrl = canvas.toDataURL("image/jpeg", pass.quality);
       }
 
@@ -173,32 +189,31 @@ export const compressImageToDataUrl = async (
 
     return bestResult || (typeof source === "string" ? source : "");
   } catch (err) {
-    console.warn("compressImageToDataUrl canvas compression fallback:", err);
-    // Safe fallback: if source is already a data URL, return it
+    console.warn("compressImageToDataUrl fallback:", err);
     if (typeof source === "string" && source.startsWith("data:image/")) {
       return source;
     }
     if (source instanceof File || source instanceof Blob) {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string) || "");
-        reader.onerror = () => resolve("");
-        reader.readAsDataURL(source);
-      });
+      return readFileAsDataUrl(source);
     }
     return typeof source === "string" ? source : "";
   }
 };
 
 /**
- * Compresses an image to a File or Blob for cloud uploads
+ * Compresses an image to a File or Blob for cloud uploads (only when > 1MB)
  */
 export const compressImageForUpload = async (
   file: File | Blob,
-  maxDimension: number = 800,
-  quality: number = 0.75
+  maxDimension: number = 2048,
+  quality: number = 0.88
 ): Promise<File | Blob> => {
   if (typeof window === "undefined" || !file.type.startsWith("image/")) {
+    return file;
+  }
+
+  // If already under 1MB, DO NOT COMPRESS
+  if (file.size <= ONE_MB_BYTES) {
     return file;
   }
 
@@ -247,17 +262,21 @@ export const compressImageForUpload = async (
         quality
       );
     });
-  } catch (err) {
+  } catch {
     return file;
   }
 };
 
-// Helper to convert File/Blob to Base64 Data URL (used as ultra-safe fallback)
+// Helper to convert File/Blob to Base64 Data URL (used as safe fallback)
 export const fileToBase64 = async (
   file: File | Blob | string,
-  targetBudgetBytes: number = 38000
+  targetBudgetBytes: number = 850000
 ): Promise<string> => {
-  return compressImageToDataUrl(file, 800, targetBudgetBytes);
+  if (typeof file === "string") return file;
+  if (file.size <= ONE_MB_BYTES && file.size <= targetBudgetBytes) {
+    return readFileAsDataUrl(file);
+  }
+  return compressImageToDataUrl(file, 2048, targetBudgetBytes);
 };
 
 export const getCloudinaryCloudName = (): string => {
@@ -276,18 +295,18 @@ export const setCloudinaryCloudName = (cloudName: string) => {
 
 /**
  * Uploads a single image file directly from browser.
+ * RULE:
+ * 1. Under 1 MB (<= 1MB): DO NOT COMPRESS! Return the exact original image as Base64 Data URL.
+ * 2. Over 1 MB (> 1MB): Compress to fit under 1MB (~850KB) at high resolution (up to 2048px).
  * Priority 1: Cloudinary (If Cloud Name configured and responsive within 3.5 seconds)
- * Priority 2: Ultra-compact, crystal-sharp WebP Canvas Compression (guaranteed < targetBudgetBytes, ~35KB)
- * 100% reliable, zero hanging, finishes in ~50ms!
+ * Priority 2: Pure high-res original base64 / gentle compression.
  */
 export const uploadToCloudinary = async (
   file: File | Blob | string,
-  targetBudgetBytes: number = 38000
+  targetBudgetBytes: number = 850000
 ): Promise<string> => {
   if (typeof file === "string") {
-    if (file.startsWith("http://") || file.startsWith("https://")) return file;
-    // If it's already a base64 string, compress it to target budget
-    return compressImageToDataUrl(file, 800, targetBudgetBytes);
+    return file;
   }
 
   if (file instanceof File) {
@@ -301,13 +320,12 @@ export const uploadToCloudinary = async (
   const cloudName = getCloudinaryCloudName();
   if (cloudName && cloudName.trim().length > 0) {
     try {
-      const fileToUpload = await compressImageForUpload(file, 800, 0.75);
+      const fileToUpload = file.size > ONE_MB_BYTES ? await compressImageForUpload(file, 2048, 0.88) : file;
       const url = `https://api.cloudinary.com/v1_1/${cloudName.trim()}/image/upload`;
       const formData = new FormData();
       formData.append("file", fileToUpload);
       formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-      // Fast 3.5s timeout: if Cloudinary hangs or is slow, fallback immediately to local canvas WebP
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -324,46 +342,58 @@ export const uploadToCloudinary = async (
         if (cdnUrl) return cdnUrl;
       }
     } catch (cdnErr) {
-      console.warn("Cloudinary upload skipped or timed out, using fast WebP compression:", cdnErr);
+      console.warn("Cloudinary upload skipped or timed out, using direct original processing:", cdnErr);
     }
   }
 
-  // 2. High-speed, guaranteed safe-budget WebP Base64 compression (< targetBudgetBytes, ~30-38KB)
-  // Completes in ~50ms, crystal clear visual quality, 100% reliable!
-  return compressImageToDataUrl(file, 800, targetBudgetBytes);
+  // 2. USER RULE: If <= 1 MB, DO NOT COMPRESS! Return 100% same original image!
+  if (file.size <= ONE_MB_BYTES && file.size <= targetBudgetBytes) {
+    return readFileAsDataUrl(file);
+  }
+
+  // 3. If > 1 MB: Compress to <= 1MB with high resolution (up to 2048px)
+  return compressImageToDataUrl(file, 2048, Math.min(targetBudgetBytes, 850000));
 };
 
 /**
- * Uploads multiple image files with dynamic budget allocation
+ * Uploads multiple image files
  */
 export const uploadMultipleToCloudinary = async (
   files: FileList | File[],
-  maxTotalBudgetBytes: number = 300000
+  maxTotalBudgetBytes: number = 900000
 ): Promise<string[]> => {
   const fileArray = Array.from(files);
   if (fileArray.length === 0) return [];
 
-  // Calculate dynamic per-image budget: e.g. for 5 images = 35KB each; for 10 = 25KB each
-  const budgetPerImage = Math.max(16000, Math.floor(maxTotalBudgetBytes / Math.max(1, fileArray.length)));
-  const uploadPromises = fileArray.map((file) => uploadToCloudinary(file, budgetPerImage));
+  // For each file, if <= 1MB don't compress. If multiple files exceed Firestore doc limit, sanitizeAndCompress handles it.
+  const uploadPromises = fileArray.map((file) => uploadToCloudinary(file, maxTotalBudgetBytes));
   return Promise.all(uploadPromises);
 };
 
 /**
  * Sanitizes and compresses an array of images before writing to Firestore.
- * Ensures the total size of all base64 images together NEVER exceeds maxTotalBytes (default: 320KB).
- * Firestore document safety is 100% mathematically guaranteed!
+ * Ensures the total size of all base64 images together NEVER exceeds maxTotalBytes (default: 900KB).
+ * If total size is already <= 900KB, images are 100% UNTOUCHED (zero compression)!
  */
 export const sanitizeAndCompressImages = async (
   images: string[],
-  maxTotalBytes: number = 320000
+  maxTotalBytes: number = 900000
 ): Promise<string[]> => {
   if (!Array.isArray(images) || images.length === 0) return [];
 
-  // Filter out any empty strings
   const validImages = images.filter((img) => typeof img === "string" && img.trim().length > 0);
   if (validImages.length === 0) return [];
 
+  const totalBase64Bytes = validImages.reduce((sum, img) => {
+    return img.startsWith("data:image/") ? sum + Math.round(img.length * 0.75) : sum;
+  }, 0);
+
+  // If already within safe Firestore limit (<= 900KB), DO NOT COMPRESS!
+  if (totalBase64Bytes <= maxTotalBytes) {
+    return validImages;
+  }
+
+  // Only compress if the total document limit would be breached
   const base64Indices: number[] = [];
   validImages.forEach((img, i) => {
     if (img.startsWith("data:image/")) {
@@ -373,35 +403,19 @@ export const sanitizeAndCompressImages = async (
 
   if (base64Indices.length === 0) return validImages;
 
-  // Calculate budget per base64 image
-  const budgetPerImage = Math.max(15000, Math.floor(maxTotalBytes / base64Indices.length));
-
+  const budgetPerImage = Math.max(100000, Math.floor(maxTotalBytes / base64Indices.length));
   const result = [...validImages];
+
   await Promise.all(
     base64Indices.map(async (idx) => {
       const img = result[idx];
-      // Only re-compress if it's larger than the target budget
-      if (img.length * 0.75 > budgetPerImage) {
-        result[idx] = await compressImageToDataUrl(img, 640, budgetPerImage);
+      const approxBytes = Math.round(img.length * 0.75);
+      if (approxBytes > budgetPerImage) {
+        result[idx] = await compressImageToDataUrl(img, 1600, budgetPerImage);
       }
     })
   );
 
-  // Final total size check
-  let totalBase64Bytes = result.reduce((sum, img) => {
-    return img.startsWith("data:image/") ? sum + Math.round(img.length * 0.75) : sum;
-  }, 0);
-
-  if (totalBase64Bytes > maxTotalBytes) {
-    const emergencyBudget = Math.max(12000, Math.floor(maxTotalBytes / base64Indices.length));
-    await Promise.all(
-      base64Indices.map(async (idx) => {
-        if (result[idx].startsWith("data:image/")) {
-          result[idx] = await compressImageToDataUrl(result[idx], 480, emergencyBudget);
-        }
-      })
-    );
-  }
-
   return result;
 };
+

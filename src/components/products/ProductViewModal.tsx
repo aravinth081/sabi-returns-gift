@@ -83,62 +83,40 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
     try {
       setIsCopyingImg(true);
 
-      // Attempt DOM image copy first
-      const domImg = document.getElementById('view-modal-main-image') as HTMLImageElement;
-      if (domImg && domImg.complete && domImg.naturalWidth > 0) {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = domImg.naturalWidth;
-          canvas.height = domImg.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(domImg, 0, 0);
-            const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
-            if (blob) {
-              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-              toast.success('Image copied');
-              return;
-            }
-          }
-        } catch {
-          // Fall through to fetch
-        }
-      }
-
-      // Fetch fallback
-      const resp = await fetch(imgUrl, { cache: 'force-cache' });
-      const origBlob = await resp.blob();
-
-      if (origBlob.type === 'image/png') {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': origBlob })]);
-        toast.success('Image copied');
-      } else {
-        const img = new Image();
+      const img = new Image();
+      if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) {
         img.crossOrigin = 'anonymous';
-        img.src = imgUrl;
+      }
+      img.src = imgUrl;
+      if (typeof img.decode === 'function') {
+        await img.decode();
+      } else {
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
         });
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Canvas context error');
-        ctx.drawImage(img, 0, 0);
-        const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
-        if (blob) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          toast.success('Image copied');
-        } else {
-          throw new Error('Blob creation failed');
-        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context error');
+      ctx.drawImage(img, 0, 0);
+
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+      if (blob) {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        toast.success('Image copied to clipboard!');
+        return;
+      } else {
+        throw new Error('Blob creation failed');
       }
     } catch {
       // Fallback: copy URL as text
       try {
         await navigator.clipboard.writeText(imgUrl);
-        toast.success('Image copied');
+        toast.success('Image URL copied to clipboard!');
       } catch {
         toast.error('Failed to copy image');
       }
