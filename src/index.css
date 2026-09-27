@@ -1359,6 +1359,16 @@ main {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
 }
 
+.screenshot-location-andhra,
+.wallpaper-active .screenshot-location-andhra {
+  color: #fbbf24 !important; /* Vivid Amber / Gold Plain Text */
+  font-weight: 900 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+}
+
 .screenshot-location-others,
 .wallpaper-active .screenshot-location-others {
   color: #38bdf8 !important; /* Vivid Sky Blue Plain Text */
@@ -1374,6 +1384,19 @@ main {
   color: #64748b !important;
   font-weight: 700 !important;
   font-size: 15px !important;
+}
+
+/* Order name custom type highlights */
+.order-name-thaaru,
+.wallpaper-active .order-name-thaaru {
+  color: #38bdf8 !important; /* Vivid Sky Blue */
+  font-weight: 900 !important;
+}
+
+.order-name-chocowrapz,
+.wallpaper-active .order-name-chocowrapz {
+  color: #f43f5e !important; /* Vivid Coral Rose */
+  font-weight: 900 !important;
 }
 
 /* Chocolate badges inside table rows — Vivid Bright Gold text */

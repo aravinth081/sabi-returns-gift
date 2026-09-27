@@ -294,6 +294,9 @@ const renderScreenshotLocation = (order: any) => {
   if (rawLoc.toLowerCase() === 'kerala' || lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
     return <span className="screenshot-location-text screenshot-location-kerala font-bold">Kerala</span>;
   }
+  if (rawLoc.toLowerCase() === 'andhra' || lower.includes('andhra') || lower.includes('vijayawada') || lower.includes('visakhapatnam') || lower.includes('vizag') || lower.includes('tirupati') || lower.includes('guntur')) {
+    return <span className="screenshot-location-text screenshot-location-andhra font-bold">Andhra</span>;
+  }
 
   const knownCities = [
     'Madurai', 'Coimbatore', 'Trichy', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 
@@ -540,7 +543,93 @@ export default function Dashboard() {
     return DEFAULT_CHOCOLATES.map((c, i) => ({ fireId: `init-${i + 1}`, ...c }));
   });
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
-  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types'>('order_types');
+  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types' | 'locations' | 'roles'>('order_types');
+
+  // Helper for checking Thaaru & Choco Wrapz orders
+  const isThaaruOrder = (type?: string): boolean => String(type || '').trim().toLowerCase() === 'thaaru';
+  const isChocoWrapzOrder = (type?: string): boolean => {
+    const t = String(type || '').trim().toLowerCase();
+    return t === 'choco wrapz' || t.replace(/\s+/g, '') === 'chocowrapz';
+  };
+
+  // Safe location helpers
+  const getLocationName = (loc: any): string => {
+    if (!loc) return '';
+    if (typeof loc === 'string') return loc.trim();
+    return String(loc.name || loc.location || loc.label || '').trim();
+  };
+
+  const getLocationId = (loc: any, index: number): string => {
+    if (!loc) return `loc-${index}`;
+    if (typeof loc === 'string') return `loc-${loc.trim().toLowerCase().replace(/\s+/g, '-')}-${index}`;
+    return String(loc.fireId || loc.id || `loc-${index}`);
+  };
+
+  const [locations, setLocations] = useState<{ fireId: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_locations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any, idx: number) => {
+            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
+            return {
+              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+              name: String(item?.name || item?.location || `Location ${idx + 1}`).trim()
+            };
+          });
+        }
+      }
+    } catch (e) {}
+    return [
+      { fireId: 'default-1', name: 'Chennai' },
+      { fireId: 'default-2', name: 'Kerala' },
+      { fireId: 'default-3', name: 'Andhra' },
+      { fireId: 'default-4', name: 'Others' }
+    ];
+  });
+  const [newLocationName, setNewLocationName] = useState("");
+  const [editLocationId, setEditLocationId] = useState<string | null>(null);
+  const [isLocationManagerOpen, setIsLocationManagerOpen] = useState(false);
+
+  // Safe role helpers
+  const getOrderRoleName = (role: any): string => {
+    if (!role) return '';
+    if (typeof role === 'string') return role.trim();
+    return String(role.name || role.role || role.label || '').trim();
+  };
+
+  const getOrderRoleId = (role: any, index: number): string => {
+    if (!role) return `role-${index}`;
+    if (typeof role === 'string') return `role-${role.trim().toLowerCase().replace(/\s+/g, '-')}-${index}`;
+    return String(role.fireId || role.id || `role-${index}`);
+  };
+
+  const [orderRoles, setOrderRoles] = useState<{ fireId: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_order_roles');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any, idx: number) => {
+            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
+            return {
+              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+              name: String(item?.name || item?.role || `Role ${idx + 1}`).trim()
+            };
+          });
+        }
+      }
+    } catch (e) {}
+    return [
+      { fireId: 'default-1', name: 'Self' },
+      { fireId: 'default-2', name: 'Others' }
+    ];
+  });
+  const [newOrderRoleName, setNewOrderRoleName] = useState("");
+  const [editOrderRoleId, setEditOrderRoleId] = useState<string | null>(null);
+  const [isRoleManagerOpen, setIsRoleManagerOpen] = useState(false);
+
   // Safe order type helpers (guarantees zero runtime crashes regardless of string or object shape)
   const getOrderTypeName = (ot: any): string => {
     if (!ot) return '';
@@ -847,7 +936,63 @@ export default function Dashboard() {
       }
     }, (err) => console.warn("Firestore order_types onSnapshot error:", err));
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); };
+    const unsubLocations = onSnapshot(collection(db, "locations"), (snapshot) => {
+      let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      if (list.length === 0) {
+        const defaults = [
+          { name: "Chennai", createdAt: new Date().toISOString() },
+          { name: "Kerala", createdAt: new Date().toISOString() },
+          { name: "Andhra", createdAt: new Date().toISOString() },
+          { name: "Others", createdAt: new Date().toISOString() }
+        ];
+        defaults.forEach(d => addDoc(collection(db, "locations"), d).catch(() => {}));
+        const initialList = defaults.map((d, i) => ({ fireId: `default-${i + 1}`, name: d.name }));
+        setLocations(initialList);
+        try {
+          localStorage.setItem('sabi_locations', JSON.stringify(initialList));
+        } catch (e) {}
+      } else {
+        list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        const normalizedList = list.map((item, idx) => ({
+          fireId: item.fireId || `loc-${idx + 1}`,
+          name: getLocationName(item) || `Location ${idx + 1}`,
+          ...item
+        }));
+        setLocations(normalizedList);
+        try {
+          localStorage.setItem('sabi_locations', JSON.stringify(normalizedList));
+        } catch (e) {}
+      }
+    }, (err) => console.warn("Firestore locations onSnapshot error:", err));
+
+    const unsubOrderRoles = onSnapshot(collection(db, "order_roles"), (snapshot) => {
+      let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      if (list.length === 0) {
+        const defaults = [
+          { name: "Self", createdAt: new Date().toISOString() },
+          { name: "Others", createdAt: new Date().toISOString() }
+        ];
+        defaults.forEach(d => addDoc(collection(db, "order_roles"), d).catch(() => {}));
+        const initialList = defaults.map((d, i) => ({ fireId: `default-${i + 1}`, name: d.name }));
+        setOrderRoles(initialList);
+        try {
+          localStorage.setItem('sabi_order_roles', JSON.stringify(initialList));
+        } catch (e) {}
+      } else {
+        list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        const normalizedList = list.map((item, idx) => ({
+          fireId: item.fireId || `role-${idx + 1}`,
+          name: getOrderRoleName(item) || `Role ${idx + 1}`,
+          ...item
+        }));
+        setOrderRoles(normalizedList);
+        try {
+          localStorage.setItem('sabi_order_roles', JSON.stringify(normalizedList));
+        } catch (e) {}
+      }
+    }, (err) => console.warn("Firestore order_roles onSnapshot error:", err));
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); unsubLocations(); unsubOrderRoles(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -1480,7 +1625,7 @@ export default function Dashboard() {
       const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
       if (!typeMatch) return sum;
 
-      const roleMatch = curRoleFilter === 'All' || order.role === curRoleFilter;
+      const roleMatch = curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase();
       if (!roleMatch) return sum;
 
       const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
@@ -2285,11 +2430,16 @@ export default function Dashboard() {
       const countMatch = curCountFilter === 'All' || order.count.toString() === curCountFilter;
       const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
       const categoryMatch = activeTab === 'dashboard2' ? order.category === 'product' : order.category !== 'product';
+      const curLocLower = String(curLocationFilter || '').trim().toLowerCase();
+      const rawOrderLoc = String((order as any).location || '').trim().toLowerCase();
+      const orderAddrLower = String((order as any).address || '').toLowerCase();
       const locationMatch = curLocationFilter === 'All' || 
-        (curLocationFilter === 'Chennai' && order.isChennai) ||
-        (curLocationFilter === 'Kerala' && !order.isChennai && (order.location?.toLowerCase() === 'kerala' || order.address?.toLowerCase().includes('kerala'))) ||
-        (curLocationFilter === 'Others' && !order.isChennai && order.location?.toLowerCase() !== 'kerala' && !order.address?.toLowerCase().includes('kerala'));
-      const roleMatch = curRoleFilter === 'All' || order.role === curRoleFilter;
+        (curLocLower === 'chennai' && (order.isChennai || rawOrderLoc === 'chennai' || orderAddrLower.includes('chennai') || orderAddrLower.includes('madras'))) ||
+        (curLocLower === 'kerala' && (!order.isChennai && (rawOrderLoc === 'kerala' || orderAddrLower.includes('kerala') || orderAddrLower.includes('kochi') || orderAddrLower.includes('calicut') || orderAddrLower.includes('trivandrum')))) ||
+        (curLocLower === 'andhra' && (!order.isChennai && (rawOrderLoc === 'andhra' || orderAddrLower.includes('andhra') || orderAddrLower.includes('vijayawada') || orderAddrLower.includes('vizag') || orderAddrLower.includes('visakhapatnam')))) ||
+        (curLocLower === 'others' && (!order.isChennai && (rawOrderLoc === 'others' || (!rawOrderLoc && !order.isChennai && !orderAddrLower.includes('kerala') && !orderAddrLower.includes('andhra') && !orderAddrLower.includes('chennai'))))) ||
+        (rawOrderLoc === curLocLower || (curLocLower !== 'others' && orderAddrLower.includes(curLocLower)));
+      const roleMatch = curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase();
 
       let duplicateMatch = true;
       if (curDuplicateFilter !== 'All') {
@@ -4172,6 +4322,208 @@ export default function Dashboard() {
       }
       toast.success(`Deleted order type "${otName}"!`);
       logActivity(`Deleted Order Type: "${otName}"`, 'Orders');
+    }
+  };
+
+  // --- DYNAMIC LOCATIONS HANDLERS ---
+  const handleAddLocation = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newLocationName.trim();
+    if (!trimmed) return;
+
+    const isDup = locations.some(
+      (loc, idx) => {
+        const locId = getLocationId(loc, idx);
+        const locName = getLocationName(loc);
+        return locId !== editLocationId && locName.toLowerCase() === trimmed.toLowerCase();
+      }
+    );
+    if (isDup) {
+      toast.error(`Location "${trimmed}" already exists!`);
+      return;
+    }
+
+    try {
+      if (editLocationId) {
+        const prev = locations.find((l, idx) => getLocationId(l, idx) === editLocationId);
+        const prevName = getLocationName(prev);
+        if (editLocationId.startsWith('default-') || editLocationId.startsWith('loc-')) {
+          const docRef = await addDoc(collection(db, "locations"), {
+            name: trimmed,
+            createdAt: new Date().toISOString()
+          });
+          const updated = locations.map((l, idx) => getLocationId(l, idx) === editLocationId ? { fireId: docRef.id, name: trimmed } : (typeof l === 'string' ? { fireId: `default-${idx + 1}`, name: l } : l));
+          setLocations(updated);
+          localStorage.setItem('sabi_locations', JSON.stringify(updated));
+        } else {
+          await updateDoc(doc(db, "locations", editLocationId), { name: trimmed });
+          const updated = locations.map((l, idx) => getLocationId(l, idx) === editLocationId ? { ...l, name: trimmed } : (typeof l === 'string' ? { fireId: `default-${idx + 1}`, name: l } : l));
+          setLocations(updated);
+          localStorage.setItem('sabi_locations', JSON.stringify(updated));
+        }
+        toast.success(`Location updated to "${trimmed}"!`);
+        logActivity(`Edited Location: "${prevName || 'Unknown'}" -> "${trimmed}"`, 'Orders');
+        setEditLocationId(null);
+      } else {
+        const docRef = await addDoc(collection(db, "locations"), {
+          name: trimmed,
+          createdAt: new Date().toISOString()
+        });
+        const cleanList = locations.map((l, idx) => typeof l === 'string' ? { fireId: `default-${idx + 1}`, name: l } : l);
+        const updated = [...cleanList, { fireId: docRef.id, name: trimmed }];
+        setLocations(updated);
+        localStorage.setItem('sabi_locations', JSON.stringify(updated));
+        toast.success(`Added Location "${trimmed}"!`);
+        logActivity(`Added Location: "${trimmed}"`, 'Orders');
+      }
+      setNewLocationName("");
+    } catch (err) {
+      console.error("Failed to save location:", err);
+      if (!editLocationId) {
+        const cleanList = locations.map((l, idx) => typeof l === 'string' ? { fireId: `default-${idx + 1}`, name: l } : l);
+        const updated = [...cleanList, { fireId: `local-${Date.now()}`, name: trimmed }];
+        setLocations(updated);
+        localStorage.setItem('sabi_locations', JSON.stringify(updated));
+        toast.success(`Added Location "${trimmed}"!`);
+      }
+      setNewLocationName("");
+    }
+  };
+
+  const handleDeleteLocation = async (locInput: any) => {
+    if (locations.length <= 1) {
+      toast.error("At least one location must remain in the system!");
+      return;
+    }
+    const locName = getLocationName(locInput);
+    const locId = locInput?.fireId || getLocationId(locInput, 0);
+
+    if (window.confirm(`Are you sure you want to delete location "${locName}"?`)) {
+      const updated = locations.filter((item, idx) => {
+        const iName = getLocationName(item);
+        const iId = getLocationId(item, idx);
+        return iName !== locName && iId !== locId;
+      }).map((item, idx) => typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item);
+      setLocations(updated);
+      try {
+        localStorage.setItem('sabi_locations', JSON.stringify(updated));
+      } catch (e) {}
+
+      if (editLocationId === locId || editLocationId === locName) {
+        setEditLocationId(null);
+        setNewLocationName("");
+      }
+
+      if (locId && !locId.startsWith('default-') && !locId.startsWith('local-') && !locId.startsWith('loc-')) {
+        try {
+          await deleteDoc(doc(db, "locations", locId));
+        } catch (err) {
+          console.warn("Firestore delete location note:", err);
+        }
+      }
+      toast.success(`Deleted location "${locName}"!`);
+      logActivity(`Deleted Location: "${locName}"`, 'Orders');
+    }
+  };
+
+  // --- DYNAMIC ROLES HANDLERS ---
+  const handleAddOrderRole = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newOrderRoleName.trim();
+    if (!trimmed) return;
+
+    const isDup = orderRoles.some(
+      (r, idx) => {
+        const rId = getOrderRoleId(r, idx);
+        const rName = getOrderRoleName(r);
+        return rId !== editOrderRoleId && rName.toLowerCase() === trimmed.toLowerCase();
+      }
+    );
+    if (isDup) {
+      toast.error(`Role "${trimmed}" already exists!`);
+      return;
+    }
+
+    try {
+      if (editOrderRoleId) {
+        const prev = orderRoles.find((r, idx) => getOrderRoleId(r, idx) === editOrderRoleId);
+        const prevName = getOrderRoleName(prev);
+        if (editOrderRoleId.startsWith('default-') || editOrderRoleId.startsWith('role-')) {
+          const docRef = await addDoc(collection(db, "order_roles"), {
+            name: trimmed,
+            createdAt: new Date().toISOString()
+          });
+          const updated = orderRoles.map((r, idx) => getOrderRoleId(r, idx) === editOrderRoleId ? { fireId: docRef.id, name: trimmed } : (typeof r === 'string' ? { fireId: `default-${idx + 1}`, name: r } : r));
+          setOrderRoles(updated);
+          localStorage.setItem('sabi_order_roles', JSON.stringify(updated));
+        } else {
+          await updateDoc(doc(db, "order_roles", editOrderRoleId), { name: trimmed });
+          const updated = orderRoles.map((r, idx) => getOrderRoleId(r, idx) === editOrderRoleId ? { ...r, name: trimmed } : (typeof r === 'string' ? { fireId: `default-${idx + 1}`, name: r } : r));
+          setOrderRoles(updated);
+          localStorage.setItem('sabi_order_roles', JSON.stringify(updated));
+        }
+        toast.success(`Role updated to "${trimmed}"!`);
+        logActivity(`Edited Role: "${prevName || 'Unknown'}" -> "${trimmed}"`, 'Orders');
+        setEditOrderRoleId(null);
+      } else {
+        const docRef = await addDoc(collection(db, "order_roles"), {
+          name: trimmed,
+          createdAt: new Date().toISOString()
+        });
+        const cleanList = orderRoles.map((r, idx) => typeof r === 'string' ? { fireId: `default-${idx + 1}`, name: r } : r);
+        const updated = [...cleanList, { fireId: docRef.id, name: trimmed }];
+        setOrderRoles(updated);
+        localStorage.setItem('sabi_order_roles', JSON.stringify(updated));
+        toast.success(`Added Role "${trimmed}"!`);
+        logActivity(`Added Role: "${trimmed}"`, 'Orders');
+      }
+      setNewOrderRoleName("");
+    } catch (err) {
+      console.error("Failed to save role:", err);
+      if (!editOrderRoleId) {
+        const cleanList = orderRoles.map((r, idx) => typeof r === 'string' ? { fireId: `default-${idx + 1}`, name: r } : r);
+        const updated = [...cleanList, { fireId: `local-${Date.now()}`, name: trimmed }];
+        setOrderRoles(updated);
+        localStorage.setItem('sabi_order_roles', JSON.stringify(updated));
+        toast.success(`Added Role "${trimmed}"!`);
+      }
+      setNewOrderRoleName("");
+    }
+  };
+
+  const handleDeleteOrderRole = async (roleInput: any) => {
+    if (orderRoles.length <= 1) {
+      toast.error("At least one role must remain in the system!");
+      return;
+    }
+    const rName = getOrderRoleName(roleInput);
+    const rId = roleInput?.fireId || getOrderRoleId(roleInput, 0);
+
+    if (window.confirm(`Are you sure you want to delete role "${rName}"?`)) {
+      const updated = orderRoles.filter((item, idx) => {
+        const iName = getOrderRoleName(item);
+        const iId = getOrderRoleId(item, idx);
+        return iName !== rName && iId !== rId;
+      }).map((item, idx) => typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item);
+      setOrderRoles(updated);
+      try {
+        localStorage.setItem('sabi_order_roles', JSON.stringify(updated));
+      } catch (e) {}
+
+      if (editOrderRoleId === rId || editOrderRoleId === rName) {
+        setEditOrderRoleId(null);
+        setNewOrderRoleName("");
+      }
+
+      if (rId && !rId.startsWith('default-') && !rId.startsWith('local-') && !rId.startsWith('role-')) {
+        try {
+          await deleteDoc(doc(db, "order_roles", rId));
+        } catch (err) {
+          console.warn("Firestore delete role note:", err);
+        }
+      }
+      toast.success(`Deleted role "${rName}"!`);
+      logActivity(`Deleted Role: "${rName}"`, 'Orders');
     }
   };
 
@@ -6855,9 +7207,15 @@ export default function Dashboard() {
                             title="Filter by Location"
                           >
                             <option value="All">All Locations</option>
-                            <option value="Chennai">Chennai</option>
-                            <option value="Kerala">Kerala</option>
-                            <option value="Others">Others</option>
+                            {locations.map((loc, idx) => {
+                              const name = getLocationName(loc);
+                              const id = getLocationId(loc, idx);
+                              return (
+                                <option key={id} value={name}>
+                                  {name}
+                                </option>
+                              );
+                            })}
                           </select>
                           <MapPin size={12} strokeWidth={3} className="absolute left-2.5 top-2.5 text-amber-700 pointer-events-none" />
                           <ChevronDown size={12} className="absolute right-2 top-2.5 text-amber-700 pointer-events-none" />
@@ -6900,8 +7258,15 @@ export default function Dashboard() {
                             title="Filter by Role"
                           >
                             <option value="All">All Roles</option>
-                            <option value="Self">Self</option>
-                            <option value="Others">Others</option>
+                            {orderRoles.map((r, idx) => {
+                              const name = getOrderRoleName(r);
+                              const id = getOrderRoleId(r, idx);
+                              return (
+                                <option key={id} value={name}>
+                                  {name}
+                                </option>
+                              );
+                            })}
                           </select>
                           <User size={14} strokeWidth={2.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
                           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
@@ -7395,8 +7760,15 @@ export default function Dashboard() {
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                   >
                                     <option value="All">All</option>
-                                    <option value="Others">Others</option>
-                                    <option value="Self">Self</option>
+                                    {orderRoles.map((r, idx) => {
+                                      const name = getOrderRoleName(r);
+                                      const id = getOrderRoleId(r, idx);
+                                      return (
+                                        <option key={id} value={name}>
+                                          {name}
+                                        </option>
+                                      );
+                                    })}
                                   </select>
                                 </div>
                               </div>
@@ -7692,7 +8064,7 @@ export default function Dashboard() {
                                   : priceData.fullTotalPrice;
                               return (
                                 <tr key={order.fireId || order.id} className={`border-b border-white/10 ${idx % 2 === 0 ? 'bg-[#0d1527]' : 'bg-[#121c33]'}`}>
-                                  <td className="py-2.5 pl-5 pr-2 font-extrabold text-amber-300 text-xs align-middle w-[220px] min-w-[220px] whitespace-nowrap">{order.name}</td>
+                                  <td className={`py-2.5 pl-5 pr-2 font-extrabold text-xs align-middle w-[220px] min-w-[220px] whitespace-nowrap ${isThaaruOrder(order.orderType) ? 'text-[#38bdf8] order-name-thaaru font-black' : isChocoWrapzOrder(order.orderType) ? 'text-[#f43f5e] order-name-chocowrapz font-black' : 'text-amber-300'}`}>{order.name}</td>
                                   <td className="py-2.5 px-2 font-bold text-white text-xs align-middle w-[120px] min-w-[120px] whitespace-nowrap">{order.deliveryDate || order.functionDate || order.orderDate || "-"}</td>
                                   <td className="py-2.5 px-2 align-middle text-center w-[240px] min-w-[240px] text-xs">{renderChocolateBadges(order.chocolate)}</td>
                                   <td className="py-2.5 px-2 text-center font-bold text-amber-200 text-xs align-middle w-[80px] min-w-[80px]">{order.count}</td>
@@ -7729,17 +8101,27 @@ export default function Dashboard() {
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const nextRole = order.role === 'Others' ? 'Self' : 'Others';
+                                          const roleNames = orderRoles.map(r => getOrderRoleName(r));
+                                          const currentIdx = roleNames.findIndex(n => n.toLowerCase() === String(order.role || '').toLowerCase());
+                                          const nextRole = currentIdx !== -1 && roleNames.length > 0
+                                            ? roleNames[(currentIdx + 1) % roleNames.length]
+                                            : (order.role === 'Others' ? 'Self' : 'Others');
                                           handleRoleUpdate(order.id, order.fireId, nextRole);
                                         }}
-                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${(order.role === 'Others') ? 'bg-green-500' : 'bg-rose-500'}`}
-                                        title={`Click to change to ${order.role === 'Others' ? 'Self' : 'Others'}`}
+                                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                          order.role === 'Others' ? 'bg-green-500' : order.role === 'Self' ? 'bg-rose-500' : 'bg-amber-500'
+                                        }`}
+                                        title={`Click to cycle role (current: ${order.role})`}
                                       >
                                         <span
-                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(order.role === 'Others') ? 'translate-x-3' : 'translate-x-0'}`}
+                                          className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                            order.role === 'Others' ? 'translate-x-3' : 'translate-x-0'
+                                          }`}
                                         />
                                       </button>
-                                      <span className={`text-[10px] font-black uppercase tracking-wider ${(order.role === 'Others') ? 'text-green-600' : 'text-rose-600'}`}>
+                                      <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                        order.role === 'Others' ? 'text-green-600' : order.role === 'Self' ? 'text-rose-600' : 'text-amber-500'
+                                      }`}>
                                         {order.role}
                                       </span>
                                     </div>
@@ -7751,8 +8133,8 @@ export default function Dashboard() {
                                   </td>
                                 )}
 
-                                <td className={`py-2.5 px-4 font-bold align-middle ${isScreenshotMode ? 'text-white font-extrabold text-sm min-w-[200px]' : order.orderType === 'Thaaru' ? 'font-extrabold print:text-black' : 'text-amber-950 print:text-black'}`}>
-                                  <span className={order.orderType === 'Thaaru' ? 'text-[#38bdf8] font-black' : ''} title={order.orderType === 'Thaaru' ? 'Thaaru Order' : ''}>{order.name}</span>
+                                <td className={`py-2.5 px-4 font-bold align-middle ${isScreenshotMode ? 'text-white font-extrabold text-sm min-w-[200px]' : (isThaaruOrder(order.orderType) || isChocoWrapzOrder(order.orderType)) ? 'font-extrabold print:text-black' : 'text-amber-950 print:text-black'}`}>
+                                  <span className={isThaaruOrder(order.orderType) ? 'text-[#38bdf8] order-name-thaaru font-black' : isChocoWrapzOrder(order.orderType) ? 'text-[#f43f5e] order-name-chocowrapz font-black' : ''} title={isThaaruOrder(order.orderType) ? 'Thaaru Order' : isChocoWrapzOrder(order.orderType) ? 'Choco Wrapz Order' : ''}>{order.name}</span>
                                 </td>
 
                                 {!isScreenshotMode && (
@@ -7770,6 +8152,10 @@ export default function Dashboard() {
 
                                       if (rawLoc.toLowerCase() === 'kerala' || lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
                                         return <span className="font-extrabold text-purple-400">Kerala</span>;
+                                      }
+
+                                      if (rawLoc.toLowerCase() === 'andhra' || lower.includes('andhra') || lower.includes('vijayawada') || lower.includes('visakhapatnam') || lower.includes('vizag') || lower.includes('tirupati') || lower.includes('guntur')) {
+                                        return <span className="font-extrabold text-amber-400">Andhra</span>;
                                       }
 
                                       const knownCities = [
@@ -7975,6 +8361,9 @@ export default function Dashboard() {
                                            }
                                            if (lower.includes('kerala') || lower.includes('kochi') || lower.includes('trivandrum') || lower.includes('ernakulam') || lower.includes('calicut')) {
                                              return <span className="screenshot-location-text screenshot-location-kerala font-bold">Kerala</span>;
+                                           }
+                                           if (lower.includes('andhra') || lower.includes('vijayawada') || lower.includes('visakhapatnam') || lower.includes('vizag') || lower.includes('tirupati') || lower.includes('guntur')) {
+                                             return <span className="screenshot-location-text screenshot-location-andhra font-bold">Andhra</span>;
                                            }
 
                                            const knownCities = [
@@ -9384,17 +9773,46 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Roles Dropdown (Replaces Address Section per user request) */}
                   <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">Address (Optional)</label>
-                    <textarea
-                      name="address"
-                      value={formData.address}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-200">Role</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditOrderRoleId(null);
+                          setNewOrderRoleName("");
+                          setIsRoleManagerOpen(true);
+                        }}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 font-black flex items-center gap-1 cursor-pointer transition-colors bg-amber-400/10 hover:bg-amber-400/20 px-2 py-0.5 rounded-lg border border-amber-400/30"
+                        title="Add or Edit Roles"
+                      >
+                        <Pencil size={10} />
+                        <span>+ Add / Edit Roles</span>
+                      </button>
+                    </div>
+                    <select
+                      name="role"
+                      value={formData.role || "Others"}
                       onChange={handleInputChange}
                       style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                      className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner resize-none transition-colors"
-                      placeholder="Enter delivery address..."
-                      rows={2}
-                    />
+                      className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer uppercase tracking-wider"
+                    >
+                      {formData.role && !orderRoles.some((r, idx) => getOrderRoleName(r) === formData.role) && (
+                        <option value={formData.role} className="bg-[#0f172a] text-white">
+                          {formData.role}
+                        </option>
+                      )}
+                      {orderRoles.map((r, idx) => {
+                        const name = getOrderRoleName(r);
+                        const id = getOrderRoleId(r, idx);
+                        return (
+                          <option key={id} value={name} className="bg-[#0f172a] text-white">
+                            {name}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
                 </div>
 
@@ -9608,9 +10026,24 @@ export default function Dashboard() {
                     <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">
                       Delivery Charge (₹)
                     </label>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">
-                      Location
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">
+                        Location
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditLocationId(null);
+                          setNewLocationName("");
+                          setIsLocationManagerOpen(true);
+                        }}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 font-black flex items-center gap-1 cursor-pointer transition-colors bg-amber-400/10 hover:bg-amber-400/20 px-2 py-0.5 rounded-lg border border-amber-400/30"
+                        title="Add or Edit Locations"
+                      >
+                        <Pencil size={10} />
+                        <span>+ Edit</span>
+                      </button>
+                    </div>
                     <div>
                       <input
                         type="number"
@@ -9628,8 +10061,8 @@ export default function Dashboard() {
                         value={(formData as any).location || (formData.isChennai ? "Chennai" : "Others")}
                         onChange={(e) => {
                           const val = e.target.value;
-                          const isC = val === "Chennai";
-                          const isK = val === "Kerala";
+                          const isC = val.toLowerCase() === "chennai";
+                          const isK = val.toLowerCase() === "kerala";
                           const newFormData = { ...formData, isChennai: isC, location: val } as any;
                           const priceData = calculatePriceInfo(
                             newFormData.chocolate,
@@ -9660,9 +10093,20 @@ export default function Dashboard() {
                         style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                         className="w-full h-[42px] font-bold rounded-xl px-3 text-white text-xs uppercase tracking-wider outline-none focus:border-amber-400 cursor-pointer shadow-inner"
                       >
-                        <option value="Chennai" className="bg-[#0f172a] text-white">Chennai</option>
-                        <option value="Kerala" className="bg-[#0f172a] text-white">Kerala</option>
-                        <option value="Others" className="bg-[#0f172a] text-white">Others</option>
+                        {formData.location && !locations.some((l, idx) => getLocationName(l) === formData.location) && (
+                          <option value={formData.location} className="bg-[#0f172a] text-white">
+                            {formData.location}
+                          </option>
+                        )}
+                        {locations.map((loc, idx) => {
+                          const name = getLocationName(loc);
+                          const id = getLocationId(loc, idx);
+                          return (
+                            <option key={id} value={name} className="bg-[#0f172a] text-white">
+                              {name}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -11055,6 +11499,16 @@ export default function Dashboard() {
                       <TrendingUp size={24} className="text-amber-400" />
                       <span>Chocolate Master Analytics</span>
                     </>
+                  ) : analyticsActiveTab === 'locations' ? (
+                    <>
+                      <MapPin size={24} className="text-amber-400" />
+                      <span>Locations Management</span>
+                    </>
+                  ) : analyticsActiveTab === 'roles' ? (
+                    <>
+                      <User size={24} className="text-amber-400" />
+                      <span>Roles Management</span>
+                    </>
                   ) : (
                     <>
                       <Tag size={24} className="text-amber-400" />
@@ -11064,15 +11518,19 @@ export default function Dashboard() {
                 </h2>
 
                 {/* Sub-Tabs Switcher */}
-                <div className="flex bg-[#090e1a] p-1 rounded-xl border border-white/10 shadow-inner">
+                <div className="flex flex-wrap bg-[#090e1a] p-1 rounded-xl border border-white/10 shadow-inner gap-1">
                   <button
                     type="button"
                     onClick={() => {
                       setAnalyticsActiveTab('order_types');
                       setEditChocId(null);
                       setNewChocForm({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
+                      setEditLocationId(null);
+                      setNewLocationName("");
+                      setEditOrderRoleId(null);
+                      setNewOrderRoleName("");
                     }}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                       analyticsActiveTab === 'order_types'
                         ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
                         : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -11091,8 +11549,12 @@ export default function Dashboard() {
                       setAnalyticsActiveTab('chocolates');
                       setEditOrderTypeId(null);
                       setNewOrderTypeName("");
+                      setEditLocationId(null);
+                      setNewLocationName("");
+                      setEditOrderRoleId(null);
+                      setNewOrderRoleName("");
                     }}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                       analyticsActiveTab === 'chocolates'
                         ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
                         : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -11101,6 +11563,52 @@ export default function Dashboard() {
                     <span>🍫 Chocolates</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'chocolates' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
                       {managedChocolates.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnalyticsActiveTab('locations');
+                      setEditOrderTypeId(null);
+                      setNewOrderTypeName("");
+                      setEditChocId(null);
+                      setEditOrderRoleId(null);
+                      setNewOrderRoleName("");
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      analyticsActiveTab === 'locations'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <MapPin size={14} />
+                    <span>Locations</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'locations' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
+                      {locations.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnalyticsActiveTab('roles');
+                      setEditOrderTypeId(null);
+                      setNewOrderTypeName("");
+                      setEditChocId(null);
+                      setEditLocationId(null);
+                      setNewLocationName("");
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      analyticsActiveTab === 'roles'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <User size={14} />
+                    <span>Roles</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'roles' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
+                      {orderRoles.length}
                     </span>
                   </button>
                 </div>
@@ -11470,6 +11978,626 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* TAB 3: LOCATIONS MANAGEMENT */}
+            {analyticsActiveTab === 'locations' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-y-auto custom-scrollbar p-0.5">
+                {/* Left Form Panel: Add / Edit Location */}
+                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-5 h-fit bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl text-white">
+                  <div>
+                    <div className="flex items-center gap-2.5 pb-3 border-b border-white/10 mb-4">
+                      <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center font-black border border-amber-400/30">
+                        {editLocationId ? <Pencil size={16} /> : <Plus size={16} />}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-amber-400 uppercase tracking-wider">
+                          {editLocationId ? 'Edit Location' : 'Add New Location'}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium">Create and customize delivery locations</p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleAddLocation} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>Location Name</span>
+                          {editLocationId && <span className="text-amber-400 text-[10px] font-bold">Editing active item</span>}
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={newLocationName}
+                          onChange={(e) => setNewLocationName(e.target.value)}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3.5 outline-none border border-white/20 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
+                          placeholder="e.g. Andhra, Coimbatore, Bangalore, Madurai..."
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs sm:text-sm"
+                      >
+                        {editLocationId ? <CheckCircle2 size={18} /> : <Plus size={18} />}
+                        <span>{editLocationId ? 'Update Location' : 'Add Location'}</span>
+                      </button>
+
+                      {editLocationId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditLocationId(null);
+                            setNewLocationName("");
+                          }}
+                          className="w-full py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl font-bold text-xs cursor-pointer transition-colors"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </form>
+                  </div>
+                </div>
+
+                {/* Right Panel: Active Locations List */}
+                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-7 bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl flex flex-col justify-between text-white overflow-hidden">
+                  <div className="flex-1 flex flex-col">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-white/10 mb-4">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={18} className="text-amber-400" />
+                        <h3 className="text-base font-black text-amber-400 uppercase tracking-wider">
+                          Active Locations
+                        </h3>
+                        <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-black px-2 py-0.5 rounded-full">
+                          {locations.length}
+                        </span>
+                      </div>
+                      <span className="text-xs font-black text-slate-300 bg-[#090e1a] px-3 py-1 rounded-xl border border-white/10">
+                        Total Orders: <strong className="text-amber-400 font-mono font-black">{orders.length}</strong>
+                      </span>
+                    </div>
+
+                    {/* Locations Cards List */}
+                    <div className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-[330px] pr-1 flex-1">
+                      {locations.length === 0 ? (
+                        <div className="p-8 text-center bg-[#090e1a]/50 rounded-2xl border border-dashed border-white/10 my-auto">
+                          <MapPin size={36} className="text-amber-400 mx-auto mb-2 opacity-60" />
+                          <p className="text-slate-200 font-extrabold text-sm">No custom locations found.</p>
+                          <p className="text-slate-400 text-xs mt-1">Use the form on the left to add delivery locations like Chennai, Kerala, Andhra, etc.</p>
+                        </div>
+                      ) : (
+                        locations.map((loc, idx) => {
+                          const locName = getLocationName(loc) || `Location ${idx + 1}`;
+                          const locId = getLocationId(loc, idx);
+                          const countForLoc = orders.filter((o: any) => {
+                            const val = String(o?.location || '').trim().toLowerCase();
+                            return val === locName.toLowerCase();
+                          }).length;
+                          const sharePct = orders.length > 0 ? Math.round((countForLoc / orders.length) * 100) : 0;
+                          const isBeingEdited = editLocationId === locId || editLocationId === locName;
+
+                          return (
+                            <div
+                              key={locId}
+                              className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 group shadow-md ${
+                                isBeingEdited
+                                  ? 'bg-[#18233a] border-amber-400 ring-2 ring-amber-400/30'
+                                  : 'bg-[#0f172a] hover:bg-[#162238] border-white/10 hover:border-amber-400/40'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
+                                  isBeingEdited ? 'bg-amber-400 text-black font-black' : 'bg-amber-500/15 border border-amber-500/30 text-amber-400'
+                                }`}>
+                                  <MapPin size={18} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-black text-white text-sm sm:text-base truncate">{locName}</p>
+                                    {isBeingEdited && (
+                                      <span className="text-[9px] bg-amber-400 text-black px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                        Editing
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-black">
+                                      {countForLoc} {countForLoc === 1 ? 'Order' : 'Orders'}
+                                    </span>
+                                    {orders.length > 0 && (
+                                      <span className="text-[10px] text-slate-400 font-bold">
+                                        • {sharePct}% share
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  title={`Edit "${locName}"`}
+                                  onClick={() => {
+                                    setEditLocationId(locId);
+                                    setNewLocationName(locName);
+                                  }}
+                                  className="p-2 text-blue-400 hover:text-white hover:bg-blue-600/80 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title={`Delete "${locName}"`}
+                                  onClick={() => handleDeleteLocation(loc)}
+                                  className="p-2 text-rose-400 hover:text-white hover:bg-rose-600/80 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Panel Footer Status */}
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                    <span>Configured Locations: <strong className="text-white">{locations.length}</strong></span>
+                    <span>Status: <strong className="text-emerald-400">Synced to Cloud</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: ROLES MANAGEMENT */}
+            {analyticsActiveTab === 'roles' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-y-auto custom-scrollbar p-0.5">
+                {/* Left Form Panel: Add / Edit Role */}
+                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-5 h-fit bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl text-white">
+                  <div>
+                    <div className="flex items-center gap-2.5 pb-3 border-b border-white/10 mb-4">
+                      <div className="w-8 h-8 rounded-xl bg-rose-400/20 text-rose-400 flex items-center justify-center font-black border border-rose-400/30">
+                        {editOrderRoleId ? <Pencil size={16} /> : <Plus size={16} />}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-rose-400 uppercase tracking-wider">
+                          {editOrderRoleId ? 'Edit Role' : 'Add New Role'}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium">Create and customize order roles (Self, Others, etc.)</p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleAddOrderRole} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                          <span>Role Name</span>
+                          {editOrderRoleId && <span className="text-rose-400 text-[10px] font-bold">Editing active item</span>}
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={newOrderRoleName}
+                          onChange={(e) => setNewOrderRoleName(e.target.value)}
+                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                          className="w-full font-bold rounded-xl p-3.5 outline-none border border-white/20 focus:border-rose-400 focus:ring-2 focus:ring-rose-400/20 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
+                          placeholder="e.g. Self, Others, Wholesale, Reseller..."
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3.5 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs sm:text-sm"
+                      >
+                        {editOrderRoleId ? <CheckCircle2 size={18} /> : <Plus size={18} />}
+                        <span>{editOrderRoleId ? 'Update Role' : 'Add Role'}</span>
+                      </button>
+
+                      {editOrderRoleId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditOrderRoleId(null);
+                            setNewOrderRoleName("");
+                          }}
+                          className="w-full py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl font-bold text-xs cursor-pointer transition-colors"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </form>
+                  </div>
+                </div>
+
+                {/* Right Panel: Active Roles List */}
+                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-7 bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl flex flex-col justify-between text-white overflow-hidden">
+                  <div className="flex-1 flex flex-col">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-white/10 mb-4">
+                      <div className="flex items-center gap-2">
+                        <User size={18} className="text-rose-400" />
+                        <h3 className="text-base font-black text-rose-400 uppercase tracking-wider">
+                          Active Order Roles
+                        </h3>
+                        <span className="bg-rose-400/20 text-rose-300 border border-rose-400/30 text-[11px] font-black px-2 py-0.5 rounded-full">
+                          {orderRoles.length}
+                        </span>
+                      </div>
+                      <span className="text-xs font-black text-slate-300 bg-[#090e1a] px-3 py-1 rounded-xl border border-white/10">
+                        Total Orders: <strong className="text-amber-400 font-mono font-black">{orders.length}</strong>
+                      </span>
+                    </div>
+
+                    {/* Roles Cards List */}
+                    <div className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-[330px] pr-1 flex-1">
+                      {orderRoles.length === 0 ? (
+                        <div className="p-8 text-center bg-[#090e1a]/50 rounded-2xl border border-dashed border-white/10 my-auto">
+                          <User size={36} className="text-rose-400 mx-auto mb-2 opacity-60" />
+                          <p className="text-slate-200 font-extrabold text-sm">No custom roles found.</p>
+                          <p className="text-slate-400 text-xs mt-1">Use the form on the left to add roles like Self, Others, etc.</p>
+                        </div>
+                      ) : (
+                        orderRoles.map((r, idx) => {
+                          const rName = getOrderRoleName(r) || `Role ${idx + 1}`;
+                          const rId = getOrderRoleId(r, idx);
+                          const countForRole = orders.filter((o: any) => {
+                            const val = String(o?.role || '').trim().toLowerCase();
+                            return val === rName.toLowerCase();
+                          }).length;
+                          const sharePct = orders.length > 0 ? Math.round((countForRole / orders.length) * 100) : 0;
+                          const isBeingEdited = editOrderRoleId === rId || editOrderRoleId === rName;
+
+                          return (
+                            <div
+                              key={rId}
+                              className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 group shadow-md ${
+                                isBeingEdited
+                                  ? 'bg-[#18233a] border-rose-400 ring-2 ring-rose-400/30'
+                                  : 'bg-[#0f172a] hover:bg-[#162238] border-white/10 hover:border-rose-400/40'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
+                                  isBeingEdited ? 'bg-rose-500 text-white font-black' : 'bg-rose-500/15 border border-rose-500/30 text-rose-400'
+                                }`}>
+                                  <User size={18} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-black text-white text-sm sm:text-base truncate">{rName}</p>
+                                    {isBeingEdited && (
+                                      <span className="text-[9px] bg-rose-500 text-white px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                        Editing
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-black">
+                                      {countForRole} {countForRole === 1 ? 'Order' : 'Orders'}
+                                    </span>
+                                    {orders.length > 0 && (
+                                      <span className="text-[10px] text-slate-400 font-bold">
+                                        • {sharePct}% share
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  title={`Edit "${rName}"`}
+                                  onClick={() => {
+                                    setEditOrderRoleId(rId);
+                                    setNewOrderRoleName(rName);
+                                  }}
+                                  className="p-2 text-blue-400 hover:text-white hover:bg-blue-600/80 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title={`Delete "${rName}"`}
+                                  onClick={() => handleDeleteOrderRole(r)}
+                                  className="p-2 text-rose-400 hover:text-white hover:bg-rose-600/80 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Panel Footer Status */}
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                    <span>Configured Roles: <strong className="text-white">{orderRoles.length}</strong></span>
+                    <span>Status: <strong className="text-emerald-400">Synced to Cloud</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 📍 QUICK LOCATION MANAGER MODAL */}
+      {isLocationManagerOpen && (
+        <div
+          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => {
+            setIsLocationManagerOpen(false);
+            setEditLocationId(null);
+            setNewLocationName("");
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-[#111a2e] border border-white/20 rounded-3xl shadow-2xl p-6 text-white overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center font-black border border-amber-400/30">
+                  <MapPin size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-amber-400 uppercase tracking-wider">
+                    {editLocationId ? 'Edit Location' : 'Manage Locations'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Add, rename or remove delivery locations</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLocationManagerOpen(false);
+                  setEditLocationId(null);
+                  setNewLocationName("");
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Add / Edit Form */}
+            <form onSubmit={handleAddLocation} className="space-y-3 mb-5">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Location Name</span>
+                  {editLocationId && <span className="text-amber-400 text-[10px] font-bold">Editing</span>}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    required
+                    type="text"
+                    value={newLocationName}
+                    onChange={(e) => setNewLocationName(e.target.value)}
+                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                    className="flex-1 font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
+                    placeholder="e.g. Andhra, Bangalore, Coimbatore..."
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 text-xs shrink-0"
+                  >
+                    {editLocationId ? <CheckCircle2 size={16} /> : <Plus size={16} />}
+                    <span>{editLocationId ? 'Save' : 'Add'}</span>
+                  </button>
+                </div>
+              </div>
+              {editLocationId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditLocationId(null);
+                    setNewLocationName("");
+                  }}
+                  className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                >
+                  Cancel editing
+                </button>
+              )}
+            </form>
+
+            {/* Locations List */}
+            <div className="space-y-2 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                Active Locations ({locations.length})
+              </label>
+              {locations.map((loc, idx) => {
+                const locName = getLocationName(loc);
+                const locId = getLocationId(loc, idx);
+                const isBeingEdited = editLocationId === locId;
+                const count = orders.filter((o: any) => {
+                  const l = String(o.location || '').toLowerCase();
+                  return l === locName.toLowerCase();
+                }).length;
+
+                return (
+                  <div
+                    key={locId}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                      isBeingEdited
+                        ? 'bg-amber-500/20 border-amber-400'
+                        : 'bg-[#162035] border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MapPin size={14} className="text-amber-400 shrink-0" />
+                      <span className="font-bold text-sm text-white truncate">{locName}</span>
+                      <span className="text-[10px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                        {count} {count === 1 ? 'order' : 'orders'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditLocationId(locId);
+                          setNewLocationName(locName);
+                        }}
+                        className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-600/60 rounded-lg transition-colors cursor-pointer"
+                        title={`Rename "${locName}"`}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteLocation(loc)}
+                        className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600/60 rounded-lg transition-colors cursor-pointer"
+                        title={`Delete "${locName}"`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👥 QUICK ROLE MANAGER MODAL */}
+      {isRoleManagerOpen && (
+        <div
+          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => {
+            setIsRoleManagerOpen(false);
+            setEditOrderRoleId(null);
+            setNewOrderRoleName("");
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-[#111a2e] border border-white/20 rounded-3xl shadow-2xl p-6 text-white overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-rose-400/20 text-rose-400 flex items-center justify-center font-black border border-rose-400/30">
+                  <User size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-rose-400 uppercase tracking-wider">
+                    {editOrderRoleId ? 'Edit Role' : 'Manage Order Roles'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Add, rename or remove order roles (Self, Others, etc.)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRoleManagerOpen(false);
+                  setEditOrderRoleId(null);
+                  setNewOrderRoleName("");
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Add / Edit Form */}
+            <form onSubmit={handleAddOrderRole} className="space-y-3 mb-5">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Role Name</span>
+                  {editOrderRoleId && <span className="text-rose-400 text-[10px] font-bold">Editing</span>}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    required
+                    type="text"
+                    value={newOrderRoleName}
+                    onChange={(e) => setNewOrderRoleName(e.target.value)}
+                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                    className="flex-1 font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-rose-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
+                    placeholder="e.g. Self, Others, Reseller, Wholesale..."
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-3 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 text-xs shrink-0"
+                  >
+                    {editOrderRoleId ? <CheckCircle2 size={16} /> : <Plus size={16} />}
+                    <span>{editOrderRoleId ? 'Save' : 'Add'}</span>
+                  </button>
+                </div>
+              </div>
+              {editOrderRoleId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditOrderRoleId(null);
+                    setNewOrderRoleName("");
+                  }}
+                  className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                >
+                  Cancel editing
+                </button>
+              )}
+            </form>
+
+            {/* Roles List */}
+            <div className="space-y-2 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                Active Roles ({orderRoles.length})
+              </label>
+              {orderRoles.map((r, idx) => {
+                const rName = getOrderRoleName(r);
+                const rId = getOrderRoleId(r, idx);
+                const isBeingEdited = editOrderRoleId === rId;
+                const count = orders.filter((o: any) => {
+                  const roleVal = String(o.role || '').toLowerCase();
+                  return roleVal === rName.toLowerCase();
+                }).length;
+
+                return (
+                  <div
+                    key={rId}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                      isBeingEdited
+                        ? 'bg-rose-500/20 border-rose-400'
+                        : 'bg-[#162035] border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <User size={14} className="text-rose-400 shrink-0" />
+                      <span className="font-bold text-sm text-white truncate">{rName}</span>
+                      <span className="text-[10px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                        {count} {count === 1 ? 'order' : 'orders'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditOrderRoleId(rId);
+                          setNewOrderRoleName(rName);
+                        }}
+                        className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-600/60 rounded-lg transition-colors cursor-pointer"
+                        title={`Rename "${rName}"`}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOrderRole(r)}
+                        className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600/60 rounded-lg transition-colors cursor-pointer"
+                        title={`Delete "${rName}"`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
