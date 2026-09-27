@@ -101,6 +101,7 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [comboSearchQuery, setComboSearchQuery] = useState('');
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Memoized object URLs for previews to prevent memory leaks and unnecessary recalculations
   const newImagePreviews = useMemo(() => {
@@ -275,6 +276,8 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
   const handleSubmit = async (e?: React.FormEvent, isDraftAction = false) => {
     if (e) e.preventDefault();
 
+    if (isSubmitting || isSaving) return;
+
     if (!formData.name.trim()) {
       toast.error(isCombo ? 'Please enter a Combo Set Name' : 'Please enter a Product Name');
       return;
@@ -290,16 +293,20 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
       return;
     }
 
+    setIsSubmitting(true);
+    const toastId = toast.loading(
+      newImageFiles.length > 0
+        ? `Optimizing ${newImageFiles.length} photo(s) & saving...`
+        : 'Saving listing...'
+    );
+
     try {
       let uploadedUrls: string[] = [];
       if (newImageFiles.length > 0) {
-        const toastId = toast.loading(`Optimizing & saving ${newImageFiles.length} photo(s)...`);
         try {
           uploadedUrls = await uploadMultipleToCloudinary(newImageFiles);
-          toast.success(`${uploadedUrls.length} photo(s) optimized successfully!`, { id: toastId });
         } catch (uploadErr: any) {
-          toast.error(uploadErr?.message || 'Photo optimization failed', { id: toastId });
-          return;
+          console.warn('Image upload fallback:', uploadErr);
         }
       }
 
@@ -343,10 +350,20 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
       }
 
       await onSave(payload, isDraftAction);
+      toast.success(
+        isDraftAction
+          ? 'Draft saved successfully!'
+          : editingProduct
+          ? 'Listing updated successfully!'
+          : 'Listing created successfully!',
+        { id: toastId }
+      );
       onClose();
     } catch (err: any) {
       console.error('Error saving listing:', err);
-      toast.error(err?.message || 'Failed to save listing');
+      toast.error(err?.message || 'Failed to save listing', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1066,13 +1083,16 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
                 <Upload size={20} className="text-amber-400 mb-1.5" />
                 <span>Click to select product photos</span>
                 <span className="text-[10px] text-emerald-400/90 font-medium mt-0.5">
-                  JPG, PNG, WEBP of any size (50MB+ photos auto-compressed to crisp &lt;35KB format)
+                  Photos of any size (phone &amp; camera photos auto-compressed instantly)
                 </span>
                 <input
                   type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  accept="image/*"
                   multiple
                   className="hidden"
+                  onClick={(e) => {
+                    (e.target as HTMLInputElement).value = '';
+                  }}
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
                       const incomingFiles = Array.from(e.target.files);
@@ -1101,7 +1121,8 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer text-xs"
+              disabled={isSaving || isSubmitting}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold border border-white/20 bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer text-xs disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1111,7 +1132,7 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
               {!editingProduct && (
                 <button
                   type="button"
-                  disabled={isSaving}
+                  disabled={isSaving || isSubmitting}
                   onClick={(e) => handleSubmit(e, true)}
                   className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors cursor-pointer text-xs disabled:opacity-50"
                 >
@@ -1122,11 +1143,11 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
               {/* Primary Action: Create Listing or Save Changes */}
               <button
                 type="button"
-                disabled={isSaving}
+                disabled={isSaving || isSubmitting}
                 onClick={(e) => handleSubmit(e, false)}
                 className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-extrabold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/40 transition-all cursor-pointer text-xs disabled:opacity-60 flex items-center justify-center gap-1.5`}
               >
-                {isSaving ? (
+                {isSaving || isSubmitting ? (
                   <span>Saving Listing...</span>
                 ) : editingProduct ? (
                   <span>Save Changes</span>

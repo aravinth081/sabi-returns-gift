@@ -1,7 +1,6 @@
 // src/firebase.js
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
 // Firebase configuration
 export const firebaseConfig = {
@@ -18,6 +17,3 @@ export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfi
 
 // Singleton Firestore instance
 export const db = getFirestore(app);
-
-// Singleton Storage instance
-export const storage = getStorage(app);
