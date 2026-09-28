@@ -18,8 +18,8 @@ import { getNextSequentialOrderId } from "@/lib/concurrency";
 // -----------------------------------------------
 
 import {
-  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers
+  Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CalendarDays, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -41,6 +41,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadToCloudinary, uploadMultipleToCloudinary, sanitizeAndCompressImages, compressImageToDataUrl } from "@/lib/cloudinary";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
+
+const PARETO_MONTHS_LIST = [
+  { value: '01', label: 'Jan', fullLabel: 'January' },
+  { value: '02', label: 'Feb', fullLabel: 'February' },
+  { value: '03', label: 'Mar', fullLabel: 'March' },
+  { value: '04', label: 'Apr', fullLabel: 'April' },
+  { value: '05', label: 'May', fullLabel: 'May' },
+  { value: '06', label: 'Jun', fullLabel: 'June' },
+  { value: '07', label: 'Jul', fullLabel: 'July' },
+  { value: '08', label: 'Aug', fullLabel: 'August' },
+  { value: '09', label: 'Sep', fullLabel: 'September' },
+  { value: '10', label: 'Oct', fullLabel: 'October' },
+  { value: '11', label: 'Nov', fullLabel: 'November' },
+  { value: '12', label: 'Dec', fullLabel: 'December' },
+];
 
 const CHOCOLATE_PRICES_MAP: Record<string, { retail: number; wholesale: number }> = {
   "10 rs 5 star": { retail: 22, wholesale: 9 },
@@ -1340,6 +1355,7 @@ export default function Dashboard() {
   const [d1DuplicateFilter, setD1DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
   const [d1RevenueDateType, setD1RevenueDateType] = useState<string>('Dispatch Date');
   const [d1RevenueMonthKey, setD1RevenueMonthKey] = useState<string>("");
+  const [d1RevenueYearKey, setD1RevenueYearKey] = useState<string>("");
   const [d1DateFilter, setD1DateFilter] = useState({ from: "", to: "" });
   const [d1CountFilter, setD1CountFilter] = useState<string>('All');
   const [d1DashboardSearch, setD1DashboardSearch] = useState("");
@@ -1357,6 +1373,7 @@ export default function Dashboard() {
   const [d2DuplicateFilter, setD2DuplicateFilter] = useState<'All' | 'Duplicates Only' | 'Non-Duplicates'>('All');
   const [d2RevenueDateType, setD2RevenueDateType] = useState<string>('Dispatch Date');
   const [d2RevenueMonthKey, setD2RevenueMonthKey] = useState<string>("");
+  const [d2RevenueYearKey, setD2RevenueYearKey] = useState<string>("");
   const [d2DateFilter, setD2DateFilter] = useState({ from: "", to: "" });
   const [d2CountFilter, setD2CountFilter] = useState<string>('All');
   const [d2DashboardSearch, setD2DashboardSearch] = useState("");
@@ -1480,8 +1497,17 @@ export default function Dashboard() {
   const setRevenueDateType = activeTab === 'dashboard2' ? setD2RevenueDateType : setD1RevenueDateType;
   const revenueMonthKey = activeTab === 'dashboard2' ? d2RevenueMonthKey : d1RevenueMonthKey;
   const setRevenueMonthKey = activeTab === 'dashboard2' ? setD2RevenueMonthKey : setD1RevenueMonthKey;
+  const revenueYearKey = activeTab === 'dashboard2' ? d2RevenueYearKey : d1RevenueYearKey;
+  const setRevenueYearKey = activeTab === 'dashboard2' ? setD2RevenueYearKey : setD1RevenueYearKey;
   const dateFilter = activeTab === 'dashboard2' ? d2DateFilter : d1DateFilter;
   const setDateFilter = activeTab === 'dashboard2' ? setD2DateFilter : setD1DateFilter;
+
+  // Popover state for Pareto Analyses card Month and Year pickers
+  const [paretoMonthPickerOpen, setParetoMonthPickerOpen] = useState(false);
+  const [paretoYearPickerOpen, setParetoYearPickerOpen] = useState(false);
+  const [paretoMonthPickerYear, setParetoMonthPickerYear] = useState<number>(new Date().getFullYear());
+  const paretoMonthPickerRef = useRef<HTMLDivElement>(null);
+  const paretoYearPickerRef = useRef<HTMLDivElement>(null);
 
   const handleRevenueMonthChange = (monthKey: string) => {
     if (!monthKey) {
@@ -1490,6 +1516,7 @@ export default function Dashboard() {
       return;
     }
     setRevenueMonthKey(monthKey);
+    setRevenueYearKey("");
     const [yearStr, monthStr] = monthKey.split('-');
     const y = parseInt(yearStr, 10);
     const m = parseInt(monthStr, 10);
@@ -1499,6 +1526,59 @@ export default function Dashboard() {
     const toStr = format(endDate, "yyyy-MM-dd");
     setDateFilter({ from: fromStr, to: toStr });
   };
+
+  const handleRevenueYearChange = (yearStr: string) => {
+    if (!yearStr) {
+      setRevenueYearKey("");
+      setDateFilter({ from: "", to: "" });
+      return;
+    }
+    setRevenueYearKey(yearStr);
+    setRevenueMonthKey("");
+    setDateFilter({ from: `${yearStr}-01-01`, to: `${yearStr}-12-31` });
+  };
+
+  const availableRevenueYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const yearSet = new Set<string>();
+    yearSet.add(String(currentYear));
+    yearSet.add(String(currentYear - 1));
+    yearSet.add(String(currentYear + 1));
+    orders.forEach(o => {
+      const dStr = parseDateToYYYYMMDD(o.deliveryDate || o.orderDate || o.functionDate);
+      if (dStr && dStr.length >= 4) {
+        const y = dStr.substring(0, 4);
+        if (/^\d{4}$/.test(y)) yearSet.add(y);
+      }
+    });
+    return Array.from(yearSet).sort((a, b) => b.localeCompare(a));
+  }, [orders]);
+
+  const formattedRevenueMonthLabel = useMemo(() => {
+    if (!revenueMonthKey) return "Month";
+    const [yStr, mStr] = revenueMonthKey.split('-');
+    const monthItem = PARETO_MONTHS_LIST.find(m => m.value === mStr);
+    const mName = monthItem ? monthItem.label : mStr;
+    const shortYear = yStr && yStr.length === 4 ? `'${yStr.substring(2)}` : yStr;
+    return `${mName} ${shortYear}`;
+  }, [revenueMonthKey]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (paretoMonthPickerRef.current && !paretoMonthPickerRef.current.contains(e.target as Node)) {
+        setParetoMonthPickerOpen(false);
+      }
+      if (paretoYearPickerRef.current && !paretoYearPickerRef.current.contains(e.target as Node)) {
+        setParetoYearPickerOpen(false);
+      }
+    };
+    if (paretoMonthPickerOpen || paretoYearPickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [paretoMonthPickerOpen, paretoYearPickerOpen]);
   const countFilter = activeTab === 'dashboard2' ? d2CountFilter : d1CountFilter;
   const setCountFilter = activeTab === 'dashboard2' ? setD2CountFilter : setD1CountFilter;
   const dashboardSearch = activeTab === 'dashboard2' ? d2DashboardSearch : d1DashboardSearch;
@@ -1541,6 +1621,7 @@ export default function Dashboard() {
       functionDates.length > 0 ||
       Boolean(dashboardSearch) ||
       Boolean(revenueMonthKey) ||
+      Boolean(revenueYearKey) ||
       Boolean(productSearchQuery) ||
       productCategoryFilter !== 'all' ||
       productSortFilter !== 'default' ||
@@ -1562,6 +1643,7 @@ export default function Dashboard() {
     functionDates,
     dashboardSearch,
     revenueMonthKey,
+    revenueYearKey,
     productSearchQuery,
     productCategoryFilter,
     productSortFilter,
@@ -1598,9 +1680,11 @@ export default function Dashboard() {
     setD1DashboardSearch('');
     setD2DashboardSearch('');
 
-    // 🟢 REVENUE MONTH FILTER RESET (Requirement 20!)
+    // 🟢 REVENUE MONTH & YEAR FILTER RESET (Requirement 20!)
     setD1RevenueMonthKey('');
     setD2RevenueMonthKey('');
+    setD1RevenueYearKey('');
+    setD2RevenueYearKey('');
 
     // 🟢 PRODUCTS MANAGEMENT FILTERS RESET (Requirement 20!)
     setProductSearchQuery('');
@@ -7121,36 +7205,133 @@ export default function Dashboard() {
                       </h3>
                     </div>
 
-                    {/* Bottom Row: Based on Date Type Label & Date Inputs Range */}
+                    {/* Bottom Row: Based on Date Type Label & Month/Year Filter Pickers */}
                     <div className="relative z-10 mt-auto">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                         Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
                       </p>
 
-                      <div className="flex items-center gap-1 w-full">
-                        <input
-                          type="date"
-                          value={dateFilter.from}
-                          onChange={e => setDateFilter({ ...dateFilter, from: e.target.value })}
-                          className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
-                          title="From Date"
-                        />
-                        <span className="text-[10px] font-black text-amber-400 shrink-0 px-0.5">To</span>
-                        <input
-                          type="date"
-                          value={dateFilter.to}
-                          onChange={e => setDateFilter({ ...dateFilter, to: e.target.value })}
-                          className="flex-1 w-full min-w-0 px-1.5 py-1 border border-white/20 rounded-lg text-[10px] font-bold text-white outline-none focus:border-amber-400 bg-[#162035] cursor-pointer shadow-inner tracking-tight"
-                          title="To Date"
-                        />
-                        {(dateFilter.from || dateFilter.to) && (
+                      <div className="flex items-center gap-1.5 w-full">
+                        {/* MONTH PICKER */}
+                        <div className="relative flex-1" ref={paretoMonthPickerRef}>
+                          <button
+                            type="button"
+                            onClick={() => { setParetoMonthPickerOpen(!paretoMonthPickerOpen); setParetoYearPickerOpen(false); }}
+                            className={`w-full flex items-center gap-1 px-1.5 py-1 border rounded-lg text-[10px] font-bold outline-none cursor-pointer shadow-inner tracking-tight transition-all ${
+                              revenueMonthKey
+                                ? 'border-cyan-400 text-cyan-300 bg-cyan-400/10'
+                                : 'border-white/20 text-slate-400 bg-[#162035] hover:border-cyan-400/60'
+                            }`}
+                            title="Filter by Month"
+                          >
+                            <Calendar size={11} className="text-cyan-400 shrink-0" />
+                            <span className="truncate">{revenueMonthKey ? formattedRevenueMonthLabel : 'Month'}</span>
+                          </button>
+                          {/* Month Picker Popover */}
+                          {paretoMonthPickerOpen && (
+                            <div className="absolute bottom-full left-0 mb-1.5 w-[200px] bg-[#111a2e] border border-cyan-400/40 rounded-xl shadow-2xl p-2.5 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
+                              {/* Year Nav Row inside Month Picker */}
+                              <div className="flex items-center justify-between mb-2 px-0.5">
+                                <button type="button" onClick={() => setParetoMonthPickerYear(prev => prev - 1)} className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"><ChevronLeft size={14} /></button>
+                                <span className="text-[11px] font-black text-cyan-300 tracking-wider">{paretoMonthPickerYear}</span>
+                                <button type="button" onClick={() => setParetoMonthPickerYear(prev => prev + 1)} className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"><ChevronRight size={14} /></button>
+                              </div>
+                              {/* 4x3 Month Grid */}
+                              <div className="grid grid-cols-4 gap-1">
+                                {PARETO_MONTHS_LIST.map(m => {
+                                  const key = `${paretoMonthPickerYear}-${m.value}`;
+                                  const isActive = revenueMonthKey === key;
+                                  return (
+                                    <button
+                                      key={m.value}
+                                      type="button"
+                                      onClick={() => { handleRevenueMonthChange(key); setParetoMonthPickerOpen(false); }}
+                                      className={`py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                                        isActive
+                                          ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/30 scale-105'
+                                          : 'text-slate-300 hover:bg-cyan-400/20 hover:text-cyan-300'
+                                      }`}
+                                    >
+                                      {m.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {/* Clear Month Filter */}
+                              {revenueMonthKey && (
+                                <button
+                                  type="button"
+                                  onClick={() => { handleRevenueMonthChange(''); setParetoMonthPickerOpen(false); }}
+                                  className="w-full mt-2 py-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider"
+                                >
+                                  ✕ Clear Month
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* YEAR PICKER */}
+                        <div className="relative flex-1" ref={paretoYearPickerRef}>
+                          <button
+                            type="button"
+                            onClick={() => { setParetoYearPickerOpen(!paretoYearPickerOpen); setParetoMonthPickerOpen(false); }}
+                            className={`w-full flex items-center gap-1 px-1.5 py-1 border rounded-lg text-[10px] font-bold outline-none cursor-pointer shadow-inner tracking-tight transition-all ${
+                              revenueYearKey
+                                ? 'border-purple-400 text-purple-300 bg-purple-400/10'
+                                : 'border-white/20 text-slate-400 bg-[#162035] hover:border-purple-400/60'
+                            }`}
+                            title="Filter by Year"
+                          >
+                            <CalendarDays size={11} className="text-purple-400 shrink-0" />
+                            <span className="truncate">{revenueYearKey || 'Year'}</span>
+                          </button>
+                          {/* Year Picker Popover */}
+                          {paretoYearPickerOpen && (
+                            <div className="absolute bottom-full right-0 mb-1.5 w-[120px] bg-[#111a2e] border border-purple-400/40 rounded-xl shadow-2xl p-2 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-[180px] overflow-y-auto custom-scrollbar">
+                              <div className="space-y-0.5">
+                                {availableRevenueYears.map(y => {
+                                  const isActive = revenueYearKey === y;
+                                  return (
+                                    <button
+                                      key={y}
+                                      type="button"
+                                      onClick={() => { handleRevenueYearChange(y); setParetoYearPickerOpen(false); }}
+                                      className={`w-full py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                                        isActive
+                                          ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                                          : 'text-slate-300 hover:bg-purple-400/20 hover:text-purple-300'
+                                      }`}
+                                    >
+                                      {y}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {/* Clear Year Filter */}
+                              {revenueYearKey && (
+                                <button
+                                  type="button"
+                                  onClick={() => { handleRevenueYearChange(''); setParetoYearPickerOpen(false); }}
+                                  className="w-full mt-1.5 py-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider"
+                                >
+                                  ✕ Clear Year
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Clear All Button */}
+                        {(revenueMonthKey || revenueYearKey || dateFilter.from || dateFilter.to) && (
                           <button
                             onClick={() => {
                               setDateFilter({ from: "", to: "" });
                               setRevenueMonthKey("");
+                              setRevenueYearKey("");
                             }}
                             className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors cursor-pointer"
-                            title="Clear Date Filter"
+                            title="Clear All Filters"
                           >
                             <X size={12} strokeWidth={3} />
                           </button>
@@ -11155,7 +11336,9 @@ export default function Dashboard() {
                 <Lock size={26} className="text-amber-400" strokeWidth={2.5} />
               </div>
               <h2 className="text-2xl font-black text-white tracking-wide uppercase">Enter Password</h2>
-              <p className="text-amber-400/90 text-xs font-bold mt-1 tracking-widest uppercase">Pareto Analyses Access</p>
+              <p className="text-amber-400/90 text-xs font-bold mt-1 tracking-widest uppercase">
+                {activeTab === 'dashboard2' ? 'Dashboard 2 (Products) Pareto Access' : 'Dashboard 1 (Chocolates) Pareto Access'}
+              </p>
             </div>
 
             <form onSubmit={handleParetoAuthSubmit} className="p-7 space-y-5 bg-[#090e1a]">
@@ -11203,6 +11386,7 @@ export default function Dashboard() {
         initialDateType={revenueDateType}
         initialRole={roleFilter !== 'All' ? roleFilter : 'All'}
         initialType={tableTypeFilter !== 'All' ? tableTypeFilter : 'All'}
+        initialDashboard={activeTab === 'dashboard2' ? 'Dashboard 2' : 'Dashboard 1'}
         customPricesMap={customPricesMap}
         managedChocPricesMap={managedChocPricesMap}
         orderTypes={orderTypes}
