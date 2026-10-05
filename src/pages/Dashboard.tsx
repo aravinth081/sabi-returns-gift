@@ -556,7 +556,6 @@ export default function Dashboard() {
   });
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types' | 'locations' | 'roles' | 'users'>('order_types');
-  const [selectedInventoryTab, setSelectedInventoryTab] = useState<'Inventory 1' | 'Inventory 2'>('Inventory 1');
   const [userDraftDefaults, setUserDraftDefaults] = useState<Record<string, { orderType?: string; role?: string; inventory?: string }>>({});
 
   const approvedEmployees = useMemo(() => {
@@ -719,6 +718,45 @@ export default function Dashboard() {
   const [editOrderRoleId, setEditOrderRoleId] = useState<string | null>(null);
   const [isRoleManagerOpen, setIsRoleManagerOpen] = useState(false);
 
+  // Safe inventory helpers
+  const getInventoryItemName = (inv: any): string => {
+    if (!inv) return '';
+    if (typeof inv === 'string') return inv.trim();
+    return String(inv.name || inv.inventory || inv.label || '').trim();
+  };
+
+  const getInventoryItemId = (inv: any, index: number): string => {
+    if (!inv) return `inv-${index}`;
+    if (typeof inv === 'string') return `inv-${inv.trim().toLowerCase().replace(/\s+/g, '-')}-${index}`;
+    return String(inv.fireId || inv.id || `inv-${index}`);
+  };
+
+  const [inventoriesList, setInventoriesList] = useState<{ fireId: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('sabi_inventories_list');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any, idx: number) => {
+            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
+            return {
+              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+              name: String(item?.name || item?.inventory || `Inventory ${idx + 1}`).trim()
+            };
+          });
+        }
+      }
+    } catch (e) {}
+    return [
+      { fireId: 'default-1', name: 'Inventory 1' },
+      { fireId: 'default-2', name: 'Inventory 2' }
+    ];
+  });
+  const [newInventoryName, setNewInventoryName] = useState("");
+  const [editInventoryId, setEditInventoryId] = useState<string | null>(null);
+  const [isInventoryManagerOpen, setIsInventoryManagerOpen] = useState(false);
+  const [selectedInventoryTab, setSelectedInventoryTab] = useState<string>('Inventory 1');
+
   // Safe order type helpers (guarantees zero runtime crashes regardless of string or object shape)
   const getOrderTypeName = (ot: any): string => {
     if (!ot) return '';
@@ -756,6 +794,122 @@ export default function Dashboard() {
   });
   const [newOrderTypeName, setNewOrderTypeName] = useState("");
   const [editOrderTypeId, setEditOrderTypeId] = useState<string | null>(null);
+
+  // --- APPROVED USERS ORDER TYPE PERMISSIONS (Tick ✓ / Wrong ✕) ---
+  const getEmployeeAllowedOrderTypes = (emp: any): string[] => {
+    if (!emp) return [];
+    if (Array.isArray(emp.allowedOrderTypes)) {
+      return emp.allowedOrderTypes;
+    }
+    try {
+      const saved = localStorage.getItem(`sabi_allowed_orderTypes_${emp.fireId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    // If not explicitly configured yet, default to all available order types
+    return orderTypes.map(ot => getOrderTypeName(ot));
+  };
+
+  const handleToggleUserOrderTypePermission = async (employeeFireId: string, orderTypeName: string) => {
+    const emp = employees.find(e => e.fireId === employeeFireId);
+    if (!emp) return;
+
+    const currentAllowed = getEmployeeAllowedOrderTypes(emp);
+    const isCurrentlyAllowed = currentAllowed.some(t => t.toLowerCase() === orderTypeName.toLowerCase());
+
+    let newAllowed: string[];
+    if (isCurrentlyAllowed) {
+      newAllowed = currentAllowed.filter(t => t.toLowerCase() !== orderTypeName.toLowerCase());
+    } else {
+      newAllowed = [...currentAllowed, orderTypeName];
+    }
+
+    try {
+      await updateDoc(doc(db, "employees", employeeFireId), {
+        allowedOrderTypes: newAllowed
+      });
+
+      setEmployees(prev => prev.map(e => e.fireId === employeeFireId ? { ...e, allowedOrderTypes: newAllowed } : e));
+      localStorage.setItem(`sabi_allowed_orderTypes_${employeeFireId}`, JSON.stringify(newAllowed));
+
+      const isCurrent = (employeeId === employeeFireId) || (loggedInName && (emp.name === loggedInName || emp.username === loggedInName));
+      if (isCurrent) {
+        localStorage.setItem('user_allowed_orderTypes', JSON.stringify(newAllowed));
+      }
+
+      if (isCurrentlyAllowed) {
+        toast.error(`Blocked "${orderTypeName}" for ${emp.name} (✕ Wrong)`);
+        logActivity(`Blocked Order Type "${orderTypeName}" for ${emp.name}`, 'Employees');
+      } else {
+        toast.success(`Allowed "${orderTypeName}" for ${emp.name} (✓ Tick)`);
+        logActivity(`Allowed Order Type "${orderTypeName}" for ${emp.name}`, 'Employees');
+      }
+    } catch (err) {
+      console.error("Failed to update order type permission:", err);
+      toast.error("Failed to update order type permission");
+    }
+  };
+
+  const handleSetAllUserOrderTypePermissions = async (employeeFireId: string, allowAll: boolean) => {
+    const emp = employees.find(e => e.fireId === employeeFireId);
+    if (!emp) return;
+
+    const allTypes = orderTypes.map(ot => getOrderTypeName(ot));
+    const newAllowed = allowAll ? allTypes : [];
+
+    try {
+      await updateDoc(doc(db, "employees", employeeFireId), {
+        allowedOrderTypes: newAllowed
+      });
+
+      setEmployees(prev => prev.map(e => e.fireId === employeeFireId ? { ...e, allowedOrderTypes: newAllowed } : e));
+      localStorage.setItem(`sabi_allowed_orderTypes_${employeeFireId}`, JSON.stringify(newAllowed));
+
+      const isCurrent = (employeeId === employeeFireId) || (loggedInName && (emp.name === loggedInName || emp.username === loggedInName));
+      if (isCurrent) {
+        localStorage.setItem('user_allowed_orderTypes', JSON.stringify(newAllowed));
+      }
+
+      if (allowAll) {
+        toast.success(`Allowed all order types for ${emp.name} (✓ All Ticked)`);
+      } else {
+        toast.error(`Blocked all order types for ${emp.name} (✕ All Wrong)`);
+      }
+      logActivity(`${allowAll ? 'Allowed' : 'Blocked'} all order types for ${emp.name}`, 'Employees');
+    } catch (err) {
+      console.error("Failed to set all order type permissions:", err);
+      toast.error("Failed to update permissions");
+    }
+  };
+
+  const currentLoggedInEmployee = useMemo(() => {
+    if (role !== 'Employee') return null;
+    return employees.find(e => 
+      (employeeId && (e.fireId === employeeId || e.id === employeeId || e.employeeId === employeeId)) ||
+      (loggedInName && (e.name === loggedInName || e.username === loggedInName))
+    ) || null;
+  }, [role, employeeId, loggedInName, employees]);
+
+  const currentUserAllowedOrderTypes = useMemo(() => {
+    if (role !== 'Employee' || !currentLoggedInEmployee) return null;
+
+    if (Array.isArray(currentLoggedInEmployee.allowedOrderTypes)) {
+      return currentLoggedInEmployee.allowedOrderTypes.map((t: string) => String(t).trim().toLowerCase());
+    }
+
+    try {
+      const saved = localStorage.getItem(`sabi_allowed_orderTypes_${currentLoggedInEmployee.fireId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed.map((t: string) => String(t).trim().toLowerCase());
+      }
+    } catch (e) {}
+
+    return null;
+  }, [role, currentLoggedInEmployee]);
+
 
   const [newChocForm, setNewChocForm] = useState({ name: "", retailPrice: "", wholesalePrice: "", stickerPrice: "1.5", displayOrder: "" });
   const [editChocId, setEditChocId] = useState<string | null>(null);
@@ -1082,7 +1236,34 @@ export default function Dashboard() {
       }
     }, (err) => console.warn("Firestore order_roles onSnapshot error:", err));
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); unsubLocations(); unsubOrderRoles(); };
+    const unsubInventoriesList = onSnapshot(collection(db, "inventories_list"), (snapshot) => {
+      let list: any[] = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      if (list.length === 0) {
+        const defaults = [
+          { name: "Inventory 1", createdAt: new Date().toISOString() },
+          { name: "Inventory 2", createdAt: new Date().toISOString() }
+        ];
+        defaults.forEach(d => addDoc(collection(db, "inventories_list"), d).catch(() => {}));
+        const initialList = defaults.map((d, i) => ({ fireId: `default-${i + 1}`, name: d.name }));
+        setInventoriesList(initialList);
+        try {
+          localStorage.setItem('sabi_inventories_list', JSON.stringify(initialList));
+        } catch (e) {}
+      } else {
+        list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        const normalizedList = list.map((item, idx) => ({
+          fireId: item.fireId || `inv-${idx + 1}`,
+          name: getInventoryItemName(item) || `Inventory ${idx + 1}`,
+          ...item
+        }));
+        setInventoriesList(normalizedList);
+        try {
+          localStorage.setItem('sabi_inventories_list', JSON.stringify(normalizedList));
+        } catch (e) {}
+      }
+    }, (err) => console.warn("Firestore inventories_list onSnapshot error:", err));
+
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); unsubLocations(); unsubOrderRoles(); unsubInventoriesList(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -2611,6 +2792,14 @@ export default function Dashboard() {
     const curDuplicateFilter = activeTab === 'dashboard2' ? d2DuplicateFilter : d1DuplicateFilter;
 
     return orders.filter(order => {
+      // 🔒 Filter by Approved Employee Order Type Permissions (Tick ✓ vs Wrong ✕)
+      if (currentUserAllowedOrderTypes !== null) {
+        const rawType = String(order.orderType || getOrderTypeName(orderTypes[0]) || "Thaaru").trim().toLowerCase();
+        if (!currentUserAllowedOrderTypes.includes(rawType)) {
+          return false;
+        }
+      }
+
       const pMatch = curPaymentFilter === 'All' || 
         order.paymentStatus === curPaymentFilter ||
         (curPaymentFilter === 'Full Paid' && (order.paymentStatus === 'Fully Paid' || String(order.paymentStatus || '').toLowerCase() === 'fully paid' || String(order.paymentStatus || '').toLowerCase() === 'full paid')) ||
@@ -2693,7 +2882,7 @@ export default function Dashboard() {
 
       return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && categoryMatch && locationMatch && roleMatch && duplicateMatch;
     });
-  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, debouncedDashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts]);
+  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, debouncedDashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts, currentUserAllowedOrderTypes, orderTypes]);
 
   const availableChocolatesData = useMemo(() => {
     const chocolateCounts: Record<string, number> = {};
@@ -2950,6 +3139,13 @@ export default function Dashboard() {
   const trackingSearchResults = useMemo(() => {
     let result = orders;
 
+    if (currentUserAllowedOrderTypes !== null) {
+      result = result.filter(o => {
+        const rawType = String(o.orderType || getOrderTypeName(orderTypes[0]) || "Thaaru").trim().toLowerCase();
+        return currentUserAllowedOrderTypes.includes(rawType);
+      });
+    }
+
     if (trkPaymentFilter !== 'All') {
       result = result.filter(o => o.paymentStatus === trkPaymentFilter);
     }
@@ -2975,7 +3171,7 @@ export default function Dashboard() {
     }
 
     return result;
-  }, [orders, orderSerialMap, debouncedTrkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter]);
+  }, [orders, orderSerialMap, debouncedTrkSearch, trkPaymentFilter, trkDeliveryFilter, trkOrderStatusFilter, currentUserAllowedOrderTypes, orderTypes]);
 
   const sortedDashboardOrders = useMemo(() => {
     let sortable = [...filteredDashboardOrders];
@@ -3013,6 +3209,13 @@ export default function Dashboard() {
 
   const reportData = useMemo(() => {
     let filtered = orders;
+
+    if (currentUserAllowedOrderTypes !== null) {
+      filtered = filtered.filter(o => {
+        const rawType = String(o.orderType || getOrderTypeName(orderTypes[0]) || "Thaaru").trim().toLowerCase();
+        return currentUserAllowedOrderTypes.includes(rawType);
+      });
+    }
 
     if (reportDateRange.start || reportDateRange.end) {
       filtered = filtered.filter(order => {
@@ -3078,7 +3281,7 @@ export default function Dashboard() {
       totalCost,
       totalProfit: totalRev - totalCost
     };
-  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, reportOrderTypeFilter, managedChocPricesMap, managedChocStickersMap]);
+  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, reportOrderTypeFilter, managedChocPricesMap, managedChocStickersMap, currentUserAllowedOrderTypes, orderTypes]);
 
 
 
@@ -3359,7 +3562,11 @@ export default function Dashboard() {
     const userDefaultRole = currentEmp?.defaultRole || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_role_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_role');
     const userDefaultInventory = currentEmp?.defaultInventory || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_inventory_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_inventory');
 
-    const initialOrderType = userDefaultOrderType || getOrderTypeName(orderTypes[0]) || "Sabi";
+    const allowedList = getEmployeeAllowedOrderTypes(currentEmp);
+    let initialOrderType = userDefaultOrderType || getOrderTypeName(orderTypes[0]) || "Sabi";
+    if (role === 'Employee' && allowedList.length > 0 && !allowedList.some(t => t.toLowerCase() === initialOrderType.toLowerCase())) {
+      initialOrderType = allowedList[0];
+    }
     const initialRole = userDefaultRole || "Others";
     const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
@@ -3391,7 +3598,11 @@ export default function Dashboard() {
     const userDefaultRole = currentEmp?.defaultRole || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_role_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_role');
     const userDefaultInventory = currentEmp?.defaultInventory || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_inventory_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_inventory');
 
-    const initialOrderType = userDefaultOrderType || getOrderTypeName(orderTypes[0]) || "Sabi";
+    const notifAllowedList = getEmployeeAllowedOrderTypes(currentEmp);
+    let initialOrderType = userDefaultOrderType || getOrderTypeName(orderTypes[0]) || "Sabi";
+    if (role === 'Employee' && notifAllowedList.length > 0 && !notifAllowedList.some(t => t.toLowerCase() === initialOrderType.toLowerCase())) {
+      initialOrderType = notifAllowedList[0];
+    }
     const initialRole = userDefaultRole || "Others";
     const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
@@ -4079,7 +4290,7 @@ export default function Dashboard() {
       itemsPerBox: Number(invForm.itemsPerBox),
       totalChocolates: Number(invForm.boxCount) * Number(invForm.itemsPerBox),
       type: "Purchase",
-      inventory: invForm.inventory || selectedInventoryTab || "Inventory 1"
+      inventory: invForm.inventory || "Inventory 1"
     };
 
     try {
@@ -4792,6 +5003,149 @@ export default function Dashboard() {
       }
       toast.success(`Deleted role "${rName}"!`);
       logActivity(`Deleted Role: "${rName}"`, 'Orders');
+    }
+  };
+
+  // --- DYNAMIC INVENTORIES HANDLERS ---
+  const handleAddOrEditInventoryItem = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newInventoryName.trim();
+    if (!trimmed) return;
+
+    const isDup = inventoriesList.some(
+      (item, idx) => {
+        const iId = getInventoryItemId(item, idx);
+        const iName = getInventoryItemName(item);
+        return iId !== editInventoryId && iName.toLowerCase() === trimmed.toLowerCase();
+      }
+    );
+    if (isDup) {
+      toast.error(`Inventory "${trimmed}" already exists!`);
+      return;
+    }
+
+    try {
+      if (editInventoryId) {
+        const prev = inventoriesList.find((item, idx) => getInventoryItemId(item, idx) === editInventoryId);
+        const prevName = getInventoryItemName(prev);
+
+        if (editInventoryId.startsWith('default-') || editInventoryId.startsWith('inv-')) {
+          const docRef = await addDoc(collection(db, "inventories_list"), {
+            name: trimmed,
+            createdAt: new Date().toISOString()
+          });
+          const updated = inventoriesList.map((item, idx) => getInventoryItemId(item, idx) === editInventoryId ? { fireId: docRef.id, name: trimmed } : (typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item));
+          setInventoriesList(updated);
+          localStorage.setItem('sabi_inventories_list', JSON.stringify(updated));
+        } else {
+          await updateDoc(doc(db, "inventories_list", editInventoryId), { name: trimmed });
+          const updated = inventoriesList.map((item, idx) => getInventoryItemId(item, idx) === editInventoryId ? { ...item, name: trimmed } : (typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item));
+          setInventoriesList(updated);
+          localStorage.setItem('sabi_inventories_list', JSON.stringify(updated));
+        }
+
+        // SYNC ALL PAST ORDERS WITH PREVIOUS INVENTORY NAME TO NEW NAME
+        if (prevName && prevName !== trimmed) {
+          const matchingOrders = orders.filter(o => (o.inventory || 'Inventory 1') === prevName);
+          matchingOrders.forEach(o => {
+            if (o.fireId) {
+              updateDoc(doc(db, "orders", o.fireId), { inventory: trimmed }).catch(() => {});
+            }
+          });
+          setOrders(prev => prev.map(o => (o.inventory || 'Inventory 1') === prevName ? { ...o, inventory: trimmed } : o));
+
+          // SYNC ALL INVENTORY LOGS WITH PREVIOUS INVENTORY NAME TO NEW NAME
+          const matchingLogs = inventoryLogs.filter(l => (l.inventory || 'Inventory 1') === prevName);
+          matchingLogs.forEach(l => {
+            if (l.fireId) {
+              updateDoc(doc(db, "inventory", l.fireId), { inventory: trimmed }).catch(() => {});
+            }
+          });
+          setInventoryLogs(prev => prev.map(l => (l.inventory || 'Inventory 1') === prevName ? { ...l, inventory: trimmed } : l));
+
+          if (selectedInventoryTab === prevName) {
+            setSelectedInventoryTab(trimmed);
+          }
+          if (formData.inventory === prevName) {
+            setFormData(prev => ({ ...prev, inventory: trimmed }));
+          }
+          if (invForm.inventory === prevName) {
+            setInvForm(prev => ({ ...prev, inventory: trimmed }));
+          }
+        }
+
+        toast.success(`Inventory updated to "${trimmed}"!`);
+        logActivity(`Edited Inventory: "${prevName || 'Unknown'}" -> "${trimmed}"`, 'Inventories');
+        setEditInventoryId(null);
+      } else {
+        const docRef = await addDoc(collection(db, "inventories_list"), {
+          name: trimmed,
+          createdAt: new Date().toISOString()
+        });
+        const cleanList = inventoriesList.map((item, idx) => typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item);
+        const updated = [...cleanList, { fireId: docRef.id, name: trimmed }];
+        setInventoriesList(updated);
+        localStorage.setItem('sabi_inventories_list', JSON.stringify(updated));
+        toast.success(`Added Inventory "${trimmed}"!`);
+        logActivity(`Added Inventory: "${trimmed}"`, 'Inventories');
+      }
+      setNewInventoryName("");
+    } catch (err) {
+      console.error("Failed to save inventory:", err);
+      if (!editInventoryId) {
+        const cleanList = inventoriesList.map((item, idx) => typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item);
+        const updated = [...cleanList, { fireId: `local-${Date.now()}`, name: trimmed }];
+        setInventoriesList(updated);
+        localStorage.setItem('sabi_inventories_list', JSON.stringify(updated));
+        toast.success(`Added Inventory "${trimmed}"!`);
+      }
+      setNewInventoryName("");
+    }
+  };
+
+  const handleDeleteInventoryItem = async (invInput: any) => {
+    if (inventoriesList.length <= 1) {
+      toast.error("At least one inventory must remain in the system!");
+      return;
+    }
+    const invName = getInventoryItemName(invInput);
+    const invId = invInput?.fireId || getInventoryItemId(invInput, 0);
+
+    const ordersCount = orders.filter(o => (o.inventory || 'Inventory 1').toLowerCase() === invName.toLowerCase()).length;
+    const msg = ordersCount > 0
+      ? `"${invName}" is used by ${ordersCount} order(s). Are you sure you want to delete this inventory?`
+      : `Are you sure you want to delete inventory "${invName}"?`;
+
+    if (window.confirm(msg)) {
+      const updated = inventoriesList.filter((item, idx) => {
+        const iName = getInventoryItemName(item);
+        const iId = getInventoryItemId(item, idx);
+        return iName !== invName && iId !== invId;
+      }).map((item, idx) => typeof item === 'string' ? { fireId: `default-${idx + 1}`, name: item } : item);
+      setInventoriesList(updated);
+      try {
+        localStorage.setItem('sabi_inventories_list', JSON.stringify(updated));
+      } catch (e) {}
+
+      if (editInventoryId === invId || editInventoryId === invName) {
+        setEditInventoryId(null);
+        setNewInventoryName("");
+      }
+
+      if (invId && !invId.startsWith('default-') && !invId.startsWith('local-') && !invId.startsWith('inv-')) {
+        try {
+          await deleteDoc(doc(db, "inventories_list", invId));
+        } catch (err) {
+          console.warn("Firestore delete inventory note:", err);
+        }
+      }
+
+      if (selectedInventoryTab === invName && updated.length > 0) {
+        setSelectedInventoryTab(getInventoryItemName(updated[0]));
+      }
+
+      toast.success(`Deleted inventory "${invName}"!`);
+      logActivity(`Deleted Inventory: "${invName}"`, 'Inventories');
     }
   };
 
@@ -6472,15 +6826,45 @@ export default function Dashboard() {
                     <label className="text-xs font-bold text-amber-400 uppercase tracking-wider">Inventory:</label>
                     <select
                       value={selectedInventoryTab}
-                      onChange={(e) => setSelectedInventoryTab(e.target.value as 'Inventory 1' | 'Inventory 2')}
+                      onChange={(e) => setSelectedInventoryTab(e.target.value)}
                       className="bg-[#0b1329] text-white font-black text-sm px-3 py-1 rounded-lg border border-white/20 focus:outline-none focus:border-amber-400 cursor-pointer"
                     >
-                      <option value="Inventory 1" className="bg-[#0d1527] text-white">Inventory 1</option>
-                      <option value="Inventory 2" className="bg-[#0d1527] text-white">Inventory 2</option>
+                      {inventoriesList.map((inv, idx) => {
+                        const name = getInventoryItemName(inv);
+                        return (
+                          <option key={idx} value={name} className="bg-[#0d1527] text-white">
+                            {name}
+                          </option>
+                        );
+                      })}
                     </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditInventoryId(null);
+                        setNewInventoryName("");
+                        setIsInventoryManagerOpen(true);
+                      }}
+                      className="p-1 hover:bg-white/10 text-amber-400 rounded-lg transition-colors cursor-pointer"
+                      title="Manage Inventories"
+                    >
+                      <Pencil size={12} />
+                    </button>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      setEditInventoryId(null);
+                      setNewInventoryName("");
+                      setIsInventoryManagerOpen(true);
+                    }}
+                    className="flex justify-center items-center px-3 h-10 font-bold rounded-lg transition-colors border bg-[#131c2e] text-amber-400 border-white/15 hover:bg-[#18243b] cursor-pointer shadow-sm text-xs gap-1.5"
+                    title="Manage Inventories"
+                  >
+                    <Pencil size={13} />
+                    <span>Manage Inventories</span>
+                  </button>
                   <button
                     onClick={() => document.getElementById('inventories-wallpaper-upload')?.click()}
                     className="flex justify-center items-center w-10 h-10 font-bold rounded-lg transition-colors border bg-[#131c2e] text-amber-400 border-white/15 hover:bg-[#18243b] cursor-pointer shadow-sm"
@@ -9975,13 +10359,19 @@ export default function Dashboard() {
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Inventory</label>
                   <select
                     required
-                    value={invForm.inventory || selectedInventoryTab || "Inventory 1"}
+                    value={invForm.inventory || selectedInventoryTab || getInventoryItemName(inventoriesList[0]) || "Inventory 1"}
                     onChange={(e) => setInvForm({ ...invForm, inventory: e.target.value as any })}
                     style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                     className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner cursor-pointer"
                   >
-                    <option value="Inventory 1" className="bg-[#0f172a] text-white">Inventory 1</option>
-                    <option value="Inventory 2" className="bg-[#0f172a] text-white">Inventory 2</option>
+                    {inventoriesList.map((inv, idx) => {
+                      const name = getInventoryItemName(inv);
+                      return (
+                        <option key={idx} value={name} className="bg-[#0f172a] text-white">
+                          {name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -10263,39 +10653,39 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Roles Dropdown (Replaces Address Section per user request) */}
+                  {/* Inventories Dropdown (Replaces Role per user request) */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-200">Role</label>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-200">Inventories</label>
                       <button
                         type="button"
                         onClick={() => {
-                          setEditOrderRoleId(null);
-                          setNewOrderRoleName("");
-                          setIsRoleManagerOpen(true);
+                          setEditInventoryId(null);
+                          setNewInventoryName("");
+                          setIsInventoryManagerOpen(true);
                         }}
                         className="text-[10px] text-amber-400 hover:text-amber-300 font-black flex items-center gap-1 cursor-pointer transition-colors bg-amber-400/10 hover:bg-amber-400/20 px-2 py-0.5 rounded-lg border border-amber-400/30"
-                        title="Add or Edit Roles"
+                        title="Add or Edit Inventories"
                       >
                         <Pencil size={10} />
-                        <span>+ Add / Edit Roles</span>
+                        <span>+ Add / Edit Inventories</span>
                       </button>
                     </div>
                     <select
-                      name="role"
-                      value={formData.role || "Others"}
+                      name="inventory"
+                      value={formData.inventory || getInventoryItemName(inventoriesList[0]) || "Inventory 1"}
                       onChange={handleInputChange}
                       style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                       className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer uppercase tracking-wider"
                     >
-                      {formData.role && !orderRoles.some((r, idx) => getOrderRoleName(r) === formData.role) && (
-                        <option value={formData.role} className="bg-[#0f172a] text-white">
-                          {formData.role}
+                      {formData.inventory && !inventoriesList.some((inv, idx) => getInventoryItemName(inv) === formData.inventory) && (
+                        <option value={formData.inventory} className="bg-[#0f172a] text-white">
+                          {formData.inventory}
                         </option>
                       )}
-                      {orderRoles.map((r, idx) => {
-                        const name = getOrderRoleName(r);
-                        const id = getOrderRoleId(r, idx);
+                      {inventoriesList.map((inv, idx) => {
+                        const name = getInventoryItemName(inv);
+                        const id = getInventoryItemId(inv, idx);
                         return (
                           <option key={id} value={name} className="bg-[#0f172a] text-white">
                             {name}
@@ -10601,23 +10991,27 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Order Type & Inventory dropdowns */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Order Type</label>
-                      <select
-                        name="orderType"
-                        value={formData.orderType}
-                        onChange={handleInputChange}
-                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer"
-                      >
-                        {formData.orderType && !orderTypes.some((ot, idx) => getOrderTypeName(ot) === formData.orderType) && (
-                          <option value={formData.orderType} className="bg-[#0f172a] text-white">
-                            {formData.orderType}
-                          </option>
-                        )}
-                        {orderTypes.map((ot, idx) => {
+                  {/* Order Type dropdown */}
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Order Type</label>
+                    <select
+                      name="orderType"
+                      value={formData.orderType}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer"
+                    >
+                      {formData.orderType && !orderTypes.some((ot, idx) => getOrderTypeName(ot) === formData.orderType) && (
+                        <option value={formData.orderType} className="bg-[#0f172a] text-white">
+                          {formData.orderType}
+                        </option>
+                      )}
+                      {orderTypes
+                        .filter(ot => {
+                          if (currentUserAllowedOrderTypes === null) return true;
+                          return currentUserAllowedOrderTypes.includes(getOrderTypeName(ot).toLowerCase());
+                        })
+                        .map((ot, idx) => {
                           const name = getOrderTypeName(ot);
                           const id = getOrderTypeId(ot, idx);
                           return (
@@ -10626,22 +11020,7 @@ export default function Dashboard() {
                             </option>
                           );
                         })}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Inventory</label>
-                      <select
-                        name="inventory"
-                        value={formData.inventory || "Inventory 1"}
-                        onChange={handleInputChange}
-                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer font-bold"
-                      >
-                        <option value="Inventory 1" className="bg-[#0f172a] text-white">Inventory 1</option>
-                        <option value="Inventory 2" className="bg-[#0f172a] text-white">Inventory 2</option>
-                      </select>
-                    </div>
+                    </select>
                   </div>
                 </div>
 
@@ -12872,7 +13251,7 @@ export default function Dashboard() {
                       <span>Approved Users Default Settings</span>
                     </h3>
                     <p className="text-xs text-slate-300 mt-1 font-semibold">
-                      Configure default Order Type, Role, and Inventory for approved users when opening <span className="text-amber-300 font-bold">Add New Order</span>.
+                      Configure allowed Order Types (✓ Tick = Show orders, ✕ Wrong = Hide orders), default Order Type, Role, and Inventory for approved users.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -12884,13 +13263,13 @@ export default function Dashboard() {
 
                 {/* Approved Users Configuration Table */}
                 <div className="overflow-x-auto flex-1 custom-scrollbar rounded-2xl border border-white/10 bg-[#090e1a]/80 shadow-inner">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
+                  <table className="w-full text-left border-collapse min-w-[960px]">
                     <thead className="sticky top-0 bg-[#0c1427] z-10 shadow-sm border-b border-amber-500/30">
                       <tr className="text-xs uppercase tracking-wider text-amber-400">
-                        <th className="p-4 font-black border-r border-white/10">Approved User</th>
-                        <th className="p-4 font-black border-r border-white/10">Order Type</th>
-                        <th className="p-4 font-black border-r border-white/10">Role</th>
-                        <th className="p-4 font-black">Inventory</th>
+                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[22%] min-w-[190px]">Approved User</th>
+                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[42%] min-w-[340px]">Order Type Access (✓ Tick / ✕ Wrong)</th>
+                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[18%] min-w-[170px]">Default Role</th>
+                        <th className="px-5 py-3.5 font-black w-[18%] min-w-[170px]">Default Inventory</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -12906,20 +13285,23 @@ export default function Dashboard() {
                         approvedEmployees.map(emp => {
                           const savedOrderType = emp.defaultOrderType || (emp.fireId ? localStorage.getItem(`sabi_default_orderType_${emp.fireId}`) : null) || getOrderTypeName(orderTypes[0]) || "Sabi";
                           const savedRole = emp.defaultRole || (emp.fireId ? localStorage.getItem(`sabi_default_role_${emp.fireId}`) : null) || "Others";
-                          const savedInventory = emp.defaultInventory || (emp.fireId ? localStorage.getItem(`sabi_default_inventory_${emp.fireId}`) : null) || "Inventory 1";
+                          const savedInventory = emp.defaultInventory || (emp.fireId ? localStorage.getItem(`sabi_default_inventory_${emp.fireId}`) : null) || getInventoryItemName(inventoriesList[0]) || "Inventory 1";
 
                           const selectedOrderType = userDraftDefaults[emp.fireId]?.orderType ?? savedOrderType;
                           const selectedRole = userDraftDefaults[emp.fireId]?.role ?? savedRole;
                           const selectedInventory = userDraftDefaults[emp.fireId]?.inventory ?? savedInventory;
 
-                          const isOrderTypeDefault = selectedOrderType === savedOrderType && Boolean(emp.defaultOrderType || (emp.fireId && localStorage.getItem(`sabi_default_orderType_${emp.fireId}`)));
                           const isRoleDefault = selectedRole === savedRole && Boolean(emp.defaultRole || (emp.fireId && localStorage.getItem(`sabi_default_role_${emp.fireId}`)));
                           const isInventoryDefault = selectedInventory === savedInventory && Boolean(emp.defaultInventory || (emp.fireId && localStorage.getItem(`sabi_default_inventory_${emp.fireId}`)));
+
+                          const allowed = getEmployeeAllowedOrderTypes(emp);
+                          const totalCount = orderTypes.length;
+                          const allowedCount = orderTypes.filter(ot => allowed.some(a => a.toLowerCase() === getOrderTypeName(ot).toLowerCase())).length;
 
                           return (
                             <tr key={emp.fireId} className="hover:bg-white/5 transition-colors">
                               {/* Approved User */}
-                              <td className="p-4 border-r border-white/10">
+                              <td className="px-5 py-4 border-r border-white/10 align-middle">
                                 <div className="flex items-center gap-3">
                                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-emerald-500/20 border border-white/20 text-amber-300 font-black flex items-center justify-center shrink-0 shadow-sm text-sm">
                                     {String(emp.name || 'U').charAt(0).toUpperCase()}
@@ -12931,48 +13313,116 @@ export default function Dashboard() {
                                 </div>
                               </td>
 
-                              {/* Order Type Dropdown + Action */}
-                              <td className="p-4 border-r border-white/10">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                                  <select
-                                    value={selectedOrderType}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setUserDraftDefaults(prev => ({
-                                        ...prev,
-                                        [emp.fireId]: { ...(prev[emp.fireId] || {}), orderType: val }
-                                      }));
-                                    }}
-                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto min-w-[130px]"
-                                  >
+                              {/* Order Type Permissions (✓ / ✕) */}
+                              <td className="px-5 py-4 border-r border-white/10 align-middle">
+                                <div className="space-y-2.5">
+                                  {/* Header bar: counter & quick allow/block all */}
+                                  <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-white/5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Order Access:</span>
+                                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                        allowedCount === totalCount
+                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                          : allowedCount === 0
+                                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                      }`}>
+                                        {allowedCount} of {totalCount} Allowed
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetAllUserOrderTypePermissions(emp.fireId, true)}
+                                        className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 hover:border-emerald-400 transition-all cursor-pointer flex items-center gap-0.5"
+                                        title="Allow all order types for this user (Tick All ✓)"
+                                      >
+                                        <Check size={10} />
+                                        <span>All ✓</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetAllUserOrderTypePermissions(emp.fireId, false)}
+                                        className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 hover:border-rose-400 transition-all cursor-pointer flex items-center gap-0.5"
+                                        title="Block all order types for this user (Wrong All ✕)"
+                                      >
+                                        <X size={10} />
+                                        <span>None ✕</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Dynamic list of Order Types with Tick (✓) / Wrong (✕) buttons */}
+                                  <div className="flex flex-wrap items-center gap-1.5">
                                     {orderTypes.map((ot, idx) => {
-                                      const name = getOrderTypeName(ot);
+                                      const otName = getOrderTypeName(ot);
+                                      const isAllowed = allowed.some(a => a.toLowerCase() === otName.toLowerCase());
+
                                       return (
-                                        <option key={idx} value={name} className="bg-[#0f172a] text-white">
-                                          {name}
-                                        </option>
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => handleToggleUserOrderTypePermission(emp.fireId, otName)}
+                                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer shadow-sm active:scale-95 ${
+                                            isAllowed
+                                              ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/25 shadow-emerald-950/20'
+                                              : 'bg-rose-500/15 border-rose-500/40 text-rose-300 hover:bg-rose-500/25 shadow-rose-950/20'
+                                          }`}
+                                          title={
+                                            isAllowed
+                                              ? `✓ Tick (Allowed): Click to mark ✕ Wrong (Hide all "${otName}" orders from this user)`
+                                              : `✕ Wrong (Blocked): Click to mark ✓ Tick (Show "${otName}" orders to this user)`
+                                          }
+                                        >
+                                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                                            isAllowed
+                                              ? 'bg-emerald-500 text-black shadow-sm'
+                                              : 'bg-rose-500 text-white shadow-sm'
+                                          }`}>
+                                            {isAllowed ? '✓' : '✕'}
+                                          </span>
+                                          <span className={isAllowed ? 'text-white' : 'line-through text-slate-400'}>
+                                            {otName}
+                                          </span>
+                                        </button>
                                       );
                                     })}
-                                  </select>
-                                  {isOrderTypeDefault ? (
-                                    <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl shrink-0 flex items-center gap-1 shadow-sm">
-                                      ✓ Default
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveUserDefault(emp.fireId, 'orderType', selectedOrderType)}
-                                      className="text-[11px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2.5 py-1.5 rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                                  </div>
+
+                                  {/* Compact Default Order Type selector for Add New Order */}
+                                  <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                                      Default Order Type:
+                                    </label>
+                                    <select
+                                      value={selectedOrderType}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setUserDraftDefaults(prev => ({
+                                          ...prev,
+                                          [emp.fireId]: { ...(prev[emp.fireId] || {}), orderType: val }
+                                        }));
+                                        handleSaveUserDefault(emp.fireId, 'orderType', val);
+                                      }}
+                                      className="bg-[#162035] border border-white/20 text-white font-bold text-[11px] rounded-lg px-2 h-[28px] outline-none focus:border-amber-400 cursor-pointer flex-1 max-w-[160px]"
                                     >
-                                      Make as Default
-                                    </button>
-                                  )}
+                                      {orderTypes.map((ot, idx) => {
+                                        const name = getOrderTypeName(ot);
+                                        return (
+                                          <option key={idx} value={name} className="bg-[#0f172a] text-white">
+                                            {name}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  </div>
                                 </div>
                               </td>
 
                               {/* Role Dropdown + Action */}
-                              <td className="p-4 border-r border-white/10">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                              <td className="px-5 py-4 border-r border-white/10 align-middle">
+                                <div className="flex items-center gap-2">
                                   <select
                                     value={selectedRole}
                                     onChange={(e) => {
@@ -12982,7 +13432,7 @@ export default function Dashboard() {
                                         [emp.fireId]: { ...(prev[emp.fireId] || {}), role: val }
                                       }));
                                     }}
-                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto min-w-[120px]"
+                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-2.5 h-[36px] outline-none focus:border-amber-400 cursor-pointer min-w-[95px] flex-1"
                                   >
                                     {orderRoles.map((r, idx) => {
                                       const name = getOrderRoleName(r);
@@ -13000,24 +13450,24 @@ export default function Dashboard() {
                                     )}
                                   </select>
                                   {isRoleDefault ? (
-                                    <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl shrink-0 flex items-center gap-1 shadow-sm">
+                                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 h-[36px] rounded-xl shrink-0 flex items-center justify-center gap-1 shadow-sm">
                                       ✓ Default
                                     </span>
                                   ) : (
                                     <button
                                       type="button"
                                       onClick={() => handleSaveUserDefault(emp.fireId, 'role', selectedRole)}
-                                      className="text-[11px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2.5 py-1.5 rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                                      className="text-[10px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2 h-[36px] rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap flex items-center justify-center"
                                     >
-                                      Make as Default
+                                      Set Default
                                     </button>
                                   )}
                                 </div>
                               </td>
 
                               {/* Inventory Dropdown + Action */}
-                              <td className="p-4">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                              <td className="px-5 py-4 align-middle">
+                                <div className="flex items-center gap-2">
                                   <select
                                     value={selectedInventory}
                                     onChange={(e) => {
@@ -13027,22 +13477,28 @@ export default function Dashboard() {
                                         [emp.fireId]: { ...(prev[emp.fireId] || {}), inventory: val }
                                       }));
                                     }}
-                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto min-w-[130px]"
+                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-2.5 h-[36px] outline-none focus:border-amber-400 cursor-pointer min-w-[95px] flex-1"
                                   >
-                                    <option value="Inventory 1" className="bg-[#0f172a] text-white">Inventory 1</option>
-                                    <option value="Inventory 2" className="bg-[#0f172a] text-white">Inventory 2</option>
+                                    {inventoriesList.map((inv, idx) => {
+                                      const name = getInventoryItemName(inv);
+                                      return (
+                                        <option key={idx} value={name} className="bg-[#0f172a] text-white">
+                                          {name}
+                                        </option>
+                                      );
+                                    })}
                                   </select>
                                   {isInventoryDefault ? (
-                                    <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl shrink-0 flex items-center gap-1 shadow-sm">
+                                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 h-[36px] rounded-xl shrink-0 flex items-center justify-center gap-1 shadow-sm">
                                       ✓ Default
                                     </span>
                                   ) : (
                                     <button
                                       type="button"
                                       onClick={() => handleSaveUserDefault(emp.fireId, 'inventory', selectedInventory)}
-                                      className="text-[11px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2.5 py-1.5 rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                                      className="text-[10px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2 h-[36px] rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap flex items-center justify-center"
                                     >
-                                      Make as Default
+                                      Set Default
                                     </button>
                                   )}
                                 </div>
@@ -13057,7 +13513,7 @@ export default function Dashboard() {
 
                 {/* Footer notes */}
                 <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between text-xs font-bold text-slate-400 gap-2">
-                  <span>* Changes apply automatically to Add New Order whenever the user logs in.</span>
+                  <span>* Order Type permissions (✓ Tick / ✕ Wrong) take effect immediately across all dashboard views.</span>
                   <span>Configured Approved Users: <strong className="text-emerald-400 font-mono">{approvedEmployees.length}</strong></span>
                 </div>
               </div>
@@ -13330,6 +13786,144 @@ export default function Dashboard() {
                         onClick={() => handleDeleteOrderRole(r)}
                         className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600/60 rounded-lg transition-colors cursor-pointer"
                         title={`Delete "${rName}"`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📦 QUICK INVENTORY MANAGER MODAL */}
+      {isInventoryManagerOpen && (
+        <div
+          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => {
+            setIsInventoryManagerOpen(false);
+            setEditInventoryId(null);
+            setNewInventoryName("");
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-[#111a2e] border border-white/20 rounded-3xl shadow-2xl p-6 text-white overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center font-black border border-amber-400/30">
+                  <Archive size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-amber-400 uppercase tracking-wider">
+                    {editInventoryId ? 'Edit Inventory' : 'Manage Inventories'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Add, rename or remove inventories (Inventory 1, Godown, etc.)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsInventoryManagerOpen(false);
+                  setEditInventoryId(null);
+                  setNewInventoryName("");
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Add / Edit Form */}
+            <form onSubmit={handleAddOrEditInventoryItem} className="space-y-3 mb-5">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Inventory Name</span>
+                  {editInventoryId && <span className="text-amber-400 text-[10px] font-bold">Editing</span>}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    required
+                    type="text"
+                    value={newInventoryName}
+                    onChange={(e) => setNewInventoryName(e.target.value)}
+                    style={{ backgroundColor: '#162035', color: '#ffffff' }}
+                    className="flex-1 font-bold rounded-xl p-3 outline-none border border-white/20 focus:border-amber-400 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
+                    placeholder="e.g. Inventory 1, Inventory 2, Godown, Shop..."
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-3 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 text-xs shrink-0"
+                  >
+                    {editInventoryId ? <CheckCircle2 size={16} /> : <Plus size={16} />}
+                    <span>{editInventoryId ? 'Save' : 'Add'}</span>
+                  </button>
+                </div>
+              </div>
+              {editInventoryId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditInventoryId(null);
+                    setNewInventoryName("");
+                  }}
+                  className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                >
+                  Cancel editing
+                </button>
+              )}
+            </form>
+
+            {/* Inventories List */}
+            <div className="space-y-2 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                Active Inventories ({inventoriesList.length})
+              </label>
+              {inventoriesList.map((inv, idx) => {
+                const invName = getInventoryItemName(inv);
+                const invId = getInventoryItemId(inv, idx);
+                const isBeingEdited = editInventoryId === invId;
+                const count = orders.filter((o: any) => {
+                  const invVal = String(o.inventory || 'Inventory 1').toLowerCase();
+                  return invVal === invName.toLowerCase();
+                }).length;
+
+                return (
+                  <div
+                    key={invId}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                      isBeingEdited
+                        ? 'bg-amber-500/20 border-amber-400'
+                        : 'bg-[#162035] border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Archive size={14} className="text-amber-400 shrink-0" />
+                      <span className="font-bold text-sm text-white truncate">{invName}</span>
+                      <span className="text-[10px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                        {count} {count === 1 ? 'order' : 'orders'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditInventoryId(invId);
+                          setNewInventoryName(invName);
+                        }}
+                        className="p-1.5 text-blue-400 hover:text-white hover:bg-blue-600/60 rounded-lg transition-colors cursor-pointer"
+                        title={`Rename "${invName}"`}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteInventoryItem(inv)}
+                        className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600/60 rounded-lg transition-colors cursor-pointer"
+                        title={`Delete "${invName}"`}
                       >
                         <Trash2 size={13} />
                       </button>
