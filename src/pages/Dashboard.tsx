@@ -796,6 +796,26 @@ export default function Dashboard() {
   const [editOrderTypeId, setEditOrderTypeId] = useState<string | null>(null);
 
   // --- APPROVED USERS ORDER TYPE PERMISSIONS (Tick ✓ / Wrong ✕) ---
+  // Safe order type string comparison & alias matcher (e.g. 'Choco Wrapz' vs 'Choc Wraps', 'Thaaru' vs 'Subtaru')
+  const isOrderTypeMatch = (orderType: string, targetType: string): boolean => {
+    const o = String(orderType || '').trim().toLowerCase();
+    const t = String(targetType || '').trim().toLowerCase();
+    if (!o || !t) return false;
+    if (o === t) return true;
+    const cleanO = o.replace(/[^a-z0-9]/g, '');
+    const cleanT = t.replace(/[^a-z0-9]/g, '');
+    if (cleanO === cleanT) return true;
+    if (cleanO.length >= 3 && cleanT.length >= 3) {
+      if (cleanO.includes(cleanT) || cleanT.includes(cleanO)) return true;
+    }
+    return false;
+  };
+
+  const isOrderMatchingAllowedTypes = (orderType: string, allowedTypes: string[]): boolean => {
+    if (!allowedTypes || allowedTypes.length === 0) return true;
+    return allowedTypes.some(allowed => isOrderTypeMatch(orderType, allowed));
+  };
+
   const getEmployeeAllowedOrderTypes = (emp: any): string[] => {
     if (!emp) return [];
     if (Array.isArray(emp.allowedOrderTypes)) {
@@ -809,6 +829,44 @@ export default function Dashboard() {
       }
     } catch (e) {}
     // If not explicitly configured yet, default to all available order types
+    return orderTypes.map(ot => getOrderTypeName(ot));
+  };
+
+  // Get assigned order types specifically configured for a user (Order Type Access ✓/✕ or Default Order Type)
+  const getEmployeeAssignedOrderTypes = (emp: any): string[] => {
+    if (!emp) return [];
+
+    let allowed: string[] = [];
+    if (Array.isArray(emp.allowedOrderTypes)) {
+      allowed = emp.allowedOrderTypes.map((t: any) => String(t || '').trim()).filter(Boolean);
+    } else {
+      try {
+        const saved = localStorage.getItem(`sabi_allowed_orderTypes_${emp.fireId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            allowed = parsed.map((t: any) => String(t || '').trim()).filter(Boolean);
+          }
+        }
+      } catch (e) {}
+    }
+
+    // If allowedOrderTypes was explicitly configured and is restricted (e.g. only Choc Wraps):
+    if (allowed.length > 0 && orderTypes.length > 0 && allowed.length < orderTypes.length) {
+      return allowed;
+    }
+
+    // Check defaultOrderType
+    const defType = emp.defaultOrderType || (emp.fireId ? localStorage.getItem(`sabi_default_orderType_${emp.fireId}`) : null);
+    if (defType && String(defType).trim()) {
+      return [String(defType).trim()];
+    }
+
+    if (allowed.length > 0) {
+      return allowed;
+    }
+
+    // Default fallback to all order types
     return orderTypes.map(ot => getOrderTypeName(ot));
   };
 
@@ -907,6 +965,12 @@ export default function Dashboard() {
       }
     } catch (e) {}
 
+    // Check defaultOrderType if allowedOrderTypes wasn't explicitly configured
+    const defType = currentLoggedInEmployee.defaultOrderType || (currentLoggedInEmployee.fireId ? localStorage.getItem(`sabi_default_orderType_${currentLoggedInEmployee.fireId}`) : null);
+    if (defType && String(defType).trim()) {
+      return [String(defType).trim().toLowerCase()];
+    }
+
     return null;
   }, [role, currentLoggedInEmployee]);
 
@@ -962,23 +1026,73 @@ export default function Dashboard() {
 
   // --- MONTHLY TARGET STATE & COMPUTATION ---
   const [targetMonthKey, setTargetMonthKey] = useState<string>(() => format(new Date(), "yyyy-MM"));
+  const [monthlyTargetsDocData, setMonthlyTargetsDocData] = useState<any>({});
   const [monthlyTarget, setMonthlyTarget] = useState<number>(() => {
-    const currentKey = format(new Date(), "yyyy-MM");
-    const saved = localStorage.getItem(`sabi_monthly_target_${currentKey}`);
-    return saved ? Number(saved) : 5000;
+    try {
+      const currentKey = format(new Date(), "yyyy-MM");
+      const saved = localStorage.getItem(`sabi_monthly_target_${currentKey}`);
+      return saved ? Number(saved) : 5000;
+    } catch (e) {
+      return 5000;
+    }
   });
   const [isEditingTarget, setIsEditingTarget] = useState<boolean>(false);
   const [targetInput, setTargetInput] = useState<string>("");
+  const [targetUserFilter, setTargetUserFilter] = useState<string>(() => {
+    try {
+      return localStorage.getItem('sabi_target_user_filter') || 'All';
+    } catch (e) {
+      return 'All';
+    }
+  });
 
+  // Active target user: If role is Employee, locked to currentLoggedInEmployee; if Admin, can be chosen via dropdown or 'All'
+  const targetActiveUser = useMemo(() => {
+    if (role === 'Employee') {
+      return currentLoggedInEmployee;
+    }
+    if (targetUserFilter !== 'All') {
+      return employees.find(e => e.fireId === targetUserFilter || e.name === targetUserFilter || e.username === targetUserFilter) || null;
+    }
+    return null;
+  }, [role, currentLoggedInEmployee, targetUserFilter, employees]);
+
+  // Active target assigned order types:
+  const targetAssignedTypes = useMemo(() => {
+    // 1. If targeting a specific employee (either logged in Employee or Admin selected employee):
+    if (targetActiveUser) {
+      const assigned = getEmployeeAssignedOrderTypes(targetActiveUser);
+      if (assigned.length > 0) return assigned;
+    }
+
+    // 2. If logged in Employee and has allowed order types:
+    if (role === 'Employee' && currentUserAllowedOrderTypes && currentUserAllowedOrderTypes.length > 0) {
+      return currentUserAllowedOrderTypes;
+    }
+
+    // 3. If Admin selected an Order Type directly in the target filter:
+    if (targetUserFilter !== 'All' && !targetActiveUser) {
+      const matchedOt = orderTypes.find(ot => isOrderTypeMatch(getOrderTypeName(ot), targetUserFilter));
+      if (matchedOt) {
+        return [getOrderTypeName(matchedOt)];
+      }
+    }
+
+    return [];
+  }, [targetActiveUser, role, currentUserAllowedOrderTypes, targetUserFilter, orderTypes, employees]);
+
+  // Real-time Firestore sync for monthly targets
   useEffect(() => {
     const unsubTarget = onSnapshot(doc(db, "monthly_targets", targetMonthKey), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        setMonthlyTargetsDocData(data);
         if (data.targetGoal !== undefined) {
           setMonthlyTarget(Number(data.targetGoal));
           localStorage.setItem(`sabi_monthly_target_${targetMonthKey}`, String(data.targetGoal));
         }
       } else {
+        setMonthlyTargetsDocData({});
         const saved = localStorage.getItem(`sabi_monthly_target_${targetMonthKey}`);
         setMonthlyTarget(saved ? Number(saved) : 5000);
       }
@@ -986,18 +1100,67 @@ export default function Dashboard() {
     return () => unsubTarget();
   }, [targetMonthKey]);
 
+  // Derive active target goal based on selected user or assigned type
+  const effectiveMonthlyTarget = useMemo(() => {
+    const userGoals = monthlyTargetsDocData?.userGoals || {};
+    const typeGoals = monthlyTargetsDocData?.typeGoals || {};
+
+    if (targetActiveUser) {
+      if (userGoals[targetActiveUser.fireId] !== undefined) return Number(userGoals[targetActiveUser.fireId]);
+      if (userGoals[targetActiveUser.name] !== undefined) return Number(userGoals[targetActiveUser.name]);
+      const savedUser = localStorage.getItem(`sabi_target_goal_${targetMonthKey}_${targetActiveUser.fireId}`);
+      if (savedUser) return Number(savedUser);
+    }
+
+    if (targetAssignedTypes.length === 1) {
+      const typeKey = targetAssignedTypes[0];
+      if (typeGoals[typeKey] !== undefined) return Number(typeGoals[typeKey]);
+      const savedType = localStorage.getItem(`sabi_target_goal_${targetMonthKey}_${typeKey}`);
+      if (savedType) return Number(savedType);
+    }
+
+    if (monthlyTargetsDocData?.targetGoal !== undefined) {
+      return Number(monthlyTargetsDocData.targetGoal);
+    }
+    return monthlyTarget || 5000;
+  }, [monthlyTargetsDocData, targetActiveUser, targetAssignedTypes, targetMonthKey, monthlyTarget]);
+
   const handleSaveTarget = async () => {
     const val = Number(targetInput);
-    if (!isNaN(val) && val >= 0) {
-      setMonthlyTarget(val);
-      localStorage.setItem(`sabi_monthly_target_${targetMonthKey}`, String(val));
-      setIsEditingTarget(false);
-      try {
-        await setDoc(doc(db, "monthly_targets", targetMonthKey), { targetGoal: val, updatedAt: new Date().toISOString() }, { merge: true });
-        toast.success(`Monthly target set to ${val.toLocaleString()}`);
-      } catch (e) {
-        console.error("Error saving target:", e);
+    if (isNaN(val) || val <= 0) {
+      toast.error("Please enter a valid target quantity number");
+      return;
+    }
+    setIsEditingTarget(false);
+
+    try {
+      let updatePayload: any = { updatedAt: new Date().toISOString() };
+
+      if (targetActiveUser) {
+        const newUserGoals = { ...(monthlyTargetsDocData?.userGoals || {}), [targetActiveUser.fireId]: val, [targetActiveUser.name]: val };
+        updatePayload.userGoals = newUserGoals;
+        setMonthlyTargetsDocData((prev: any) => ({ ...prev, userGoals: newUserGoals }));
+        localStorage.setItem(`sabi_target_goal_${targetMonthKey}_${targetActiveUser.fireId}`, String(val));
+        toast.success(`Monthly target for ${targetActiveUser.name} set to ${val.toLocaleString()}`);
+      } else if (targetAssignedTypes.length === 1) {
+        const typeKey = targetAssignedTypes[0];
+        const newTypeGoals = { ...(monthlyTargetsDocData?.typeGoals || {}), [typeKey]: val };
+        updatePayload.typeGoals = newTypeGoals;
+        setMonthlyTargetsDocData((prev: any) => ({ ...prev, typeGoals: newTypeGoals }));
+        localStorage.setItem(`sabi_target_goal_${targetMonthKey}_${typeKey}`, String(val));
+        toast.success(`Monthly target for "${typeKey}" set to ${val.toLocaleString()}`);
+      } else {
+        updatePayload.targetGoal = val;
+        setMonthlyTarget(val);
+        setMonthlyTargetsDocData((prev: any) => ({ ...prev, targetGoal: val }));
+        localStorage.setItem(`sabi_monthly_target_${targetMonthKey}`, String(val));
+        toast.success(`Overall monthly target set to ${val.toLocaleString()}`);
       }
+
+      await setDoc(doc(db, "monthly_targets", targetMonthKey), updatePayload, { merge: true });
+    } catch (e) {
+      console.error("Error saving target:", e);
+      toast.error("Saved locally. Could not sync target to cloud.");
     }
   };
 
@@ -2043,8 +2206,21 @@ export default function Dashboard() {
       const categoryMatch = activeTab === 'dashboard2' ? isProduct : !isProduct;
       if (!categoryMatch) return sum;
 
-      const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
-      if (!typeMatch) return sum;
+      const orderTypeVal = String(order.orderType || getOrderTypeName(orderTypes[0]) || "Thaaru").trim();
+
+      // 🎯 TARGET SPECIFIC RESTRICTION:
+      // If user/target filter has assigned order types (e.g. only "Choc Wraps" for Kavilaya),
+      // ONLY orders matching those assigned order types are displayed under targets!
+      if (targetAssignedTypes.length > 0) {
+        const matchesAssigned = isOrderMatchingAllowedTypes(orderTypeVal, targetAssignedTypes);
+        if (!matchesAssigned) return sum;
+      }
+
+      // Check active tab order type filter if set
+      if (curTableTypeFilter !== 'All') {
+        const matchesTableFilter = isOrderTypeMatch(orderTypeVal, curTableTypeFilter);
+        if (!matchesTableFilter) return sum;
+      }
 
       const roleMatch = activeTab === 'dashboard2'
         ? (curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase())
@@ -2064,17 +2240,17 @@ export default function Dashboard() {
       }
       return sum;
     }, 0);
-  }, [orders, targetMonthKey, activeTab, d1TableTypeFilter, d2TableTypeFilter, d1RoleFilter, d2RoleFilter, d1InventoryFilter]);
+  }, [orders, targetMonthKey, activeTab, d1TableTypeFilter, d2TableTypeFilter, d1RoleFilter, d2RoleFilter, d1InventoryFilter, targetAssignedTypes, orderTypes]);
 
-  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthItems / monthlyTarget) * 100)) : 0;
+  const targetPercentage = effectiveMonthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthItems / effectiveMonthlyTarget) * 100)) : 0;
   const currentMonthKey = format(new Date(), "yyyy-MM");
   const isMonthPast = targetMonthKey < currentMonthKey;
   const isMonthCurrent = targetMonthKey === currentMonthKey;
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const isMonthEnd = isMonthPast || (isMonthCurrent && now.getDate() >= daysInMonth);
-  const isTargetCompleted = selectedMonthItems >= monthlyTarget && monthlyTarget > 0;
-  const isTargetFailed = isMonthEnd && selectedMonthItems < monthlyTarget;
+  const isTargetCompleted = selectedMonthItems >= effectiveMonthlyTarget && effectiveMonthlyTarget > 0;
+  const isTargetFailed = isMonthEnd && selectedMonthItems < effectiveMonthlyTarget;
 
   // Wrapper helpers for cost analytics states depending on Reports vs Inventories settings
   const isInvAdmin = (activeTab as any) === 'inventories_admin_panel';
@@ -7116,19 +7292,26 @@ export default function Dashboard() {
                       <select
                         value={tableTypeFilter}
                         onChange={(e) => setTableTypeFilter(e.target.value)}
-                        className="p-2 border border-white/20 rounded-xl text-xs font-bold text-amber-300 outline-none focus:ring-2 focus:ring-amber-500 bg-[#162035] cursor-pointer shadow-inner"
-                        title="Filter by Order Type (Sabi / Thaaru)"
+                        className="p-2 border border-white/20 rounded-xl text-xs font-bold text-amber-300 outline-none focus:ring-2 focus:ring-amber-500 bg-[#162035] cursor-pointer shadow-inner max-w-[130px] truncate"
+                        title="Filter by Order Type"
                       >
-                        <option value="All" className="bg-[#0d1527] text-white">All Types</option>
-                        {orderTypes.map((ot, idx) => {
-                          const name = getOrderTypeName(ot);
-                          const id = getOrderTypeId(ot, idx);
-                          return (
-                            <option key={id} value={name} className="bg-[#0d1527] text-white">
-                              {name}
-                            </option>
-                          );
-                        })}
+                        <option value="All" className="bg-[#0d1527] text-white">
+                          {currentUserAllowedOrderTypes && currentUserAllowedOrderTypes.length > 0 ? "All Assigned Types" : "All Types"}
+                        </option>
+                        {orderTypes
+                          .filter(ot => {
+                            if (currentUserAllowedOrderTypes === null) return true;
+                            return currentUserAllowedOrderTypes.some(allowed => isOrderTypeMatch(getOrderTypeName(ot), allowed));
+                          })
+                          .map((ot, idx) => {
+                            const name = getOrderTypeName(ot);
+                            const id = getOrderTypeId(ot, idx);
+                            return (
+                              <option key={id} value={name} className="bg-[#0d1527] text-white">
+                                {name}
+                              </option>
+                            );
+                          })}
                       </select>
                     </div>
                   </div>
@@ -7538,11 +7721,58 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Card Header: Title + Month/Year Picker + Target Edit Trigger */}
-                    <div className="flex justify-between items-center mb-1 relative z-10 gap-1.5">
-                      <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Card Header: Title + User/Type Filter + Month/Year Picker + Target Edit Trigger */}
+                    <div className="flex justify-between items-center mb-1 relative z-10 gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                         <p className="text-xs font-black text-amber-400 tracking-wide uppercase drop-shadow-sm shrink-0">Targets</p>
                         
+                        {/* If Admin: allow filtering Target metrics by specific user or order type or overall */}
+                        {role === 'Admin' ? (
+                          <select
+                            value={targetUserFilter}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setTargetUserFilter(val);
+                              try { localStorage.setItem('sabi_target_user_filter', val); } catch (_) {}
+                            }}
+                            className="bg-[#162035] border border-amber-400/40 text-amber-300 text-[10px] font-black rounded-lg px-2 py-0.5 outline-none cursor-pointer hover:border-amber-300 transition-colors shadow-sm max-w-[130px] truncate"
+                            title="Filter Target by Assigned User or Order Type"
+                          >
+                            <option value="All" className="bg-[#0f172a] text-white">Overall Metrics</option>
+                            {approvedEmployees.length > 0 && (
+                              <optgroup label="Approved Users" className="bg-[#0f172a] text-slate-300 font-bold">
+                                {approvedEmployees.map(emp => {
+                                  const assigned = getEmployeeAssignedOrderTypes(emp);
+                                  const label = assigned.length > 0 ? `${emp.name} (${assigned.join(', ')})` : emp.name;
+                                  return (
+                                    <option key={emp.fireId} value={emp.fireId} className="bg-[#0f172a] text-white">
+                                      👤 {label}
+                                    </option>
+                                  );
+                                })}
+                              </optgroup>
+                            )}
+                            <optgroup label="Order Types" className="bg-[#0f172a] text-slate-300 font-bold">
+                              {orderTypes.map((ot, idx) => {
+                                const name = getOrderTypeName(ot);
+                                return (
+                                  <option key={idx} value={name} className="bg-[#0f172a] text-white">
+                                    🏷️ {name}
+                                  </option>
+                                );
+                              })}
+                            </optgroup>
+                          </select>
+                        ) : (
+                          /* If Employee: display their assigned page/order type badge */
+                          <span 
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/30 truncate max-w-[130px]" 
+                            title={`Assigned Page/Type: ${targetAssignedTypes.join(', ') || 'All Types'}`}
+                          >
+                            {targetAssignedTypes.length > 0 ? targetAssignedTypes.join(', ') : 'All Types'}
+                          </span>
+                        )}
+
                         {/* Month & Year Editable Picker Badge */}
                         <div className="relative shrink-0">
                           <input
@@ -7568,7 +7798,7 @@ export default function Dashboard() {
                         {!isEditingTarget ? (
                           <button
                             onClick={() => {
-                              setTargetInput(String(monthlyTarget));
+                              setTargetInput(String(effectiveMonthlyTarget));
                               setIsEditingTarget(true);
                             }}
                             className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 flex items-center justify-center transition-all cursor-pointer border border-amber-400/40 shadow-md"
@@ -7609,6 +7839,17 @@ export default function Dashboard() {
                       </div>
                     </div>
 
+                    {/* Sub-header: Active Page/Type Indicator when filtered */}
+                    {targetAssignedTypes.length > 0 && (
+                      <div className="relative z-10 flex items-center gap-1.5 text-[10px] font-black text-slate-300 bg-white/5 px-2 py-0.5 rounded-md border border-white/10 w-fit">
+                        <span className="text-amber-400 uppercase tracking-wider text-[9px]">Active:</span>
+                        <span className="text-white font-bold truncate max-w-[160px]">{targetAssignedTypes.join(', ')}</span>
+                        {targetActiveUser && role === 'Admin' && (
+                          <span className="text-amber-300/90 font-mono text-[9px]">({targetActiveUser.name})</span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Middle: Live Progress Count with High Contrast */}
                     <div className="relative z-10 my-1">
                       <div className="flex items-baseline justify-between">
@@ -7616,7 +7857,7 @@ export default function Dashboard() {
                           {selectedMonthItems.toLocaleString()}
                         </span>
                         <span className="text-sm font-black text-amber-300 tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
-                          / {monthlyTarget.toLocaleString()} Pcs
+                          / {effectiveMonthlyTarget.toLocaleString()} Pcs
                         </span>
                       </div>
                       
