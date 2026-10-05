@@ -19,7 +19,7 @@ import { getNextSequentialOrderId } from "@/lib/concurrency";
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CalendarDays, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -468,11 +468,8 @@ export default function Dashboard() {
   const [showAmounts, setShowAmounts] = useState<boolean>(false);
 
   const maskAmount = (val: string | number) => {
-    if (showAmounts) {
-      if (typeof val === 'number') return `₹${val.toLocaleString()}`;
-      return String(val).startsWith('₹') ? val : `₹${val}`;
-    }
-    return '₹••••••';
+    if (typeof val === 'number') return `₹${val.toLocaleString('en-IN')}`;
+    return String(val).startsWith('₹') ? val : `₹${val}`;
   };
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -558,7 +555,84 @@ export default function Dashboard() {
     return DEFAULT_CHOCOLATES.map((c, i) => ({ fireId: `init-${i + 1}`, ...c }));
   });
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
-  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types' | 'locations' | 'roles'>('order_types');
+  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types' | 'locations' | 'roles' | 'users'>('order_types');
+  const [selectedInventoryTab, setSelectedInventoryTab] = useState<'Inventory 1' | 'Inventory 2'>('Inventory 1');
+  const [userDraftDefaults, setUserDraftDefaults] = useState<Record<string, { orderType?: string; role?: string; inventory?: string }>>({});
+
+  const approvedEmployees = useMemo(() => {
+    return employees.filter(e => String(e.status || '').toLowerCase() === 'approved');
+  }, [employees]);
+
+  const handleSaveUserDefault = async (fireId: string, field: 'orderType' | 'role' | 'inventory', value: string) => {
+    try {
+      const fieldKey = field === 'orderType' ? 'defaultOrderType' : field === 'role' ? 'defaultRole' : 'defaultInventory';
+      await updateDoc(doc(db, "employees", fireId), {
+        [fieldKey]: value
+      });
+
+      setEmployees(prev => prev.map(e => e.fireId === fireId ? { ...e, [fieldKey]: value } : e));
+
+      setUserDraftDefaults(prev => ({
+        ...prev,
+        [fireId]: {
+          ...prev[fireId],
+          [field]: value
+        }
+      }));
+
+      const currentEmployeeId = typeof window !== "undefined" ? localStorage.getItem('employeeId') : null;
+      const targetUser = employees.find(e => e.fireId === fireId);
+      if (currentEmployeeId === fireId || (targetUser && (targetUser.name === loggedInName || targetUser.username === loggedInName))) {
+        localStorage.setItem(`user_default_${field}`, value);
+      }
+
+      toast.success(`Default ${field === 'orderType' ? 'Order Type' : field === 'role' ? 'Role' : 'Inventory'} set to "${value}" for ${targetUser?.name || 'user'}`);
+      logActivity(`Updated Default ${field} to "${value}" for ${targetUser?.name || 'user'}`, 'Employees');
+    } catch (err) {
+      console.error("Failed to save user default:", err);
+      toast.error("Failed to save default settings");
+    }
+  };
+
+  const handleSaveAllUserDefaults = async (fireId: string, orderTypeVal: string, roleVal: string, inventoryVal: string) => {
+    try {
+      await updateDoc(doc(db, "employees", fireId), {
+        defaultOrderType: orderTypeVal,
+        defaultRole: roleVal,
+        defaultInventory: inventoryVal
+      });
+
+      setEmployees(prev => prev.map(e => e.fireId === fireId ? {
+        ...e,
+        defaultOrderType: orderTypeVal,
+        defaultRole: roleVal,
+        defaultInventory: inventoryVal
+      } : e));
+
+      setUserDraftDefaults(prev => ({
+        ...prev,
+        [fireId]: {
+          orderType: orderTypeVal,
+          role: roleVal,
+          inventory: inventoryVal
+        }
+      }));
+
+      const currentEmployeeId = typeof window !== "undefined" ? localStorage.getItem('employeeId') : null;
+      const targetUser = employees.find(e => e.fireId === fireId);
+      if (currentEmployeeId === fireId || (targetUser && (targetUser.name === loggedInName || targetUser.username === loggedInName))) {
+        localStorage.setItem(`user_default_orderType`, orderTypeVal);
+        localStorage.setItem(`user_default_role`, roleVal);
+        localStorage.setItem(`user_default_inventory`, inventoryVal);
+      }
+
+      toast.success(`Saved all default configurations for ${targetUser?.name || 'user'}`);
+      logActivity(`Saved all defaults for ${targetUser?.name || 'user'}`, 'Employees');
+    } catch (err) {
+      console.error("Failed to save user defaults:", err);
+      toast.error("Failed to save default settings");
+    }
+  };
 
   // Helper for checking Thaaru & Choco Wrapz orders
   const isThaaruOrder = (type?: string): boolean => String(type || '').trim().toLowerCase() === 'thaaru';
@@ -783,7 +857,8 @@ export default function Dashboard() {
         return {
           fireId: doc.id,
           ...data,
-          role: data.role || fallbackRole
+          role: data.role || fallbackRole,
+          inventory: data.inventory || 'Inventory 1'
         };
       });
       ordersList.sort((a: any, b: any) => b.id - a.id);
@@ -1509,33 +1584,106 @@ export default function Dashboard() {
   const paretoMonthPickerRef = useRef<HTMLDivElement>(null);
   const paretoYearPickerRef = useRef<HTMLDivElement>(null);
 
-  const handleRevenueMonthChange = (monthKey: string) => {
-    if (!monthKey) {
+  // Helper to compute date range when month and/or year are selected
+  const computeRevenueDateRange = (monthVal: string, yearVal: string) => {
+    const cleanMonth = monthVal.includes('-') ? monthVal.split('-')[1] : monthVal;
+    const cleanYear = yearVal || (monthVal.includes('-') ? monthVal.split('-')[0] : '');
+
+    // Case 1: Both Month and Year are present
+    if (cleanMonth && cleanYear) {
+      const y = parseInt(cleanYear, 10);
+      const m = parseInt(cleanMonth, 10);
+      if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+        const startDate = new Date(y, m - 1, 1);
+        const endDate = new Date(y, m, 0);
+        return {
+          from: format(startDate, "yyyy-MM-dd"),
+          to: format(endDate, "yyyy-MM-dd"),
+          year: String(y),
+          month: cleanMonth.padStart(2, '0')
+        };
+      }
+    }
+
+    // Case 2: Only Year is present
+    if (cleanYear) {
+      const y = parseInt(cleanYear, 10);
+      if (!isNaN(y)) {
+        return {
+          from: `${cleanYear}-01-01`,
+          to: `${cleanYear}-12-31`,
+          year: cleanYear,
+          month: ""
+        };
+      }
+    }
+
+    // Case 3: Neither
+    return { from: "", to: "", year: "", month: "" };
+  };
+
+  const handleRevenueMonthChange = (monthVal: string, yearOverride?: number | string) => {
+    // If clearing month:
+    if (!monthVal) {
+      setRevenueMonthKey("");
+      if (revenueYearKey) {
+        // Keep year filter active across whole year
+        setDateFilter({ from: `${revenueYearKey}-01-01`, to: `${revenueYearKey}-12-31` });
+      } else {
+        setDateFilter({ from: "", to: "" });
+      }
+      return;
+    }
+
+    const cleanMonth = monthVal.includes('-') ? monthVal.split('-')[1] : monthVal;
+    const targetYear = String(
+      yearOverride ||
+      (monthVal.includes('-') ? monthVal.split('-')[0] : '') ||
+      revenueYearKey ||
+      paretoMonthPickerYear ||
+      new Date().getFullYear()
+    );
+
+    // If clicking the already selected month in the same year, toggle off (clear month)
+    if (cleanMonth === revenueMonthKey && targetYear === revenueYearKey) {
+      setRevenueMonthKey("");
+      setDateFilter({ from: `${targetYear}-01-01`, to: `${targetYear}-12-31` });
+      return;
+    }
+
+    const range = computeRevenueDateRange(cleanMonth, targetYear);
+    setRevenueMonthKey(cleanMonth);
+    setRevenueYearKey(targetYear);
+    setDateFilter({ from: range.from, to: range.to });
+    setParetoMonthPickerYear(parseInt(targetYear, 10));
+  };
+
+  const handleRevenueYearChange = (yearVal: string) => {
+    if (!yearVal) {
+      // Clear year -> clears both year and month
+      setRevenueYearKey("");
       setRevenueMonthKey("");
       setDateFilter({ from: "", to: "" });
       return;
     }
-    setRevenueMonthKey(monthKey);
-    setRevenueYearKey("");
-    const [yearStr, monthStr] = monthKey.split('-');
-    const y = parseInt(yearStr, 10);
-    const m = parseInt(monthStr, 10);
-    const startDate = new Date(y, m - 1, 1);
-    const endDate = new Date(y, m, 0);
-    const fromStr = format(startDate, "yyyy-MM-dd");
-    const toStr = format(endDate, "yyyy-MM-dd");
-    setDateFilter({ from: fromStr, to: toStr });
-  };
 
-  const handleRevenueYearChange = (yearStr: string) => {
-    if (!yearStr) {
+    // If toggling off active year when no month is selected
+    if (yearVal === revenueYearKey && !revenueMonthKey) {
       setRevenueYearKey("");
       setDateFilter({ from: "", to: "" });
       return;
     }
-    setRevenueYearKey(yearStr);
-    setRevenueMonthKey("");
-    setDateFilter({ from: `${yearStr}-01-01`, to: `${yearStr}-12-31` });
+
+    setRevenueYearKey(yearVal);
+    setParetoMonthPickerYear(parseInt(yearVal, 10));
+
+    // If a month was already selected, update date range to that month in the NEW year!
+    if (revenueMonthKey) {
+      const range = computeRevenueDateRange(revenueMonthKey, yearVal);
+      setDateFilter({ from: range.from, to: range.to });
+    } else {
+      setDateFilter({ from: `${yearVal}-01-01`, to: `${yearVal}-12-31` });
+    }
   };
 
   const availableRevenueYears = useMemo(() => {
@@ -1556,12 +1704,17 @@ export default function Dashboard() {
 
   const formattedRevenueMonthLabel = useMemo(() => {
     if (!revenueMonthKey) return "Month";
-    const [yStr, mStr] = revenueMonthKey.split('-');
+    const mStr = revenueMonthKey.includes('-') ? revenueMonthKey.split('-')[1] : revenueMonthKey;
     const monthItem = PARETO_MONTHS_LIST.find(m => m.value === mStr);
-    const mName = monthItem ? monthItem.label : mStr;
-    const shortYear = yStr && yStr.length === 4 ? `'${yStr.substring(2)}` : yStr;
-    return `${mName} ${shortYear}`;
+    return monthItem ? monthItem.label : mStr;
   }, [revenueMonthKey]);
+
+  useEffect(() => {
+    const currentTabYear = activeTab === 'dashboard2' ? d2RevenueYearKey : d1RevenueYearKey;
+    if (currentTabYear && /^\d{4}$/.test(currentTabYear)) {
+      setParetoMonthPickerYear(parseInt(currentTabYear, 10));
+    }
+  }, [activeTab, d1RevenueYearKey, d2RevenueYearKey]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -2031,7 +2184,8 @@ export default function Dashboard() {
     date: new Date().toISOString().split('T')[0],
     chocolate: "",
     boxCount: "",
-    itemsPerBox: ""
+    itemsPerBox: "",
+    inventory: "Inventory 1"
   });
   const [editInvId, setEditInvId] = useState<string | null>(null);
   const [viewingInvLog, setViewingInvLog] = useState<any>(null);
@@ -2100,7 +2254,7 @@ export default function Dashboard() {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale' });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale', inventory: "Inventory 1" });
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
 
@@ -2241,6 +2395,7 @@ export default function Dashboard() {
     dynamicInventory.forEach(c => balances[c] = 0);
 
     inventoryLogs.forEach(log => {
+      if ((log.inventory || 'Inventory 1') !== selectedInventoryTab) return;
       const key = normalizeChocName(String(log.chocolate), dynamicInventory);
       if (balances[key] !== undefined) {
         const qty = Number(log.boxCount || 0) * Number(log.itemsPerBox || 0);
@@ -2248,9 +2403,9 @@ export default function Dashboard() {
       }
     });
 
-
     orders.forEach(order => {
       if (order.orderStatus === 'cancelled') return;
+      if ((order.inventory || 'Inventory 1') !== selectedInventoryTab) return;
       // Exclude 'Self' orders from inventory calculations (only 'Others' affect inventory)
       const isSelf = order.role === 'Self';
       if (isSelf) return;
@@ -2270,7 +2425,7 @@ export default function Dashboard() {
     });
 
     return balances;
-  }, [inventoryLogs, orders, dynamicInventory]);
+  }, [inventoryLogs, orders, dynamicInventory, selectedInventoryTab]);
 
   const currentInventoryValueData = useMemo(() => {
     const CURRENT_INVENTORY_RETAIL_PRICES: Record<string, number> = {
@@ -3195,10 +3350,23 @@ export default function Dashboard() {
     const category = (categoryOverride === 'chocolate' || categoryOverride === 'product')
       ? categoryOverride
       : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+
+    const currentEmp = employees.find(e => 
+      (employeeId && (e.fireId === employeeId || e.id === employeeId || e.employeeId === employeeId)) ||
+      (loggedInName && (e.name === loggedInName || e.username === loggedInName))
+    );
+    const userDefaultOrderType = currentEmp?.defaultOrderType || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_orderType_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_orderType');
+    const userDefaultRole = currentEmp?.defaultRole || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_role_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_role');
+    const userDefaultInventory = currentEmp?.defaultInventory || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_inventory_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_inventory');
+
+    const initialOrderType = userDefaultOrderType || getOrderTypeName(orderTypes[0]) || "Sabi";
+    const initialRole = userDefaultRole || "Others";
+    const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
+
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
     setChocolateRows([{ chocolate: "", count: "" }]);
     setProductRows([{ productName: "", quantity: "", price: "" }]);
-    setOrderTypeOthersToggle(true);
+    setOrderTypeOthersToggle(initialRole !== 'Self');
     setIsModalOpen(true);
   };
 
@@ -3214,6 +3382,18 @@ export default function Dashboard() {
     } catch (e) {
       console.error("Failed to mark notification as read:", e);
     }
+
+    const currentEmp = employees.find(e => 
+      (employeeId && (e.fireId === employeeId || e.id === employeeId || e.employeeId === employeeId)) ||
+      (loggedInName && (e.name === loggedInName || e.username === loggedInName))
+    );
+    const userDefaultOrderType = currentEmp?.defaultOrderType || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_orderType_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_orderType');
+    const userDefaultRole = currentEmp?.defaultRole || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_role_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_role');
+    const userDefaultInventory = currentEmp?.defaultInventory || (currentEmp?.fireId ? localStorage.getItem(`sabi_default_inventory_${currentEmp.fireId}`) : null) || localStorage.getItem('user_default_inventory');
+
+    const initialOrderType = userDefaultOrderType || getOrderTypeName(orderTypes[0]) || "Sabi";
+    const initialRole = userDefaultRole || "Others";
+    const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
     setFormData({
       id: null,
@@ -3231,8 +3411,9 @@ export default function Dashboard() {
       discount: 0,
       isDeliveryFree: false,
       isChennai: false,
-      orderType: getOrderTypeName(orderTypes[0]) || "Sabi",
-      role: "Others",
+      orderType: initialOrderType,
+      role: initialRole,
+      inventory: initialInventory,
       orderStatus: "image edited (not paid)",
       category,
       manualDeliveryFee: "",
@@ -3241,7 +3422,7 @@ export default function Dashboard() {
       pricingType: 'retail'
     });
     setChocolateRows([{ chocolate: "", count: String(n.chocolateCount || "") }]);
-    setOrderTypeOthersToggle(true);
+    setOrderTypeOthersToggle(initialRole !== 'Self');
     setIsModalOpen(true);
   };
 
@@ -3263,6 +3444,7 @@ export default function Dashboard() {
       isChennai: order.isChennai || false,
       orderType: order.orderType || "Thaaru",
       role: currentRole,
+      inventory: order.inventory || "Inventory 1",
       orderStatus: order.orderStatus || "image edited (not paid)",
       category: orderCat,
       manualDeliveryFee: order.manualDeliveryFee || "",
@@ -3711,6 +3893,7 @@ export default function Dashboard() {
 
     const formattedOrder: any = {
       ...formData,
+      inventory: formData.inventory || "Inventory 1",
       phone: formatPhoneNumber(formData.phone),
       orderDate: formatToDisplayDate(formData.orderDate) || "",
       functionDate: formatToDisplayDate(formData.functionDate) || "",
@@ -3895,7 +4078,8 @@ export default function Dashboard() {
       boxCount: Number(invForm.boxCount),
       itemsPerBox: Number(invForm.itemsPerBox),
       totalChocolates: Number(invForm.boxCount) * Number(invForm.itemsPerBox),
-      type: "Purchase"
+      type: "Purchase",
+      inventory: invForm.inventory || selectedInventoryTab || "Inventory 1"
     };
 
     try {
@@ -6279,10 +6463,23 @@ export default function Dashboard() {
           {activeTab === 'inventories' && (
             <div className="space-y-6 print:hidden animate-in fade-in duration-300">
 
-              <div className="bg-[#0d1527] p-4 rounded-2xl shadow-2xl border border-white/15 flex justify-between items-center gap-4">
-                <h2 className="text-xl font-black text-amber-400 flex items-center gap-2">
-                  <Archive className="text-amber-400" /> Stock Control Center
-                </h2>
+              <div className="bg-[#0d1527] p-4 rounded-2xl shadow-2xl border border-white/15 flex flex-wrap justify-between items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <h2 className="text-xl font-black text-amber-400 flex items-center gap-2">
+                    <Archive className="text-amber-400" /> Stock Control Center
+                  </h2>
+                  <div className="flex items-center gap-2 bg-[#131c2e] px-3 py-1.5 rounded-xl border border-amber-500/30 shadow-inner">
+                    <label className="text-xs font-bold text-amber-400 uppercase tracking-wider">Inventory:</label>
+                    <select
+                      value={selectedInventoryTab}
+                      onChange={(e) => setSelectedInventoryTab(e.target.value as 'Inventory 1' | 'Inventory 2')}
+                      className="bg-[#0b1329] text-white font-black text-sm px-3 py-1 rounded-lg border border-white/20 focus:outline-none focus:border-amber-400 cursor-pointer"
+                    >
+                      <option value="Inventory 1" className="bg-[#0d1527] text-white">Inventory 1</option>
+                      <option value="Inventory 2" className="bg-[#0d1527] text-white">Inventory 2</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => document.getElementById('inventories-wallpaper-upload')?.click()}
@@ -6317,7 +6514,9 @@ export default function Dashboard() {
                   }`}
               >
                 <div className="flex items-center justify-center gap-3 mb-6">
-                  <h2 className="text-3xl font-black text-amber-400 tracking-widest uppercase" style={{ textShadow: "0 0 12px rgba(245,158,11,0.3)" }}>Live Stock Balance</h2>
+                  <h2 className="text-3xl font-black text-amber-400 tracking-widest uppercase" style={{ textShadow: "0 0 12px rgba(245,158,11,0.3)" }}>
+                    Live Stock Balance ({selectedInventoryTab})
+                  </h2>
                   <button
                     onClick={() => setActiveTab('inventories_admin_panel' as any)}
                     className="p-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-amber-400 hover:text-amber-300 rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] shrink-0"
@@ -6456,13 +6655,14 @@ export default function Dashboard() {
                 {/* Col 2 & 3: Inventory Log */}
                 <div className="lg:col-span-2 bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 overflow-hidden flex flex-col h-full min-h-[500px]">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-2xl font-black text-amber-400">Inventory Log</h3>
+                    <h3 className="text-2xl font-black text-amber-400">Inventory Log ({selectedInventoryTab})</h3>
                     <button onClick={() => {
                       setInvForm({
                         date: new Date().toISOString().split('T')[0],
                         chocolate: managedChocolates[0]?.name || "",
                         boxCount: "",
-                        itemsPerBox: ""
+                        itemsPerBox: "",
+                        inventory: selectedInventoryTab
                       });
                       setEditInvId(null);
                       setIsInvModalOpen(true);
@@ -6476,6 +6676,7 @@ export default function Dashboard() {
                         <tr className="text-sm uppercase tracking-wider text-amber-400">
                           <th className="p-4 font-black border-r border-white/10">Date</th>
                           <th className="p-4 font-black border-r border-white/10">Chocolate Name</th>
+                          <th className="p-4 font-black border-r border-white/10 text-center">Inventory</th>
                           <th className="p-4 font-black text-center border-r border-white/10">Boxes</th>
                           <th className="p-4 font-black text-center border-r border-white/10">Count</th>
                           <th className="p-4 font-black text-center border-r border-white/10">Total Added</th>
@@ -6483,13 +6684,22 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {inventoryLogs.length === 0 ? (
-                          <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-bold">No manual inventory entries found.</td></tr>
-                        ) : (
-                          inventoryLogs.map(log => (
+                        {(() => {
+                          const currentInventoryLogs = inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab);
+                          if (currentInventoryLogs.length === 0) {
+                            return (
+                              <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">No inventory entries found for {selectedInventoryTab}.</td></tr>
+                            );
+                          }
+                          return currentInventoryLogs.map(log => (
                             <tr key={log.fireId} className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors">
                               <td className="p-4 font-bold text-slate-300">{formatToDisplayDate(log.date)}</td>
                               <td className="p-4 font-bold text-white">{log.chocolate}</td>
+                              <td className="p-4 text-center font-bold">
+                                <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-xs font-black">
+                                  {log.inventory || 'Inventory 1'}
+                                </span>
+                              </td>
                               <td className="p-4 text-center font-bold text-slate-300">{log.boxCount}</td>
                               <td className="p-4 text-center font-bold text-slate-300">{log.itemsPerBox}</td>
                               <td className="p-4 text-center font-black text-emerald-400">+{log.totalChocolates}</td>
@@ -6500,7 +6710,8 @@ export default function Dashboard() {
                                     date: log.date || new Date().toISOString().split('T')[0],
                                     chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
                                     boxCount: String(log.boxCount || ""),
-                                    itemsPerBox: String(log.itemsPerBox || "")
+                                    itemsPerBox: String(log.itemsPerBox || ""),
+                                    inventory: log.inventory || selectedInventoryTab || "Inventory 1"
                                   });
                                   setEditInvId(log.fireId);
                                   setIsInvModalOpen(true);
@@ -6508,8 +6719,8 @@ export default function Dashboard() {
                                 <button onClick={() => handleDeleteInventory(log.fireId)} className="text-rose-400 hover:text-rose-300 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
                               </td>
                             </tr>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -7185,41 +7396,50 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Middle Row: Only show the pending amount alone */}
+                    {/* Middle Row: Pending amount permanently visible */}
                     <div className="relative z-10 my-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider block">
-                          Pending Amount
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowAmounts(!showAmounts)}
-                          className="text-slate-400 hover:text-amber-300 text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
-                          title={showAmounts ? "Hide monetary amounts" : "Show monetary amounts"}
-                        >
-                          {showAmounts ? <EyeOff size={11} /> : <Eye size={11} />}
-                        </button>
-                      </div>
+                      <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider block">
+                        Pending Amount
+                      </span>
                       <h3 className="text-2xl font-black text-rose-400 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] mt-0.5 truncate">
-                        {maskAmount(displayPendingAmount)}
+                        ₹ {displayPendingAmount.toLocaleString('en-IN')}
                       </h3>
                     </div>
 
                     {/* Bottom Row: Based on Date Type Label & Month/Year Filter Pickers */}
                     <div className="relative z-10 mt-auto">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                        Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
-                      </p>
+                      <div className="flex items-center justify-between mb-1 gap-1">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                          Based on: <span className="text-amber-400 font-extrabold">{revenueDateType}</span>
+                        </p>
+                        {(revenueMonthKey || revenueYearKey) && (
+                          <span className="text-[9px] font-extrabold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0 tracking-wide">
+                            {revenueMonthKey && revenueYearKey
+                              ? `${formattedRevenueMonthLabel} ${revenueYearKey}`
+                              : revenueYearKey
+                              ? `Full Year ${revenueYearKey}`
+                              : formattedRevenueMonthLabel}
+                          </span>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-1.5 w-full">
                         {/* MONTH PICKER */}
                         <div className="relative flex-1" ref={paretoMonthPickerRef}>
                           <button
                             type="button"
-                            onClick={() => { setParetoMonthPickerOpen(!paretoMonthPickerOpen); setParetoYearPickerOpen(false); }}
-                            className={`w-full flex items-center gap-1 px-1.5 py-1 border rounded-lg text-[10px] font-bold outline-none cursor-pointer shadow-inner tracking-tight transition-all ${
+                            onClick={() => {
+                              if (!paretoMonthPickerOpen) {
+                                if (revenueYearKey && /^\d{4}$/.test(revenueYearKey)) {
+                                  setParetoMonthPickerYear(parseInt(revenueYearKey, 10));
+                                }
+                              }
+                              setParetoMonthPickerOpen(!paretoMonthPickerOpen);
+                              setParetoYearPickerOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-center gap-1 px-1.5 py-1 border rounded-lg text-[10px] font-bold outline-none cursor-pointer shadow-inner tracking-tight transition-all ${
                               revenueMonthKey
-                                ? 'border-cyan-400 text-cyan-300 bg-cyan-400/10'
+                                ? 'border-cyan-400 text-cyan-300 bg-cyan-400/15 shadow-sm shadow-cyan-500/20 ring-1 ring-cyan-400/30'
                                 : 'border-white/20 text-slate-400 bg-[#162035] hover:border-cyan-400/60'
                             }`}
                             title="Filter by Month"
@@ -7229,26 +7449,53 @@ export default function Dashboard() {
                           </button>
                           {/* Month Picker Popover */}
                           {paretoMonthPickerOpen && (
-                            <div className="absolute bottom-full left-0 mb-1.5 w-[200px] bg-[#111a2e] border border-cyan-400/40 rounded-xl shadow-2xl p-2.5 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
+                            <div className="absolute bottom-full left-0 mb-1.5 w-[210px] bg-[#111a2e] border border-cyan-400/40 rounded-xl shadow-2xl p-2.5 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
                               {/* Year Nav Row inside Month Picker */}
-                              <div className="flex items-center justify-between mb-2 px-0.5">
-                                <button type="button" onClick={() => setParetoMonthPickerYear(prev => prev - 1)} className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"><ChevronLeft size={14} /></button>
-                                <span className="text-[11px] font-black text-cyan-300 tracking-wider">{paretoMonthPickerYear}</span>
-                                <button type="button" onClick={() => setParetoMonthPickerYear(prev => prev + 1)} className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"><ChevronRight size={14} /></button>
+                              <div className="flex items-center justify-between mb-2 px-1 py-0.5 bg-[#162035] rounded-lg border border-cyan-400/20">
+                                <button
+                                  type="button"
+                                  onClick={() => setParetoMonthPickerYear(prev => prev - 1)}
+                                  className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"
+                                  title="Previous Year"
+                                >
+                                  <ChevronLeft size={14} />
+                                </button>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[11px] font-black text-cyan-300 tracking-wider">
+                                    {paretoMonthPickerYear}
+                                  </span>
+                                  {revenueYearKey && String(paretoMonthPickerYear) === revenueYearKey && (
+                                    <span className="text-[8px] bg-purple-500/30 text-purple-300 px-1 py-0.2 rounded font-bold uppercase">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setParetoMonthPickerYear(prev => prev + 1)}
+                                  className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"
+                                  title="Next Year"
+                                >
+                                  <ChevronRight size={14} />
+                                </button>
                               </div>
                               {/* 4x3 Month Grid */}
                               <div className="grid grid-cols-4 gap-1">
                                 {PARETO_MONTHS_LIST.map(m => {
-                                  const key = `${paretoMonthPickerYear}-${m.value}`;
-                                  const isActive = revenueMonthKey === key;
+                                  const isMonthSelected = revenueMonthKey === m.value || (revenueMonthKey && revenueMonthKey.endsWith(`-${m.value}`));
+                                  const isYearMatching = !revenueYearKey || revenueYearKey === String(paretoMonthPickerYear);
+                                  const isActive = Boolean(isMonthSelected && isYearMatching);
                                   return (
                                     <button
                                       key={m.value}
                                       type="button"
-                                      onClick={() => { handleRevenueMonthChange(key); setParetoMonthPickerOpen(false); }}
+                                      onClick={() => {
+                                        handleRevenueMonthChange(m.value, paretoMonthPickerYear);
+                                        setParetoMonthPickerOpen(false);
+                                      }}
                                       className={`py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
                                         isActive
-                                          ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/30 scale-105'
+                                          ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/30 scale-105 ring-1 ring-cyan-300'
                                           : 'text-slate-300 hover:bg-cyan-400/20 hover:text-cyan-300'
                                       }`}
                                     >
@@ -7257,16 +7504,32 @@ export default function Dashboard() {
                                   );
                                 })}
                               </div>
-                              {/* Clear Month Filter */}
-                              {revenueMonthKey && (
-                                <button
-                                  type="button"
-                                  onClick={() => { handleRevenueMonthChange(''); setParetoMonthPickerOpen(false); }}
-                                  className="w-full mt-2 py-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider"
-                                >
-                                  ✕ Clear Month
-                                </button>
-                              )}
+                              {/* Action buttons inside Month Picker */}
+                              <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center gap-1.5">
+                                {revenueMonthKey ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleRevenueMonthChange('');
+                                      setParetoMonthPickerOpen(false);
+                                    }}
+                                    className="flex-1 py-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider text-center"
+                                  >
+                                    ✕ All Months ({revenueYearKey || paretoMonthPickerYear})
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleRevenueYearChange(String(paretoMonthPickerYear));
+                                      setParetoMonthPickerOpen(false);
+                                    }}
+                                    className="flex-1 py-1 text-[9px] font-bold text-cyan-400 hover:text-white hover:bg-cyan-500/30 rounded-lg cursor-pointer transition-colors border border-cyan-500/30 uppercase tracking-wider text-center"
+                                  >
+                                    Full Year {paretoMonthPickerYear}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -7275,10 +7538,13 @@ export default function Dashboard() {
                         <div className="relative flex-1" ref={paretoYearPickerRef}>
                           <button
                             type="button"
-                            onClick={() => { setParetoYearPickerOpen(!paretoYearPickerOpen); setParetoMonthPickerOpen(false); }}
-                            className={`w-full flex items-center gap-1 px-1.5 py-1 border rounded-lg text-[10px] font-bold outline-none cursor-pointer shadow-inner tracking-tight transition-all ${
+                            onClick={() => {
+                              setParetoYearPickerOpen(!paretoYearPickerOpen);
+                              setParetoMonthPickerOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-center gap-1 px-1.5 py-1 border rounded-lg text-[10px] font-bold outline-none cursor-pointer shadow-inner tracking-tight transition-all ${
                               revenueYearKey
-                                ? 'border-purple-400 text-purple-300 bg-purple-400/10'
+                                ? 'border-purple-400 text-purple-300 bg-purple-400/15 shadow-sm shadow-purple-500/20 ring-1 ring-purple-400/30'
                                 : 'border-white/20 text-slate-400 bg-[#162035] hover:border-purple-400/60'
                             }`}
                             title="Filter by Year"
@@ -7288,7 +7554,15 @@ export default function Dashboard() {
                           </button>
                           {/* Year Picker Popover */}
                           {paretoYearPickerOpen && (
-                            <div className="absolute bottom-full right-0 mb-1.5 w-[120px] bg-[#111a2e] border border-purple-400/40 rounded-xl shadow-2xl p-2 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-[180px] overflow-y-auto custom-scrollbar">
+                            <div className="absolute bottom-full right-0 mb-1.5 w-[140px] bg-[#111a2e] border border-purple-400/40 rounded-xl shadow-2xl p-2 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-[220px] overflow-y-auto custom-scrollbar">
+                              <div className="text-[9px] font-extrabold text-purple-300 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between">
+                                <span>Select Year</span>
+                                {revenueMonthKey && (
+                                  <span className="text-[8px] text-cyan-300 bg-cyan-400/10 px-1 py-0.2 rounded font-black">
+                                    {formattedRevenueMonthLabel}
+                                  </span>
+                                )}
+                              </div>
                               <div className="space-y-0.5">
                                 {availableRevenueYears.map(y => {
                                   const isActive = revenueYearKey === y;
@@ -7296,14 +7570,18 @@ export default function Dashboard() {
                                     <button
                                       key={y}
                                       type="button"
-                                      onClick={() => { handleRevenueYearChange(y); setParetoYearPickerOpen(false); }}
-                                      className={`w-full py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                                      onClick={() => {
+                                        handleRevenueYearChange(y);
+                                        setParetoYearPickerOpen(false);
+                                      }}
+                                      className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all flex items-center justify-between ${
                                         isActive
-                                          ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                                          ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30 font-black'
                                           : 'text-slate-300 hover:bg-purple-400/20 hover:text-purple-300'
                                       }`}
                                     >
-                                      {y}
+                                      <span>{y}</span>
+                                      {isActive && <Check size={12} strokeWidth={3} />}
                                     </button>
                                   );
                                 })}
@@ -7312,8 +7590,11 @@ export default function Dashboard() {
                               {revenueYearKey && (
                                 <button
                                   type="button"
-                                  onClick={() => { handleRevenueYearChange(''); setParetoYearPickerOpen(false); }}
-                                  className="w-full mt-1.5 py-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider"
+                                  onClick={() => {
+                                    handleRevenueYearChange('');
+                                    setParetoYearPickerOpen(false);
+                                  }}
+                                  className="w-full mt-2 pt-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider text-center"
                                 >
                                   ✕ Clear Year
                                 </button>
@@ -7325,12 +7606,13 @@ export default function Dashboard() {
                         {/* Clear All Button */}
                         {(revenueMonthKey || revenueYearKey || dateFilter.from || dateFilter.to) && (
                           <button
+                            type="button"
                             onClick={() => {
                               setDateFilter({ from: "", to: "" });
                               setRevenueMonthKey("");
                               setRevenueYearKey("");
                             }}
-                            className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors cursor-pointer"
+                            className="text-white hover:bg-red-600 bg-red-500 p-1 rounded-full shrink-0 shadow-sm transition-colors cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95"
                             title="Clear All Filters"
                           >
                             <X size={12} strokeWidth={3} />
@@ -8952,6 +9234,18 @@ export default function Dashboard() {
 
                     <button
                       onClick={() => {
+                        setAnalyticsActiveTab('users');
+                        setIsAnalyticsModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 h-[34px]"
+                      title="Manage Approved Users Default Settings"
+                    >
+                      <UserCheck size={16} strokeWidth={2.5} />
+                      <span className="font-black">User Name</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
                         setTempReportsPasscode(reportsPasscode);
                         setTempHistoryPasscode(historyPasscode);
                         setIsPasscodeSettingsOpen(true);
@@ -9672,9 +9966,24 @@ export default function Dashboard() {
               {editInvId ? "Edit Inventory Entry" : "Add Inventory Entry"}
             </h2>
             <form onSubmit={handleAddInventory} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Date</label>
-                <input required type="date" value={invForm.date} onChange={(e) => setInvForm({ ...invForm, date: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Date</label>
+                  <input required type="date" value={invForm.date} onChange={(e) => setInvForm({ ...invForm, date: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Inventory</label>
+                  <select
+                    required
+                    value={invForm.inventory || selectedInventoryTab || "Inventory 1"}
+                    onChange={(e) => setInvForm({ ...invForm, inventory: e.target.value as any })}
+                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner cursor-pointer"
+                  >
+                    <option value="Inventory 1" className="bg-[#0f172a] text-white">Inventory 1</option>
+                    <option value="Inventory 2" className="bg-[#0f172a] text-white">Inventory 2</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Chocolate Name</label>
@@ -10292,7 +10601,8 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Order Type - shown for all categories as dropdown */}
+                  {/* Order Type & Inventory dropdowns */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Order Type</label>
                       <select
@@ -10318,6 +10628,21 @@ export default function Dashboard() {
                         })}
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider mb-1.5 text-slate-200">Inventory</label>
+                      <select
+                        name="inventory"
+                        value={formData.inventory || "Inventory 1"}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-xs cursor-pointer font-bold"
+                      >
+                        <option value="Inventory 1" className="bg-[#0f172a] text-white">Inventory 1</option>
+                        <option value="Inventory 2" className="bg-[#0f172a] text-white">Inventory 2</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Column 3: Payment & Summary */}
@@ -11693,6 +12018,11 @@ export default function Dashboard() {
                       <User size={24} className="text-amber-400" />
                       <span>Roles Management</span>
                     </>
+                  ) : analyticsActiveTab === 'users' ? (
+                    <>
+                      <UserCheck size={24} className="text-amber-400" />
+                      <span>Approved Users Default Settings</span>
+                    </>
                   ) : (
                     <>
                       <Tag size={24} className="text-amber-400" />
@@ -11793,6 +12123,31 @@ export default function Dashboard() {
                     <span>Roles</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'roles' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
                       {orderRoles.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnalyticsActiveTab('users');
+                      setEditOrderTypeId(null);
+                      setNewOrderTypeName("");
+                      setEditChocId(null);
+                      setEditLocationId(null);
+                      setNewLocationName("");
+                      setEditOrderRoleId(null);
+                      setNewOrderRoleName("");
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      analyticsActiveTab === 'users'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <UserCheck size={14} />
+                    <span>User Name</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'users' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
+                      {approvedEmployees.length}
                     </span>
                   </button>
                 </div>
@@ -12503,6 +12858,207 @@ export default function Dashboard() {
                     <span>Configured Roles: <strong className="text-white">{orderRoles.length}</strong></span>
                     <span>Status: <strong className="text-emerald-400">Synced to Cloud</strong></span>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: USER NAME & DEFAULTS CONFIGURATION (Requirements 3, 4, 6, 7) */}
+            {analyticsActiveTab === 'users' && (
+              <div className="flex flex-col flex-1 overflow-hidden bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-lg text-white">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-4 border-b border-white/10 shrink-0">
+                  <div>
+                    <h3 className="text-lg font-black text-amber-400 flex items-center gap-2 uppercase tracking-wider">
+                      <UserCheck size={20} className="text-amber-400" />
+                      <span>Approved Users Default Settings</span>
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-1 font-semibold">
+                      Configure default Order Type, Role, and Inventory for approved users when opening <span className="text-amber-300 font-bold">Add New Order</span>.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-black text-slate-200 bg-[#090e1a] px-3.5 py-1.5 rounded-xl border border-white/15">
+                      Approved Users: <strong className="text-emerald-400 font-mono text-sm">{approvedEmployees.length}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Approved Users Configuration Table */}
+                <div className="overflow-x-auto flex-1 custom-scrollbar rounded-2xl border border-white/10 bg-[#090e1a]/80 shadow-inner">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead className="sticky top-0 bg-[#0c1427] z-10 shadow-sm border-b border-amber-500/30">
+                      <tr className="text-xs uppercase tracking-wider text-amber-400">
+                        <th className="p-4 font-black border-r border-white/10">Approved User</th>
+                        <th className="p-4 font-black border-r border-white/10">Order Type</th>
+                        <th className="p-4 font-black border-r border-white/10">Role</th>
+                        <th className="p-4 font-black">Inventory</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {approvedEmployees.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-10 text-center text-slate-400 font-bold">
+                            <UserCheck size={36} className="text-emerald-400 mx-auto mb-2 opacity-60" />
+                            <p className="text-slate-200 font-extrabold text-sm">No approved users found.</p>
+                            <p className="text-slate-400 text-xs mt-1">Approve employees from the Attendance / Employees section to configure defaults.</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        approvedEmployees.map(emp => {
+                          const savedOrderType = emp.defaultOrderType || (emp.fireId ? localStorage.getItem(`sabi_default_orderType_${emp.fireId}`) : null) || getOrderTypeName(orderTypes[0]) || "Sabi";
+                          const savedRole = emp.defaultRole || (emp.fireId ? localStorage.getItem(`sabi_default_role_${emp.fireId}`) : null) || "Others";
+                          const savedInventory = emp.defaultInventory || (emp.fireId ? localStorage.getItem(`sabi_default_inventory_${emp.fireId}`) : null) || "Inventory 1";
+
+                          const selectedOrderType = userDraftDefaults[emp.fireId]?.orderType ?? savedOrderType;
+                          const selectedRole = userDraftDefaults[emp.fireId]?.role ?? savedRole;
+                          const selectedInventory = userDraftDefaults[emp.fireId]?.inventory ?? savedInventory;
+
+                          const isOrderTypeDefault = selectedOrderType === savedOrderType && Boolean(emp.defaultOrderType || (emp.fireId && localStorage.getItem(`sabi_default_orderType_${emp.fireId}`)));
+                          const isRoleDefault = selectedRole === savedRole && Boolean(emp.defaultRole || (emp.fireId && localStorage.getItem(`sabi_default_role_${emp.fireId}`)));
+                          const isInventoryDefault = selectedInventory === savedInventory && Boolean(emp.defaultInventory || (emp.fireId && localStorage.getItem(`sabi_default_inventory_${emp.fireId}`)));
+
+                          return (
+                            <tr key={emp.fireId} className="hover:bg-white/5 transition-colors">
+                              {/* Approved User */}
+                              <td className="p-4 border-r border-white/10">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-emerald-500/20 border border-white/20 text-amber-300 font-black flex items-center justify-center shrink-0 shadow-sm text-sm">
+                                    {String(emp.name || 'U').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-extrabold text-white text-sm truncate">{emp.name}</p>
+                                    <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">@{emp.username || emp.name}</p>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Order Type Dropdown + Action */}
+                              <td className="p-4 border-r border-white/10">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                  <select
+                                    value={selectedOrderType}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setUserDraftDefaults(prev => ({
+                                        ...prev,
+                                        [emp.fireId]: { ...(prev[emp.fireId] || {}), orderType: val }
+                                      }));
+                                    }}
+                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto min-w-[130px]"
+                                  >
+                                    {orderTypes.map((ot, idx) => {
+                                      const name = getOrderTypeName(ot);
+                                      return (
+                                        <option key={idx} value={name} className="bg-[#0f172a] text-white">
+                                          {name}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                  {isOrderTypeDefault ? (
+                                    <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl shrink-0 flex items-center gap-1 shadow-sm">
+                                      ✓ Default
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveUserDefault(emp.fireId, 'orderType', selectedOrderType)}
+                                      className="text-[11px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2.5 py-1.5 rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                                    >
+                                      Make as Default
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Role Dropdown + Action */}
+                              <td className="p-4 border-r border-white/10">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                  <select
+                                    value={selectedRole}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setUserDraftDefaults(prev => ({
+                                        ...prev,
+                                        [emp.fireId]: { ...(prev[emp.fireId] || {}), role: val }
+                                      }));
+                                    }}
+                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto min-w-[120px]"
+                                  >
+                                    {orderRoles.map((r, idx) => {
+                                      const name = getOrderRoleName(r);
+                                      return (
+                                        <option key={idx} value={name} className="bg-[#0f172a] text-white">
+                                          {name}
+                                        </option>
+                                      );
+                                    })}
+                                    {orderRoles.length === 0 && (
+                                      <>
+                                        <option value="Others" className="bg-[#0f172a] text-white">Others</option>
+                                        <option value="Self" className="bg-[#0f172a] text-white">Self</option>
+                                      </>
+                                    )}
+                                  </select>
+                                  {isRoleDefault ? (
+                                    <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl shrink-0 flex items-center gap-1 shadow-sm">
+                                      ✓ Default
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveUserDefault(emp.fireId, 'role', selectedRole)}
+                                      className="text-[11px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2.5 py-1.5 rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                                    >
+                                      Make as Default
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Inventory Dropdown + Action */}
+                              <td className="p-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                  <select
+                                    value={selectedInventory}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setUserDraftDefaults(prev => ({
+                                        ...prev,
+                                        [emp.fireId]: { ...(prev[emp.fireId] || {}), inventory: val }
+                                      }));
+                                    }}
+                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-3 py-2 outline-none focus:border-amber-400 cursor-pointer w-full sm:w-auto min-w-[130px]"
+                                  >
+                                    <option value="Inventory 1" className="bg-[#0f172a] text-white">Inventory 1</option>
+                                    <option value="Inventory 2" className="bg-[#0f172a] text-white">Inventory 2</option>
+                                  </select>
+                                  {isInventoryDefault ? (
+                                    <span className="text-[11px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl shrink-0 flex items-center gap-1 shadow-sm">
+                                      ✓ Default
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveUserDefault(emp.fireId, 'inventory', selectedInventory)}
+                                      className="text-[11px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2.5 py-1.5 rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                                    >
+                                      Make as Default
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer notes */}
+                <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between text-xs font-bold text-slate-400 gap-2">
+                  <span>* Changes apply automatically to Add New Order whenever the user logs in.</span>
+                  <span>Configured Approved Users: <strong className="text-emerald-400 font-mono">{approvedEmployees.length}</strong></span>
                 </div>
               </div>
             )}
