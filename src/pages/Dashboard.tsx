@@ -13187,7 +13187,7 @@ export default function Dashboard() {
                       <span>Approved Users Default Settings</span>
                     </h3>
                     <p className="text-xs text-slate-300 mt-1 font-semibold">
-                      Configure allowed Order Types (✓ Tick = Show orders, ✕ Wrong = Hide orders), default Order Type, Role, and Inventory for approved users.
+                      Configure allowed Order Types (✓ Tick = Show orders, ✕ Wrong = Hide orders), default Order Type, and Inventory for approved users.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -13202,16 +13202,15 @@ export default function Dashboard() {
                   <table className="w-full text-left border-collapse min-w-[960px]">
                     <thead className="sticky top-0 bg-[#0c1427] z-10 shadow-sm border-b border-amber-500/30">
                       <tr className="text-xs uppercase tracking-wider text-amber-400">
-                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[22%] min-w-[190px]">Approved User</th>
-                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[42%] min-w-[340px]">Order Type Access (✓ Tick / ✕ Wrong)</th>
-                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[18%] min-w-[170px]">Default Role</th>
-                        <th className="px-5 py-3.5 font-black w-[18%] min-w-[170px]">Default Inventory</th>
+                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[24%] min-w-[190px]">Approved User</th>
+                        <th className="px-5 py-3.5 font-black border-r border-white/10 w-[52%] min-w-[360px]">Order Type Access (✓ Tick / ✕ Wrong)</th>
+                        <th className="px-5 py-3.5 font-black w-[24%] min-w-[190px]">Default Inventory</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {approvedEmployees.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="p-10 text-center text-slate-400 font-bold">
+                          <td colSpan={3} className="p-10 text-center text-slate-400 font-bold">
                             <UserCheck size={36} className="text-emerald-400 mx-auto mb-2 opacity-60" />
                             <p className="text-slate-200 font-extrabold text-sm">No approved users found.</p>
                             <p className="text-slate-400 text-xs mt-1">Approve employees from the Attendance / Employees section to configure defaults.</p>
@@ -13220,14 +13219,11 @@ export default function Dashboard() {
                       ) : (
                         approvedEmployees.map(emp => {
                           const savedOrderType = emp.defaultOrderType || (emp.fireId ? localStorage.getItem(`sabi_default_orderType_${emp.fireId}`) : null) || getOrderTypeName(orderTypes[0]) || "Sabi";
-                          const savedRole = emp.defaultRole || (emp.fireId ? localStorage.getItem(`sabi_default_role_${emp.fireId}`) : null) || "Others";
                           const savedInventory = emp.defaultInventory || (emp.fireId ? localStorage.getItem(`sabi_default_inventory_${emp.fireId}`) : null) || getInventoryItemName(inventoriesList[0]) || "Inventory 1";
 
                           const selectedOrderType = userDraftDefaults[emp.fireId]?.orderType ?? savedOrderType;
-                          const selectedRole = userDraftDefaults[emp.fireId]?.role ?? savedRole;
                           const selectedInventory = userDraftDefaults[emp.fireId]?.inventory ?? savedInventory;
 
-                          const isRoleDefault = selectedRole === savedRole && Boolean(emp.defaultRole || (emp.fireId && localStorage.getItem(`sabi_default_role_${emp.fireId}`)));
                           const isInventoryDefault = selectedInventory === savedInventory && Boolean(emp.defaultInventory || (emp.fireId && localStorage.getItem(`sabi_default_inventory_${emp.fireId}`)));
 
                           const allowed = getEmployeeAllowedOrderTypes(emp);
@@ -13356,50 +13352,7 @@ export default function Dashboard() {
                                 </div>
                               </td>
 
-                              {/* Role Dropdown + Action */}
-                              <td className="px-5 py-4 border-r border-white/10 align-middle">
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={selectedRole}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setUserDraftDefaults(prev => ({
-                                        ...prev,
-                                        [emp.fireId]: { ...(prev[emp.fireId] || {}), role: val }
-                                      }));
-                                    }}
-                                    className="bg-[#162035] border border-white/20 text-white font-bold text-xs rounded-xl px-2.5 h-[36px] outline-none focus:border-amber-400 cursor-pointer min-w-[95px] flex-1"
-                                  >
-                                    {orderRoles.map((r, idx) => {
-                                      const name = getOrderRoleName(r);
-                                      return (
-                                        <option key={idx} value={name} className="bg-[#0f172a] text-white">
-                                          {name}
-                                        </option>
-                                      );
-                                    })}
-                                    {orderRoles.length === 0 && (
-                                      <>
-                                        <option value="Others" className="bg-[#0f172a] text-white">Others</option>
-                                        <option value="Self" className="bg-[#0f172a] text-white">Self</option>
-                                      </>
-                                    )}
-                                  </select>
-                                  {isRoleDefault ? (
-                                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 h-[36px] rounded-xl shrink-0 flex items-center justify-center gap-1 shadow-sm">
-                                      ✓ Default
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveUserDefault(emp.fireId, 'role', selectedRole)}
-                                      className="text-[10px] font-black text-amber-300 hover:text-black bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 hover:border-amber-400 px-2 h-[36px] rounded-xl shrink-0 transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap flex items-center justify-center"
-                                    >
-                                      Set Default
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
+
 
                               {/* Inventory Dropdown + Action */}
                               <td className="px-5 py-4 align-middle">
