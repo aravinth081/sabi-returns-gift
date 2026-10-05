@@ -1620,6 +1620,7 @@ export default function Dashboard() {
   const [d1ChocFilter, setD1ChocFilter] = useState<string>('');
   const [d1LocationFilter, setD1LocationFilter] = useState<string>('All');
   const [d1RoleFilter, setD1RoleFilter] = useState<string>('All');
+  const [d1InventoryFilter, setD1InventoryFilter] = useState<string>('All');
 
   // Dashboard 2 filters
   const [d2PaymentFilter, setD2PaymentFilter] = useState<'All' | 'Full Paid' | 'Partially Paid' | 'Pending'>('All');
@@ -1950,7 +1951,7 @@ export default function Dashboard() {
       chocFilter !== '' ||
       (activeTab !== 'dashboard2' && d1SelectedChocolateBoxFilter !== 'All Chocolates') ||
       locationFilter !== 'All' ||
-      roleFilter !== 'All' ||
+      (activeTab === 'dashboard2' ? roleFilter !== 'All' : d1InventoryFilter !== 'All') ||
       deliveryDates.length > 0 ||
       functionDates.length > 0 ||
       Boolean(dashboardSearch) ||
@@ -1973,6 +1974,7 @@ export default function Dashboard() {
     d1SelectedChocolateBoxFilter,
     locationFilter,
     roleFilter,
+    d1InventoryFilter,
     deliveryDates,
     functionDates,
     dashboardSearch,
@@ -2007,6 +2009,7 @@ export default function Dashboard() {
     setD2LocationFilter('All');
     setD1RoleFilter('All');
     setD2RoleFilter('All');
+    setD1InventoryFilter('All');
     setD1DeliveryDates([]);
     setD2DeliveryDates([]);
     setD1FunctionDates([]);
@@ -2043,8 +2046,15 @@ export default function Dashboard() {
       const typeMatch = curTableTypeFilter === 'All' || (order.orderType || "Thaaru") === curTableTypeFilter;
       if (!typeMatch) return sum;
 
-      const roleMatch = curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase();
+      const roleMatch = activeTab === 'dashboard2'
+        ? (curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase())
+        : true;
       if (!roleMatch) return sum;
+
+      const invMatch = activeTab === 'dashboard1'
+        ? (d1InventoryFilter === 'All' || (order.inventory || 'Inventory 1').toLowerCase() === d1InventoryFilter.toLowerCase())
+        : true;
+      if (!invMatch) return sum;
 
       const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
       if (!targetDateStr) return sum;
@@ -2054,7 +2064,7 @@ export default function Dashboard() {
       }
       return sum;
     }, 0);
-  }, [orders, targetMonthKey, activeTab, d1TableTypeFilter, d2TableTypeFilter, d1RoleFilter, d2RoleFilter]);
+  }, [orders, targetMonthKey, activeTab, d1TableTypeFilter, d2TableTypeFilter, d1RoleFilter, d2RoleFilter, d1InventoryFilter]);
 
   const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthItems / monthlyTarget) * 100)) : 0;
   const currentMonthKey = format(new Date(), "yyyy-MM");
@@ -2867,7 +2877,12 @@ export default function Dashboard() {
         (curLocLower === 'andhra' && (!order.isChennai && (rawOrderLoc === 'andhra' || orderAddrLower.includes('andhra') || orderAddrLower.includes('vijayawada') || orderAddrLower.includes('vizag') || orderAddrLower.includes('visakhapatnam')))) ||
         (curLocLower === 'others' && (!order.isChennai && (rawOrderLoc === 'others' || (!rawOrderLoc && !order.isChennai && !orderAddrLower.includes('kerala') && !orderAddrLower.includes('andhra') && !orderAddrLower.includes('chennai'))))) ||
         (rawOrderLoc === curLocLower || (curLocLower !== 'others' && orderAddrLower.includes(curLocLower)));
-      const roleMatch = curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase();
+      const roleMatch = activeTab === 'dashboard2'
+        ? (curRoleFilter === 'All' || String(order.role || '').trim().toLowerCase() === String(curRoleFilter).trim().toLowerCase())
+        : true;
+      const invMatch = activeTab === 'dashboard1'
+        ? (d1InventoryFilter === 'All' || (order.inventory || 'Inventory 1').toLowerCase() === d1InventoryFilter.toLowerCase())
+        : true;
 
       let duplicateMatch = true;
       if (curDuplicateFilter !== 'All') {
@@ -2880,9 +2895,9 @@ export default function Dashboard() {
         }
       }
 
-      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && categoryMatch && locationMatch && roleMatch && duplicateMatch;
+      return pMatch && dMatch && osMatch && rangeMatch && fDateMatch && tDelDateMatch && searchMatch && countMatch && typeMatch && categoryMatch && locationMatch && roleMatch && invMatch && duplicateMatch;
     });
-  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, debouncedDashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts, currentUserAllowedOrderTypes, orderTypes]);
+  }, [activeTab, orders, orderSerialMap, d1PaymentFilter, d1DeliveryFilter, d1OrderStatusFilter, d1DateFilter, d1FunctionDates, d1DeliveryDates, debouncedDashboardSearch, d1CountFilter, d1RevenueDateType, d1TableTypeFilter, d1LocationFilter, d1RoleFilter, d1InventoryFilter, d1DuplicateFilter, d2PaymentFilter, d2DeliveryFilter, d2OrderStatusFilter, d2DateFilter, d2FunctionDates, d2DeliveryDates, d2CountFilter, d2RevenueDateType, d2TableTypeFilter, d2LocationFilter, d2RoleFilter, d2DuplicateFilter, duplicatePhoneCounts, currentUserAllowedOrderTypes, orderTypes]);
 
   const availableChocolatesData = useMemo(() => {
     const chocolateCounts: Record<string, number> = {};
@@ -6933,183 +6948,79 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-                {/* Col 1: Sales Tracker & Inventory Value Comparison Doughnut */}
-                <div className="flex flex-col h-full">
-                  <div className="bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 flex flex-col h-full">
-                    <h3 className="text-2xl font-black text-amber-400 mb-4 border-b border-white/10 pb-2 flex items-center gap-2"><TrendingUp size={22} /> Sales Tracker</h3>
-
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-2.5 text-amber-400" size={16} />
-                        <select
-                          value={salesTrackerChoc}
-                          onChange={(e) => setSalesTrackerChoc(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 font-bold rounded-xl outline-none border border-white/15 focus:border-amber-500 bg-[#131c2e] text-white shadow-inner appearance-none cursor-pointer"
-                        >
-                          <option value="All">All Chocolates</option>
-                          {dynamicInventory.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 relative">
-                          <span className="text-[10px] font-bold text-amber-400 absolute -top-2 left-2 bg-[#0d1527] px-1">From</span>
-                          <input
-                            type="date"
-                            value={salesTrackerFrom}
-                            onChange={(e) => setSalesTrackerFrom(e.target.value)}
-                            className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border border-white/15 bg-[#131c2e] text-white shadow-inner"
-                          />
-                        </div>
-                        <div className="flex-1 relative">
-                          <span className="text-[10px] font-bold text-amber-400 absolute -top-2 left-2 bg-[#0d1527] px-1">To</span>
-                          <input
-                            type="date"
-                            value={salesTrackerTo}
-                            onChange={(e) => setSalesTrackerTo(e.target.value)}
-                            className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border border-white/15 bg-[#131c2e] text-white shadow-inner"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        <div className="bg-amber-500/15 border border-amber-500/30 p-4 rounded-xl text-center shadow-sm flex-1">
-                          <p className="text-xs font-black text-amber-400 uppercase tracking-wider mb-1">Total Items Sold</p>
-                          <p className="text-3xl font-black text-amber-300">{trackedSalesResult.count}</p>
-                        </div>
-                        <div className="bg-emerald-500/15 border border-emerald-500/30 p-4 rounded-xl text-center shadow-sm flex-1">
-                          <p className="text-xs font-black text-emerald-400 uppercase tracking-wider mb-1">Sales Amount</p>
-                          <p className="text-3xl font-black text-emerald-300">₹{trackedSalesResult.revenue.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      {/* 🟢 DOUGHNUT CHART: INVENTORY VALUES COMPARISON */}
-                      <div className="bg-[#131c2e] border border-white/10 p-4 rounded-xl shadow-inner flex flex-col items-center">
-                        <p className="text-xs font-black text-amber-400 uppercase tracking-wider mb-2 text-center">
-                          Inventory Value Comparison
-                        </p>
-                        <div className="w-full h-52">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={[
-                                  { name: 'Current Inventory Value', value: currentInventoryValueData.grandTotal },
-                                  { name: 'Approx Inventory Value', value: Math.round(approximateProfitData.grandTotal) }
-                                ]}
-                                cx="50%"
-                                cy="45%"
-                                innerRadius={42}
-                                outerRadius={65}
-                                paddingAngle={5}
-                                dataKey="value"
-                                isAnimationActive={true}
-                              >
-                                <Cell key="cell-0" fill="#d35400" />
-                                <Cell key="cell-1" fill="#047857" />
-                              </Pie>
-                              <Tooltip
-                                formatter={(val, name) => {
-                                  const total = currentInventoryValueData.grandTotal + approximateProfitData.grandTotal;
-                                  const pct = total > 0 ? ((Number(val) / total) * 100).toFixed(1) : '0';
-                                  return [`₹${Number(val).toLocaleString()} (${pct}%)`, name];
-                                }}
-                                contentStyle={{
-                                  backgroundColor: '#0d1527',
-                                  color: '#fff',
-                                  borderRadius: '0.75rem',
-                                  border: '1px solid rgba(255,255,255,0.15)',
-                                  fontSize: '12px',
-                                  fontWeight: 'bold'
-                                }}
-                              />
-                              <Legend
-                                verticalAlign="bottom"
-                                height={36}
-                                formatter={(value) => <span className="text-xs font-black text-slate-100" style={{ color: '#f1f5f9' }}>{value}</span>}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              {/* Inventory Log */}
+              <div className="w-full bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 overflow-hidden flex flex-col min-h-[500px]">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-2xl font-black text-amber-400">Inventory Log ({selectedInventoryTab})</h3>
+                  <button onClick={() => {
+                    setInvForm({
+                      date: new Date().toISOString().split('T')[0],
+                      chocolate: managedChocolates[0]?.name || "",
+                      boxCount: "",
+                      itemsPerBox: "",
+                      inventory: selectedInventoryTab
+                    });
+                    setEditInvId(null);
+                    setIsInvModalOpen(true);
+                  }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
+                    <Plus size={16} /> Add Entry
+                  </button>
                 </div>
-
-                {/* Col 2 & 3: Inventory Log */}
-                <div className="lg:col-span-2 bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 overflow-hidden flex flex-col h-full min-h-[500px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-2xl font-black text-amber-400">Inventory Log ({selectedInventoryTab})</h3>
-                    <button onClick={() => {
-                      setInvForm({
-                        date: new Date().toISOString().split('T')[0],
-                        chocolate: managedChocolates[0]?.name || "",
-                        boxCount: "",
-                        itemsPerBox: "",
-                        inventory: selectedInventoryTab
-                      });
-                      setEditInvId(null);
-                      setIsInvModalOpen(true);
-                    }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
-                      <Plus size={16} /> Add Entry
-                    </button>
-                  </div>
-                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                      <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-amber-500/30">
-                        <tr className="text-sm uppercase tracking-wider text-amber-400">
-                          <th className="p-4 font-black border-r border-white/10">Date</th>
-                          <th className="p-4 font-black border-r border-white/10">Chocolate Name</th>
-                          <th className="p-4 font-black border-r border-white/10 text-center">Inventory</th>
-                          <th className="p-4 font-black text-center border-r border-white/10">Boxes</th>
-                          <th className="p-4 font-black text-center border-r border-white/10">Count</th>
-                          <th className="p-4 font-black text-center border-r border-white/10">Total Added</th>
-                          <th className="p-4 font-black text-center">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const currentInventoryLogs = inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab);
-                          if (currentInventoryLogs.length === 0) {
-                            return (
-                              <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">No inventory entries found for {selectedInventoryTab}.</td></tr>
-                            );
-                          }
-                          return currentInventoryLogs.map(log => (
-                            <tr key={log.fireId} className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors">
-                              <td className="p-4 font-bold text-slate-300">{formatToDisplayDate(log.date)}</td>
-                              <td className="p-4 font-bold text-white">{log.chocolate}</td>
-                              <td className="p-4 text-center font-bold">
-                                <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-xs font-black">
-                                  {log.inventory || 'Inventory 1'}
-                                </span>
-                              </td>
-                              <td className="p-4 text-center font-bold text-slate-300">{log.boxCount}</td>
-                              <td className="p-4 text-center font-bold text-slate-300">{log.itemsPerBox}</td>
-                              <td className="p-4 text-center font-black text-emerald-400">+{log.totalChocolates}</td>
-                              <td className="p-4 text-center flex items-center justify-center gap-3">
-                                <button onClick={() => setViewingInvLog(log)} className="text-sky-400 hover:text-sky-300 transition-colors" title="View Entry"><Eye size={18} /></button>
-                                <button onClick={() => {
-                                  setInvForm({
-                                    date: log.date || new Date().toISOString().split('T')[0],
-                                    chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
-                                    boxCount: String(log.boxCount || ""),
-                                    itemsPerBox: String(log.itemsPerBox || ""),
-                                    inventory: log.inventory || selectedInventoryTab || "Inventory 1"
-                                  });
-                                  setEditInvId(log.fireId);
-                                  setIsInvModalOpen(true);
-                                }} className="text-blue-400 hover:text-blue-300 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
-                                <button onClick={() => handleDeleteInventory(log.fireId)} className="text-rose-400 hover:text-rose-300 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
-                              </td>
-                            </tr>
-                          ));
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-400 mt-3 text-center shrink-0">* Note: Dashboard orders are automatically deducted from the Live Stock Balance (Not shown in this manual entry table).</p>
+                <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
+                  <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-amber-500/30">
+                      <tr className="text-sm uppercase tracking-wider text-amber-400">
+                        <th className="p-4 font-black border-r border-white/10">Date</th>
+                        <th className="p-4 font-black border-r border-white/10">Chocolate Name</th>
+                        <th className="p-4 font-black border-r border-white/10 text-center">Inventory</th>
+                        <th className="p-4 font-black text-center border-r border-white/10">Boxes</th>
+                        <th className="p-4 font-black text-center border-r border-white/10">Count</th>
+                        <th className="p-4 font-black text-center border-r border-white/10">Total Added</th>
+                        <th className="p-4 font-black text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const currentInventoryLogs = inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab);
+                        if (currentInventoryLogs.length === 0) {
+                          return (
+                            <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">No inventory entries found for {selectedInventoryTab}.</td></tr>
+                          );
+                        }
+                        return currentInventoryLogs.map(log => (
+                          <tr key={log.fireId} className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors">
+                            <td className="p-4 font-bold text-slate-300">{formatToDisplayDate(log.date)}</td>
+                            <td className="p-4 font-bold text-white">{log.chocolate}</td>
+                            <td className="p-4 text-center font-bold">
+                              <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-xs font-black">
+                                {log.inventory || 'Inventory 1'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center font-bold text-slate-300">{log.boxCount}</td>
+                            <td className="p-4 text-center font-bold text-slate-300">{log.itemsPerBox}</td>
+                            <td className="p-4 text-center font-black text-emerald-400">+{log.totalChocolates}</td>
+                            <td className="p-4 text-center flex items-center justify-center gap-3">
+                              <button onClick={() => setViewingInvLog(log)} className="text-sky-400 hover:text-sky-300 transition-colors" title="View Entry"><Eye size={18} /></button>
+                              <button onClick={() => {
+                                setInvForm({
+                                  date: log.date || new Date().toISOString().split('T')[0],
+                                  chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
+                                  boxCount: String(log.boxCount || ""),
+                                  itemsPerBox: String(log.itemsPerBox || ""),
+                                  inventory: log.inventory || selectedInventoryTab || "Inventory 1"
+                                });
+                                setEditInvId(log.fireId);
+                                setIsInvModalOpen(true);
+                              }} className="text-blue-400 hover:text-blue-300 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
+                              <button onClick={() => handleDeleteInventory(log.fireId)} className="text-rose-400 hover:text-rose-300 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
+                            </td>
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
                 </div>
+                <p className="text-[10px] font-bold text-slate-400 mt-3 text-center shrink-0">* Note: Dashboard orders are automatically deducted from the Live Stock Balance (Not shown in this manual entry table).</p>
               </div>
 
               {/* 🟢 HORIZONTAL LAYOUT: CURRENT INVENTORY VALUE & APPROX INVENTORY VALUE CARDS */}
@@ -8096,28 +8007,51 @@ export default function Dashboard() {
                           />
                         </div>
 
-                        {/* 🟢 ROLE FILTER DROPDOWN */}
-                        <div className="relative shrink-0">
-                          <select
-                            value={roleFilter}
-                            onChange={(e) => setRoleFilter(e.target.value)}
-                            className="h-9 md:h-10 pl-8 pr-7 bg-white border-2 border-amber-100 focus:border-amber-500 rounded-xl text-xs font-black text-amber-950 outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer shadow-sm appearance-none uppercase tracking-wider transition-all duration-300"
-                            title="Filter by Role"
-                          >
-                            <option value="All">All Roles</option>
-                            {orderRoles.map((r, idx) => {
-                              const name = getOrderRoleName(r);
-                              const id = getOrderRoleId(r, idx);
-                              return (
-                                <option key={id} value={name}>
-                                  {name}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          <User size={14} strokeWidth={2.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
-                          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
-                        </div>
+                        {/* 🟢 ROLE FILTER (Dashboard 2) / INVENTORIES FILTER (Dashboard 1) */}
+                        {activeTab === 'dashboard1' ? (
+                          <div className="relative shrink-0">
+                            <select
+                              value={d1InventoryFilter}
+                              onChange={(e) => setD1InventoryFilter(e.target.value)}
+                              className="h-9 md:h-10 pl-8 pr-7 bg-white border-2 border-amber-100 focus:border-amber-500 rounded-xl text-xs font-black text-amber-950 outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer shadow-sm appearance-none uppercase tracking-wider transition-all duration-300"
+                              title="Filter by Inventory"
+                            >
+                              <option value="All">All Inventories</option>
+                              {inventoriesList.map((inv, idx) => {
+                                const name = getInventoryItemName(inv);
+                                return (
+                                  <option key={idx} value={name}>
+                                    {name}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <Archive size={14} strokeWidth={2.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                          </div>
+                        ) : (
+                          <div className="relative shrink-0">
+                            <select
+                              value={roleFilter}
+                              onChange={(e) => setRoleFilter(e.target.value)}
+                              className="h-9 md:h-10 pl-8 pr-7 bg-white border-2 border-amber-100 focus:border-amber-500 rounded-xl text-xs font-black text-amber-950 outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer shadow-sm appearance-none uppercase tracking-wider transition-all duration-300"
+                              title="Filter by Role"
+                            >
+                              <option value="All">All Roles</option>
+                              {orderRoles.map((r, idx) => {
+                                const name = getOrderRoleName(r);
+                                const id = getOrderRoleId(r, idx);
+                                return (
+                                  <option key={id} value={name}>
+                                    {name}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <User size={14} strokeWidth={2.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                          </div>
+                        )}
 
                         {/* 🟢 DUPLICATE CONTACT FILTER DROPDOWN (Dashboard 1) */}
                         {activeTab === 'dashboard1' && (
@@ -8599,25 +8533,27 @@ export default function Dashboard() {
                             <th className="py-3 px-4 font-bold align-top transition-all duration-300 min-w-[90px]">
                               <div className="flex items-center gap-1 group">
                                 <span className="whitespace-nowrap">Role</span>
-                                <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
-                                  <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
-                                  <select
-                                    value={roleFilter}
-                                    onChange={(e) => setRoleFilter(e.target.value)}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  >
-                                    <option value="All">All</option>
-                                    {orderRoles.map((r, idx) => {
-                                      const name = getOrderRoleName(r);
-                                      const id = getOrderRoleId(r, idx);
-                                      return (
-                                        <option key={id} value={name}>
-                                          {name}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                </div>
+                                {activeTab === 'dashboard2' && (
+                                  <div className="relative inline-flex items-center justify-center w-5 h-5 hover:bg-amber-200 rounded-md cursor-pointer transition-colors" title="Filter by Role">
+                                    <ChevronDown size={14} className={roleFilter !== 'All' ? 'text-amber-800' : 'text-amber-400'} />
+                                    <select
+                                      value={roleFilter}
+                                      onChange={(e) => setRoleFilter(e.target.value)}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    >
+                                      <option value="All">All</option>
+                                      {orderRoles.map((r, idx) => {
+                                        const name = getOrderRoleName(r);
+                                        const id = getOrderRoleId(r, idx);
+                                        return (
+                                          <option key={id} value={name}>
+                                            {name}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  </div>
+                                )}
                               </div>
                             </th>
                           )}
