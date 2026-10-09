@@ -555,7 +555,7 @@ export default function Dashboard() {
     return DEFAULT_CHOCOLATES.map((c, i) => ({ fireId: `init-${i + 1}`, ...c }));
   });
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
-  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types' | 'locations' | 'roles' | 'users'>('order_types');
+  const [analyticsActiveTab, setAnalyticsActiveTab] = useState<'chocolates' | 'order_types' | 'locations' | 'users'>('order_types');
   const [userDraftDefaults, setUserDraftDefaults] = useState<Record<string, { orderType?: string; role?: string; inventory?: string }>>({});
 
   const approvedEmployees = useMemo(() => {
@@ -659,13 +659,20 @@ export default function Dashboard() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item: any, idx: number) => {
-            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
-            return {
-              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
-              name: String(item?.name || item?.location || `Location ${idx + 1}`).trim()
-            };
+          const seen = new Set<string>();
+          const unique: { fireId: string; name: string }[] = [];
+          parsed.forEach((item: any, idx: number) => {
+            const rawName = typeof item === 'string' ? item.trim() : String(item?.name || item?.location || `Location ${idx + 1}`).trim();
+            const norm = rawName.toLowerCase();
+            if (!seen.has(norm)) {
+              seen.add(norm);
+              unique.push({
+                fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+                name: rawName
+              });
+            }
           });
+          if (unique.length > 0) return unique;
         }
       }
     } catch (e) {}
@@ -699,13 +706,20 @@ export default function Dashboard() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item: any, idx: number) => {
-            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
-            return {
-              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
-              name: String(item?.name || item?.role || `Role ${idx + 1}`).trim()
-            };
+          const seen = new Set<string>();
+          const unique: { fireId: string; name: string }[] = [];
+          parsed.forEach((item: any, idx: number) => {
+            const rawName = typeof item === 'string' ? item.trim() : String(item?.name || item?.role || `Role ${idx + 1}`).trim();
+            const norm = rawName.toLowerCase();
+            if (!seen.has(norm)) {
+              seen.add(norm);
+              unique.push({
+                fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+                name: rawName
+              });
+            }
           });
+          if (unique.length > 0) return unique;
         }
       }
     } catch (e) {}
@@ -737,13 +751,20 @@ export default function Dashboard() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item: any, idx: number) => {
-            if (typeof item === 'string') return { fireId: `default-${idx + 1}`, name: item.trim() };
-            return {
-              fireId: item?.fireId || item?.id || `default-${idx + 1}`,
-              name: String(item?.name || item?.inventory || `Inventory ${idx + 1}`).trim()
-            };
+          const seen = new Set<string>();
+          const unique: { fireId: string; name: string }[] = [];
+          parsed.forEach((item: any, idx: number) => {
+            const rawName = typeof item === 'string' ? item.trim() : String(item?.name || item?.inventory || `Inventory ${idx + 1}`).trim();
+            const norm = rawName.toLowerCase();
+            if (!seen.has(norm)) {
+              seen.add(norm);
+              unique.push({
+                fireId: item?.fireId || item?.id || `default-${idx + 1}`,
+                name: rawName
+              });
+            }
           });
+          if (unique.length > 0) return unique;
         }
       }
     } catch (e) {}
@@ -1331,14 +1352,23 @@ export default function Dashboard() {
         } catch (e) {}
       } else {
         list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-        const normalizedList = list.map((item, idx) => ({
-          fireId: item.fireId || `ot-${idx + 1}`,
-          name: getOrderTypeName(item) || `Order Type ${idx + 1}`,
-          ...item
-        }));
-        setOrderTypes(normalizedList);
+        const seen = new Set<string>();
+        const uniqueList: any[] = [];
+        list.forEach((item, idx) => {
+          const rawName = getOrderTypeName(item) || `Order Type ${idx + 1}`;
+          const normalized = rawName.trim().toLowerCase();
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            uniqueList.push({
+              fireId: item.fireId || `ot-${idx + 1}`,
+              name: rawName,
+              ...item
+            });
+          }
+        });
+        setOrderTypes(uniqueList);
         try {
-          localStorage.setItem('sabi_order_types', JSON.stringify(normalizedList));
+          localStorage.setItem('sabi_order_types', JSON.stringify(uniqueList));
         } catch (e) {}
       }
     }, (err) => console.warn("Firestore order_types onSnapshot error:", err));
@@ -1360,14 +1390,23 @@ export default function Dashboard() {
         } catch (e) {}
       } else {
         list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-        const normalizedList = list.map((item, idx) => ({
-          fireId: item.fireId || `loc-${idx + 1}`,
-          name: getLocationName(item) || `Location ${idx + 1}`,
-          ...item
-        }));
-        setLocations(normalizedList);
+        const seen = new Set<string>();
+        const uniqueList: any[] = [];
+        list.forEach((item, idx) => {
+          const rawName = getLocationName(item) || `Location ${idx + 1}`;
+          const normalized = rawName.trim().toLowerCase();
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            uniqueList.push({
+              fireId: item.fireId || `loc-${idx + 1}`,
+              name: rawName,
+              ...item
+            });
+          }
+        });
+        setLocations(uniqueList);
         try {
-          localStorage.setItem('sabi_locations', JSON.stringify(normalizedList));
+          localStorage.setItem('sabi_locations', JSON.stringify(uniqueList));
         } catch (e) {}
       }
     }, (err) => console.warn("Firestore locations onSnapshot error:", err));
@@ -1387,14 +1426,23 @@ export default function Dashboard() {
         } catch (e) {}
       } else {
         list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-        const normalizedList = list.map((item, idx) => ({
-          fireId: item.fireId || `role-${idx + 1}`,
-          name: getOrderRoleName(item) || `Role ${idx + 1}`,
-          ...item
-        }));
-        setOrderRoles(normalizedList);
+        const seen = new Set<string>();
+        const uniqueList: any[] = [];
+        list.forEach((item, idx) => {
+          const rawName = getOrderRoleName(item) || `Role ${idx + 1}`;
+          const normalized = rawName.trim().toLowerCase();
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            uniqueList.push({
+              fireId: item.fireId || `role-${idx + 1}`,
+              name: rawName,
+              ...item
+            });
+          }
+        });
+        setOrderRoles(uniqueList);
         try {
-          localStorage.setItem('sabi_order_roles', JSON.stringify(normalizedList));
+          localStorage.setItem('sabi_order_roles', JSON.stringify(uniqueList));
         } catch (e) {}
       }
     }, (err) => console.warn("Firestore order_roles onSnapshot error:", err));
@@ -1414,14 +1462,23 @@ export default function Dashboard() {
         } catch (e) {}
       } else {
         list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-        const normalizedList = list.map((item, idx) => ({
-          fireId: item.fireId || `inv-${idx + 1}`,
-          name: getInventoryItemName(item) || `Inventory ${idx + 1}`,
-          ...item
-        }));
-        setInventoriesList(normalizedList);
+        const seen = new Set<string>();
+        const uniqueList: any[] = [];
+        list.forEach((item, idx) => {
+          const rawName = getInventoryItemName(item) || `Inventory ${idx + 1}`;
+          const normalized = rawName.trim().toLowerCase();
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            uniqueList.push({
+              fireId: item.fireId || `inv-${idx + 1}`,
+              name: rawName,
+              ...item
+            });
+          }
+        });
+        setInventoriesList(uniqueList);
         try {
-          localStorage.setItem('sabi_inventories_list', JSON.stringify(normalizedList));
+          localStorage.setItem('sabi_inventories_list', JSON.stringify(uniqueList));
         } catch (e) {}
       }
     }, (err) => console.warn("Firestore inventories_list onSnapshot error:", err));
@@ -7893,7 +7950,7 @@ export default function Dashboard() {
                   </div>
 
 
-                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className="revenue-card-stat relative bg-[#0d1527] px-3.5 py-3 rounded-[1.3rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-amber-500/40 hover:border-amber-400 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px] overflow-hidden">
+                  <div style={{ backgroundColor: '#0d1527', color: '#ffffff' }} className={`revenue-card-stat relative bg-[#0d1527] px-3.5 py-3 rounded-[1.3rem] shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-2 border-amber-500/40 hover:border-amber-400 flex flex-col justify-between hover:-translate-y-1 transition-all duration-300 h-full min-h-[120px] overflow-visible ${paretoMonthPickerOpen || paretoYearPickerOpen ? 'z-50' : 'z-10'}`}>
                     {/* Header Row: Box Name "Pareto Analyses" (Eye icon) & Revenue Filter Dropdown Alone */}
                     <div className="flex justify-between items-center w-full mb-1 relative z-10 gap-1.5">
                       {/* Box Name: Pareto Analyses (Eye icon) */}
@@ -7985,23 +8042,23 @@ export default function Dashboard() {
                           </button>
                           {/* Month Picker Popover */}
                           {paretoMonthPickerOpen && (
-                            <div className="absolute bottom-full left-0 mb-1.5 w-[210px] bg-[#111a2e] border border-cyan-400/40 rounded-xl shadow-2xl p-2.5 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
+                            <div className="absolute bottom-full left-0 mb-2 w-[230px] bg-[#0c1424] border-2 border-cyan-400/60 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] p-3 z-[999] animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl">
                               {/* Year Nav Row inside Month Picker */}
-                              <div className="flex items-center justify-between mb-2 px-1 py-0.5 bg-[#162035] rounded-lg border border-cyan-400/20">
+                              <div className="flex items-center justify-between mb-2.5 px-2 py-1 bg-[#162238] rounded-xl border border-cyan-400/30 shadow-inner">
                                 <button
                                   type="button"
                                   onClick={() => setParetoMonthPickerYear(prev => prev - 1)}
-                                  className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"
+                                  className="text-slate-300 hover:text-cyan-300 p-1 rounded-lg hover:bg-cyan-400/10 cursor-pointer transition-colors"
                                   title="Previous Year"
                                 >
-                                  <ChevronLeft size={14} />
+                                  <ChevronLeft size={15} />
                                 </button>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[11px] font-black text-cyan-300 tracking-wider">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[12px] font-black text-cyan-300 tracking-wider">
                                     {paretoMonthPickerYear}
                                   </span>
                                   {revenueYearKey && String(paretoMonthPickerYear) === revenueYearKey && (
-                                    <span className="text-[8px] bg-purple-500/30 text-purple-300 px-1 py-0.2 rounded font-bold uppercase">
+                                    <span className="text-[8px] bg-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-bold uppercase">
                                       Active
                                     </span>
                                   )}
@@ -8009,14 +8066,14 @@ export default function Dashboard() {
                                 <button
                                   type="button"
                                   onClick={() => setParetoMonthPickerYear(prev => prev + 1)}
-                                  className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-white/10 cursor-pointer transition-colors"
+                                  className="text-slate-300 hover:text-cyan-300 p-1 rounded-lg hover:bg-cyan-400/10 cursor-pointer transition-colors"
                                   title="Next Year"
                                 >
-                                  <ChevronRight size={14} />
+                                  <ChevronRight size={15} />
                                 </button>
                               </div>
-                              {/* 4x3 Month Grid */}
-                              <div className="grid grid-cols-4 gap-1">
+                              {/* 4x3 Month Grid (Jan - Dec) */}
+                              <div className="grid grid-cols-4 gap-1.5">
                                 {PARETO_MONTHS_LIST.map(m => {
                                   const isMonthSelected = revenueMonthKey === m.value || (revenueMonthKey && revenueMonthKey.endsWith(`-${m.value}`));
                                   const isYearMatching = !revenueYearKey || revenueYearKey === String(paretoMonthPickerYear);
@@ -8029,10 +8086,10 @@ export default function Dashboard() {
                                         handleRevenueMonthChange(m.value, paretoMonthPickerYear);
                                         setParetoMonthPickerOpen(false);
                                       }}
-                                      className={`py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                                      className={`py-1.5 rounded-lg text-[11px] font-black cursor-pointer transition-all ${
                                         isActive
-                                          ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/30 scale-105 ring-1 ring-cyan-300'
-                                          : 'text-slate-300 hover:bg-cyan-400/20 hover:text-cyan-300'
+                                          ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/40 scale-105 ring-2 ring-cyan-300'
+                                          : 'text-slate-200 bg-[#141e33] hover:bg-cyan-400/20 hover:text-cyan-300 border border-white/5'
                                       }`}
                                     >
                                       {m.label}
@@ -8041,7 +8098,7 @@ export default function Dashboard() {
                                 })}
                               </div>
                               {/* Action buttons inside Month Picker */}
-                              <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center gap-1.5">
+                              <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center gap-1.5">
                                 {revenueMonthKey ? (
                                   <button
                                     type="button"
@@ -8049,7 +8106,7 @@ export default function Dashboard() {
                                       handleRevenueMonthChange('');
                                       setParetoMonthPickerOpen(false);
                                     }}
-                                    className="flex-1 py-1 text-[9px] font-bold text-rose-400 hover:text-white hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/30 uppercase tracking-wider text-center"
+                                    className="flex-1 py-1.5 text-[10px] font-black text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-500/30 rounded-lg cursor-pointer transition-colors border border-rose-500/40 uppercase tracking-wider text-center"
                                   >
                                     ✕ All Months ({revenueYearKey || paretoMonthPickerYear})
                                   </button>
@@ -8060,7 +8117,7 @@ export default function Dashboard() {
                                       handleRevenueYearChange(String(paretoMonthPickerYear));
                                       setParetoMonthPickerOpen(false);
                                     }}
-                                    className="flex-1 py-1 text-[9px] font-bold text-cyan-400 hover:text-white hover:bg-cyan-500/30 rounded-lg cursor-pointer transition-colors border border-cyan-500/30 uppercase tracking-wider text-center"
+                                    className="flex-1 py-1.5 text-[10px] font-black text-cyan-300 hover:text-white bg-cyan-500/15 hover:bg-cyan-500/30 rounded-lg cursor-pointer transition-colors border border-cyan-500/40 uppercase tracking-wider text-center"
                                   >
                                     Full Year {paretoMonthPickerYear}
                                   </button>
@@ -8090,8 +8147,8 @@ export default function Dashboard() {
                           </button>
                           {/* Year Picker Popover */}
                           {paretoYearPickerOpen && (
-                            <div className="absolute bottom-full right-0 mb-1.5 w-[140px] bg-[#111a2e] border border-purple-400/40 rounded-xl shadow-2xl p-2 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-[220px] overflow-y-auto custom-scrollbar">
-                              <div className="text-[9px] font-extrabold text-purple-300 uppercase tracking-wider mb-1.5 px-1 flex items-center justify-between">
+                            <div className="absolute bottom-full right-0 mb-2 w-[150px] bg-[#0c1424] border-2 border-purple-400/60 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] p-2.5 z-[999] animate-in fade-in zoom-in-95 duration-150 max-h-[220px] overflow-y-auto custom-scrollbar backdrop-blur-xl">
+                              <div className="text-[10px] font-black text-purple-300 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
                                 <span>Select Year</span>
                                 {revenueMonthKey && (
                                   <span className="text-[8px] text-cyan-300 bg-cyan-400/10 px-1 py-0.2 rounded font-black">
@@ -8099,7 +8156,7 @@ export default function Dashboard() {
                                   </span>
                                 )}
                               </div>
-                              <div className="space-y-0.5">
+                              <div className="space-y-1">
                                 {availableRevenueYears.map(y => {
                                   const isActive = revenueYearKey === y;
                                   return (
@@ -8112,8 +8169,8 @@ export default function Dashboard() {
                                       }}
                                       className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all flex items-center justify-between ${
                                         isActive
-                                          ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30 font-black'
-                                          : 'text-slate-300 hover:bg-purple-400/20 hover:text-purple-300'
+                                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 font-black ring-1 ring-purple-300'
+                                          : 'text-slate-200 bg-[#141e33] hover:bg-purple-400/20 hover:text-purple-300 border border-white/5'
                                       }`}
                                     >
                                       <span>{y}</span>
@@ -12569,11 +12626,6 @@ export default function Dashboard() {
                       <MapPin size={24} className="text-amber-400" />
                       <span>Locations Management</span>
                     </>
-                  ) : analyticsActiveTab === 'roles' ? (
-                    <>
-                      <User size={24} className="text-amber-400" />
-                      <span>Roles Management</span>
-                    </>
                   ) : analyticsActiveTab === 'users' ? (
                     <>
                       <UserCheck size={24} className="text-amber-400" />
@@ -12656,29 +12708,6 @@ export default function Dashboard() {
                     <span>Locations</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'locations' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
                       {locations.length}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAnalyticsActiveTab('roles');
-                      setEditOrderTypeId(null);
-                      setNewOrderTypeName("");
-                      setEditChocId(null);
-                      setEditLocationId(null);
-                      setNewLocationName("");
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                      analyticsActiveTab === 'roles'
-                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md'
-                        : 'text-slate-300 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <User size={14} />
-                    <span>Roles</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${analyticsActiveTab === 'roles' ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-300'}`}>
-                      {orderRoles.length}
                     </span>
                   </button>
 
@@ -13246,179 +13275,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* TAB 4: ROLES MANAGEMENT */}
-            {analyticsActiveTab === 'roles' && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-y-auto custom-scrollbar p-0.5">
-                {/* Left Form Panel: Add / Edit Role */}
-                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-5 h-fit bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl text-white">
-                  <div>
-                    <div className="flex items-center gap-2.5 pb-3 border-b border-white/10 mb-4">
-                      <div className="w-8 h-8 rounded-xl bg-rose-400/20 text-rose-400 flex items-center justify-center font-black border border-rose-400/30">
-                        {editOrderRoleId ? <Pencil size={16} /> : <Plus size={16} />}
-                      </div>
-                      <div>
-                        <h3 className="text-base font-black text-rose-400 uppercase tracking-wider">
-                          {editOrderRoleId ? 'Edit Role' : 'Add New Role'}
-                        </h3>
-                        <p className="text-[11px] text-slate-400 font-medium">Create and customize order roles (Self, Others, etc.)</p>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleAddOrderRole} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                          <span>Role Name</span>
-                          {editOrderRoleId && <span className="text-rose-400 text-[10px] font-bold">Editing active item</span>}
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          value={newOrderRoleName}
-                          onChange={(e) => setNewOrderRoleName(e.target.value)}
-                          style={{ backgroundColor: '#162035', color: '#ffffff' }}
-                          className="w-full font-bold rounded-xl p-3.5 outline-none border border-white/20 focus:border-rose-400 focus:ring-2 focus:ring-rose-400/20 bg-[#162035] text-white placeholder-slate-400 shadow-inner text-sm transition-all"
-                          placeholder="e.g. Self, Others, Wholesale, Reseller..."
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full py-3.5 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white font-black uppercase tracking-wider rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs sm:text-sm"
-                      >
-                        {editOrderRoleId ? <CheckCircle2 size={18} /> : <Plus size={18} />}
-                        <span>{editOrderRoleId ? 'Update Role' : 'Add Role'}</span>
-                      </button>
-
-                      {editOrderRoleId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditOrderRoleId(null);
-                            setNewOrderRoleName("");
-                          }}
-                          className="w-full py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl font-bold text-xs cursor-pointer transition-colors"
-                        >
-                          Cancel Edit
-                        </button>
-                      )}
-                    </form>
-                  </div>
-                </div>
-
-                {/* Right Panel: Active Roles List */}
-                <div style={{ backgroundColor: '#131c2e' }} className="lg:col-span-7 bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-xl flex flex-col justify-between text-white overflow-hidden">
-                  <div className="flex-1 flex flex-col">
-                    {/* Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-white/10 mb-4">
-                      <div className="flex items-center gap-2">
-                        <User size={18} className="text-rose-400" />
-                        <h3 className="text-base font-black text-rose-400 uppercase tracking-wider">
-                          Active Order Roles
-                        </h3>
-                        <span className="bg-rose-400/20 text-rose-300 border border-rose-400/30 text-[11px] font-black px-2 py-0.5 rounded-full">
-                          {orderRoles.length}
-                        </span>
-                      </div>
-                      <span className="text-xs font-black text-slate-300 bg-[#090e1a] px-3 py-1 rounded-xl border border-white/10">
-                        Total Orders: <strong className="text-amber-400 font-mono font-black">{orders.length}</strong>
-                      </span>
-                    </div>
-
-                    {/* Roles Cards List */}
-                    <div className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-[330px] pr-1 flex-1">
-                      {orderRoles.length === 0 ? (
-                        <div className="p-8 text-center bg-[#090e1a]/50 rounded-2xl border border-dashed border-white/10 my-auto">
-                          <User size={36} className="text-rose-400 mx-auto mb-2 opacity-60" />
-                          <p className="text-slate-200 font-extrabold text-sm">No custom roles found.</p>
-                          <p className="text-slate-400 text-xs mt-1">Use the form on the left to add roles like Self, Others, etc.</p>
-                        </div>
-                      ) : (
-                        orderRoles.map((r, idx) => {
-                          const rName = getOrderRoleName(r) || `Role ${idx + 1}`;
-                          const rId = getOrderRoleId(r, idx);
-                          const countForRole = orders.filter((o: any) => {
-                            const val = String(o?.role || '').trim().toLowerCase();
-                            return val === rName.toLowerCase();
-                          }).length;
-                          const sharePct = orders.length > 0 ? Math.round((countForRole / orders.length) * 100) : 0;
-                          const isBeingEdited = editOrderRoleId === rId || editOrderRoleId === rName;
-
-                          return (
-                            <div
-                              key={rId}
-                              className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 group shadow-md ${
-                                isBeingEdited
-                                  ? 'bg-[#18233a] border-rose-400 ring-2 ring-rose-400/30'
-                                  : 'bg-[#0f172a] hover:bg-[#162238] border-white/10 hover:border-rose-400/40'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
-                                  isBeingEdited ? 'bg-rose-500 text-white font-black' : 'bg-rose-500/15 border border-rose-500/30 text-rose-400'
-                                }`}>
-                                  <User size={18} />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-black text-white text-sm sm:text-base truncate">{rName}</p>
-                                    {isBeingEdited && (
-                                      <span className="text-[9px] bg-rose-500 text-white px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
-                                        Editing
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-black">
-                                      {countForRole} {countForRole === 1 ? 'Order' : 'Orders'}
-                                    </span>
-                                    {orders.length > 0 && (
-                                      <span className="text-[10px] text-slate-400 font-bold">
-                                        • {sharePct}% share
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  type="button"
-                                  title={`Edit "${rName}"`}
-                                  onClick={() => {
-                                    setEditOrderRoleId(rId);
-                                    setNewOrderRoleName(rName);
-                                  }}
-                                  className="p-2 text-blue-400 hover:text-white hover:bg-blue-600/80 rounded-xl transition-colors cursor-pointer"
-                                >
-                                  <Pencil size={15} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  title={`Delete "${rName}"`}
-                                  onClick={() => handleDeleteOrderRole(r)}
-                                  className="p-2 text-rose-400 hover:text-white hover:bg-rose-600/80 rounded-xl transition-colors cursor-pointer"
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Panel Footer Status */}
-                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-400">
-                    <span>Configured Roles: <strong className="text-white">{orderRoles.length}</strong></span>
-                    <span>Status: <strong className="text-emerald-400">Synced to Cloud</strong></span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 5: USER NAME & DEFAULTS CONFIGURATION (Requirements 3, 4, 6, 7) */}
+            {/* TAB 4: USER NAME & DEFAULTS CONFIGURATION */}
             {analyticsActiveTab === 'users' && (
               <div className="flex flex-col flex-1 overflow-hidden bg-[#131c2e] p-5 sm:p-6 rounded-3xl border border-white/10 shadow-lg text-white">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-4 border-b border-white/10 shrink-0">
