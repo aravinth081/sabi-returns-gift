@@ -17,7 +17,9 @@ import {
   Info,
   User,
   Tag,
-  RotateCcw
+  RotateCcw,
+  Archive,
+  Package
 } from 'lucide-react';
 import {
   ComposedChart,
@@ -41,6 +43,9 @@ export interface ParetoAnalysisModalProps {
   initialDateType?: string;
   initialRole?: string;
   initialType?: string;
+  initialDashboard?: string;
+  initialInventory?: string;
+  inventoriesList?: any[];
   customPricesMap?: Record<string, number>;
   managedChocPricesMap?: Record<string, { retail: number; wholesale: number }>;
   orderTypes?: any[];
@@ -84,6 +89,9 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
   initialDateType = 'Dispatch Date',
   initialRole = 'All',
   initialType = 'All',
+  initialDashboard = 'Dashboard 1',
+  initialInventory = 'Inventory 1',
+  inventoriesList = [],
   customPricesMap = {},
   managedChocPricesMap = {},
   orderTypes = []
@@ -98,12 +106,14 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
       : 'Dispatch Date'
   );
 
-  // Filter 2: Year dropdown (Extracted from orders or default to current year)
+  // Filter 2: Year dropdown (Extracted from orders or default to current year, explicitly supporting 2027)
   const currentSystemYear = new Date().getFullYear();
   const availableYears = useMemo(() => {
     const set = new Set<string>();
     set.add(String(currentSystemYear));
     set.add(String(currentSystemYear - 1));
+    set.add(String(currentSystemYear + 1));
+    set.add('2027'); // Explicitly guaranteed year support for 2027
     orders.forEach(o => {
       const dt = parseToYYYYMMDD(o.deliveryDate || o.orderDate || o.functionDate);
       if (dt) {
@@ -133,13 +143,35 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
   // Filter 7: Order Type dropdown (All Types, Sabi, Thaaru, Choco Wrapz, + custom)
   const [selectedType, setSelectedType] = useState<string>(initialType || 'All');
 
-  // Sync initialRole and initialType when modal opens
+  // Filter 8: Inventory selection dropdown (Inventory 1, Inventory 2, + dynamic)
+  const [selectedInventory, setSelectedInventory] = useState<string>(initialInventory || 'Inventory 1');
+
+  // Sync initialRole, initialType, and initialInventory when modal opens
   React.useEffect(() => {
     if (isOpen) {
       if (initialRole) setSelectedRole(initialRole);
       if (initialType) setSelectedType(initialType);
+      if (initialInventory) setSelectedInventory(initialInventory);
     }
-  }, [isOpen, initialRole, initialType]);
+  }, [isOpen, initialRole, initialType, initialInventory]);
+
+  // Extract available inventories dynamically
+  const availableInventories = useMemo(() => {
+    const set = new Set<string>();
+    set.add('Inventory 1');
+    set.add('Inventory 2');
+    if (Array.isArray(inventoriesList) && inventoriesList.length > 0) {
+      inventoriesList.forEach((item: any, idx: number) => {
+        const name = typeof item === 'string' ? item.trim() : String(item?.name || item?.inventory || `Inventory ${idx + 1}`).trim();
+        if (name) set.add(name);
+      });
+    }
+    orders.forEach(o => {
+      const inv = String(o.inventory || '').trim();
+      if (inv) set.add(inv);
+    });
+    return Array.from(set);
+  }, [orders, inventoriesList]);
 
   // Extract available roles dynamically from orders and defaults
   const availableRoles = useMemo(() => {
@@ -331,9 +363,17 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
         }
       }
 
+      // Inventory filter check (Selecting Inventory 1 / Inventory 2 isolates records strictly)
+      if (selectedInventory && selectedInventory !== 'All') {
+        const orderInv = order.inventory || 'Inventory 1';
+        if (orderInv.trim().toLowerCase() !== selectedInventory.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [orders, dateType, dateRange, selectedRole, selectedType]);
+  }, [orders, dateType, dateRange, selectedRole, selectedType, selectedInventory]);
 
   // 2. PRODUCT-WISE PARETO ANALYSIS DATA
   const paretoData = useMemo(() => {
@@ -774,9 +814,46 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Roles, Types & Date Range (3 spacious columns) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end pt-2 border-t border-white/5">
-            {/* 5. Role Selection Dropdown */}
+          {/* Row 2: Inventories, Roles, Types & Date Range */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 items-end pt-2 border-t border-white/5">
+            {/* 5. Inventory Selection Dropdown */}
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-amber-300">
+                  <Archive size={11} className="text-amber-400" /> Inventories Dropdown
+                </span>
+                {selectedInventory && selectedInventory !== 'All' && (
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase">
+                    Active
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedInventory}
+                  onChange={e => setSelectedInventory(e.target.value)}
+                  className={`w-full bg-[#162035] font-bold text-xs rounded-xl px-3 py-2 border outline-none cursor-pointer appearance-none shadow-sm transition-all ${
+                    selectedInventory && selectedInventory !== 'All'
+                      ? 'border-amber-400 text-amber-300 ring-1 ring-amber-400/30'
+                      : 'border-amber-400/40 text-amber-300 focus:border-amber-400'
+                  }`}
+                  title="Filter Pareto Analysis by Inventory"
+                >
+                  <option value="Inventory 1">Inventory 1</option>
+                  <option value="Inventory 2">Inventory 2</option>
+                  {availableInventories
+                    .filter(inv => inv !== 'Inventory 1' && inv !== 'Inventory 2')
+                    .map(inv => (
+                      <option key={inv} value={inv}>
+                        {inv}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown size={14} className="text-amber-400 absolute right-3 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 6. Role Selection Dropdown */}
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1 text-rose-300">
@@ -810,7 +887,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
               </div>
             </div>
 
-            {/* 6. Order Types Selection Dropdown */}
+            {/* 7. Order Types Selection Dropdown */}
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1 text-sky-300">
@@ -844,17 +921,18 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
               </div>
             </div>
 
-            {/* 7. Date Range (From & To) */}
+            {/* 8. Date Range (From & To) */}
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
                 <span>Date Range (From & To)</span>
-                {(isCustomRange || selectedRole !== 'All' || selectedType !== 'All') && (
+                {(isCustomRange || selectedRole !== 'All' || selectedType !== 'All' || (selectedInventory && selectedInventory !== (initialInventory || 'Inventory 1'))) && (
                   <button
                     type="button"
                     onClick={() => {
                       setIsCustomRange(false);
                       setSelectedRole('All');
                       setSelectedType('All');
+                      setSelectedInventory(initialInventory || 'Inventory 1');
                       updateRangeFromDropdowns(selectedYear, selectedMonth, selectedWeek);
                     }}
                     className="text-[9px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
@@ -997,7 +1075,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                     {paretoData.topItem?.name || 'N/A'}
                   </h3>
                   <p className="text-[10px] text-emerald-400/90 font-bold mt-1">
-                    {paretoData.topItem?.quantity.toLocaleString()} pcs ({paretoData.topItem?.percentage}%)
+                    {paretoData.topItem ? `${paretoData.topItem.quantity.toLocaleString()} pcs (${paretoData.topItem.percentage}%)` : '0 pcs (0%)'}
                   </p>
                 </div>
 
@@ -1251,7 +1329,20 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5 font-semibold">
-                      {paretoData.items.map(item => {
+                      {paretoData.items.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-12 text-center text-slate-400 font-bold">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Package size={28} className="text-slate-600 mb-1" />
+                              <p className="text-sm font-extrabold text-slate-300">No Sales Records Found</p>
+                              <p className="text-xs text-slate-500 font-medium">
+                                No sales recorded for {selectedInventory} in {selectedYear}{selectedMonth !== 'all' ? ` (Month ${selectedMonth})` : ''}.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paretoData.items.map(item => {
                         let badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
                         let label = 'Category A (Top 80%)';
                         if (item.group === 'B') {
@@ -1304,7 +1395,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                             </td>
                           </tr>
                         );
-                      })}
+                      }))}
                     </tbody>
                   </table>
                 </div>
@@ -1663,7 +1754,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                         {paretoData.topItem?.name || 'N/A'}
                       </h4>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Generated {paretoData.topItem?.quantity.toLocaleString()} pcs ({paretoData.topItem?.percentage}% of sales)
+                        {paretoData.topItem ? `Generated ${paretoData.topItem.quantity.toLocaleString()} pcs (${paretoData.topItem.percentage}% of sales)` : 'No sales records for this filter'}
                       </p>
                     </div>
 

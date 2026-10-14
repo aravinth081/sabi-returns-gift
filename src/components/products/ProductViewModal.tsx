@@ -171,6 +171,74 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
     }
   };
 
+  // 4. Copy Main Image and Description in a single action
+  const [isCopyingMainAndDesc, setIsCopyingMainAndDesc] = useState(false);
+  const handleCopyMainImageAndDescription = async () => {
+    const mainImage = (images && images.length > 0) ? images[0] : (product.image || '');
+    const rawDescription = product.description?.trim() || '';
+
+    if (!mainImage && !rawDescription) {
+      toast.error('No main image or description found for this product.');
+      return;
+    }
+
+    try {
+      setIsCopyingMainAndDesc(true);
+
+      const escapedHtmlDesc = rawDescription
+        ? rawDescription
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br/>')
+        : '';
+
+      const htmlContent = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1e293b;">
+          ${escapedHtmlDesc ? `<p style="white-space: pre-wrap; margin-bottom: 14px;">${escapedHtmlDesc}</p>` : ''}
+          ${mainImage ? `<img src="${mainImage}" alt="${(product.name || 'Product').replace(/"/g, '&quot;')}" style="max-width: 100%; height: auto; border-radius: 8px;" />` : ''}
+        </div>
+      `.trim();
+
+      const plainTextContent = [
+        rawDescription,
+        mainImage ? (rawDescription ? `\n\nMain Image: ${mainImage}` : mainImage) : ''
+      ].filter(Boolean).join('');
+
+      let copied = false;
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          const clipboardItems: Record<string, Blob> = {
+            'text/html': new Blob([htmlContent], { type: 'text/html' }),
+            'text/plain': new Blob([plainTextContent], { type: 'text/plain' })
+          };
+          await navigator.clipboard.write([new ClipboardItem(clipboardItems)]);
+          copied = true;
+        } catch (err) {
+          console.warn('ClipboardItem write failed, trying fallback:', err);
+        }
+      }
+
+      if (!copied) {
+        await navigator.clipboard.writeText(plainTextContent);
+        copied = true;
+      }
+
+      if (mainImage && rawDescription) {
+        toast.success('Main image and description copied to clipboard!');
+      } else if (mainImage) {
+        toast.success('Main image copied (no description available).');
+      } else {
+        toast.success('Description copied (no main image available).');
+      }
+    } catch (err) {
+      console.error('Copy failed:', err);
+      toast.error('Failed to copy to clipboard.');
+    } finally {
+      setTimeout(() => setIsCopyingMainAndDesc(false), 1500);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
@@ -341,6 +409,18 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
                     <span>{isCopyingImg ? 'Copied' : 'Copy Image'}</span>
                   </button>
 
+                  {/* Copy Main Image and Description Button */}
+                  <button
+                    type="button"
+                    onClick={handleCopyMainImageAndDescription}
+                    disabled={isCopyingMainAndDesc}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
+                    title="Copy Main Image and Description in a single action"
+                  >
+                    <Copy size={14} />
+                    <span>{isCopyingMainAndDesc ? 'Copied' : 'Copy Main Image & Description'}</span>
+                  </button>
+
                   {/* Copy All Button (Requirement 17: Copies ALL images) */}
                   <button
                     type="button"
@@ -509,23 +589,35 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
 
           {/* Description Section with Copy Description Button (Requirement 15 & 17) */}
           <div className="bg-[#121b2f] p-5 rounded-2xl border border-white/10 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+            <div className="flex flex-wrap items-center justify-between border-b border-white/10 pb-2.5 gap-2">
               <div className="flex items-center gap-2">
                 <FileText size={15} className="text-blue-400" />
                 <h3 className="text-xs font-black uppercase tracking-wider text-blue-400">
                   Product Description
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyDescription}
-                disabled={!product.description || isCopyingDesc}
-                className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
-                title="Copy complete product description"
-              >
-                {isCopyingDesc ? <Check size={13} /> : <Copy size={13} />}
-                <span>{isCopyingDesc ? 'Copied' : 'Copy Description'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyMainImageAndDescription}
+                  disabled={isCopyingMainAndDesc}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Copy Main Image and Description in a single action"
+                >
+                  <Copy size={13} />
+                  <span>{isCopyingMainAndDesc ? 'Copied' : 'Copy Main Image & Description'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyDescription}
+                  disabled={!product.description || isCopyingDesc}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Copy complete product description"
+                >
+                  {isCopyingDesc ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{isCopyingDesc ? 'Copied' : 'Copy Description'}</span>
+                </button>
+              </div>
             </div>
 
             {product.description ? (

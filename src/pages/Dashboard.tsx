@@ -19,7 +19,7 @@ import { getNextSequentialOrderId } from "@/lib/concurrency";
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CalendarDays, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck, Copy
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -2335,6 +2335,7 @@ export default function Dashboard() {
 
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [reportDashboardFilter, setReportDashboardFilter] = useState("All");
+  const [reportInventoryFilter, setReportInventoryFilter] = useState("Inventory 1");
   const [reportFromMonth, setReportFromMonth] = useState("");
   const [reportToMonth, setReportToMonth] = useState("");
 
@@ -2535,6 +2536,7 @@ export default function Dashboard() {
 
     orders.forEach(order => {
       if (order.status === 'Cancelled') return;
+      if (reportInventoryFilter && (order.inventory || 'Inventory 1').toLowerCase() !== reportInventoryFilter.toLowerCase()) return;
       const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
       if (!targetDateStr) return;
 
@@ -2566,7 +2568,7 @@ export default function Dashboard() {
     }
 
     return sorted;
-  }, [orders, customPricesMap, managedChocPricesMap, managedChocStickersMap, reportFromMonth, reportToMonth]);
+  }, [orders, customPricesMap, managedChocPricesMap, managedChocStickersMap, reportFromMonth, reportToMonth, reportInventoryFilter]);
 
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
   const [adminCreds, setAdminCreds] = useState({ username: "", password: "" });
@@ -3488,6 +3490,10 @@ export default function Dashboard() {
       filtered = filtered.filter(order => (order.orderType || "Sabi") === reportOrderTypeFilter);
     }
 
+    if (reportInventoryFilter) {
+      filtered = filtered.filter(order => (order.inventory || 'Inventory 1').toLowerCase() === reportInventoryFilter.toLowerCase());
+    }
+
     const chocolateCounts: Record<string, number> = {};
     let totalRev = 0;
     let totalItems = 0;
@@ -3529,7 +3535,7 @@ export default function Dashboard() {
       totalCost,
       totalProfit: totalRev - totalCost
     };
-  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, reportOrderTypeFilter, managedChocPricesMap, managedChocStickersMap, currentUserAllowedOrderTypes, orderTypes]);
+  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, reportInventoryFilter, reportOrderTypeFilter, managedChocPricesMap, managedChocStickersMap, currentUserAllowedOrderTypes, orderTypes]);
 
 
 
@@ -4883,6 +4889,69 @@ export default function Dashboard() {
   const handleEditProductClick = (prod: any) => {
     setSelectedEditingProduct(prod);
     setIsProductListingModalOpen(true);
+  };
+
+  const handleCopyMainImageAndDescription = async (prod: any) => {
+    if (!prod) return;
+    const mainImage = (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.image || '');
+    const rawDescription = typeof prod.description === 'string' ? prod.description.trim() : '';
+
+    if (!mainImage && !rawDescription) {
+      toast.error("No main image or description found for this product.");
+      return;
+    }
+
+    try {
+      const escapedHtmlDesc = rawDescription
+        ? rawDescription
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br/>')
+        : '';
+
+      const htmlContent = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1e293b;">
+          ${escapedHtmlDesc ? `<p style="white-space: pre-wrap; margin-bottom: 14px;">${escapedHtmlDesc}</p>` : ''}
+          ${mainImage ? `<img src="${mainImage}" alt="${(prod.name || 'Product').replace(/"/g, '&quot;')}" style="max-width: 100%; height: auto; border-radius: 8px;" />` : ''}
+        </div>
+      `.trim();
+
+      const plainTextContent = [
+        rawDescription,
+        mainImage ? (rawDescription ? `\n\nMain Image: ${mainImage}` : mainImage) : ''
+      ].filter(Boolean).join('');
+
+      let copied = false;
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          const clipboardItems: Record<string, Blob> = {
+            'text/html': new Blob([htmlContent], { type: 'text/html' }),
+            'text/plain': new Blob([plainTextContent], { type: 'text/plain' })
+          };
+          await navigator.clipboard.write([new ClipboardItem(clipboardItems)]);
+          copied = true;
+        } catch (err) {
+          console.warn("ClipboardItem write failed, trying fallback:", err);
+        }
+      }
+
+      if (!copied) {
+        await navigator.clipboard.writeText(plainTextContent);
+        copied = true;
+      }
+
+      if (mainImage && rawDescription) {
+        toast.success("Main image and description copied to clipboard!");
+      } else if (mainImage) {
+        toast.success("Main image copied (no description available).");
+      } else {
+        toast.success("Description copied (no main image available).");
+      }
+    } catch (err) {
+      console.error("Copy failed:", err);
+      toast.error("Failed to copy to clipboard.");
+    }
   };
 
   const handleDeleteProductClick = async (fireId: string) => {
@@ -6725,7 +6794,7 @@ export default function Dashboard() {
                           <th className="py-3.5 px-4 text-right">Wholesale (₹)</th>
                           <th className="py-3.5 px-4 text-right">Selling (₹)</th>
                           <th className="py-3.5 px-4 text-right min-w-[120px]">Profit (₹)</th>
-                          <th className="py-3.5 px-3 text-center min-w-[170px] whitespace-nowrap">Actions</th>
+                          <th className="py-3.5 px-3 text-center min-w-[210px] whitespace-nowrap">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
@@ -6960,8 +7029,8 @@ export default function Dashboard() {
                                 </div>
                               </td>
 
-                              {/* Actions: View (Eye), Edit (Pencil), Upload (Image), Delete (Trash) */}
-                              <td className="py-3.5 px-3 text-center min-w-[170px] whitespace-nowrap">
+                              {/* Actions: View (Eye), Copy (Copy), Edit (Pencil), Upload (Image), Delete (Trash) */}
+                              <td className="py-3.5 px-3 text-center min-w-[210px] whitespace-nowrap">
                                 <div className="inline-flex items-center justify-center gap-2">
                                   {/* View Button (Requirement 17: Opens rich View Modal with Copy Description, Copy Image, Copy All) */}
                                   <button
@@ -6971,6 +7040,16 @@ export default function Dashboard() {
                                     title="View listing details, description & photos"
                                   >
                                     <Eye size={15} />
+                                  </button>
+
+                                  {/* Copy Main Image and Description Button (Requirement 2) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyMainImageAndDescription(prod)}
+                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    title="Copy Main Image and Description"
+                                  >
+                                    <Copy size={15} />
                                   </button>
 
                                   {/* Edit Button (Requirement 10 & 22: Opens reusable ProductListingModal) */}
@@ -7047,7 +7126,7 @@ export default function Dashboard() {
                                   ₹{totalProfit.toLocaleString()} ({avgMarginPct}%)
                                 </span>
                               </td>
-                              <td className="py-3.5 px-3 min-w-[170px]"></td>
+                              <td className="py-3.5 px-3 min-w-[210px]"></td>
                             </tr>
                           </tfoot>
                         );
@@ -9810,6 +9889,20 @@ export default function Dashboard() {
                       <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
                     </div>
 
+                    {/* 🟢 INVENTORIES DROPDOWN (Requirement 1.A) */}
+                    <div className="relative">
+                      <select
+                        value={reportInventoryFilter}
+                        onChange={(e) => setReportInventoryFilter(e.target.value)}
+                        className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
+                        title="Filter Analytics & Reports by Inventory"
+                      >
+                        <option value="Inventory 1">Inventory 1</option>
+                        <option value="Inventory 2">Inventory 2</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
+                    </div>
+
                     <div className="relative">
                       <select
                         value={reportOrderTypeFilter}
@@ -9964,6 +10057,17 @@ export default function Dashboard() {
                   </button>
                   <button onClick={() => setIsProfitModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white px-4 py-2 rounded-xl font-black text-xs shadow-md transition-transform hover:scale-105 cursor-pointer">
                     Profit Table
+                  </button>
+                  <button
+                    onClick={() => {
+                      setParetoAuthPassword("");
+                      setParetoAuthError("");
+                      setIsParetoAuthModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white px-4 py-2 rounded-xl font-black text-xs shadow-md transition-transform hover:scale-105 cursor-pointer"
+                    title="Open Pareto Analysis for Selected Inventory"
+                  >
+                    <TrendingUp size={16} /> Pareto Analysis
                   </button>
                 </div>
 
@@ -12135,6 +12239,13 @@ export default function Dashboard() {
                   <p className="text-xs font-bold text-slate-400 mt-1">Period: All Time Overview</p>
                 )}
 
+                {/* Inventory Filter Subtitle inside Report */}
+                {reportInventoryFilter && (
+                  <p className="text-xs font-black text-amber-300 uppercase tracking-widest mt-2 bg-amber-500/15 px-3.5 py-1 rounded-full border border-amber-500/30 inline-block mr-2">
+                    Inventory: {reportInventoryFilter}
+                  </p>
+                )}
+
                 {/* Dashboard Type Subtitle inside Report */}
                 {reportDashboardFilter !== 'All' && (
                   <p className="text-xs font-black text-amber-300 uppercase tracking-widest mt-2 bg-amber-500/15 px-3.5 py-1 rounded-full border border-amber-500/30 inline-block">
@@ -12325,6 +12436,8 @@ export default function Dashboard() {
         initialRole={roleFilter !== 'All' ? roleFilter : 'All'}
         initialType={tableTypeFilter !== 'All' ? tableTypeFilter : 'All'}
         initialDashboard={activeTab === 'dashboard2' ? 'Dashboard 2' : 'Dashboard 1'}
+        initialInventory={activeTab === 'reports' ? reportInventoryFilter : (activeTab === 'dashboard1' && d1InventoryFilter !== 'All' ? d1InventoryFilter : 'Inventory 1')}
+        inventoriesList={inventoriesList}
         customPricesMap={customPricesMap}
         managedChocPricesMap={managedChocPricesMap}
         orderTypes={orderTypes}
@@ -13969,7 +14082,12 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-3 sm:p-4 backdrop-blur-md" onClick={() => setIsProfitModalOpen(false)}>
           <div style={{ backgroundColor: '#0c1427', color: '#ffffff' }} className="bg-[#0c1427] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90dvh] flex flex-col overflow-hidden border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
             <div style={{ backgroundColor: '#131c2e' }} className="p-4 sm:p-6 bg-[#131c2e] border-b border-white/15 flex justify-between items-center shadow-md">
-              <h2 className="text-xl sm:text-2xl font-black text-amber-400 uppercase tracking-widest flex items-center gap-2.5"><DollarSign className="text-amber-400" /> Profit Analytics Table</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl sm:text-2xl font-black text-amber-400 uppercase tracking-widest flex items-center gap-2.5"><DollarSign className="text-amber-400" /> Profit Analytics Table</h2>
+                <span className="text-xs font-black text-amber-300 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/40 uppercase tracking-wider">
+                  {reportInventoryFilter}
+                </span>
+              </div>
               <button onClick={() => setIsProfitModalOpen(false)} className="text-slate-300 hover:text-white p-1 rounded-full cursor-pointer transition-colors"><X size={24} /></button>
             </div>
 
