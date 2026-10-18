@@ -154,7 +154,7 @@ export function parseDateToStandard(dateInput: any): string {
     return str.split('T')[0];
   }
 
-  // DD-MM-YYYY (e.g. 18-10-2026)
+  // DD-MM-YYYY or DD/MM/YYYY (e.g. 18-10-2026)
   const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (dmyMatch) {
     const day = dmyMatch[1].padStart(2, '0');
@@ -163,9 +163,28 @@ export function parseDateToStandard(dateInput: any): string {
     return `${year}-${month}-${day}`;
   }
 
-  // DD MMM or DD MMM YYYY (e.g. "18 Oct" or "18 Oct 2026")
+  // DD-MM-YY or DD/MM/YY (2-digit year e.g. 18-10-26 or 18/10/26)
+  const dmy2Match = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
+  if (dmy2Match) {
+    const day = dmy2Match[1].padStart(2, '0');
+    const month = dmy2Match[2].padStart(2, '0');
+    const yrNum = Number(dmy2Match[3]);
+    const year = yrNum < 70 ? 2000 + yrNum : 1900 + yrNum;
+    return `${year}-${month}-${day}`;
+  }
+
+  // DD/MM or DD-MM (no year, e.g. 18/10 or 18-10)
   const currentYear = new Date().getFullYear();
-  const dateWithYear = /\d{4}/.test(str) ? str : `${str} ${currentYear}`;
+  const dmMatch = str.match(/^(\d{1,2})[-/](\d{1,2})$/);
+  if (dmMatch) {
+    const day = dmMatch[1].padStart(2, '0');
+    const month = dmMatch[2].padStart(2, '0');
+    return `${currentYear}-${month}-${day}`;
+  }
+
+  // DD MMM or DD MMM YYYY or DD-MMM-YYYY (e.g. "18 Oct" or "18 Oct 2026" or "18-Oct")
+  const cleanStr = str.replace(/-/g, ' ');
+  const dateWithYear = /\d{4}/.test(cleanStr) ? cleanStr : `${cleanStr} ${currentYear}`;
   const parsed = new Date(dateWithYear);
   if (!isNaN(parsed.getTime())) {
     const month = String(parsed.getMonth() + 1).padStart(2, '0');
@@ -478,33 +497,25 @@ export function calculateDateWiseInventory(
       const itemKey = `${order.id || order.fireId}_${norm}`;
       const alreadyProcessedViaTxn = processedOrderItems.has(itemKey);
 
-      // 2. Processed deductions (historical, marked delivered, or explicitly deducted upon save)
-      // Requirement: "current date enna enna add panromo antha date ku mattum tha inventories la minus aaganum"
-      if (!alreadyProcessedViaTxn && (isDelivered || isExplicitlyDeducted)) {
-        processedOrderItems.add(itemKey);
-        chocMetrics[norm].totalDeducted += item.quantity;
-        if (isToday) {
-          chocMetrics[norm].todayProcessed += item.quantity;
-        }
-        return; // Accounted for in totalDeducted
-      }
-
-      // If already processed via transaction, don't count as pending
+      // If already processed via transaction, don't count twice
       if (alreadyProcessedViaTxn) {
         return;
       }
 
-      // 3. Today's Scheduled (Dispatch Date is today, pending dispatch processing)
-      if (isToday) {
-        chocMetrics[norm].todayScheduled += item.quantity;
-      }
-      // 4. Overdue / Pending (Dispatch Date in the past, not yet processed)
-      else if (isPast) {
-        chocMetrics[norm].overduePending += item.quantity;
-      }
-      // 5. Unspecified date
-      else {
-        chocMetrics[norm].todayScheduled += item.quantity;
+      // 2. Dispatch Date <= today (Both new orders and existing / previous data)
+      // Requirement: "dashboard 1 la dispatch date la pandra pandra data va vachu inventorires count la minus aganum nu antha logic crt a work aguthu eppa but enna na new va pandra data mattum than logic work aguthu already eruka previews data vum entha logic follow pannaum okay va antha marre perfect a vachedu okay"
+      // Any non-future order that is not cancelled/reversed deducts from available stock immediately
+      if (order.stockDeductionStatus !== 'Cancelled' && order.stockDeductionStatus !== 'Reversed') {
+        processedOrderItems.add(itemKey);
+        chocMetrics[norm].totalDeducted += item.quantity;
+        if (isToday) {
+          chocMetrics[norm].todayProcessed += item.quantity;
+          chocMetrics[norm].todayScheduled += item.quantity;
+        }
+        if (isPast) {
+          chocMetrics[norm].overduePending += item.quantity;
+        }
+        return; // Accounted for in totalDeducted
       }
     });
   });

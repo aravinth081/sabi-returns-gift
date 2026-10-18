@@ -415,59 +415,73 @@ const ChocolateSingleSelect = ({
     return suggestions.filter(item => item.toLowerCase().includes(q));
   }, [suggestions, searchQuery]);
 
+  const getPriceDisplay = (item: string) => {
+    if (!pricesMap) return null;
+    const normalized = item.toLowerCase().trim().replace(/\s+/g, ' ');
+    const entry = (pricesMap as any)[normalized] || (pricesMap as any)[item];
+    if (entry === undefined || entry === null) return null;
+    if (typeof entry === 'number') return entry;
+    if (typeof entry === 'object') {
+      return entry.retail ?? entry.wholesale ?? null;
+    }
+    return null;
+  };
+
   return (
     <div ref={wrapperRef} className="relative w-full">
       <button
         type="button"
         onClick={() => { setIsOpen(!isOpen); if (isOpen) setSearchQuery(""); }}
-        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-        className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner flex justify-between items-center text-left cursor-pointer transition-all hover:border-amber-400/50"
+        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.25)' }}
+        className="w-full text-sm sm:text-base font-extrabold rounded-xl px-3.5 py-3 outline-none border focus:border-amber-400 text-white shadow-inner flex justify-between items-center text-left cursor-pointer transition-all hover:border-amber-400/60 hover:bg-[#1a2742] min-h-[46px]"
       >
-        <span className={`truncate pr-2 ${value ? 'text-white font-extrabold' : 'text-slate-400 font-medium'}`}>
+        <span className={`truncate pr-2 ${value ? 'text-white font-black tracking-wide' : 'text-slate-400 font-medium'}`}>
           {value ? value : placeholderText}
         </span>
-        <ChevronDown size={18} className="text-slate-400 shrink-0 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+        <ChevronDown size={20} className="text-amber-400 shrink-0 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
       </button>
 
       {isOpen && (
-        <div className="absolute z-[250] w-full mt-1.5 bg-[#121a2d] border border-white/20 shadow-2xl max-h-60 overflow-hidden rounded-xl text-left backdrop-blur-xl custom-scrollbar animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+        <div className="absolute z-[300] left-0 w-full min-w-[280px] sm:min-w-[340px] md:min-w-[380px] max-w-[92vw] mt-1.5 bg-[#0e1628] border-2 border-amber-400/40 shadow-[0_25px_60px_rgba(0,0,0,0.95)] max-h-80 sm:max-h-96 overflow-hidden rounded-2xl text-left backdrop-blur-2xl custom-scrollbar animate-in fade-in zoom-in-95 duration-150 flex flex-col">
           {/* Search Input */}
-          <div className="px-2.5 py-2 border-b border-white/15 shrink-0 sticky top-0 bg-[#121a2d] z-10">
+          <div className="p-2.5 sm:p-3 border-b border-white/15 shrink-0 sticky top-0 bg-[#0e1628] z-10">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full pl-8 pr-3 py-1.5 bg-[#1a2540] border border-white/15 rounded-lg text-xs font-bold text-white placeholder:text-slate-500 outline-none focus:border-amber-400/60 transition-colors"
+                placeholder="Search chocolate..."
+                className="w-full pl-10 pr-3.5 py-2.5 bg-[#16223e] border border-white/20 rounded-xl text-sm font-bold text-white placeholder:text-slate-400 outline-none focus:border-amber-400 transition-colors shadow-inner"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
           </div>
           <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
             <div
-              className="px-3.5 py-2 cursor-pointer hover:bg-amber-500/20 hover:text-amber-300 text-slate-400 text-xs font-semibold select-none transition-colors border-b border-white/10"
+              className="px-4 py-2.5 cursor-pointer hover:bg-amber-500/20 hover:text-amber-300 text-slate-400 text-xs sm:text-sm font-semibold select-none transition-colors border-b border-white/10 flex items-center justify-between"
               onClick={() => {
                 onChange("");
                 setIsOpen(false);
                 setSearchQuery("");
               }}
             >
-              {placeholderText}
+              <span>{placeholderText}</span>
+              <span className="text-[10px] uppercase font-bold text-slate-500">Clear selection</span>
             </div>
             {filteredSuggestions.length === 0 && (
-              <div className="px-3.5 py-3 text-xs text-slate-500 text-center font-medium">No results found</div>
+              <div className="px-4 py-6 text-sm text-slate-400 text-center font-bold">No results found</div>
             )}
             {filteredSuggestions.map((item, index) => {
               const isSelected = value === item;
+              const price = getPriceDisplay(item);
               return (
                 <div
                   key={index}
-                  className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold select-none transition-colors border-b border-white/5 last:border-0 ${isSelected
-                      ? 'bg-amber-500/20 text-amber-300 font-extrabold'
-                      : 'text-slate-200 hover:bg-amber-500/15 hover:text-amber-300'
+                  className={`px-4 py-3 sm:py-3.5 cursor-pointer text-sm sm:text-base font-bold select-none transition-all border-b border-white/5 last:border-0 flex items-center justify-between gap-3 ${isSelected
+                      ? 'bg-amber-500/25 text-amber-300 font-black border-l-4 border-l-amber-400 pl-3.5'
+                      : 'text-slate-100 hover:bg-amber-500/15 hover:text-amber-300 active:bg-amber-500/30'
                     }`}
                   onClick={() => {
                     onChange(item);
@@ -475,7 +489,12 @@ const ChocolateSingleSelect = ({
                     setSearchQuery("");
                   }}
                 >
-                  {item}
+                  <span className="truncate flex-1 tracking-wide">{item}</span>
+                  {price !== null && (
+                    <span className="text-xs font-black text-amber-300 bg-amber-400/15 border border-amber-400/30 px-2.5 py-0.5 rounded-lg shrink-0">
+                      ₹{price}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -4632,7 +4651,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       ...formData,
       inventory: formData.inventory || "Inventory 1",
       phone: formatPhoneNumber(formData.phone),
-      orderDate: formatToDisplayDate(formData.orderDate) || "",
+      orderDate: formatToDisplayDate(formData.orderDate) || formatToDisplayDate(formData.functionDate) || displayDispatchDate || formatToDisplayDate(new Date()),
       functionDate: formatToDisplayDate(formData.functionDate) || "",
       deliveryDate: displayDispatchDate || "",
       dispatchDate: displayDispatchDate || stdDispatchDate,
@@ -5273,63 +5292,96 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     if (!prod) return;
     const mainImage = (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.image || '');
     const rawDescription = typeof prod.description === 'string' ? prod.description.trim() : '';
+    const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
 
-    if (!mainImage && !rawDescription) {
-      toast.error("No image or description found for this product.");
+    if (!mainImage && !rawDescription && !prod.name) {
+      toast.error("No product details found to copy.");
       return;
     }
 
+    // Build structured clean text for plain-text pasting (WhatsApp, SMS, Notepad)
+    const cleanText = [
+      prod.name ? `*${prod.name}*` : '',
+      sellPrice ? `💰 Price: ₹${sellPrice}` : '',
+      prod.category && prod.category !== 'Unassigned' ? `📂 Category: ${prod.category}` : '',
+      prod.sku ? `🏷️ SKU: ${prod.sku}` : '',
+      prod.type ? `📦 Type: ${prod.type}` : '',
+      rawDescription ? `📝 Description:\n${rawDescription}` : '',
+      mainImage && (mainImage.startsWith('http://') || mainImage.startsWith('https://')) ? `🖼️ Image: ${mainImage}` : ''
+    ].filter(Boolean).join('\n\n');
+
+    // Build rich HTML format for rich-text destinations (Word, Docs, Gmail, Outlook, Rich Text Editors)
+    const escapeHtml = (str: string) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const cleanHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 550px; color: #1e293b; line-height: 1.5;">
+        ${prod.name ? `<h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 800; color: #0f172a;">${escapeHtml(prod.name)}</h3>` : ''}
+        ${sellPrice ? `<p style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #059669;">Price: ₹${sellPrice}</p>` : ''}
+        ${prod.category && prod.category !== 'Unassigned' ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #64748b;"><strong>Category:</strong> ${escapeHtml(prod.category)}</p>` : ''}
+        ${prod.sku ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #94a3b8;"><strong>SKU:</strong> ${escapeHtml(prod.sku)}</p>` : ''}
+        ${rawDescription ? `<div style="margin: 0 0 14px 0; font-size: 14px; color: #334155; white-space: pre-wrap; background: #f8fafc; padding: 10px 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">${escapeHtml(rawDescription)}</div>` : ''}
+        ${mainImage ? `<div style="margin-top: 10px;"><img src="${mainImage}" alt="${escapeHtml(prod.name || 'Product Image')}" style="max-width: 100%; max-height: 400px; border-radius: 10px; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>` : ''}
+      </div>
+    `.trim();
+
     try {
+      let pngBlob: Blob | null = null;
       if (mainImage) {
-        // Native image copy for WhatsApp, Telegram, Word, etc.
-        const blob = await convertImageUrlToPngBlob(mainImage);
-        
-        let writeSuccess = false;
-        if (navigator.clipboard && window.ClipboardItem) {
-          try {
-            await navigator.clipboard.write([
-              new ClipboardItem({ 'image/png': blob })
-            ]);
-            writeSuccess = true;
-          } catch (clipErr) {
-            console.warn("Direct image/png clipboard write failed, trying fallback:", clipErr);
+        try {
+          pngBlob = await convertImageUrlToPngBlob(mainImage);
+        } catch (imgErr) {
+          console.warn("Could not convert image to PNG blob:", imgErr);
+        }
+      }
+
+      let writeSuccess = false;
+
+      // Tier 1: Try writing Multi-MIME with Image + HTML + Plain Text together
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          const clipboardData: Record<string, Blob> = {
+            'text/plain': new Blob([cleanText], { type: 'text/plain' }),
+            'text/html': new Blob([cleanHtml], { type: 'text/html' })
+          };
+          if (pngBlob) {
+            clipboardData['image/png'] = pngBlob;
           }
-        }
-
-        if (writeSuccess) {
-          toast.success("Product image copied! Paste directly in WhatsApp (Ctrl+V) to send photo.");
-          return;
+          await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
+          writeSuccess = true;
+        } catch (multiErr) {
+          console.warn("Multi-MIME clipboard write with image failed, trying fallbacks:", multiErr);
         }
       }
 
-      // If no image or image copy not supported by browser, copy clean text (NEVER raw base64 data!)
-      const cleanText = [
-        prod.name ? `*${prod.name}*` : '',
-        prod.price ? `Price: ₹${prod.price}` : '',
-        rawDescription || '',
-        mainImage && mainImage.startsWith('http') ? `Image: ${mainImage}` : ''
-      ].filter(Boolean).join('\n\n');
+      // Tier 2: Try HTML + Plain Text
+      if (!writeSuccess && navigator.clipboard && window.ClipboardItem) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/plain': new Blob([cleanText], { type: 'text/plain' }),
+              'text/html': new Blob([cleanHtml], { type: 'text/html' })
+            })
+          ]);
+          writeSuccess = true;
+        } catch (htmlErr) {
+          console.warn("HTML + plain text clipboard write failed:", htmlErr);
+        }
+      }
 
-      if (cleanText) {
+      // Tier 3: Standard writeText fallback
+      if (!writeSuccess) {
         await navigator.clipboard.writeText(cleanText);
-        toast.success("Product details copied as text!");
+        writeSuccess = true;
       }
+
+      toast.success("Product copied! (Name, Price, Description & Image)");
     } catch (err: any) {
       console.error("Copy failed:", err);
-      // Clean fallback: only text, never base64
       try {
-        const fallbackText = [
-          prod.name ? `*${prod.name}*` : '',
-          prod.price ? `Price: ₹${prod.price}` : '',
-          rawDescription || ''
-        ].filter(Boolean).join('\n\n');
-        if (fallbackText) {
-          await navigator.clipboard.writeText(fallbackText);
-          toast.success("Product details copied as text!");
-          return;
-        }
-      } catch (e) {}
-      toast.error("Failed to copy image to clipboard.");
+        await navigator.clipboard.writeText(cleanText);
+        toast.success("Product details copied as text!");
+      } catch (e) {
+        toast.error("Failed to copy product details.");
+      }
     }
   };
 
@@ -7422,12 +7474,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                     <Eye size={15} />
                                   </button>
 
-                                  {/* Copy Main Image Button (Native image copy for WhatsApp) */}
+                                  {/* Copy Product Button (Native image copy + rich text + clean formatted plain text) */}
                                   <button
                                     type="button"
                                     onClick={() => handleCopyMainImageAndDescription(prod)}
                                     className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                                    title="Copy Image to Clipboard (Paste directly in WhatsApp)"
+                                    title="Copy Product (Name, Price, Description & Image)"
                                   >
                                     <Copy size={15} />
                                   </button>
@@ -7436,7 +7488,15 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const text = `*${prod.name || 'Product'}*\n${prod.price ? `Selling Price: ₹${prod.price}\n` : ''}${prod.description ? `\n${prod.description}` : ''}`;
+                                      const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
+                                      const text = [
+                                        prod.name ? `*${prod.name}*` : '',
+                                        sellPrice ? `💰 Price: ₹${sellPrice}` : '',
+                                        prod.category && prod.category !== 'Unassigned' ? `📂 Category: ${prod.category}` : '',
+                                        prod.sku ? `🏷️ SKU: ${prod.sku}` : '',
+                                        prod.description ? `📝 Description:\n${prod.description}` : '',
+                                        prod.image && (prod.image.startsWith('http://') || prod.image.startsWith('https://')) ? `🖼️ Image: ${prod.image}` : ''
+                                      ].filter(Boolean).join('\n\n');
                                       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                                     }}
                                     className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
@@ -11569,19 +11629,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-x-2 gap-y-1">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Order Date</label>
-                      <input
-                        required
-                        type="date"
-                        name="orderDate"
-                        value={formData.orderDate}
-                        onChange={handleInputChange}
-                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors"
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Function Date</label>
                       <input
@@ -11776,7 +11824,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         </button>
                       </div>
                       {chocolateRows.map((row, idx) => (
-                        <div key={idx} style={{ backgroundColor: '#141d33', borderColor: 'rgba(255, 255, 255, 0.15)' }} className="flex gap-2 items-center p-2.5 rounded-xl border">
+                        <div key={idx} style={{ backgroundColor: '#141d33', borderColor: 'rgba(255, 255, 255, 0.18)' }} className="flex gap-2.5 items-center p-3 rounded-2xl border shadow-sm">
                           <div className="flex-1 min-w-0">
                             <ChocolateSingleSelect
                               value={row.chocolate}
@@ -11797,7 +11845,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                               placeholderText="Select chocolate..."
                             />
                           </div>
-                          <div className="w-20 shrink-0">
+                          <div className="w-24 shrink-0">
                             <input
                               required
                               type="text"
@@ -11814,8 +11862,8 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                   count: countsStr
                                 }));
                               }}
-                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                              className="w-full text-xs font-bold rounded-lg p-2 outline-none border focus:border-amber-400 text-white shadow-inner"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.25)' }}
+                              className="w-full text-sm font-black rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-center min-h-[46px]"
                               placeholder="Qty"
                             />
                           </div>
@@ -11833,9 +11881,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                   count: countsStr
                                 }));
                               }}
-                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer"
+                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-2 rounded-xl transition-colors shrink-0 cursor-pointer"
+                              title="Remove chocolate"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={16} />
                             </button>
                           )}
                         </div>

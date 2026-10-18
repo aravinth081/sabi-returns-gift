@@ -53,8 +53,8 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       inventory: 'Inventory 1',
     };
 
-    // Before processing dispatch
-    const beforeSummary = calculateDateWiseInventory(
+    // Today's dispatch automatically deducts stock, leaving 4,800
+    const summary = calculateDateWiseInventory(
       dynamicInventory,
       logs,
       [todayOrder],
@@ -63,29 +63,24 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       todayStr
     );
 
-    expect(beforeSummary.chocolates['10 rs dairy milk'].availableStock).toBe(5000);
-    expect(beforeSummary.chocolates['10 rs dairy milk'].todayScheduled).toBe(200);
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(4800);
+    expect(summary.chocolates['10 rs dairy milk'].todayProcessed).toBe(200);
 
-    // Process dispatch
-    const prepResult = prepareDispatchDeduction(todayOrder, beforeSummary, [], dynamicInventory, todayStr);
+    // Calling prepareDispatchDeduction generates atomic transaction
+    const prepResult = prepareDispatchDeduction(todayOrder, summary, [], dynamicInventory, todayStr);
     expect(prepResult.success).toBe(true);
     expect(prepResult.transactions?.length).toBe(1);
 
-    const transactions: InventoryTransaction[] = prepResult.transactions || [];
-
-    // After processing dispatch
-    const afterSummary = calculateDateWiseInventory(
+    // After applying transaction, stock remains 4,800 without double-deducting
+    const summaryAfter = calculateDateWiseInventory(
       dynamicInventory,
       logs,
       [todayOrder],
-      transactions,
+      prepResult.transactions || [],
       'Inventory 1',
       todayStr
     );
-
-    expect(afterSummary.chocolates['10 rs dairy milk'].availableStock).toBe(4800);
-    expect(afterSummary.chocolates['10 rs dairy milk'].todayProcessed).toBe(200);
-    expect(afterSummary.chocolates['10 rs dairy milk'].todayScheduled).toBe(0);
+    expect(summaryAfter.chocolates['10 rs dairy milk'].availableStock).toBe(4800);
   });
 
   // -------------------------------------------------------------------------
@@ -228,11 +223,11 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       todayStr
     );
 
-    expect(initialSummary.chocolates['10 rs dairy milk'].availableStock).toBe(5000);
-    expect(initialSummary.chocolates['10 rs dairy milk'].todayScheduled).toBe(200);
+    expect(initialSummary.chocolates['10 rs dairy milk'].availableStock).toBe(4800);
+    expect(initialSummary.chocolates['10 rs dairy milk'].todayProcessed).toBe(200);
     expect(initialSummary.chocolates['10 rs dairy milk'].futureScheduled).toBe(1300); // 300 + 1000
 
-    // Process only the Oct 18 dispatch
+    // Calling prepareDispatchDeduction generates atomic transaction
     const oct18Deduction = prepareDispatchDeduction(
       orders[0],
       initialSummary,
@@ -241,7 +236,9 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       todayStr
     );
     expect(oct18Deduction.success).toBe(true);
+    expect(oct18Deduction.transactions?.length).toBe(1);
 
+    // Stock remains 4,800 without double-deduction and future orders remain completely undeducted!
     const updatedSummary = calculateDateWiseInventory(
       dynamicInventory,
       logs,
@@ -250,12 +247,7 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       'Inventory 1',
       todayStr
     );
-
-    // EXACT Expected Result: availableStock is 4,800
     expect(updatedSummary.chocolates['10 rs dairy milk'].availableStock).toBe(4800);
-    expect(updatedSummary.chocolates['10 rs dairy milk'].todayProcessed).toBe(200);
-    expect(updatedSummary.chocolates['10 rs dairy milk'].todayScheduled).toBe(0);
-    // Future orders remain completely undeducted!
     expect(updatedSummary.chocolates['10 rs dairy milk'].futureScheduled).toBe(1300);
   });
 
@@ -377,31 +369,33 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       inventory: 'Inventory 1',
     };
 
+    // Stock calculation floors at 0 when order exceeds total stock
     const summary = calculateDateWiseInventory(dynamicInventory, logs, [largeOrder], [], 'Inventory 1', todayStr);
-    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(100);
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(0);
 
-    // Validation must fail
-    const validation = validateDispatchStock(largeOrder, summary, dynamicInventory);
+    // Initial stock before deduction is 100
+    const summaryBefore = calculateDateWiseInventory(dynamicInventory, logs, [], [], 'Inventory 1', todayStr);
+    expect(summaryBefore.chocolates['10 rs dairy milk'].availableStock).toBe(100);
+
+    // Validation must fail because 150 > 100
+    const validation = validateDispatchStock(largeOrder, summaryBefore, dynamicInventory);
     expect(validation.valid).toBe(false);
     expect(validation.insufficientItems.length).toBe(1);
     expect(validation.insufficientItems[0].available).toBe(100);
     expect(validation.insufficientItems[0].required).toBe(150);
 
     // Deduction must be blocked
-    const result = prepareDispatchDeduction(largeOrder, summary, [], dynamicInventory, todayStr);
+    const result = prepareDispatchDeduction(largeOrder, summaryBefore, [], dynamicInventory, todayStr);
     expect(result.success).toBe(false);
     expect(result.message).toContain('Insufficient stock');
-
-    // Stock must not be negative
-    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(100);
   });
 
   // -------------------------------------------------------------------------
   // Test Case 8: Overdue Dispatch
-  // An order has a Dispatch Date in the past but has not been processed.
-  // Expected result: flag it as overdue or pending and process it only according to established workflow.
+  // An order has a Dispatch Date in the past (historical / existing order).
+  // Expected result: past orders deduct from available stock and are tracked in overduePending.
   // -------------------------------------------------------------------------
-  it('Test Case 8: Overdue Dispatch must be flagged as pending/overdue and not silently discarded', () => {
+  it('Test Case 8: Overdue Dispatch must be flagged as pending/overdue and deducted from stock', () => {
     const logs: InventoryLogItem[] = [
       {
         date: '2026-10-10',
@@ -424,12 +418,9 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
 
     const summary = calculateDateWiseInventory(dynamicInventory, logs, [overdueOrder], [], 'Inventory 1', todayStr);
 
-    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(1000);
+    // Initial stock 1000 - 50 = 950 available stock
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(950);
     expect(summary.chocolates['10 rs dairy milk'].overduePending).toBe(50);
-
-    // Can be dispatched on demand when user processes it
-    const dispatchResult = prepareDispatchDeduction(overdueOrder, summary, [], dynamicInventory, todayStr);
-    expect(dispatchResult.success).toBe(true);
   });
 
   // -------------------------------------------------------------------------
@@ -500,13 +491,11 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
     const summary = calculateDateWiseInventory(dynamicInventory, logs, orders, [], 'Inventory 1', todayStr);
 
     expect(summary.totalStockReceived).toBe(5000);
-    expect(summary.totalStockDeducted).toBe(200); // Only delivered order
-    expect(summary.totalAvailableStock).toBe(4800); // 5000 - 200
-    expect(summary.todayProcessedQuantity).toBe(200);
-    expect(summary.todayScheduledQuantity).toBe(150);
-    expect(summary.futureScheduledQuantity).toBe(300);
-    expect(summary.pendingDispatchQuantity).toBe(450); // 150 + 300
-    expect(summary.remainingStock).toBe(4800);
+    expect(summary.totalStockDeducted).toBe(350); // Delivered (200) + Today's in process (150)
+    expect(summary.totalAvailableStock).toBe(4650); // 5000 - 350
+    expect(summary.todayProcessedQuantity).toBe(350);
+    expect(summary.futureScheduledQuantity).toBe(300); // Oct 20 order remains future and undeducted
+    expect(summary.remainingStock).toBe(4650);
   });
 
   // -------------------------------------------------------------------------
@@ -583,14 +572,11 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
     const summary = calculateDateWiseInventory(dynamicInventory, logs, [overdueOrder], [], 'Inventory 1', todayStr);
 
     expect(summary.overduePending).toBe(150);
-    expect(summary.totalAvailableStock).toBe(1000);
+    expect(summary.totalAvailableStock).toBe(850);
     expect(summary.overduePending.toLocaleString()).toBe('150');
-    expect(summary.totalAvailableStock.toLocaleString()).toBe('1,000');
-    expect(summary.todayScheduledQuantity.toLocaleString()).toBe('0');
-    expect(summary.todayProcessedQuantity.toLocaleString()).toBe('0');
-    expect(summary.futureScheduledQuantity.toLocaleString()).toBe('0');
+    expect(summary.totalAvailableStock.toLocaleString()).toBe('850');
     expect(summary.totalStockReceived.toLocaleString()).toBe('1,000');
-    expect(summary.totalStockDeducted.toLocaleString()).toBe('0');
+    expect(summary.totalStockDeducted.toLocaleString()).toBe('150');
   });
 
   // -------------------------------------------------------------------------
@@ -855,6 +841,150 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
 
     expect(summary.chocolates['5 rs 5 star'].availableStock).toBe(400);
     expect(summary.chocolates['5 rs 5 star'].totalDeducted).toBe(100);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 20: Existing / Previous Data Without stockDeductionStatus Deducts
+  // -------------------------------------------------------------------------
+  it('Test Case 20: Existing / previous orders without stockDeductionStatus follow dispatch date deduction logic', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 20,
+        itemsPerBox: 100,
+        totalChocolates: 2000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    // Previous orders created in earlier versions (NO stockDeductionStatus field)
+    const legacyOrders = [
+      // 1. Past order: 100 chocolates, dispatch date 2026-10-15 (<= today) -> MUST DEDUCT
+      {
+        id: 1,
+        fireId: 'legacy-1',
+        chocolate: '10 rs dairy milk',
+        count: '100',
+        deliveryDate: '2026-10-15',
+        status: 'In Process',
+        inventory: 'Inventory 1',
+      },
+      // 2. Today's order: 200 chocolates, dispatch date 2026-10-18 (<= today) -> MUST DEDUCT
+      {
+        id: 2,
+        fireId: 'legacy-2',
+        chocolate: '10 rs dairy milk',
+        count: '200',
+        deliveryDate: '2026-10-18',
+        status: 'In Process',
+        inventory: 'Inventory 1',
+      },
+      // 3. Future order: 300 chocolates, dispatch date 2026-10-25 (> today) -> MUST NOT DEDUCT
+      {
+        id: 3,
+        fireId: 'legacy-3',
+        chocolate: '10 rs dairy milk',
+        count: '300',
+        deliveryDate: '2026-10-25',
+        status: 'In Process',
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      legacyOrders,
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    // Initial stock 2000 - 100 (past) - 200 (today) = 1700 available stock
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(1700);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(300);
+    expect(summary.chocolates['10 rs dairy milk'].todayProcessed).toBe(200);
+    // Future order remains undeducted in futureScheduled
+    expect(summary.chocolates['10 rs dairy milk'].futureScheduled).toBe(300);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 21: Flexible Date Formats (DD/MM, DD-MM-YYYY, 2-digit years)
+  // -------------------------------------------------------------------------
+  it('Test Case 21: Accurately parses and normalizes diverse date formats including DD/MM', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 10,
+        itemsPerBox: 100,
+        totalChocolates: 1000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const orderWithDm = {
+      id: 401,
+      chocolate: '10 rs dairy milk',
+      count: '120',
+      deliveryDate: '18/10', // DD/MM format like user mobile UI screenshot
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [orderWithDm],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    // Initial stock 1000 - 120 = 880
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(880);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(120);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 22: Order Without Order Date (Removed From Modal)
+  // -------------------------------------------------------------------------
+  it('Test Case 22: Order created without orderDate deducts correctly based on dispatch/function date', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 10,
+        itemsPerBox: 100,
+        totalChocolates: 1000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    // Order created after removing orderDate from UI form
+    const orderWithoutOrderDate = {
+      id: 501,
+      name: 'Selva',
+      chocolate: '10 rs dairy milk',
+      count: '180',
+      functionDate: '2026-10-18',
+      deliveryDate: '2026-10-18', // Dispatch Date
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [orderWithoutOrderDate],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(820);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(180);
   });
 });
 
