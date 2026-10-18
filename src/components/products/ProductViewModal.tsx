@@ -19,8 +19,14 @@ import {
   Images,
   ExternalLink,
   Pencil,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  copyProductCard,
+  copyProductText,
+  copyProductRawImage
+} from '@/lib/productCardGenerator';
 
 interface ProductViewModalProps {
   isOpen: boolean;
@@ -210,123 +216,9 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
 
   // 4. Copy Main Image and Details (Name, Price, Description & Image) in a single action
   const handleCopyMainImageAndDescription = async () => {
-    const mainImage = (images && images.length > 0) ? images[0] : (product.image || '');
-    const rawDescription = product.description?.trim() || '';
-    const sellPrice = Number(product.price ?? product.sellingPrice) || 0;
-
-    if (!mainImage && !rawDescription && !product.name) {
-      toast.error('No product details found to copy.');
-      return;
-    }
-
-    // Build structured clean text for plain-text pasting
-    const cleanText = [
-      product.name ? `*${product.name}*` : '',
-      sellPrice ? `💰 Price: ₹${sellPrice}` : '',
-      product.category && product.category !== 'Unassigned' ? `📂 Category: ${product.category}` : '',
-      product.sku ? `🏷️ SKU: ${product.sku}` : '',
-      product.type ? `📦 Type: ${product.type}` : '',
-      rawDescription ? `📝 Description:\n${rawDescription}` : '',
-      mainImage && (mainImage.startsWith('http://') || mainImage.startsWith('https://')) ? `🖼️ Image: ${mainImage}` : ''
-    ].filter(Boolean).join('\n\n');
-
-    // Build rich HTML format
-    const escapeHtml = (str: string) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const cleanHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 550px; color: #1e293b; line-height: 1.5;">
-        ${product.name ? `<h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 800; color: #0f172a;">${escapeHtml(product.name)}</h3>` : ''}
-        ${sellPrice ? `<p style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #059669;">Price: ₹${sellPrice}</p>` : ''}
-        ${product.category && product.category !== 'Unassigned' ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #64748b;"><strong>Category:</strong> ${escapeHtml(product.category)}</p>` : ''}
-        ${product.sku ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #94a3b8;"><strong>SKU:</strong> ${escapeHtml(product.sku)}</p>` : ''}
-        ${rawDescription ? `<div style="margin: 0 0 14px 0; font-size: 14px; color: #334155; white-space: pre-wrap; background: #f8fafc; padding: 10px 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">${escapeHtml(rawDescription)}</div>` : ''}
-        ${mainImage ? `<div style="margin-top: 10px;"><img src="${mainImage}" alt="${escapeHtml(product.name || 'Product Image')}" style="max-width: 100%; max-height: 400px; border-radius: 10px; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>` : ''}
-      </div>
-    `.trim();
-
     try {
       setIsCopyingMainAndDesc(true);
-
-      let pngBlob: Blob | null = null;
-      if (mainImage) {
-        try {
-          pngBlob = await new Promise<Blob>((resolve, reject) => {
-            const img = new Image();
-            if (mainImage.startsWith('http://') || mainImage.startsWith('https://')) {
-              img.crossOrigin = 'anonymous';
-            }
-            img.onload = () => {
-              try {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth || img.width || 400;
-                canvas.height = img.naturalHeight || img.height || 400;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return reject(new Error('Canvas context failed'));
-                ctx.drawImage(img, 0, 0);
-                canvas.toBlob((b) => {
-                  if (b) resolve(b);
-                  else reject(new Error('Canvas toBlob failed'));
-                }, 'image/png');
-              } catch (err) {
-                reject(err);
-              }
-            };
-            img.onerror = () => reject(new Error('Failed to load image'));
-            img.src = mainImage;
-          });
-        } catch (imgErr) {
-          console.warn('Could not convert image to PNG blob:', imgErr);
-        }
-      }
-
-      let writeSuccess = false;
-
-      // Tier 1: Multi-MIME with Image + HTML + Plain Text
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          const clipboardData: Record<string, Blob> = {
-            'text/plain': new Blob([cleanText], { type: 'text/plain' }),
-            'text/html': new Blob([cleanHtml], { type: 'text/html' })
-          };
-          if (pngBlob) {
-            clipboardData['image/png'] = pngBlob;
-          }
-          await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
-          writeSuccess = true;
-        } catch (multiErr) {
-          console.warn('Multi-MIME clipboard write with image failed, trying fallbacks:', multiErr);
-        }
-      }
-
-      // Tier 2: HTML + Plain Text
-      if (!writeSuccess && navigator.clipboard && window.ClipboardItem) {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              'text/plain': new Blob([cleanText], { type: 'text/plain' }),
-              'text/html': new Blob([cleanHtml], { type: 'text/html' })
-            })
-          ]);
-          writeSuccess = true;
-        } catch (htmlErr) {
-          console.warn('HTML + plain text clipboard write failed:', htmlErr);
-        }
-      }
-
-      // Tier 3: Standard writeText fallback
-      if (!writeSuccess) {
-        await navigator.clipboard.writeText(cleanText);
-        writeSuccess = true;
-      }
-
-      toast.success('Product copied! (Name, Price, Description & Image)');
-    } catch (err) {
-      console.error('Copy failed:', err);
-      try {
-        await navigator.clipboard.writeText(cleanText);
-        toast.success('Product details copied as text!');
-      } catch {
-        toast.error('Failed to copy product details.');
-      }
+      await copyProductCard(product);
     } finally {
       setTimeout(() => setIsCopyingMainAndDesc(false), 1500);
     }
@@ -489,29 +381,40 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
 
               {/* 🟢 IMAGE COPY ACTIONS BAR (Requirement 17) */}
               <div className="bg-[#121b2f] p-3 rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2">
-                  {/* Copy Image Button */}
-                  <button
-                    type="button"
-                    onClick={() => currentImage && handleCopyImage(currentImage)}
-                    disabled={!currentImage || isCopyingImg}
-                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-blue-900/30 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
-                    title="Copy currently selected image"
-                  >
-                    <ClipboardList size={14} />
-                    <span>{isCopyingImg ? 'Copied' : 'Copy Image'}</span>
-                  </button>
-
-                  {/* Copy Product (Name, Price, Description & Image) Button */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Copy Product Card (Photo with Details) */}
                   <button
                     type="button"
                     onClick={handleCopyMainImageAndDescription}
                     disabled={isCopyingMainAndDesc}
                     className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
-                    title="Copy Product (Name, Price, Description & Image)"
+                    title="Copy Product Card (Photo with Name, Price & Description on it)"
+                  >
+                    <ImageIcon size={14} />
+                    <span>{isCopyingMainAndDesc ? 'Copied' : 'Copy Product Card'}</span>
+                  </button>
+
+                  {/* Copy Details as Text */}
+                  <button
+                    type="button"
+                    onClick={() => copyProductText(product)}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-blue-900/30 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
+                    title="Copy Details as Text (Ready to paste in WhatsApp chat)"
+                  >
+                    <ClipboardList size={14} />
+                    <span>Copy as Text</span>
+                  </button>
+
+                  {/* Copy Raw Photo Only */}
+                  <button
+                    type="button"
+                    onClick={() => currentImage && copyProductRawImage(currentImage)}
+                    disabled={!currentImage || isCopyingImg}
+                    className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 hover:text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
+                    title="Copy currently selected raw image"
                   >
                     <Copy size={14} />
-                    <span>{isCopyingMainAndDesc ? 'Copied' : 'Copy Product (Image & Details)'}</span>
+                    <span>Copy Raw Photo</span>
                   </button>
 
                   {/* Copy All Button (Requirement 17: Copies ALL images) */}
@@ -694,21 +597,20 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
                   type="button"
                   onClick={handleCopyMainImageAndDescription}
                   disabled={isCopyingMainAndDesc}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
-                  title="Copy Product (Name, Price, Description & Image)"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
+                  title="Copy Product Card (Photo with Name, Price & Description on it)"
                 >
-                  <Copy size={13} />
-                  <span>{isCopyingMainAndDesc ? 'Copied' : 'Copy Product with Image'}</span>
+                  <ImageIcon size={13} />
+                  <span>{isCopyingMainAndDesc ? 'Copied Card' : 'Copy Product Card'}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={handleCopyDescription}
-                  disabled={!product.description || isCopyingDesc}
-                  className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
-                  title="Copy complete product description"
+                  onClick={() => copyProductText(product)}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                  title="Copy Details as Text (Ready to paste in WhatsApp chat)"
                 >
-                  {isCopyingDesc ? <Check size={13} /> : <Copy size={13} />}
-                  <span>{isCopyingDesc ? 'Copied' : 'Copy Description'}</span>
+                  <FileText size={13} />
+                  <span>Copy as Text</span>
                 </button>
               </div>
             </div>

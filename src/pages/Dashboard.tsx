@@ -57,6 +57,17 @@ import { format } from "date-fns";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadToCloudinary, uploadMultipleToCloudinary, sanitizeAndCompressImages, compressImageToDataUrl } from "@/lib/cloudinary";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from "@/components/ui/dropdown-menu";
+import {
+  copyProductCard,
+  copyProductText,
+  copyProductRawImage
+} from "@/lib/productCardGenerator";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#ff7300'];
 
@@ -5289,100 +5300,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   };
 
   const handleCopyMainImageAndDescription = async (prod: any) => {
-    if (!prod) return;
-    const mainImage = (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.image || '');
-    const rawDescription = typeof prod.description === 'string' ? prod.description.trim() : '';
-    const sellPrice = Number(prod.price ?? prod.sellingPrice) || 0;
-
-    if (!mainImage && !rawDescription && !prod.name) {
-      toast.error("No product details found to copy.");
-      return;
-    }
-
-    // Build structured clean text for plain-text pasting (WhatsApp, SMS, Notepad)
-    const cleanText = [
-      prod.name ? `*${prod.name}*` : '',
-      sellPrice ? `💰 Price: ₹${sellPrice}` : '',
-      prod.category && prod.category !== 'Unassigned' ? `📂 Category: ${prod.category}` : '',
-      prod.sku ? `🏷️ SKU: ${prod.sku}` : '',
-      prod.type ? `📦 Type: ${prod.type}` : '',
-      rawDescription ? `📝 Description:\n${rawDescription}` : '',
-      mainImage && (mainImage.startsWith('http://') || mainImage.startsWith('https://')) ? `🖼️ Image: ${mainImage}` : ''
-    ].filter(Boolean).join('\n\n');
-
-    // Build rich HTML format for rich-text destinations (Word, Docs, Gmail, Outlook, Rich Text Editors)
-    const escapeHtml = (str: string) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const cleanHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 550px; color: #1e293b; line-height: 1.5;">
-        ${prod.name ? `<h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 800; color: #0f172a;">${escapeHtml(prod.name)}</h3>` : ''}
-        ${sellPrice ? `<p style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #059669;">Price: ₹${sellPrice}</p>` : ''}
-        ${prod.category && prod.category !== 'Unassigned' ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #64748b;"><strong>Category:</strong> ${escapeHtml(prod.category)}</p>` : ''}
-        ${prod.sku ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #94a3b8;"><strong>SKU:</strong> ${escapeHtml(prod.sku)}</p>` : ''}
-        ${rawDescription ? `<div style="margin: 0 0 14px 0; font-size: 14px; color: #334155; white-space: pre-wrap; background: #f8fafc; padding: 10px 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">${escapeHtml(rawDescription)}</div>` : ''}
-        ${mainImage ? `<div style="margin-top: 10px;"><img src="${mainImage}" alt="${escapeHtml(prod.name || 'Product Image')}" style="max-width: 100%; max-height: 400px; border-radius: 10px; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>` : ''}
-      </div>
-    `.trim();
-
-    try {
-      let pngBlob: Blob | null = null;
-      if (mainImage) {
-        try {
-          pngBlob = await convertImageUrlToPngBlob(mainImage);
-        } catch (imgErr) {
-          console.warn("Could not convert image to PNG blob:", imgErr);
-        }
-      }
-
-      let writeSuccess = false;
-
-      // Tier 1: Try writing Multi-MIME with Image + HTML + Plain Text together
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          const clipboardData: Record<string, Blob> = {
-            'text/plain': new Blob([cleanText], { type: 'text/plain' }),
-            'text/html': new Blob([cleanHtml], { type: 'text/html' })
-          };
-          if (pngBlob) {
-            clipboardData['image/png'] = pngBlob;
-          }
-          await navigator.clipboard.write([new ClipboardItem(clipboardData)]);
-          writeSuccess = true;
-        } catch (multiErr) {
-          console.warn("Multi-MIME clipboard write with image failed, trying fallbacks:", multiErr);
-        }
-      }
-
-      // Tier 2: Try HTML + Plain Text
-      if (!writeSuccess && navigator.clipboard && window.ClipboardItem) {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              'text/plain': new Blob([cleanText], { type: 'text/plain' }),
-              'text/html': new Blob([cleanHtml], { type: 'text/html' })
-            })
-          ]);
-          writeSuccess = true;
-        } catch (htmlErr) {
-          console.warn("HTML + plain text clipboard write failed:", htmlErr);
-        }
-      }
-
-      // Tier 3: Standard writeText fallback
-      if (!writeSuccess) {
-        await navigator.clipboard.writeText(cleanText);
-        writeSuccess = true;
-      }
-
-      toast.success("Product copied! (Name, Price, Description & Image)");
-    } catch (err: any) {
-      console.error("Copy failed:", err);
-      try {
-        await navigator.clipboard.writeText(cleanText);
-        toast.success("Product details copied as text!");
-      } catch (e) {
-        toast.error("Failed to copy product details.");
-      }
-    }
+    await copyProductCard(prod);
   };
 
   const handleDeleteProductClick = async (fireId: string) => {
@@ -7474,15 +7392,53 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                     <Eye size={15} />
                                   </button>
 
-                                  {/* Copy Product Button (Native image copy + rich text + clean formatted plain text) */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyMainImageAndDescription(prod)}
-                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                                    title="Copy Product (Name, Price, Description & Image)"
-                                  >
-                                    <Copy size={15} />
-                                  </button>
+                                  {/* Copy Product with Dropdown Options */}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                        title="Copy Options: Product Card or Text"
+                                      >
+                                        <Copy size={15} />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="center" className="w-64 bg-[#0f172a] border border-white/10 text-white shadow-2xl p-1.5 rounded-xl z-50">
+                                      <DropdownMenuItem
+                                        onClick={() => copyProductCard(prod)}
+                                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-purple-600/20 text-purple-300 hover:text-purple-200 cursor-pointer font-bold text-xs"
+                                      >
+                                        <ImageIcon size={15} className="text-purple-400 shrink-0" />
+                                        <div>
+                                          <div className="font-extrabold text-white">Copy Product Card</div>
+                                          <div className="text-[10px] text-slate-400 font-normal">Photo with Name, Price & Desc on it</div>
+                                        </div>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => copyProductText(prod)}
+                                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-blue-600/20 text-blue-300 hover:text-blue-200 cursor-pointer font-bold text-xs"
+                                      >
+                                        <ClipboardList size={15} className="text-blue-400 shrink-0" />
+                                        <div>
+                                          <div className="font-extrabold text-white">Copy Details as Text</div>
+                                          <div className="text-[10px] text-slate-400 font-normal">Ready to paste in WhatsApp chat</div>
+                                        </div>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const mainImage = (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.image || '');
+                                          copyProductRawImage(mainImage);
+                                        }}
+                                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-700/40 text-slate-300 hover:text-white cursor-pointer font-bold text-xs"
+                                      >
+                                        <Copy size={15} className="text-slate-400 shrink-0" />
+                                        <div>
+                                          <div className="font-extrabold text-white">Copy Raw Photo Only</div>
+                                          <div className="text-[10px] text-slate-400 font-normal">Original photo without card frame</div>
+                                        </div>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
 
                                   {/* Direct Share on WhatsApp */}
                                   <button
