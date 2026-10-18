@@ -5116,66 +5116,94 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     setIsProductListingModalOpen(true);
   };
 
+  const convertImageUrlToPngBlob = async (imageUrl: string): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+        img.crossOrigin = 'anonymous';
+      }
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 400;
+          canvas.height = img.naturalHeight || img.height || 400;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Canvas context failed'));
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas toBlob failed'));
+          }, 'image/png');
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageUrl;
+    });
+  };
+
   const handleCopyMainImageAndDescription = async (prod: any) => {
     if (!prod) return;
     const mainImage = (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.image || '');
     const rawDescription = typeof prod.description === 'string' ? prod.description.trim() : '';
 
     if (!mainImage && !rawDescription) {
-      toast.error("No main image or description found for this product.");
+      toast.error("No image or description found for this product.");
       return;
     }
 
     try {
-      const escapedHtmlDesc = rawDescription
-        ? rawDescription
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br/>')
-        : '';
+      if (mainImage) {
+        // Native image copy for WhatsApp, Telegram, Word, etc.
+        const blob = await convertImageUrlToPngBlob(mainImage);
+        
+        let writeSuccess = false;
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            writeSuccess = true;
+          } catch (clipErr) {
+            console.warn("Direct image/png clipboard write failed, trying fallback:", clipErr);
+          }
+        }
 
-      const htmlContent = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1e293b;">
-          ${escapedHtmlDesc ? `<p style="white-space: pre-wrap; margin-bottom: 14px;">${escapedHtmlDesc}</p>` : ''}
-          ${mainImage ? `<img src="${mainImage}" alt="${(prod.name || 'Product').replace(/"/g, '&quot;')}" style="max-width: 100%; height: auto; border-radius: 8px;" />` : ''}
-        </div>
-      `.trim();
-
-      const plainTextContent = [
-        rawDescription,
-        mainImage ? (rawDescription ? `\n\nMain Image: ${mainImage}` : mainImage) : ''
-      ].filter(Boolean).join('');
-
-      let copied = false;
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          const clipboardItems: Record<string, Blob> = {
-            'text/html': new Blob([htmlContent], { type: 'text/html' }),
-            'text/plain': new Blob([plainTextContent], { type: 'text/plain' })
-          };
-          await navigator.clipboard.write([new ClipboardItem(clipboardItems)]);
-          copied = true;
-        } catch (err) {
-          console.warn("ClipboardItem write failed, trying fallback:", err);
+        if (writeSuccess) {
+          toast.success("Product image copied! Paste directly in WhatsApp (Ctrl+V) to send photo.");
+          return;
         }
       }
 
-      if (!copied) {
-        await navigator.clipboard.writeText(plainTextContent);
-        copied = true;
-      }
+      // If no image or image copy not supported by browser, copy clean text (NEVER raw base64 data!)
+      const cleanText = [
+        prod.name ? `*${prod.name}*` : '',
+        prod.price ? `Price: ₹${prod.price}` : '',
+        rawDescription || '',
+        mainImage && mainImage.startsWith('http') ? `Image: ${mainImage}` : ''
+      ].filter(Boolean).join('\n\n');
 
-      if (mainImage && rawDescription) {
-        toast.success("Main image and description copied to clipboard!");
-      } else if (mainImage) {
-        toast.success("Main image copied (no description available).");
-      } else {
-        toast.success("Description copied (no main image available).");
+      if (cleanText) {
+        await navigator.clipboard.writeText(cleanText);
+        toast.success("Product details copied as text!");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Copy failed:", err);
-      toast.error("Failed to copy to clipboard.");
+      // Clean fallback: only text, never base64
+      try {
+        const fallbackText = [
+          prod.name ? `*${prod.name}*` : '',
+          prod.price ? `Price: ₹${prod.price}` : '',
+          rawDescription || ''
+        ].filter(Boolean).join('\n\n');
+        if (fallbackText) {
+          await navigator.clipboard.writeText(fallbackText);
+          toast.success("Product details copied as text!");
+          return;
+        }
+      } catch (e) {}
+      toast.error("Failed to copy image to clipboard.");
     }
   };
 
@@ -7267,14 +7295,27 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                     <Eye size={15} />
                                   </button>
 
-                                  {/* Copy Main Image and Description Button (Requirement 2) */}
+                                  {/* Copy Main Image Button (Native image copy for WhatsApp) */}
                                   <button
                                     type="button"
                                     onClick={() => handleCopyMainImageAndDescription(prod)}
                                     className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                                    title="Copy Main Image and Description"
+                                    title="Copy Image to Clipboard (Paste directly in WhatsApp)"
                                   >
                                     <Copy size={15} />
+                                  </button>
+
+                                  {/* Direct Share on WhatsApp */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const text = `*${prod.name || 'Product'}*\n${prod.price ? `Selling Price: ₹${prod.price}\n` : ''}${prod.description ? `\n${prod.description}` : ''}`;
+                                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                                    }}
+                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+                                    title="Share Product to WhatsApp"
+                                  >
+                                    <MessageCircle size={15} />
                                   </button>
 
                                   {/* Edit Button (Requirement 10 & 22: Opens reusable ProductListingModal) */}

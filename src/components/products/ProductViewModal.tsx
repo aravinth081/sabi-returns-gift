@@ -214,55 +214,78 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
     try {
       setIsCopyingMainAndDesc(true);
 
-      const escapedHtmlDesc = rawDescription
-        ? rawDescription
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br/>')
-        : '';
-
-      const htmlContent = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1e293b;">
-          ${escapedHtmlDesc ? `<p style="white-space: pre-wrap; margin-bottom: 14px;">${escapedHtmlDesc}</p>` : ''}
-          ${mainImage ? `<img src="${mainImage}" alt="${(product.name || 'Product').replace(/"/g, '&quot;')}" style="max-width: 100%; height: auto; border-radius: 8px;" />` : ''}
-        </div>
-      `.trim();
-
-      const plainTextContent = [
-        rawDescription,
-        mainImage ? (rawDescription ? `\n\nMain Image: ${mainImage}` : mainImage) : ''
-      ].filter(Boolean).join('');
-
-      let copied = false;
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          const clipboardItems: Record<string, Blob> = {
-            'text/html': new Blob([htmlContent], { type: 'text/html' }),
-            'text/plain': new Blob([plainTextContent], { type: 'text/plain' })
+      if (mainImage) {
+        // Load image and render to canvas to get clean standard PNG blob
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          const img = new Image();
+          if (mainImage.startsWith('http://') || mainImage.startsWith('https://')) {
+            img.crossOrigin = 'anonymous';
+          }
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth || img.width || 400;
+              canvas.height = img.naturalHeight || img.height || 400;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return reject(new Error('Canvas context failed'));
+              ctx.drawImage(img, 0, 0);
+              canvas.toBlob((b) => {
+                if (b) resolve(b);
+                else reject(new Error('Canvas toBlob failed'));
+              }, 'image/png');
+            } catch (err) {
+              reject(err);
+            }
           };
-          await navigator.clipboard.write([new ClipboardItem(clipboardItems)]);
-          copied = true;
-        } catch (err) {
-          console.warn('ClipboardItem write failed, trying fallback:', err);
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = mainImage;
+        });
+
+        let writeSuccess = false;
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            writeSuccess = true;
+          } catch (clipErr) {
+            console.warn('Direct image/png clipboard write failed:', clipErr);
+          }
+        }
+
+        if (writeSuccess) {
+          toast.success('Product image copied! Paste directly in WhatsApp (Ctrl+V) to send photo.');
+          return;
         }
       }
 
-      if (!copied) {
-        await navigator.clipboard.writeText(plainTextContent);
-        copied = true;
-      }
+      // Fallback clean text only (NEVER raw base64 data!)
+      const cleanText = [
+        product.name ? `*${product.name}*` : '',
+        product.price ? `Price: ₹${product.price}` : '',
+        rawDescription || '',
+        mainImage && mainImage.startsWith('http') ? `Image: ${mainImage}` : ''
+      ].filter(Boolean).join('\n\n');
 
-      if (mainImage && rawDescription) {
-        toast.success('Main image and description copied to clipboard!');
-      } else if (mainImage) {
-        toast.success('Main image copied (no description available).');
-      } else {
-        toast.success('Description copied (no main image available).');
+      if (cleanText) {
+        await navigator.clipboard.writeText(cleanText);
+        toast.success('Product details copied as text!');
       }
     } catch (err) {
       console.error('Copy failed:', err);
-      toast.error('Failed to copy to clipboard.');
+      try {
+        const fallbackText = [
+          product.name ? `*${product.name}*` : '',
+          product.price ? `Price: ₹${product.price}` : '',
+          rawDescription || ''
+        ].filter(Boolean).join('\n\n');
+        if (fallbackText) {
+          await navigator.clipboard.writeText(fallbackText);
+          toast.success('Product details copied as text!');
+          return;
+        }
+      } catch (e) {}
+      toast.error('Failed to copy image to clipboard.');
     } finally {
       setTimeout(() => setIsCopyingMainAndDesc(false), 1500);
     }
