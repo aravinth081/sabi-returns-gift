@@ -72,6 +72,7 @@ export interface OverallInventorySummary {
   todayScheduledQuantity: number;
   todayProcessedQuantity: number;
   futureScheduledQuantity: number;
+  overduePending: number;
   pendingDispatchQuantity: number;
   totalStockReceived: number;
   totalStockDeducted: number;
@@ -512,6 +513,7 @@ export function calculateDateWiseInventory(
     todayScheduledQuantity: sumTodaySched,
     todayProcessedQuantity: sumTodayProc,
     futureScheduledQuantity: sumFutureSched,
+    overduePending: sumOverdue,
     pendingDispatchQuantity: sumTodaySched + sumFutureSched + sumOverdue,
     totalStockReceived: sumReceived,
     totalStockDeducted: sumDeducted,

@@ -2709,7 +2709,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale', inventory: "Inventory 1" });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale', inventory: "Inventory 1", location: "" });
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
 
@@ -4049,7 +4049,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const initialRole = userDefaultRole || "Others";
     const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
     setChocolateRows([{ chocolate: "", count: "" }]);
     setProductRows([{ productName: "", quantity: "", price: "" }]);
     setOrderTypeOthersToggle(initialRole !== 'Self');
@@ -4109,7 +4109,8 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       manualDeliveryFee: "",
       advanceAmount: "",
       manualProductPrice: "",
-      pricingType: 'retail'
+      pricingType: 'retail',
+      location: ""
     });
     setChocolateRows([{ chocolate: "", count: String(n.chocolateCount || "") }]);
     setOrderTypeOthersToggle(initialRole !== 'Self');
@@ -4712,7 +4713,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       // Close modal and reset form immediately after main DB write
       setIsModalOpen(false);
       const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', inventory: "Inventory 1", location: "" });
 
       // Fire-and-forget: Board card auto-move is non-critical
       if (formData.phone) {
@@ -7454,9 +7455,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   >
                     <Truck size={15} className={isProcessingDispatches ? "animate-bounce" : ""} />
                     <span>Process Today's Dispatches</span>
-                    {(dateWiseInventorySummary.todayScheduledQuantity + dateWiseInventorySummary.overduePending) > 0 && (
+                    {(Number(dateWiseInventorySummary?.todayScheduledQuantity || 0) + Number(dateWiseInventorySummary?.overduePending || 0)) > 0 && (
                       <span className="bg-emerald-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                        {dateWiseInventorySummary.todayScheduledQuantity + dateWiseInventorySummary.overduePending}
+                        {Number(dateWiseInventorySummary?.todayScheduledQuantity || 0) + Number(dateWiseInventorySummary?.overduePending || 0)}
                       </span>
                     )}
                   </button>
@@ -7504,7 +7505,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">Available Stock</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
-                      {dateWiseInventorySummary.totalAvailableStock.toLocaleString()}
+                      {(dateWiseInventorySummary?.totalAvailableStock ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-semibold">Live physically ready</span>
@@ -7514,7 +7515,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">Today's Scheduled</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-amber-300">
-                      {dateWiseInventorySummary.todayScheduledQuantity.toLocaleString()}
+                      {(dateWiseInventorySummary?.todayScheduledQuantity ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-semibold">{todayKolkataDate}</span>
@@ -7524,7 +7525,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-cyan-400 uppercase tracking-wider">Today's Dispatched</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-cyan-300">
-                      {dateWiseInventorySummary.todayProcessedQuantity.toLocaleString()}
+                      {(dateWiseInventorySummary?.todayProcessedQuantity ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-semibold">Processed today</span>
@@ -7534,7 +7535,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-purple-400 uppercase tracking-wider">Future Scheduled</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-purple-300">
-                      {dateWiseInventorySummary.futureScheduledQuantity.toLocaleString()}
+                      {(dateWiseInventorySummary?.futureScheduledQuantity ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-purple-300/80 font-semibold">Undeducted until date</span>
@@ -7544,7 +7545,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-rose-400 uppercase tracking-wider">Overdue Pending</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-rose-300">
-                      {dateWiseInventorySummary.overduePending.toLocaleString()}
+                      {(dateWiseInventorySummary?.overduePending ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-rose-300/80 font-semibold">Past dispatch dates</span>
@@ -7554,7 +7555,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-blue-400 uppercase tracking-wider">Total Received</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-blue-300">
-                      {dateWiseInventorySummary.totalStockReceived.toLocaleString()}
+                      {(dateWiseInventorySummary?.totalStockReceived ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-semibold">All receipt entries</span>
@@ -7564,7 +7565,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <span className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider">Total Deducted</span>
                   <div className="my-1">
                     <span className="text-2xl font-black text-orange-300">
-                      {dateWiseInventorySummary.totalStockDeducted.toLocaleString()}
+                      {(dateWiseInventorySummary?.totalStockDeducted ?? 0).toLocaleString()}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 font-semibold">Processed dispatches</span>
@@ -7813,16 +7814,16 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </div>
                       <div className="text-right mt-3 sm:mt-0">
                         <span className="text-[11px] font-extrabold text-slate-400 block uppercase tracking-wider">Grand Total Inventory Value</span>
-                        <span className="text-3xl font-black text-amber-300 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">₹{currentInventoryValueData.grandTotal.toLocaleString()}</span>
+                        <span className="text-3xl font-black text-amber-300 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">₹{(currentInventoryValueData?.grandTotal ?? 0).toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {currentInventoryValueData.items.map((item, idx) => (
+                      {(currentInventoryValueData?.items || []).map((item, idx) => (
                         <div key={idx} style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-3.5 rounded-2xl border border-white/10 shadow-md transition-all flex flex-col justify-between hover:bg-[#18243b]">
                           <div className="flex justify-between items-center gap-2">
                             <span className="text-xs font-extrabold text-white truncate" title={item.name}>{item.name}</span>
-                            <span className="text-xs font-black text-amber-300 shrink-0">₹{item.value.toLocaleString()}</span>
+                            <span className="text-xs font-black text-amber-300 shrink-0">₹{(item?.value ?? 0).toLocaleString()}</span>
                           </div>
                           <div className="mt-2.5 flex justify-between items-center text-[11px] font-extrabold border-t border-white/10 pt-2 text-slate-300">
                             <span className="font-bold text-slate-400">Calculation:</span>
@@ -7844,16 +7845,16 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </div>
                       <div className="text-right mt-3 sm:mt-0">
                         <span className="text-[11px] font-extrabold text-slate-400 block uppercase tracking-wider">Grand Total Approx Inventory Value</span>
-                        <span className="text-3xl font-black text-emerald-300 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">₹{Math.round(approximateProfitData.grandTotal).toLocaleString()}</span>
+                        <span className="text-3xl font-black text-emerald-300 drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">₹{Math.round(approximateProfitData?.grandTotal ?? 0).toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {approximateProfitData.items.map((item, idx) => (
+                      {(approximateProfitData?.items || []).map((item, idx) => (
                         <div key={idx} style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-3.5 rounded-2xl border border-white/10 shadow-md transition-all flex flex-col justify-between hover:bg-[#18243b]">
                           <div className="flex justify-between items-center gap-2">
                             <span className="text-xs font-extrabold text-white truncate" title={item.name}>{item.name}</span>
-                            <span className="text-xs font-black text-emerald-300 shrink-0">₹{Math.round(item.value).toLocaleString()}</span>
+                            <span className="text-xs font-black text-emerald-300 shrink-0">₹{Math.round(item?.value ?? 0).toLocaleString()}</span>
                           </div>
                           <div className="mt-2.5 flex justify-between items-center text-[11px] font-extrabold border-t border-white/10 pt-2 text-slate-300">
                             <span className="font-bold text-slate-400">Calculation:</span>

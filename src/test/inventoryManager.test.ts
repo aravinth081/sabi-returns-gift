@@ -552,4 +552,43 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
     expect(summary.chocolates['10 rs dairy milk'].totalReceived).toBe(1000);
     expect(summary.chocolates['10 rs dairy milk'].futureReceived).toBe(2000);
   });
+
+  // -------------------------------------------------------------------------
+  // Test Case 13: OverallInventorySummary overduePending and toLocaleString formatting
+  // -------------------------------------------------------------------------
+  it('Test Case 13: OverallInventorySummary has overduePending and formats with toLocaleString()', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 10,
+        itemsPerBox: 100,
+        totalChocolates: 1000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const overdueOrder = {
+      id: 99,
+      fireId: 'order-99',
+      name: 'Past Customer',
+      chocolate: '10 rs dairy milk',
+      count: '150',
+      deliveryDate: '2026-10-15', // Past date relative to Oct 18
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(dynamicInventory, logs, [overdueOrder], [], 'Inventory 1', todayStr);
+
+    expect(summary.overduePending).toBe(150);
+    expect(summary.totalAvailableStock).toBe(1000);
+    expect(summary.overduePending.toLocaleString()).toBe('150');
+    expect(summary.totalAvailableStock.toLocaleString()).toBe('1,000');
+    expect(summary.todayScheduledQuantity.toLocaleString()).toBe('0');
+    expect(summary.todayProcessedQuantity.toLocaleString()).toBe('0');
+    expect(summary.futureScheduledQuantity.toLocaleString()).toBe('0');
+    expect(summary.totalStockReceived.toLocaleString()).toBe('1,000');
+    expect(summary.totalStockDeducted.toLocaleString()).toBe('0');
+  });
 });

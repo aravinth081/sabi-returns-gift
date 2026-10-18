@@ -63,9 +63,9 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 ];
 
 // Generate empty rows up to 25 for full initial page
-const createEmptyRow = (index: number): SheetRow => ({
+const createEmptyRow = (index: number, initialDate: string = ''): SheetRow => ({
   id: `row-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 6)}`,
-  date: '',
+  date: initialDate,
   contactNumber: '',
   count: '',
   birthday: '',
@@ -1991,7 +1991,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         });
 
         // Make sure at least 25 rows exist
-        const finalRows = generateInitialRows(importedRows, Math.max(25, importedRows.length));
+        const finalRows = importedRows.length < 25
+          ? [...importedRows, ...generateInitialRows(25 - importedRows.length)]
+          : importedRows;
 
         const newSheetName = file.name.replace(/\.[^/.]+$/, '').substring(0, 31);
         const newSheet: SheetData = {

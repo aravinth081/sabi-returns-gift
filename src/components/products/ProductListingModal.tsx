@@ -163,6 +163,8 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
               ? editingProduct.image.filter(Boolean)
               : (typeof editingProduct.image === 'string' && editingProduct.image.trim() ? [editingProduct.image.trim()] : []))),
         comboItems: comboItems,
+        minOrderQuantity: String(editingProduct.minOrderQuantity ?? '1'),
+        status: editingProduct.status || 'Active',
       });
       setNewImageFiles([]);
       setShowProductPicker(false);
