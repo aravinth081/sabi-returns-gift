@@ -7403,38 +7403,46 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                         <Copy size={15} />
                                       </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="center" className="w-64 bg-[#0f172a] border border-white/10 text-white shadow-2xl p-1.5 rounded-xl z-50">
+                                    <DropdownMenuContent align="center" className="w-72 bg-[#0c1427] border border-white/20 text-white shadow-2xl p-2 rounded-2xl z-50">
                                       <DropdownMenuItem
                                         onClick={() => copyProductCard(prod)}
-                                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-purple-600/20 text-purple-300 hover:text-purple-200 cursor-pointer font-bold text-xs"
+                                        className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer text-white focus:bg-purple-600/30 focus:text-white hover:bg-purple-600/30 hover:text-white border border-transparent hover:border-purple-500/30 focus:border-purple-500/30 outline-none"
                                       >
-                                        <ImageIcon size={15} className="text-purple-400 shrink-0" />
-                                        <div>
-                                          <div className="font-extrabold text-white">Copy Product Card</div>
-                                          <div className="text-[10px] text-slate-400 font-normal">Photo with Name, Price & Desc on it</div>
+                                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                                          <ImageIcon size={16} />
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                          <span className="font-extrabold text-sm text-white">Copy Product Card</span>
+                                          <span className="text-[11px] text-slate-300 font-medium">Photo with Name, Price & Desc on it</span>
                                         </div>
                                       </DropdownMenuItem>
+
                                       <DropdownMenuItem
                                         onClick={() => copyProductText(prod)}
-                                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-blue-600/20 text-blue-300 hover:text-blue-200 cursor-pointer font-bold text-xs"
+                                        className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer text-white focus:bg-blue-600/30 focus:text-white hover:bg-blue-600/30 hover:text-white border border-transparent hover:border-blue-500/30 focus:border-blue-500/30 outline-none mt-1"
                                       >
-                                        <ClipboardList size={15} className="text-blue-400 shrink-0" />
-                                        <div>
-                                          <div className="font-extrabold text-white">Copy Details as Text</div>
-                                          <div className="text-[10px] text-slate-400 font-normal">Ready to paste in WhatsApp chat</div>
+                                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                                          <ClipboardList size={16} />
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                          <span className="font-extrabold text-sm text-white">Copy Details as Text</span>
+                                          <span className="text-[11px] text-slate-300 font-medium">Ready to paste in WhatsApp chat</span>
                                         </div>
                                       </DropdownMenuItem>
+
                                       <DropdownMenuItem
                                         onClick={() => {
                                           const mainImage = (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.image || '');
                                           copyProductRawImage(mainImage);
                                         }}
-                                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-700/40 text-slate-300 hover:text-white cursor-pointer font-bold text-xs"
+                                        className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer text-white focus:bg-slate-700/50 focus:text-white hover:bg-slate-700/50 hover:text-white border border-transparent hover:border-white/20 focus:border-white/20 outline-none mt-1"
                                       >
-                                        <Copy size={15} className="text-slate-400 shrink-0" />
-                                        <div>
-                                          <div className="font-extrabold text-white">Copy Raw Photo Only</div>
-                                          <div className="text-[10px] text-slate-400 font-normal">Original photo without card frame</div>
+                                        <div className="w-8 h-8 rounded-lg bg-slate-700/50 text-slate-300 flex items-center justify-center shrink-0">
+                                          <Copy size={16} />
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                          <span className="font-extrabold text-sm text-white">Copy Raw Photo Only</span>
+                                          <span className="text-[11px] text-slate-300 font-medium">Original photo without card frame</span>
                                         </div>
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
