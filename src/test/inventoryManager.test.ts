@@ -7,6 +7,7 @@ import {
   isDateFuture,
   isDateToday,
   isDatePast,
+  isOrderFuture,
   normalizeChocName,
   InventoryLogItem,
   InventoryTransaction,
@@ -678,4 +679,182 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
     expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(0);
     expect(summary.chocolates['10 rs dairy milk'].futureScheduled).toBe(400);
   });
+
+  // -------------------------------------------------------------------------
+  // Test Case 16: Dispatch Date Priority
+  // order.dispatchDate takes precedence over deliveryDate, functionDate, and orderDate
+  // -------------------------------------------------------------------------
+  it('Test Case 16: getOrderDispatchDate strictly respects priority dispatchDate > deliveryDate > functionDate > orderDate', () => {
+    // 1. When dispatchDate is provided
+    expect(getOrderDispatchDate({
+      dispatchDate: '2026-10-25',
+      deliveryDate: '2026-10-20',
+      functionDate: '2026-10-19',
+      orderDate: '2026-10-18'
+    })).toBe('2026-10-25');
+
+    // 2. Fallback to deliveryDate
+    expect(getOrderDispatchDate({
+      deliveryDate: '2026-10-20',
+      functionDate: '2026-10-19',
+      orderDate: '2026-10-18'
+    })).toBe('2026-10-20');
+
+    // 3. Fallback to functionDate
+    expect(getOrderDispatchDate({
+      functionDate: '2026-10-19',
+      orderDate: '2026-10-18'
+    })).toBe('2026-10-19');
+
+    // 4. Fallback to orderDate
+    expect(getOrderDispatchDate({
+      orderDate: '2026-10-18'
+    })).toBe('2026-10-18');
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 17: Current Dispatch Date Order Deducts Inventory Immediately
+  // -------------------------------------------------------------------------
+  it('Test Case 17: Order with current dispatch date (<= today) deducts inventory count immediately', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 10,
+        itemsPerBox: 100,
+        totalChocolates: 1000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const currentOrder = {
+      id: 301,
+      fireId: 'order-301',
+      name: 'Ramesh',
+      chocolate: '10 rs dairy milk',
+      count: '150',
+      orderDate: '2026-10-18',
+      dispatchDate: '2026-10-18', // Today's dispatch date
+      deliveryDate: '2026-10-18',
+      stockDeductionStatus: 'Deducted',
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [currentOrder],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    // Initial stock 1000 - 150 = 850 available stock
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(850);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(150);
+    expect(summary.chocolates['10 rs dairy milk'].todayProcessed).toBe(150);
+    expect(summary.chocolates['10 rs dairy milk'].futureScheduled).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 18: Future Dispatch Date Order Does NOT Deduct Inventory
+  // -------------------------------------------------------------------------
+  it('Test Case 18: Order with future dispatch date (even in next year) does NOT deduct inventory', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 10,
+        itemsPerBox: 100,
+        totalChocolates: 1000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const nextYearFutureOrder = {
+      id: 302,
+      fireId: 'order-302',
+      name: 'Suresh',
+      chocolate: '10 rs dairy milk',
+      count: '300',
+      orderDate: '2026-10-18',
+      dispatchDate: '2027-01-15', // Future dispatch date next year
+      deliveryDate: '15 Jan 2027',
+      stockDeductionStatus: 'Pending',
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const isFuture = isOrderFuture(nextYearFutureOrder, todayStr);
+    expect(isFuture).toBe(true);
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [nextYearFutureOrder],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    // 1000 stock remains intact; futureScheduled is 300
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(1000);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(0);
+    expect(summary.chocolates['10 rs dairy milk'].futureScheduled).toBe(300);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 19: Multi-Chocolate Current Dispatch Date Deducts All Items
+  // -------------------------------------------------------------------------
+  it('Test Case 19: Multi-chocolate order on current dispatch date deducts all items accurately', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 10,
+        itemsPerBox: 100,
+        totalChocolates: 1000,
+        inventory: 'Inventory 1',
+      },
+      {
+        date: '2026-10-10',
+        chocolate: '5 rs 5 star',
+        boxCount: 5,
+        itemsPerBox: 100,
+        totalChocolates: 500,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const multiOrder = {
+      id: 303,
+      fireId: 'order-303',
+      name: 'Priya',
+      chocolate: '10 rs dairy milk, 5 rs 5 star',
+      count: '200, 100',
+      orderDate: '2026-10-18',
+      dispatchDate: '2026-10-18',
+      deliveryDate: '2026-10-18',
+      stockDeductionStatus: 'Deducted',
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [multiOrder],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(800);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(200);
+
+    expect(summary.chocolates['5 rs 5 star'].availableStock).toBe(400);
+    expect(summary.chocolates['5 rs 5 star'].totalDeducted).toBe(100);
+  });
 });
+

@@ -24,6 +24,7 @@ import {
   getOrderDispatchDate,
   getOrderChocolateItems,
   getTodayKolkata,
+  parseDateToStandard,
   isDateFuture,
   isDateToday,
   isDatePast,
@@ -288,13 +289,18 @@ const calculateOrderFinalCost = (
 
 const parseDateToYYYYMMDD = (displayDate: string) => {
   if (!displayDate) return "";
-  if (String(displayDate).includes("-")) return displayDate;
-  const currentYear = new Date().getFullYear();
-  const d = new Date(`${displayDate} ${currentYear}`);
-  if (isNaN(d.getTime())) return "";
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${month}-${day}`;
+  const std = parseDateToStandard(displayDate);
+  if (std && /^\d{4}-\d{2}-\d{2}$/.test(std)) {
+    return std;
+  }
+  const dmy = String(displayDate).trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(displayDate).trim())) {
+    return String(displayDate).trim();
+  }
+  return "";
 };
 
 const formatToDisplayDate = (dateStr: any) => {
@@ -305,8 +311,20 @@ const formatToDisplayDate = (dateStr: any) => {
   }
   if (typeof dateStr === 'string') {
     const str = dateStr.trim();
-    if (/^\d{1,2}\s+[a-zA-Z]{3}$/.test(str)) return str;
-    if (!str.includes("-") && !str.includes("/")) return str;
+    if (/^\d{1,2}\s+[a-zA-Z]{3}(\s+\d{4})?$/.test(str)) return str;
+    const std = parseDateToStandard(str);
+    if (std && /^\d{4}-\d{2}-\d{2}$/.test(std)) {
+      const parts = std.split('-');
+      const year = parts[0];
+      const curYear = String(new Date().getFullYear());
+      const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (!isNaN(date.getTime())) {
+        if (year !== curYear) {
+          return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      }
+    }
     const date = new Date(str);
     if (!isNaN(date.getTime())) return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
@@ -4030,7 +4048,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   };
 
   const handleAddClick = (categoryOverride?: any) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayKolkata();
     const category = (categoryOverride === 'chocolate' || categoryOverride === 'product')
       ? categoryOverride
       : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
@@ -4051,7 +4069,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const initialRole = userDefaultRole || "Others";
     const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
     setChocolateRows([{ chocolate: "", count: "" }]);
     setProductRows([{ productName: "", quantity: "", price: "" }]);
     setOrderTypeOthersToggle(initialRole !== 'Self');
@@ -4130,7 +4148,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       id: order.id,
       orderDate: order.orderDate ? parseDateToYYYYMMDD(order.orderDate) : parseDateToYYYYMMDD(order.functionDate),
       functionDate: parseDateToYYYYMMDD(order.functionDate),
-      deliveryDate: parseDateToYYYYMMDD(order.deliveryDate || order.functionDate),
+      deliveryDate: parseDateToYYYYMMDD(order.dispatchDate || order.deliveryDate || order.functionDate || order.orderDate),
       address: order.address || "",
       discount: order.discount || 0,
       isDeliveryFree: order.isDeliveryFree || false,
@@ -4216,6 +4234,19 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
           const trashRef = await addDoc(collection(db, "trash_orders"), trashOrder);
           const trashFireId = trashRef.id;
 
+          // Revert inventory deductions if any existed for this order
+          const existingTxns = inventoryTransactions.filter(t => String(t.orderId) === String(order.id) || t.orderFireId === originalFireId);
+          for (const tx of existingTxns) {
+            if (tx.stockDeductionStatus === 'Deducted') {
+              try {
+                await updateDoc(doc(db, "inventory_transactions", tx.transactionId), {
+                  stockDeductionStatus: 'Cancelled',
+                  cancelledAt: new Date().toISOString()
+                });
+              } catch (e) {}
+            }
+          }
+
           await deleteDoc(doc(db, "orders", originalFireId));
           setSelectedOrders(selectedOrders.filter(selectedId => selectedId !== id));
           logActivity(`Deleted Order: ${order.name} (${order.chocolate || 'Product'} x${order.count})`,
@@ -4227,6 +4258,15 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
             undo: async () => {
               await setDoc(doc(db, "orders", originalFireId), originalOrderData);
               await deleteDoc(doc(db, "trash_orders", trashFireId));
+              for (const tx of existingTxns) {
+                if (tx.stockDeductionStatus === 'Deducted') {
+                  try {
+                    await updateDoc(doc(db, "inventory_transactions", tx.transactionId), {
+                      stockDeductionStatus: 'Deducted'
+                    });
+                  } catch (e) {}
+                }
+              }
               logActivity(`Restored Order: ${order.name}`, 'Trash Bin');
             },
             redo: async () => {
@@ -4584,13 +4624,18 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const rawAdvance = Number(formData.advanceAmount) || 0;
     const finalPaymentStatus = formData.paymentStatus || 'Pending';
 
+    const rawDispatchDate = formData.deliveryDate || (formData as any).dispatchDate;
+    const stdDispatchDate = parseDateToStandard(rawDispatchDate) || todayKolkataDate;
+    const displayDispatchDate = formatToDisplayDate(rawDispatchDate);
+
     const formattedOrder: any = {
       ...formData,
       inventory: formData.inventory || "Inventory 1",
       phone: formatPhoneNumber(formData.phone),
       orderDate: formatToDisplayDate(formData.orderDate) || "",
       functionDate: formatToDisplayDate(formData.functionDate) || "",
-      deliveryDate: formatToDisplayDate(formData.deliveryDate) || "",
+      deliveryDate: displayDispatchDate || "",
+      dispatchDate: displayDispatchDate || stdDispatchDate,
       discount: Number(formData.discount) || 0,
       manualDeliveryFee: Number(formData.manualDeliveryFee) || 0,
       advanceAmount: rawAdvance,
@@ -4618,7 +4663,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     }
 
     // Determine whether this order is for current date (<= today) or future (> today)
-    const isFutureOrder = isOrderFuture(formattedOrder, todayKolkataDate);
+    const isFutureOrder = isDateFuture(stdDispatchDate, todayKolkataDate);
     formattedOrder.stockDeductionStatus = isFutureOrder ? 'Pending' : 'Deducted';
 
     try {
@@ -4675,7 +4720,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 chocolate: item.normalizedName,
                 orderQuantity: item.quantity,
                 quantityDeducted: item.quantity,
-                dispatchDate: getOrderDispatchDate(formattedOrder) || todayKolkataDate,
+                dispatchDate: stdDispatchDate,
                 actualDispatchTimestamp: new Date().toISOString(),
                 dispatchStatus: 'Delivered',
                 stockDeductionStatus: 'Deducted',
@@ -4754,7 +4799,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
               chocolate: item.normalizedName,
               orderQuantity: item.quantity,
               quantityDeducted: item.quantity,
-              dispatchDate: getOrderDispatchDate(formattedOrder) || todayKolkataDate,
+              dispatchDate: stdDispatchDate,
               actualDispatchTimestamp: new Date().toISOString(),
               dispatchStatus: 'Delivered',
               stockDeductionStatus: 'Deducted',
@@ -6068,6 +6113,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 name: String(rawName).trim(),
                 phone: formatPhoneNumber(rawPhone),
                 deliveryDate: formatToDisplayDate(row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || row['Function Date'] || row.functionDate || row['Order Date'] || row.orderDate || ""),
+                dispatchDate: formatToDisplayDate(row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || row['Function Date'] || row.functionDate || row['Order Date'] || row.orderDate || ""),
                 functionDate: formatToDisplayDate(row['Function Date'] || row.functionDate || row['Dispatch Date'] || row['Delivery Date'] || row.deliveryDate || ""),
                 chocolate: String(row['Chocolate Name'] || row.Chocolate || row.chocolate || "").trim(),
                 count: Number(row.Count || row.count) || 0,

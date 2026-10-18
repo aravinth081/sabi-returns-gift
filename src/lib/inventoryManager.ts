@@ -247,29 +247,23 @@ export function getOrderChocolateItems(
 
 /**
  * Resolves the applicable Dispatch Date for an order.
- * Priority: order.deliveryDate -> order.functionDate -> order.orderDate.
+ * Priority: order.dispatchDate -> order.deliveryDate -> order.functionDate -> order.orderDate.
  */
 export function getOrderDispatchDate(order: any): string {
   if (!order) return '';
-  const rawDate = order.deliveryDate || order.functionDate || order.orderDate || '';
+  const rawDate = order.dispatchDate || order.deliveryDate || order.functionDate || order.orderDate || '';
   return parseDateToStandard(rawDate);
 }
 
 /**
  * Determines whether an order is scheduled for a future date.
- * If any of deliveryDate, functionDate, or orderDate is after todayStr, it is a future order.
+ * An order is considered future if its resolved dispatch date is after todayStr.
  */
 export function isOrderFuture(order: any, todayStr = getTodayKolkata()): boolean {
   if (!order) return false;
   const dispatchDate = getOrderDispatchDate(order);
-  if (dispatchDate && isDateFuture(dispatchDate, todayStr)) {
-    return true;
-  }
-  if (order.orderDate) {
-    const stdOrderDate = parseDateToStandard(order.orderDate);
-    if (stdOrderDate && stdOrderDate > todayStr) {
-      return true;
-    }
+  if (dispatchDate) {
+    return isDateFuture(dispatchDate, todayStr);
   }
   return false;
 }
