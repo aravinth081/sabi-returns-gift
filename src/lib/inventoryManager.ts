@@ -255,6 +255,25 @@ export function getOrderDispatchDate(order: any): string {
   return parseDateToStandard(rawDate);
 }
 
+/**
+ * Determines whether an order is scheduled for a future date.
+ * If any of deliveryDate, functionDate, or orderDate is after todayStr, it is a future order.
+ */
+export function isOrderFuture(order: any, todayStr = getTodayKolkata()): boolean {
+  if (!order) return false;
+  const dispatchDate = getOrderDispatchDate(order);
+  if (dispatchDate && isDateFuture(dispatchDate, todayStr)) {
+    return true;
+  }
+  if (order.orderDate) {
+    const stdOrderDate = parseDateToStandard(order.orderDate);
+    if (stdOrderDate && stdOrderDate > todayStr) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // 3. ORDER DISPATCH & STOCK DEDUCTION STATUS EVALUATION
 // ---------------------------------------------------------------------------
@@ -272,12 +291,15 @@ export function isOrderCancelled(order: any): boolean {
 /**
  * Determines whether an order has already had its stock deducted.
  * Checks for explicit stockDeductionStatus === 'Deducted' or a matching processed transaction.
+ * Future orders must NEVER be considered already deducted.
  */
 export function isOrderStockAlreadyDeducted(
   order: any,
-  transactions: InventoryTransaction[] = []
+  transactions: InventoryTransaction[] = [],
+  todayStr = getTodayKolkata()
 ): boolean {
   if (!order) return false;
+  if (isOrderFuture(order, todayStr)) return false;
 
   // Direct flag on order
   if (order.stockDeductionStatus === 'Deducted') {
@@ -394,13 +416,17 @@ export function calculateDateWiseInventory(
     if (!chocMetrics[norm]) return;
 
     if (t.transactionType === 'Dispatch Deduction' && t.stockDeductionStatus === 'Deducted') {
+      const dispatchDate = parseDateToStandard(t.dispatchDate);
+      // Future dispatch transactions must NOT deduct current live stock
+      if (dispatchDate && dispatchDate > todayStr) {
+        return;
+      }
       const key = `${t.orderId}_${norm}`;
       if (!processedOrderItems.has(key)) {
         processedOrderItems.add(key);
         chocMetrics[norm].totalDeducted += Number(t.quantityDeducted || t.orderQuantity || 0);
 
         // Check if processed today
-        const dispatchDate = parseDateToStandard(t.dispatchDate);
         if (dispatchDate === todayStr) {
           chocMetrics[norm].todayProcessed += Number(t.quantityDeducted || t.orderQuantity || 0);
         }
@@ -423,9 +449,9 @@ export function calculateDateWiseInventory(
     if (order.category === 'product') return;
 
     const dispatchDate = getOrderDispatchDate(order);
-    const isFuture = dispatchDate > todayStr;
-    const isToday = dispatchDate === todayStr;
-    const isPast = dispatchDate !== '' && dispatchDate < todayStr;
+    const isFuture = isOrderFuture(order, todayStr);
+    const isToday = isDateToday(dispatchDate, todayStr);
+    const isPast = isDatePast(dispatchDate, todayStr);
     const isDelivered = order.status === 'Delivered';
     const isExplicitlyDeducted = order.stockDeductionStatus === 'Deducted';
 
@@ -448,17 +474,25 @@ export function calculateDateWiseInventory(
         };
       }
 
+      // 1. Future Scheduled (Dispatch Date in the future - DO NOT DEDUCT!)
+      // Requirement: "future date la irukura dashboard 1 la save panna athu order ku minus aaga koodathu"
+      if (isFuture) {
+        chocMetrics[norm].futureScheduled += item.quantity;
+        return;
+      }
+
       const itemKey = `${order.id || order.fireId}_${norm}`;
       const alreadyProcessedViaTxn = processedOrderItems.has(itemKey);
 
-      // 1. Processed deductions (historical or marked delivered)
+      // 2. Processed deductions (historical, marked delivered, or explicitly deducted upon save)
+      // Requirement: "current date enna enna add panromo antha date ku mattum tha inventories la minus aaganum"
       if (!alreadyProcessedViaTxn && (isDelivered || isExplicitlyDeducted)) {
         processedOrderItems.add(itemKey);
         chocMetrics[norm].totalDeducted += item.quantity;
         if (isToday) {
           chocMetrics[norm].todayProcessed += item.quantity;
         }
-        return; // Already accounted for in totalDeducted
+        return; // Accounted for in totalDeducted
       }
 
       // If already processed via transaction, don't count as pending
@@ -466,12 +500,8 @@ export function calculateDateWiseInventory(
         return;
       }
 
-      // 2. Future Scheduled (Dispatch Date in the future - DO NOT DEDUCT!)
-      if (isFuture) {
-        chocMetrics[norm].futureScheduled += item.quantity;
-      }
-      // 3. Today's Scheduled (Dispatch Date is today, not yet processed)
-      else if (isToday) {
+      // 3. Today's Scheduled (Dispatch Date is today, pending dispatch processing)
+      if (isToday) {
         chocMetrics[norm].todayScheduled += item.quantity;
       }
       // 4. Overdue / Pending (Dispatch Date in the past, not yet processed)

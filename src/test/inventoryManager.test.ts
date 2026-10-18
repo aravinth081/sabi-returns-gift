@@ -591,4 +591,91 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
     expect(summary.totalStockReceived.toLocaleString()).toBe('1,000');
     expect(summary.totalStockDeducted.toLocaleString()).toBe('0');
   });
+
+  // -------------------------------------------------------------------------
+  // Test Case 14: Order Added with Current Date (Today) Automatically Deducts
+  // -------------------------------------------------------------------------
+  it('Test Case 14: Order saved with current date (today) automatically deducts from available stock', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 50,
+        itemsPerBox: 100,
+        totalChocolates: 5000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const currentOrder = {
+      id: 201,
+      fireId: 'order-201',
+      name: 'Priya',
+      chocolate: '10 rs dairy milk',
+      count: '250',
+      orderDate: '2026-10-18',
+      deliveryDate: '2026-10-18',
+      stockDeductionStatus: 'Deducted',
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [currentOrder],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    // Initial stock 5000 - 250 = 4750 available
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(4750);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(250);
+    expect(summary.chocolates['10 rs dairy milk'].todayProcessed).toBe(250);
+    expect(summary.chocolates['10 rs dairy milk'].futureScheduled).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 15: Order Saved with Future Date Must NOT Deduct from Inventory
+  // -------------------------------------------------------------------------
+  it('Test Case 15: Order saved with future date must NOT deduct from available stock and remain in futureScheduled', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-10',
+        chocolate: '10 rs dairy milk',
+        boxCount: 50,
+        itemsPerBox: 100,
+        totalChocolates: 5000,
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const futureOrder = {
+      id: 202,
+      fireId: 'order-202',
+      name: 'Karthik',
+      chocolate: '10 rs dairy milk',
+      count: '400',
+      orderDate: '2026-10-18',
+      deliveryDate: '2026-10-25', // Future dispatch date
+      stockDeductionStatus: 'Pending',
+      status: 'In Process',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(
+      dynamicInventory,
+      logs,
+      [futureOrder],
+      [],
+      'Inventory 1',
+      todayStr
+    );
+
+    // Initial stock 5000 remains 5000 available; futureScheduled is 400
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(5000);
+    expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(0);
+    expect(summary.chocolates['10 rs dairy milk'].futureScheduled).toBe(400);
+  });
 });

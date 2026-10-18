@@ -22,11 +22,13 @@ import {
   prepareDispatchReversal,
   validateDispatchStock,
   getOrderDispatchDate,
+  getOrderChocolateItems,
   getTodayKolkata,
   isDateFuture,
   isDateToday,
   isDatePast,
   isOrderCancelled,
+  isOrderFuture,
   isOrderStockAlreadyDeducted,
   InventoryTransaction,
   OverallInventorySummary
@@ -4615,6 +4617,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       }
     }
 
+    // Determine whether this order is for current date (<= today) or future (> today)
+    const isFutureOrder = isOrderFuture(formattedOrder, todayKolkataDate);
+    formattedOrder.stockDeductionStatus = isFutureOrder ? 'Pending' : 'Deducted';
+
     try {
       const moduleName = (formData.category === 'product') ? 'Order Management (Products)' : 'Order Management (Chocolates)';
       if (formData.fireId) {
@@ -4639,6 +4645,51 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
         const sanitizedDataToUpdate = cleanOrderData(dataToUpdate);
         await setDoc(doc(db, "orders", formData.fireId), sanitizedDataToUpdate, { merge: true });
+
+        // Synchronize inventory transaction audit trail for chocolate orders
+        if (formattedOrder.category !== 'product' && formattedOrder.chocolate && formattedOrder.role !== 'Self') {
+          if (isFutureOrder) {
+            // Revert deduction if order was changed to a future date
+            const existingTxns = inventoryTransactions.filter(t => String(t.orderId) === String(formData.id) || t.orderFireId === formData.fireId);
+            for (const tx of existingTxns) {
+              if (tx.stockDeductionStatus === 'Deducted') {
+                try {
+                  await updateDoc(doc(db, "inventory_transactions", tx.transactionId), {
+                    stockDeductionStatus: 'Pending',
+                    reversedAt: new Date().toISOString()
+                  });
+                } catch (e) {}
+              }
+            }
+          } else {
+            // Deduct for current date order
+            const items = getOrderChocolateItems(formattedOrder, dynamicInventory);
+            for (const item of items) {
+              const txnId = `txn_${formData.id || formData.fireId}_${item.normalizedName.replace(/\s+/g, '_')}`;
+              const txnDoc = {
+                transactionId: txnId,
+                orderId: formData.id || formData.fireId,
+                orderFireId: formData.fireId,
+                orderSerial: formData.id ? `SR${String(formData.id).padStart(4, '0')}` : undefined,
+                productName: item.normalizedName,
+                chocolate: item.normalizedName,
+                orderQuantity: item.quantity,
+                quantityDeducted: item.quantity,
+                dispatchDate: getOrderDispatchDate(formattedOrder) || todayKolkataDate,
+                actualDispatchTimestamp: new Date().toISOString(),
+                dispatchStatus: 'Delivered',
+                stockDeductionStatus: 'Deducted',
+                transactionType: 'Dispatch Deduction',
+                inventory: formattedOrder.inventory || 'Inventory 1',
+                createdAt: new Date().toISOString()
+              };
+              try {
+                await setDoc(doc(db, "inventory_transactions", txnId), txnDoc);
+              } catch (e) {}
+            }
+          }
+        }
+
         // Fire-and-forget: logActivity is non-critical
         logActivity(`Edited Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
         toast.success("Order updated successfully!");
@@ -4688,6 +4739,35 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
         const sanitizedFormattedOrder = cleanOrderData(formattedOrder);
 
         const newDocRef = await addDoc(collection(db, "orders"), sanitizedFormattedOrder);
+
+        // Record immediate deduction in inventory transactions for current date chocolate orders
+        if (!isFutureOrder && formattedOrder.category !== 'product' && formattedOrder.chocolate && formattedOrder.role !== 'Self') {
+          const items = getOrderChocolateItems(formattedOrder, dynamicInventory);
+          for (const item of items) {
+            const txnId = `txn_${nextId}_${item.normalizedName.replace(/\s+/g, '_')}`;
+            const txnDoc = {
+              transactionId: txnId,
+              orderId: nextId,
+              orderFireId: newDocRef.id,
+              orderSerial: `SR${String(nextId).padStart(4, '0')}`,
+              productName: item.normalizedName,
+              chocolate: item.normalizedName,
+              orderQuantity: item.quantity,
+              quantityDeducted: item.quantity,
+              dispatchDate: getOrderDispatchDate(formattedOrder) || todayKolkataDate,
+              actualDispatchTimestamp: new Date().toISOString(),
+              dispatchStatus: 'Delivered',
+              stockDeductionStatus: 'Deducted',
+              transactionType: 'Dispatch Deduction',
+              inventory: formattedOrder.inventory || 'Inventory 1',
+              createdAt: new Date().toISOString()
+            };
+            try {
+              await setDoc(doc(db, "inventory_transactions", txnId), txnDoc);
+            } catch (e) {}
+          }
+        }
+
         // Fire-and-forget: logActivity is non-critical
         logActivity(`Added New Order: ${formData.name} (${formData.chocolate || 'Product'} x${formData.count})`, moduleName);
         toast.success("Order added successfully!");
@@ -11143,19 +11223,21 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       />
 
       {/* 🟢 PRODUCT VIEW DETAILS & GALLERY MODAL (Requirement 17: Copy Description, Copy Image, Copy All) */}
-      <ProductViewModal
-        isOpen={Boolean(productViewModalProduct)}
-        onClose={() => setProductViewModalProduct(null)}
-        product={productViewModalProduct}
-        soldCount={productViewModalProduct ? (productSoldCountMap[(productViewModalProduct.name || '').trim().toLowerCase()] || 0) : 0}
-        onEdit={(prod) => {
-          setProductViewModalProduct(null);
-          setSelectedEditingProduct(prod);
-          setIsProductListingModalOpen(true);
-        }}
-        onImageUpload={handleImageUpload}
-        onDeleteImage={handleDeleteImage}
-      />
+      {Boolean(productViewModalProduct) && (
+        <ProductViewModal
+          isOpen={Boolean(productViewModalProduct)}
+          onClose={() => setProductViewModalProduct(null)}
+          product={productViewModalProduct}
+          soldCount={productViewModalProduct ? (productSoldCountMap[(productViewModalProduct.name || '').trim().toLowerCase()] || 0) : 0}
+          onEdit={(prod) => {
+            setProductViewModalProduct(null);
+            setSelectedEditingProduct(prod);
+            setIsProductListingModalOpen(true);
+          }}
+          onImageUpload={handleImageUpload}
+          onDeleteImage={handleDeleteImage}
+        />
+      )}
 
       {/* 🟢 NEW: INVENTORY MODAL */}
       {isInvModalOpen && (
@@ -11441,10 +11523,21 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">Function Date</label>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200">Dispatch Date</label>
+                  <div className="grid grid-cols-3 gap-x-2 gap-y-1">
                     <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Order Date</label>
+                      <input
+                        required
+                        type="date"
+                        name="orderDate"
+                        value={formData.orderDate}
+                        onChange={handleInputChange}
+                        style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Function Date</label>
                       <input
                         required
                         type="date"
@@ -11456,6 +11549,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       />
                     </div>
                     <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Dispatch Date</label>
                       <input
                         required
                         type="date"

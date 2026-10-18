@@ -45,8 +45,14 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
   const [isCopyingDesc, setIsCopyingDesc] = useState(false);
   const [isCopyingImg, setIsCopyingImg] = useState(false);
   const [isCopyingAll, setIsCopyingAll] = useState(false);
+  const [isCopyingMainAndDesc, setIsCopyingMainAndDesc] = useState(false);
 
-  if (!isOpen || !product) return null;
+  // Reset active index when product changes or modal opens
+  React.useEffect(() => {
+    if (isOpen && product) {
+      setActiveIndex(0);
+    }
+  }, [isOpen, product]);
 
   const images: string[] = React.useMemo(() => {
     if (!product) return [];
@@ -56,15 +62,6 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
     if (typeof product.image === 'string' && product.image.trim()) return [product.image.trim()];
     return [];
   }, [product]);
-
-  const safeActiveIndex = Math.min(activeIndex, Math.max(0, images.length - 1));
-  const currentImage = images[safeActiveIndex] || images[0] || '';
-  const isCombo = (product.productType || 'Single product') === 'Combo set';
-  const comboProducts: any[] = Array.isArray(product.comboProducts) ? product.comboProducts : [];
-  const sellPrice = Number(product.price ?? product.sellingPrice) || 0;
-  const wholesalePrice = Number(product.wholesalePrice ?? product.discountPrice) || 0;
-  const profit = sellPrice - wholesalePrice;
-  const marginPct = wholesalePrice > 0 ? Math.round((profit / wholesalePrice) * 100) : 100;
 
   const formattedCreatedAt = React.useMemo(() => {
     if (!product?.createdAt) return 'N/A';
@@ -84,6 +81,17 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
       return 'N/A';
     }
   }, [product?.createdAt]);
+
+  if (!isOpen || !product) return null;
+
+  const safeActiveIndex = Math.min(activeIndex, Math.max(0, images.length - 1));
+  const currentImage = images[safeActiveIndex] || images[0] || '';
+  const isCombo = (product.productType || 'Single product') === 'Combo set';
+  const comboProducts: any[] = Array.isArray(product.comboProducts) ? product.comboProducts : [];
+  const sellPrice = Number(product.price ?? product.sellingPrice) || 0;
+  const wholesalePrice = Number(product.wholesalePrice ?? product.discountPrice) || 0;
+  const profit = sellPrice - wholesalePrice;
+  const marginPct = wholesalePrice > 0 ? Math.round((profit / wholesalePrice) * 100) : 100;
 
   // 1. Copy Description (Requirement 17)
   const handleCopyDescription = async () => {
@@ -201,7 +209,6 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
   };
 
   // 4. Copy Main Image and Description in a single action
-  const [isCopyingMainAndDesc, setIsCopyingMainAndDesc] = useState(false);
   const handleCopyMainImageAndDescription = async () => {
     const mainImage = (images && images.length > 0) ? images[0] : (product.image || '');
     const rawDescription = product.description?.trim() || '';
@@ -284,7 +291,9 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
           toast.success('Product details copied as text!');
           return;
         }
-      } catch (e) {}
+      } catch {
+        /* ignore fallback error */
+      }
       toast.error('Failed to copy image to clipboard.');
     } finally {
       setTimeout(() => setIsCopyingMainAndDesc(false), 1500);
