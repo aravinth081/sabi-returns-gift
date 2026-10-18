@@ -155,9 +155,13 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
           editingProduct.discountPrice ?? editingProduct.wholesalePrice ?? ''
         ),
         stock: String(editingProduct.stock ?? 100),
-        minOrderQuantity: String(editingProduct.minOrderQuantity ?? 1),
-        status: (editingProduct.status as ProductStatus) || 'Active',
-        images: editingProduct.images || [],
+        images: Array.isArray(editingProduct.images)
+          ? editingProduct.images.filter(Boolean)
+          : (typeof editingProduct.images === 'string' && editingProduct.images.trim()
+            ? [editingProduct.images.trim()]
+            : (Array.isArray(editingProduct.image)
+              ? editingProduct.image.filter(Boolean)
+              : (typeof editingProduct.image === 'string' && editingProduct.image.trim() ? [editingProduct.image.trim()] : []))),
         comboItems: comboItems,
       });
       setNewImageFiles([]);

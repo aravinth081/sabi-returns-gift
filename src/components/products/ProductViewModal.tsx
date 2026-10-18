@@ -48,13 +48,42 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
 
   if (!isOpen || !product) return null;
 
-  const images: string[] = product.images || [];
-  const currentImage = images[activeIndex] || images[0] || '';
+  const images: string[] = React.useMemo(() => {
+    if (!product) return [];
+    if (Array.isArray(product.images)) return product.images.filter(Boolean);
+    if (typeof product.images === 'string' && product.images.trim()) return [product.images.trim()];
+    if (Array.isArray(product.image)) return product.image.filter(Boolean);
+    if (typeof product.image === 'string' && product.image.trim()) return [product.image.trim()];
+    return [];
+  }, [product]);
+
+  const safeActiveIndex = Math.min(activeIndex, Math.max(0, images.length - 1));
+  const currentImage = images[safeActiveIndex] || images[0] || '';
   const isCombo = (product.productType || 'Single product') === 'Combo set';
+  const comboProducts: any[] = Array.isArray(product.comboProducts) ? product.comboProducts : [];
   const sellPrice = Number(product.price ?? product.sellingPrice) || 0;
   const wholesalePrice = Number(product.wholesalePrice ?? product.discountPrice) || 0;
   const profit = sellPrice - wholesalePrice;
   const marginPct = wholesalePrice > 0 ? Math.round((profit / wholesalePrice) * 100) : 100;
+
+  const formattedCreatedAt = React.useMemo(() => {
+    if (!product?.createdAt) return 'N/A';
+    try {
+      if (typeof product.createdAt?.toDate === 'function') {
+        return product.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+      if (typeof product.createdAt === 'object' && product.createdAt?.seconds) {
+        return new Date(product.createdAt.seconds * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+      const d = new Date(product.createdAt);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+      return String(product.createdAt);
+    } catch {
+      return 'N/A';
+    }
+  }, [product?.createdAt]);
 
   // 1. Copy Description (Requirement 17)
   const handleCopyDescription = async () => {
@@ -547,14 +576,14 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
           </div>
 
           {/* Combo Set Bundled Products (Requirement 13 & 14) */}
-          {isCombo && product.comboProducts && product.comboProducts.length > 0 && (
+          {isCombo && comboProducts.length > 0 && (
             <div className="bg-[#121b2f] p-5 rounded-2xl border border-purple-500/30 space-y-3">
               <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
                 <Boxes size={15} />
-                <span>Bundled Combo Set Products ({product.comboProducts.length})</span>
+                <span>Bundled Combo Set Products ({comboProducts.length})</span>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {product.comboProducts.map((ci: any, idx: number) => (
+                {comboProducts.map((ci: any, idx: number) => (
                   <div
                     key={ci.productId || idx}
                     className="p-3 bg-[#15213b] rounded-xl border border-white/10 flex items-center gap-3"
@@ -633,7 +662,7 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#0c1427] shrink-0">
           <span className="text-xs text-slate-500">
-            Created: {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : 'N/A'}
+            Created: {formattedCreatedAt}
           </span>
           <button
             type="button"

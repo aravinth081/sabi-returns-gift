@@ -52,8 +52,8 @@ describe("High-Concurrency Architecture Verification", () => {
     releaseSubmissionLock(lockKey);
   });
 
-  it("should enforce maximum image size of 10MB to prevent Firestore 1MB document corruption", () => {
-    expect(MAX_FILE_SIZE_BYTES).toBe(10 * 1024 * 1024);
+  it("should enforce maximum image size of 100MB to prevent client crashes while allowing camera photos", () => {
+    expect(MAX_FILE_SIZE_BYTES).toBe(100 * 1024 * 1024);
   });
 
   it("should ensure fallback serial formatting formats invoice IDs consistently", () => {

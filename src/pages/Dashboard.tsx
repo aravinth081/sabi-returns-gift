@@ -16,6 +16,21 @@ import {
 import { useDebounce } from "@/hooks/useDebounce";
 import { getNextSequentialOrderId } from "@/lib/concurrency";
 // -----------------------------------------------
+import {
+  calculateDateWiseInventory,
+  prepareDispatchDeduction,
+  prepareDispatchReversal,
+  validateDispatchStock,
+  getOrderDispatchDate,
+  getTodayKolkata,
+  isDateFuture,
+  isDateToday,
+  isDatePast,
+  isOrderCancelled,
+  isOrderStockAlreadyDeducted,
+  InventoryTransaction,
+  OverallInventorySummary
+} from "@/lib/inventoryManager";
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CalendarDays, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
@@ -322,7 +337,7 @@ const renderScreenshotLocation = (order: any) => {
   ];
 
   for (const city of knownCities) {
-    if (lower.includes(city.toLowerCase())) {
+    if (lower.includes(city.toLowerCase())) {``
       return <span className="screenshot-location-text screenshot-location-others font-bold">{city}</span>;
     }
   }
@@ -451,7 +466,7 @@ const ChocolateSingleSelect = ({
   );
 };
 
-export default function Dashboard() {
+export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   const { profile, signOut: supabaseSignOut } = useAuth();
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -492,6 +507,9 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
+  const [showAuditLog, setShowAuditLog] = useState<boolean>(false);
+  const [isProcessingDispatches, setIsProcessingDispatches] = useState<boolean>(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const jumpToActions = () => {
@@ -1210,6 +1228,10 @@ export default function Dashboard() {
       invList.sort((a: any, b: any) => b.timestamp - a.timestamp);
       setInventoryLogs(invList);
     }, (err) => console.warn("Firestore inventory onSnapshot error:", err));
+    const unsubTransactions = onSnapshot(collection(db, "inventory_transactions"), (snapshot) => {
+      const txnList = snapshot.docs.map(doc => ({ fireId: doc.id, id: doc.id, ...doc.data() })) as InventoryTransaction[];
+      setInventoryTransactions(txnList);
+    }, (err) => console.warn("Firestore inventory_transactions onSnapshot error:", err));
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
       setCustomProducts(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
     }, (err) => console.warn("Firestore products onSnapshot error:", err));
@@ -1483,7 +1505,7 @@ export default function Dashboard() {
       }
     }, (err) => console.warn("Firestore inventories_list onSnapshot error:", err));
 
-    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); unsubLocations(); unsubOrderRoles(); unsubInventoriesList(); };
+    return () => { unsubOrders(); unsubEmployees(); unsubInventory(); unsubTransactions(); unsubProducts(); unsubCategories(); unsubManagedChocs(); unsubTrash(); unsubActivityLogs(); unsubPasscodes(); unsubIgnoredDups(); unsubOrderTypes(); unsubLocations(); unsubOrderRoles(); unsubInventoriesList(); };
   }, []);
 
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
@@ -1512,8 +1534,15 @@ export default function Dashboard() {
   }, [openActionId]);
 
   const [activeTab, setActiveTab] = useState<'dashboard1' | 'dashboard2' | 'products' | 'tracking' | 'reports' | 'inventories' | 'daily_tasks' | 'random_picker' | 'attendance'>(
-    (localStorage.getItem('activeTab') as any) || 'dashboard1'
+    initialTab || (localStorage.getItem('activeTab') as any) || 'dashboard1'
   );
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const debouncedProductSearch = useDebounce(productSearchQuery, 300);
 
@@ -2816,42 +2845,27 @@ export default function Dashboard() {
 
 
 
+  const todayKolkataDate = useMemo(() => getTodayKolkata(), []);
+
+  const dateWiseInventorySummary: OverallInventorySummary = useMemo(() => {
+    return calculateDateWiseInventory(
+      dynamicInventory,
+      inventoryLogs,
+      orders,
+      inventoryTransactions,
+      selectedInventoryTab,
+      todayKolkataDate
+    );
+  }, [dynamicInventory, inventoryLogs, orders, inventoryTransactions, selectedInventoryTab, todayKolkataDate]);
+
   const inventoryBalances = useMemo(() => {
     const balances: Record<string, number> = {};
-    dynamicInventory.forEach(c => balances[c] = 0);
-
-    inventoryLogs.forEach(log => {
-      if ((log.inventory || 'Inventory 1') !== selectedInventoryTab) return;
-      const key = normalizeChocName(String(log.chocolate), dynamicInventory);
-      if (balances[key] !== undefined) {
-        const qty = Number(log.boxCount || 0) * Number(log.itemsPerBox || 0);
-        balances[key] += qty;
-      }
+    dynamicInventory.forEach(c => {
+      const norm = normalizeChocName(c, dynamicInventory);
+      balances[c] = dateWiseInventorySummary.chocolates[norm]?.availableStock ?? 0;
     });
-
-    orders.forEach(order => {
-      if (order.orderStatus === 'cancelled') return;
-      if ((order.inventory || 'Inventory 1') !== selectedInventoryTab) return;
-      // Exclude 'Self' orders from inventory calculations (only 'Others' affect inventory)
-      const isSelf = order.role === 'Self';
-      if (isSelf) return;
-      if (!order.chocolate) return;
-
-      const orderChocs = String(order.chocolate).split(',');
-      const orderCountStr = String(order.count || 0);
-      const countParts = orderCountStr.split(',').map(c => Number(c.trim()) || 0);
-
-      orderChocs.forEach((c, idx) => {
-        const key = normalizeChocName(c, dynamicInventory);
-        const qty = countParts[idx] !== undefined ? countParts[idx] : (countParts[0] || 0);
-        if (balances[key] !== undefined) {
-          balances[key] -= qty;
-        }
-      });
-    });
-
     return balances;
-  }, [inventoryLogs, orders, dynamicInventory, selectedInventoryTab]);
+  }, [dynamicInventory, dateWiseInventorySummary]);
 
   const currentInventoryValueData = useMemo(() => {
     const CURRENT_INVENTORY_RETAIL_PRICES: Record<string, number> = {
@@ -3715,12 +3729,110 @@ export default function Dashboard() {
     const orderToUpdate = orders.find(o => o.id === id);
     if (!orderToUpdate) return;
 
+    const isBecomingDispatched = newStatus === 'Delivered' || newStatus === 'Dispatched';
+    const wasDispatched = orderToUpdate.status === 'Delivered' || orderToUpdate.status === 'Dispatched';
+
+    // 1. If transitioning to Delivered / Dispatched: validate date & stock, prepare atomic transaction
+    if (isBecomingDispatched && !wasDispatched) {
+      const prep = prepareDispatchDeduction(
+        orderToUpdate,
+        dateWiseInventorySummary,
+        inventoryTransactions,
+        dynamicInventory,
+        todayKolkataDate
+      );
+
+      if (!prep.success) {
+        toast.error(prep.message || "Failed to process stock deduction for this dispatch.");
+        return;
+      }
+
+      const updatedOrder = { ...orderToUpdate, status: newStatus, stockDeductionStatus: 'Deducted' };
+      const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
+
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, stockDeductionStatus: 'Deducted', totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
+
+      if (fireId) {
+        try {
+          const batch = writeBatch(db);
+          batch.update(doc(db, "orders", fireId), {
+            status: newStatus,
+            stockDeductionStatus: 'Deducted',
+            totalOrderPrice: priceData.fullTotalPrice,
+            itemSubtotal: priceData.fullChocolatePrice,
+            calculatedDeliveryFee: priceData.fullDeliveryCharge
+          });
+
+          if (prep.transactions && prep.transactions.length > 0) {
+            prep.transactions.forEach(txn => {
+              batch.set(doc(db, "inventory_transactions", txn.transactionId), txn);
+            });
+          }
+
+          await batch.commit();
+          toast.success(`Order #${orderToUpdate.id || ''} marked as ${newStatus} and stock deducted accurately!`);
+        } catch (e: any) {
+          console.error("Failed to update delivery status and record transaction:", e);
+          toast.error("Failed to record inventory deduction: " + (e?.message || e));
+        }
+      }
+      return;
+    }
+
+    // 2. If reverting from Delivered / Dispatched back to In Process or Pending: reverse stock deduction
+    if (!isBecomingDispatched && wasDispatched) {
+      const revPrep = prepareDispatchReversal(
+        orderToUpdate,
+        dateWiseInventorySummary,
+        inventoryTransactions,
+        dynamicInventory
+      );
+
+      const updatedOrder = { ...orderToUpdate, status: newStatus, stockDeductionStatus: 'Pending' };
+      const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
+
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, stockDeductionStatus: 'Pending', totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
+
+      if (fireId) {
+        try {
+          const batch = writeBatch(db);
+          batch.update(doc(db, "orders", fireId), {
+            status: newStatus,
+            stockDeductionStatus: 'Pending',
+            totalOrderPrice: priceData.fullTotalPrice,
+            itemSubtotal: priceData.fullChocolatePrice,
+            calculatedDeliveryFee: priceData.fullDeliveryCharge
+          });
+
+          if (revPrep.transactions && revPrep.transactions.length > 0) {
+            revPrep.transactions.forEach(txn => {
+              batch.set(doc(db, "inventory_transactions", txn.transactionId), txn);
+            });
+          }
+
+          await batch.commit();
+          toast.info(`Order #${orderToUpdate.id || ''} delivery status updated and stock deduction reversed.`);
+        } catch (e: any) {
+          console.error("Failed to reverse delivery status and stock:", e);
+        }
+      }
+      return;
+    }
+
+    // Standard delivery update
     const updatedOrder = { ...orderToUpdate, status: newStatus };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { status: newStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
+      try {
+        await updateDoc(doc(db, "orders", fireId), {
+          status: newStatus,
+          totalOrderPrice: priceData.fullTotalPrice,
+          itemSubtotal: priceData.fullChocolatePrice,
+          calculatedDeliveryFee: priceData.fullDeliveryCharge
+        });
+      } catch (e) {}
     }
   };
 
@@ -3728,12 +3840,125 @@ export default function Dashboard() {
     const orderToUpdate = orders.find(o => o.id === id);
     if (!orderToUpdate) return;
 
+    // If order is cancelled and had stock deducted, reverse stock deduction
+    if (newOrderStatus === 'cancelled' && isOrderStockAlreadyDeducted(orderToUpdate, inventoryTransactions)) {
+      const revPrep = prepareDispatchReversal(
+        orderToUpdate,
+        dateWiseInventorySummary,
+        inventoryTransactions,
+        dynamicInventory
+      );
+
+      const updatedOrder = { ...orderToUpdate, orderStatus: newOrderStatus, stockDeductionStatus: 'Cancelled' };
+      const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
+
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, stockDeductionStatus: 'Cancelled', totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
+
+      if (fireId) {
+        try {
+          const batch = writeBatch(db);
+          batch.update(doc(db, "orders", fireId), {
+            orderStatus: newOrderStatus,
+            stockDeductionStatus: 'Cancelled',
+            totalOrderPrice: priceData.fullTotalPrice,
+            itemSubtotal: priceData.fullChocolatePrice,
+            calculatedDeliveryFee: priceData.fullDeliveryCharge
+          });
+
+          if (revPrep.transactions && revPrep.transactions.length > 0) {
+            revPrep.transactions.forEach(txn => {
+              batch.set(doc(db, "inventory_transactions", txn.transactionId), txn);
+            });
+          }
+
+          await batch.commit();
+          toast.info(`Order #${orderToUpdate.id || ''} cancelled and stock deduction safely reversed.`);
+          return;
+        } catch (e) {
+          console.error("Failed to cancel order and reverse stock:", e);
+        }
+      }
+    }
+
     const updatedOrder = { ...orderToUpdate, orderStatus: newOrderStatus };
     const priceData = calculatePriceInfo(updatedOrder.chocolate, updatedOrder.count, updatedOrder.discount, updatedOrder.isDeliveryFree, updatedOrder.paymentStatus, updatedOrder.category, customPricesMap, updatedOrder.manualDeliveryFee, updatedOrder.orderStatus, managedChocPricesMap, updatedOrder.pricingType, updatedOrder.manualProductPrice);
 
     setOrders(prev => prev.map(o => o.id === id ? { ...o, orderStatus: newOrderStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge } : o));
     if (fireId) {
-      try { await updateDoc(doc(db, "orders", fireId), { orderStatus: newOrderStatus, totalOrderPrice: priceData.fullTotalPrice, itemSubtotal: priceData.fullChocolatePrice, calculatedDeliveryFee: priceData.fullDeliveryCharge }); } catch (e) { }
+      try {
+        await updateDoc(doc(db, "orders", fireId), {
+          orderStatus: newOrderStatus,
+          totalOrderPrice: priceData.fullTotalPrice,
+          itemSubtotal: priceData.fullChocolatePrice,
+          calculatedDeliveryFee: priceData.fullDeliveryCharge
+        });
+      } catch (e) {}
+    }
+  };
+
+  const handleProcessTodaysDispatches = async () => {
+    setIsProcessingDispatches(true);
+    try {
+      const eligibleOrders = orders.filter(o => {
+        if (isOrderCancelled(o)) return false;
+        if (o.role === 'Self') return false;
+        if ((o.inventory || 'Inventory 1') !== selectedInventoryTab) return false;
+        if (o.category === 'product') return false;
+        if (o.status === 'Delivered' || o.stockDeductionStatus === 'Deducted') return false;
+        
+        const dDate = getOrderDispatchDate(o);
+        return !isDateFuture(dDate, todayKolkataDate);
+      });
+
+      if (eligibleOrders.length === 0) {
+        toast.info(`No pending dispatches scheduled for today (${todayKolkataDate}) in ${selectedInventoryTab}.`);
+        return;
+      }
+
+      let processedCount = 0;
+      const batch = writeBatch(db);
+      const tempSummary = JSON.parse(JSON.stringify(dateWiseInventorySummary)) as OverallInventorySummary;
+      const errors: string[] = [];
+
+      for (const ord of eligibleOrders) {
+        const validation = validateDispatchStock(ord, tempSummary, dynamicInventory);
+        if (!validation.valid) {
+          const details = validation.insufficientItems.map(i => `${i.chocolate} (Need ${i.required}, Available ${i.available})`).join(', ');
+          errors.push(`Order #${ord.id || ord.fireId}: Insufficient ${details}`);
+          continue;
+        }
+
+        const prep = prepareDispatchDeduction(ord, tempSummary, inventoryTransactions, dynamicInventory, todayKolkataDate);
+        if (prep.success && prep.transactions && prep.transactions.length > 0) {
+          if (ord.fireId) {
+            batch.update(doc(db, "orders", ord.fireId), {
+              status: 'Delivered',
+              stockDeductionStatus: 'Deducted',
+            });
+          }
+          prep.transactions.forEach(txn => {
+            batch.set(doc(db, "inventory_transactions", txn.transactionId), txn);
+            if (tempSummary.chocolates[txn.chocolate]) {
+              tempSummary.chocolates[txn.chocolate].availableStock = Math.max(0, tempSummary.chocolates[txn.chocolate].availableStock - txn.quantityDeducted);
+            }
+          });
+          processedCount++;
+        }
+      }
+
+      if (processedCount > 0) {
+        await batch.commit();
+        toast.success(`Successfully dispatched ${processedCount} orders and deducted chocolate stock!`);
+      }
+
+      if (errors.length > 0) {
+        toast.error(`Could not dispatch ${errors.length} orders due to insufficient stock:\n` + errors.slice(0, 3).join('; ') + (errors.length > 3 ? ` (+${errors.length - 3} more)` : ''));
+      }
+    } catch (err: any) {
+      console.error("Batch dispatch error:", err);
+      toast.error("Failed to commit batch dispatches: " + (err?.message || err));
+    } finally {
+      setIsProcessingDispatches(false);
     }
   };
 
@@ -7179,7 +7404,21 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleProcessTodaysDispatches}
+                    disabled={isProcessingDispatches}
+                    className="flex justify-center items-center px-4 h-10 font-black rounded-lg transition-all border bg-emerald-600/30 text-emerald-300 border-emerald-500/50 hover:bg-emerald-600/50 cursor-pointer shadow-md text-xs gap-2 disabled:opacity-50"
+                    title="Process eligible dispatches for today and deduct stock"
+                  >
+                    <Truck size={15} className={isProcessingDispatches ? "animate-bounce" : ""} />
+                    <span>Process Today's Dispatches</span>
+                    {(dateWiseInventorySummary.todayScheduledQuantity + dateWiseInventorySummary.overduePending) > 0 && (
+                      <span className="bg-emerald-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                        {dateWiseInventorySummary.todayScheduledQuantity + dateWiseInventorySummary.overduePending}
+                      </span>
+                    )}
+                  </button>
                   <button
                     onClick={() => {
                       setEditInventoryId(null);
@@ -7218,6 +7457,79 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* 🟢 DATE-WISE INVENTORY SYNCHRONIZATION METRICS (Section 7) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-emerald-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">Available Stock</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
+                      {dateWiseInventorySummary.totalAvailableStock.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-semibold">Live physically ready</span>
+                </div>
+
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-amber-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">Today's Scheduled</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-amber-300">
+                      {dateWiseInventorySummary.todayScheduledQuantity.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-semibold">{todayKolkataDate}</span>
+                </div>
+
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-cyan-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-cyan-400 uppercase tracking-wider">Today's Dispatched</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-cyan-300">
+                      {dateWiseInventorySummary.todayProcessedQuantity.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-semibold">Processed today</span>
+                </div>
+
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-purple-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-purple-400 uppercase tracking-wider">Future Scheduled</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-purple-300">
+                      {dateWiseInventorySummary.futureScheduledQuantity.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-purple-300/80 font-semibold">Undeducted until date</span>
+                </div>
+
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-rose-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-rose-400 uppercase tracking-wider">Overdue Pending</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-rose-300">
+                      {dateWiseInventorySummary.overduePending.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-rose-300/80 font-semibold">Past dispatch dates</span>
+                </div>
+
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-blue-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-blue-400 uppercase tracking-wider">Total Received</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-blue-300">
+                      {dateWiseInventorySummary.totalStockReceived.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-semibold">All receipt entries</span>
+                </div>
+
+                <div className="bg-[#0d1527] p-3.5 rounded-2xl border border-orange-500/30 shadow-lg flex flex-col justify-between">
+                  <span className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider">Total Deducted</span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-orange-300">
+                      {dateWiseInventorySummary.totalStockDeducted.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-semibold">Processed dispatches</span>
+                </div>
+              </div>
+
               <div
                 className={`p-5 rounded-[2rem] transition-all duration-500 ${isWallpaperActive
                     ? 'bg-[#0d1527]/80 backdrop-blur-xl border border-white/20 shadow-2xl'
@@ -7238,102 +7550,215 @@ export default function Dashboard() {
                 </div>
                 <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
                   {dynamicInventory.map((choc, i) => {
-                    const bal = inventoryBalances[choc] || 0;
+                    const norm = normalizeChocName(choc, dynamicInventory);
+                    const metrics = dateWiseInventorySummary.chocolates[norm];
+                    const bal = metrics?.availableStock ?? (inventoryBalances[choc] || 0);
                     return (
                       <div
                         key={i}
-                        className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[100px] sm:min-w-[125px] flex-1 flex flex-col justify-center items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
+                        className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[140px] sm:min-w-[160px] flex-1 flex flex-col justify-between items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
                       >
                         <span className="text-xs font-extrabold text-white uppercase leading-tight mb-2 h-8 flex items-center justify-center text-center px-1">
                           {choc}
                         </span>
-                        <span className={`text-2xl font-black ${bal < 0
-                            ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
-                            : bal === 0
-                              ? 'text-slate-400'
-                              : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]'
-                          }`}>{bal}</span>
+                        <div className="my-1">
+                          <span className={`text-2xl font-black ${bal < 0
+                              ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                              : bal === 0
+                                ? 'text-slate-400'
+                                : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                            }`}>{bal}</span>
+                          <span className="text-[10px] block text-slate-400 font-bold uppercase tracking-wider">Available</span>
+                        </div>
+                        <div className="w-full grid grid-cols-2 gap-1 pt-2 border-t border-white/10 text-[10px] font-bold">
+                          <span className="text-blue-300 bg-blue-900/30 px-1 py-0.5 rounded truncate" title="Total Received">
+                            Rec: {metrics?.totalReceived ?? 0}
+                          </span>
+                          <span className="text-orange-300 bg-orange-900/30 px-1 py-0.5 rounded truncate" title="Total Deducted">
+                            Ded: {metrics?.totalDeducted ?? 0}
+                          </span>
+                          <span className="text-amber-300 bg-amber-900/30 px-1 py-0.5 rounded truncate" title="Today's Scheduled">
+                            Today: {metrics?.todayScheduled ?? 0}
+                          </span>
+                          <span className="text-purple-300 bg-purple-900/30 px-1 py-0.5 rounded truncate" title="Future Scheduled (Undeducted)">
+                            Fut: {metrics?.futureScheduled ?? 0}
+                          </span>
+                        </div>
                       </div>
-                    )
+                    );
                   })}
-
                 </div>
               </div>
 
-              {/* Inventory Log */}
+              {/* Inventory Log & Transaction Audit Log */}
               <div className="w-full bg-[#0d1527] p-4 rounded-[1.5rem] shadow-2xl border border-white/15 overflow-hidden flex flex-col min-h-[500px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-2xl font-black text-amber-400">Inventory Log ({selectedInventoryTab})</h3>
-                  <button onClick={() => {
-                    setInvForm({
-                      date: new Date().toISOString().split('T')[0],
-                      chocolate: managedChocolates[0]?.name || "",
-                      boxCount: "",
-                      itemsPerBox: "",
-                      inventory: selectedInventoryTab
-                    });
-                    setEditInvId(null);
-                    setIsInvModalOpen(true);
-                  }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
-                    <Plus size={16} /> Add Entry
-                  </button>
+                <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 bg-[#131c2e] p-1 rounded-xl border border-white/10">
+                    <button
+                      onClick={() => setShowAuditLog(false)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                        !showAuditLog
+                          ? 'bg-amber-500 text-black shadow-md'
+                          : 'text-slate-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      Stock Receipts Log ({inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab).length})
+                    </button>
+                    <button
+                      onClick={() => setShowAuditLog(true)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                        showAuditLog
+                          ? 'bg-emerald-500 text-black shadow-md'
+                          : 'text-slate-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      Dispatch Deductions & Audit ({inventoryTransactions.filter(t => (t.inventory || 'Inventory 1') === selectedInventoryTab).length})
+                    </button>
+                  </div>
+
+                  {!showAuditLog ? (
+                    <button onClick={() => {
+                      setInvForm({
+                        date: new Date().toISOString().split('T')[0],
+                        chocolate: managedChocolates[0]?.name || "",
+                        boxCount: "",
+                        itemsPerBox: "",
+                        inventory: selectedInventoryTab
+                      });
+                      setEditInvId(null);
+                      setIsInvModalOpen(true);
+                    }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
+                      <Plus size={16} /> Add Entry
+                    </button>
+                  ) : (
+                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
+                      Immutable Idempotent Audit Log
+                    </span>
+                  )}
                 </div>
-                <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
-                  <table className="w-full text-left border-collapse min-w-[600px]">
-                    <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-amber-500/30">
-                      <tr className="text-sm uppercase tracking-wider text-amber-400">
-                        <th className="p-4 font-black border-r border-white/10">Date</th>
-                        <th className="p-4 font-black border-r border-white/10">Chocolate Name</th>
-                        <th className="p-4 font-black border-r border-white/10 text-center">Inventory</th>
-                        <th className="p-4 font-black text-center border-r border-white/10">Boxes</th>
-                        <th className="p-4 font-black text-center border-r border-white/10">Count</th>
-                        <th className="p-4 font-black text-center border-r border-white/10">Total Added</th>
-                        <th className="p-4 font-black text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const currentInventoryLogs = inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab);
-                        if (currentInventoryLogs.length === 0) {
-                          return (
-                            <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">No inventory entries found for {selectedInventoryTab}.</td></tr>
-                          );
-                        }
-                        return currentInventoryLogs.map(log => (
-                          <tr key={log.fireId} className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors">
-                            <td className="p-4 font-bold text-slate-300">{formatToDisplayDate(log.date)}</td>
-                            <td className="p-4 font-bold text-white">{log.chocolate}</td>
-                            <td className="p-4 text-center font-bold">
-                              <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-xs font-black">
-                                {log.inventory || 'Inventory 1'}
-                              </span>
-                            </td>
-                            <td className="p-4 text-center font-bold text-slate-300">{log.boxCount}</td>
-                            <td className="p-4 text-center font-bold text-slate-300">{log.itemsPerBox}</td>
-                            <td className="p-4 text-center font-black text-emerald-400">+{log.totalChocolates}</td>
-                            <td className="p-4 text-center flex items-center justify-center gap-3">
-                              <button onClick={() => setViewingInvLog(log)} className="text-sky-400 hover:text-sky-300 transition-colors" title="View Entry"><Eye size={18} /></button>
-                              <button onClick={() => {
-                                setInvForm({
-                                  date: log.date || new Date().toISOString().split('T')[0],
-                                  chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
-                                  boxCount: String(log.boxCount || ""),
-                                  itemsPerBox: String(log.itemsPerBox || ""),
-                                  inventory: log.inventory || selectedInventoryTab || "Inventory 1"
-                                });
-                                setEditInvId(log.fireId);
-                                setIsInvModalOpen(true);
-                              }} className="text-blue-400 hover:text-blue-300 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
-                              <button onClick={() => handleDeleteInventory(log.fireId)} className="text-rose-400 hover:text-rose-300 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
-                            </td>
-                          </tr>
-                        ));
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-[10px] font-bold text-slate-400 mt-3 text-center shrink-0">* Note: Dashboard orders are automatically deducted from the Live Stock Balance (Not shown in this manual entry table).</p>
+
+                {!showAuditLog ? (
+                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
+                      <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-amber-500/30">
+                        <tr className="text-sm uppercase tracking-wider text-amber-400">
+                          <th className="p-4 font-black border-r border-white/10">Date</th>
+                          <th className="p-4 font-black border-r border-white/10">Chocolate Name</th>
+                          <th className="p-4 font-black border-r border-white/10 text-center">Inventory</th>
+                          <th className="p-4 font-black text-center border-r border-white/10">Boxes</th>
+                          <th className="p-4 font-black text-center border-r border-white/10">Count</th>
+                          <th className="p-4 font-black text-center border-r border-white/10">Total Added</th>
+                          <th className="p-4 font-black text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const currentInventoryLogs = inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab);
+                          if (currentInventoryLogs.length === 0) {
+                            return (
+                              <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">No inventory entries found for {selectedInventoryTab}.</td></tr>
+                            );
+                          }
+                          return currentInventoryLogs.map(log => (
+                            <tr key={log.fireId} className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors">
+                              <td className="p-4 font-bold text-slate-300">{formatToDisplayDate(log.date)}</td>
+                              <td className="p-4 font-bold text-white">{log.chocolate}</td>
+                              <td className="p-4 text-center font-bold">
+                                <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-xs font-black">
+                                  {log.inventory || 'Inventory 1'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center font-bold text-slate-300">{log.boxCount}</td>
+                              <td className="p-4 text-center font-bold text-slate-300">{log.itemsPerBox}</td>
+                              <td className="p-4 text-center font-black text-emerald-400">+{log.totalChocolates}</td>
+                              <td className="p-4 text-center flex items-center justify-center gap-3">
+                                <button onClick={() => setViewingInvLog(log)} className="text-sky-400 hover:text-sky-300 transition-colors" title="View Entry"><Eye size={18} /></button>
+                                <button onClick={() => {
+                                  setInvForm({
+                                    date: log.date || new Date().toISOString().split('T')[0],
+                                    chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
+                                    boxCount: String(log.boxCount || ""),
+                                    itemsPerBox: String(log.itemsPerBox || ""),
+                                    inventory: log.inventory || selectedInventoryTab || "Inventory 1"
+                                  });
+                                  setEditInvId(log.fireId);
+                                  setIsInvModalOpen(true);
+                                }} className="text-blue-400 hover:text-blue-300 transition-colors" title="Edit Entry"><Pencil size={18} /></button>
+                                <button onClick={() => handleDeleteInventory(log.fireId)} className="text-rose-400 hover:text-rose-300 transition-colors" title="Delete Entry"><Trash2 size={18} /></button>
+                              </td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-emerald-500/30">
+                        <tr className="text-xs uppercase tracking-wider text-emerald-400">
+                          <th className="p-3.5 font-black border-r border-white/10">Order #</th>
+                          <th className="p-3.5 font-black border-r border-white/10">Product / Chocolate</th>
+                          <th className="p-3.5 font-black text-center border-r border-white/10">Dispatch Date</th>
+                          <th className="p-3.5 font-black text-center border-r border-white/10">Qty Deducted</th>
+                          <th className="p-3.5 font-black text-center border-r border-white/10">Type</th>
+                          <th className="p-3.5 font-black text-center border-r border-white/10">Stock Balance</th>
+                          <th className="p-3.5 font-black text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const currentTransactions = inventoryTransactions.filter(t => (t.inventory || 'Inventory 1') === selectedInventoryTab);
+                          if (currentTransactions.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
+                                  No dispatch deduction transactions recorded yet for {selectedInventoryTab}.
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return currentTransactions.map(txn => (
+                            <tr key={txn.id || txn.fireId || txn.transactionId} className="border-b border-white/5 text-xs hover:bg-white/5 transition-colors">
+                              <td className="p-3.5 font-bold text-amber-400 font-mono">
+                                {txn.orderSerial || `#${txn.orderId}`}
+                              </td>
+                              <td className="p-3.5 font-bold text-white">{txn.chocolate || txn.productName}</td>
+                              <td className="p-3.5 text-center font-bold text-slate-300">
+                                {formatToDisplayDate(txn.dispatchDate)}
+                              </td>
+                              <td className="p-3.5 text-center font-black text-orange-400">
+                                -{txn.quantityDeducted || txn.orderQuantity}
+                              </td>
+                              <td className="p-3.5 text-center font-bold">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                  txn.transactionType === 'Reversal'
+                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                }`}>
+                                  {txn.transactionType || 'Dispatch Deduction'}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center font-mono text-[11px] text-slate-300">
+                                {txn.previousStockBalance} → <span className="text-emerald-400 font-bold">{txn.updatedStockBalance}</span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-black">
+                                  {txn.stockDeductionStatus || 'Deducted'}
+                                </span>
+                              </td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p className="text-[10px] font-bold text-slate-400 mt-3 text-center shrink-0">
+                  * Live Available Stock reflects verified receipt batches minus successfully processed dispatch deductions. Future scheduled orders are tracked separately and not deducted in advance.
+                </p>
               </div>
+
 
               {/* 🟢 HORIZONTAL LAYOUT: CURRENT INVENTORY VALUE & APPROX INVENTORY VALUE CARDS */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
@@ -9623,6 +10048,16 @@ export default function Dashboard() {
                                           className="action-menu-popup absolute right-14 top-2 z-[100] rounded-[1.5rem] p-2.5 flex gap-2 animate-in slide-in-from-right-5 duration-200"
                                         >
                                           <button onClick={() => { setHistoryDetailOrder(order); setOpenActionId(null); }} className="text-sky-400 hover:text-sky-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-sky-500/20 cursor-pointer" title="View Detailed Record"><Eye size={20} /></button>
+                                          <button
+                                            onClick={() => {
+                                              handleDeliveryStatusUpdate(order.id, order.fireId, order.status === 'Delivered' ? 'In Process' : 'Delivered');
+                                              setOpenActionId(null);
+                                            }}
+                                            className={`${order.status === 'Delivered' ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-teal-400 hover:bg-teal-500/20'} hover:scale-125 p-2 rounded-xl transition-all cursor-pointer`}
+                                            title={order.status === 'Delivered' ? "Dispatched & Deducted (Click to revert)" : "Dispatch & Deduct Stock"}
+                                          >
+                                            <CheckCircle2 size={20} />
+                                          </button>
                                           <button onClick={() => { handleSendSMS(order); setOpenActionId(null); }} className="text-indigo-400 hover:text-indigo-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-indigo-500/20 cursor-pointer" title="Send SMS Bill"><MessageSquare size={20} /></button>
                                           <button onClick={() => { setShippingOrder(order); setIsShippingOpen(true); setOpenActionId(null); }} className="text-purple-400 hover:text-purple-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-purple-500/20 cursor-pointer" title="Shipping"><Truck size={20} /></button>
                                           <button onClick={() => { handleEditClick(order); setOpenActionId(null); }} className="text-emerald-400 hover:text-emerald-300 hover:scale-125 p-2 rounded-xl transition-all hover:bg-emerald-500/20 cursor-pointer" title="Edit Order"><Pencil size={20} /></button>
