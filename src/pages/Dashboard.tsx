@@ -64,7 +64,6 @@ import {
   DropdownMenuItem
 } from "@/components/ui/dropdown-menu";
 import {
-  copyProductCard,
   copyProductText,
   copyProductRawImage
 } from "@/lib/productCardGenerator";
@@ -5299,9 +5298,6 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     });
   };
 
-  const handleCopyMainImageAndDescription = async (prod: any) => {
-    await copyProductCard(prod);
-  };
 
   const handleDeleteProductClick = async (fireId: string) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
@@ -6742,7 +6738,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       </aside>
 
       <main
-        className="flex-1 flex flex-col h-full w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500 relative"
+        className="flex-1 flex flex-col h-full w-full min-w-0 max-w-full overflow-hidden print:overflow-visible shadow-[inset_0_5px_20px_rgba(0,0,0,0.6)] transition-all duration-500 relative"
         style={{
           backgroundImage: activeTab === 'daily_tasks' && dailyTasksWallpaper
             ? `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), ${dailyTasksWallpaper.startsWith('data:image') || dailyTasksWallpaper.startsWith('http') ? `url(${dailyTasksWallpaper})` : dailyTasksWallpaper
@@ -6795,7 +6791,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
         )}
 
         {showHeader && (
-          <header className="bg-[#0e1628] border-b border-blue-900/50 px-3 sm:px-4 md:px-8 py-3 sm:py-4 flex justify-between items-center shadow-md relative z-50 print:hidden gap-3 flex-wrap sm:flex-nowrap">
+          <header className="bg-[#0e1628] border-b border-blue-900/50 px-3 sm:px-4 md:px-8 py-3 sm:py-4 flex justify-between items-center shadow-md relative z-50 print:hidden gap-3 flex-wrap md:flex-nowrap min-w-0">
             <div className="flex items-center gap-2 sm:gap-3 md:gap-5 min-w-0">
               <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-blue-200 bg-[#19233b] hover:bg-[#233152] rounded-lg transition-colors border border-blue-800/60 shrink-0 cursor-pointer" title="Toggle Menu">
                 <Menu size={22} />
@@ -6842,7 +6838,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
           </header>
         )}
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-3 md:p-4 print:p-0 print:overflow-visible flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-3 md:p-4 print:p-0 print:overflow-visible flex flex-col min-h-0 min-w-0 max-w-full">
 
           {activeTab === 'daily_tasks' && (
             <div className="w-full h-full animate-in fade-in duration-300">
@@ -7127,7 +7123,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   </div>
                 ) : (
                   /* Products Table */
-                  <div className="overflow-x-auto rounded-2xl border border-white/10 shadow-inner">
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 shadow-inner responsive-table-container custom-scrollbar min-w-0 max-w-full">
                     <table className="w-full text-left border-collapse text-xs md:text-sm">
                       <thead>
                         <tr className="bg-[#15213b] border-b border-white/10 text-slate-300 uppercase tracking-wider text-[11px] font-black">
@@ -7398,28 +7394,15 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                       <button
                                         type="button"
                                         className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                                        title="Copy Options: Product Card or Text"
+                                        title="Copy Options: Text or Raw Photo"
                                       >
                                         <Copy size={15} />
                                       </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="center" className="w-72 bg-[#0c1427] border border-white/20 text-white shadow-2xl p-2 rounded-2xl z-50">
                                       <DropdownMenuItem
-                                        onClick={() => copyProductCard(prod)}
-                                        className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer text-white focus:bg-purple-600/30 focus:text-white hover:bg-purple-600/30 hover:text-white border border-transparent hover:border-purple-500/30 focus:border-purple-500/30 outline-none"
-                                      >
-                                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-                                          <ImageIcon size={16} />
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                          <span className="font-extrabold text-sm text-white">Copy Product Card</span>
-                                          <span className="text-[11px] text-slate-300 font-medium">Photo with Name, Price & Desc on it</span>
-                                        </div>
-                                      </DropdownMenuItem>
-
-                                      <DropdownMenuItem
                                         onClick={() => copyProductText(prod)}
-                                        className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer text-white focus:bg-blue-600/30 focus:text-white hover:bg-blue-600/30 hover:text-white border border-transparent hover:border-blue-500/30 focus:border-blue-500/30 outline-none mt-1"
+                                        className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer text-white focus:bg-blue-600/30 focus:text-white hover:bg-blue-600/30 hover:text-white border border-transparent hover:border-blue-500/30 focus:border-blue-500/30 outline-none"
                                       >
                                         <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                                           <ClipboardList size={16} />
@@ -7830,7 +7813,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 </div>
 
                 {!showAuditLog ? (
-                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[500px] flex-1 custom-scrollbar responsive-table-container min-w-0 max-w-full bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
                     <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-amber-500/30">
                         <tr className="text-sm uppercase tracking-wider text-amber-400">
@@ -7885,7 +7868,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     </table>
                   </div>
                 ) : (
-                  <div className="overflow-y-auto max-h-[500px] flex-1 custom-scrollbar bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[500px] flex-1 custom-scrollbar responsive-table-container min-w-0 max-w-full bg-[#131c2e] rounded-xl border border-white/10 shadow-inner">
                     <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead className="sticky top-0 bg-[#0b1329] z-10 shadow-sm border-b border-emerald-500/30">
                         <tr className="text-xs uppercase tracking-wider text-emerald-400">
@@ -8031,7 +8014,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
               <div className="relative z-10 flex flex-col gap-3 sm:gap-4 lg:gap-6 flex-1 min-h-0">
                 <div className={`grid grid-cols-1 sm:grid-cols-2 ${showHeader
-                    ? 'lg:grid-cols-4'
+                    ? 'lg:grid-cols-2 xl:grid-cols-4'
                     : 'hidden'
                   } gap-3 md:gap-4 mb-6 print:hidden mt-1 items-stretch`}>
 
@@ -8913,11 +8896,11 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
                 </div>
 
-                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white flex flex-col flex-1 min-h-0 print:h-auto print:min-h-0 mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active w-[1180px] min-w-[1180px] p-5 rounded-none shadow-none border-none overflow-visible' : 'rounded-2xl shadow-2xl border border-white/10 overflow-hidden'}`}>
+                <div ref={screenshotTableRef} className={`order-records-table-container bg-[#0d1527] text-white flex flex-col flex-1 min-h-0 min-w-0 max-w-full print:h-auto print:min-h-0 mb-2 lg:mb-0 ${isScreenshotMode ? 'screenshot-mode-active w-[1180px] min-w-[1180px] p-5 rounded-none shadow-none border-none overflow-visible' : 'rounded-2xl shadow-2xl border border-white/10 overflow-hidden'}`}>
                   <div className={`p-3 sm:p-4 md:p-6 border-b flex flex-col lg:flex-row justify-between items-center gap-3 sm:gap-4 border-white/10 shrink-0 print:hidden ${isScreenshotMode ? 'hidden' : 'bg-[#0d1527] backdrop-blur-sm shadow-sm'}`}>
 
 
-                    <div className="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-3 sm:gap-4 w-full lg:w-auto flex-wrap">
                       <div className="flex items-center gap-3">
                         <h2 className={`text-2xl font-bold text-amber-400 whitespace-nowrap hidden md:block`}>Order Records</h2>
                         <button
@@ -9098,7 +9081,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </div>
                     )}
 
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto print:hidden shrink-0 justify-center sm:justify-end">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto print:hidden shrink-0 justify-center sm:justify-end">
                       {/* Gift Icon Button to open Winner Picker Modal */}
                       <button
                         type="button"
@@ -9394,7 +9377,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         }
                       }
                     }}
-                    className={`shadow-inner bg-white/50 custom-scrollbar responsive-table-container relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 min-h-[300px] max-h-[72vh] lg:max-h-none overflow-x-auto overflow-y-auto'}`}
+                    className={`shadow-inner bg-white/50 custom-scrollbar responsive-table-container min-w-0 max-w-full relative ${isScreenshotMode ? 'h-auto flex-none w-[1180px] min-w-[1180px] overflow-visible' : 'w-full flex-1 min-h-[300px] max-h-[72vh] lg:max-h-none overflow-x-auto overflow-y-auto'}`}
                   >
 
                     {/* 📸 Screenshot Header - Only visible during screenshot capture */}
@@ -11560,7 +11543,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
             </div>
 
             <form onSubmit={handleSave} className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                 {/* Column 1: Customer & Dates */}
                 <div className="space-y-3">
                   <div>

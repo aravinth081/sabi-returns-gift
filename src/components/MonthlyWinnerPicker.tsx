@@ -566,10 +566,10 @@ export default function MonthlyWinnerPicker({ orders, onClose }: MonthlyWinnerPi
   };
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-[75vh] w-full p-4 select-none relative">
+    <div className="flex flex-col items-center justify-start min-h-[75vh] w-full p-2 sm:p-4 select-none relative overflow-y-auto">
       
       {/* 🎬 9:16 aspect ratio Reels Frame Container Wrapper */}
-      <div className="relative w-full max-w-sm aspect-[9/16] shrink-0">
+      <div className="relative w-full max-w-[360px] sm:max-w-sm max-h-[85vh] aspect-[9/16] shrink-0">
         
         {/* SaaS Premium Offset Close Button */}
         {onClose && (

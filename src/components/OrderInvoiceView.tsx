@@ -179,7 +179,7 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
       </div>
 
       {/* Invoice Main Content Wrapped for Mobile Responsiveness */}
-      <div className="w-full overflow-x-auto custom-scrollbar responsive-table-container flex justify-center p-2 sm:p-4 bg-gray-100/50 print:p-0 print:bg-white print:overflow-visible">
+      <div className="w-full overflow-x-auto custom-scrollbar responsive-table-container flex justify-start md:justify-center p-2 sm:p-4 bg-gray-100/50 print:p-0 print:bg-white print:overflow-visible min-w-0 max-w-full">
         <div ref={invoiceRef} className="pl-10 pt-10 pb-10 pr-4 bg-white text-black select-text text-[13px] leading-tight font-sans w-[800px] min-w-[800px] shadow-sm print:shadow-none">
 
         {/* Header Section */}

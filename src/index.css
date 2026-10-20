@@ -2162,14 +2162,30 @@ body {
 .responsive-table-container {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   position: relative;
+  touch-action: pan-x pan-y;
 }
 
 .responsive-table-container table {
   margin-bottom: 0;
+}
+
+/* Flexbox & Grid Overflow Prevention Guard */
+.flex-shrink-safe {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.table-scroll-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 6. Centralized Responsive Modal System */

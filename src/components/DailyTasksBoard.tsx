@@ -419,6 +419,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const parseCellDateToDate = (val: any): Date | undefined => {
     if (!val) return undefined;
     const str = String(val).trim();
+    if (!str) return undefined;
 
     // Match DD.MM.YYYY
     if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
@@ -432,15 +433,47 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       const date = new Date(y, m - 1, d);
       if (!isNaN(date.getTime())) return date;
     }
+    // Match DD/MM/YYYY
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+      const [d, m, y] = str.split('/').map(Number);
+      const date = new Date(y, m - 1, d);
+      if (!isNaN(date.getTime())) return date;
+    }
+    // Match DD.MM.YY or DD-MM-YY or DD/MM/YY
+    if (/^\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2}$/.test(str)) {
+      const parts = str.split(/[\.\-\/]/).map(Number);
+      const fullYear = 2000 + parts[2];
+      const date = new Date(fullYear, parts[1] - 1, parts[0]);
+      if (!isNaN(date.getTime())) return date;
+    }
     // Match YYYY-MM-DD
     if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)) {
       const [y, m, d] = str.split('-').map(Number);
       const date = new Date(y, m - 1, d);
       if (!isNaN(date.getTime())) return date;
     }
-    // Standard parse
+    // Match DD.MM or DD-MM or DD/MM (assume current year)
+    if (/^\d{1,2}[\.\-\/]\d{1,2}$/.test(str)) {
+      const parts = str.split(/[\.\-\/]/).map(Number);
+      const currentYear = new Date().getFullYear();
+      const date = new Date(currentYear, parts[1] - 1, parts[0]);
+      if (!isNaN(date.getTime())) return date;
+    }
+
+    // Standard parse (e.g. "28 Oct 2026", "October 28 2026", "2026-11-28T00:00:00")
     const parsed = new Date(str);
     if (!isNaN(parsed.getTime())) return parsed;
+
+    // Direct month names (e.g. "January", "Feb", "March", etc.)
+    const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const lower = str.toLowerCase();
+    const mIdx = MONTH_NAMES.findIndex(mn => lower.startsWith(mn));
+    if (mIdx !== -1) {
+      const currentYear = new Date().getFullYear();
+      const date = new Date(currentYear, mIdx, 1);
+      if (!isNaN(date.getTime())) return date;
+    }
+
     return undefined;
   };
 
@@ -1925,6 +1958,94 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     toast.success(`Column "${colToDelete?.label || ''}" deleted`);
   };
 
+  // Sort Column Handler (Handles Date/Month, Numeric, Text with empty rows always at bottom)
+  const handleSortColumn = (col: ColumnDef, direction: 'asc' | 'desc') => {
+    const isDateCol = 
+      col.type === 'date' || 
+      col.id === 'birthday' || 
+      col.id === 'date' || 
+      col.id === 'dispatch' ||
+      /date|birthday|bday|dob|dispatch|month/i.test(col.id) ||
+      /date|birthday|bday|dob|dispatch|month/i.test(col.label);
+
+    const isNumberCol = 
+      col.type === 'number' || 
+      col.id === 'count' ||
+      /count|qty|quantity|amount|price|total|rate/i.test(col.id) ||
+      /count|qty|quantity|amount|price|total|rate/i.test(col.label);
+
+    const updatedSheets = sheets.map(s => {
+      if (s.id !== currentSheet.id) return s;
+
+      const sortedRows = [...s.rows].sort((rowA, rowB) => {
+        const rawA = rowA[col.id];
+        const rawB = rowB[col.id];
+
+        const strA = rawA !== undefined && rawA !== null ? String(rawA).trim() : '';
+        const strB = rawB !== undefined && rawB !== null ? String(rawB).trim() : '';
+
+        const isEmptyA = strA === '';
+        const isEmptyB = strB === '';
+
+        // 1. EMPTY CELLS ALWAYS GO TO BOTTOM REGARDLESS OF ASC OR DESC
+        if (isEmptyA && isEmptyB) {
+          const hasAnyA = s.columns.some(c => rowA[c.id] && String(rowA[c.id]).trim() !== '');
+          const hasAnyB = s.columns.some(c => rowB[c.id] && String(rowB[c.id]).trim() !== '');
+          if (hasAnyA && !hasAnyB) return -1;
+          if (!hasAnyA && hasAnyB) return 1;
+          return 0;
+        }
+        if (isEmptyA) return 1; // rowA goes to bottom
+        if (isEmptyB) return -1; // rowB goes to bottom
+
+        let comparison = 0;
+
+        // 2. DATE / MONTH-WISE SORTING
+        const dateA = parseCellDateToDate(strA);
+        const dateB = parseCellDateToDate(strB);
+
+        if (isDateCol || (dateA && dateB)) {
+          if (dateA && dateB) {
+            comparison = dateA.getTime() - dateB.getTime();
+          } else if (dateA && !dateB) {
+            comparison = -1;
+          } else if (!dateA && dateB) {
+            comparison = 1;
+          } else {
+            comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+          }
+        } 
+        // 3. NUMERIC SORTING
+        else if (isNumberCol || (!isNaN(Number(strA.replace(/,/g, ''))) && !isNaN(Number(strB.replace(/,/g, ''))))) {
+          const numA = Number(strA.replace(/,/g, ''));
+          const numB = Number(strB.replace(/,/g, ''));
+          if (!isNaN(numA) && !isNaN(numB)) {
+            comparison = numA - numB;
+          } else {
+            comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+          }
+        } 
+        // 4. NATURAL TEXT SORTING
+        else {
+          comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        return direction === 'asc' ? comparison : -comparison;
+      });
+
+      return { ...s, rows: sortedRows };
+    });
+
+    saveSheets(updatedSheets);
+    setCurrentPage(1);
+
+    if (direction === 'asc') {
+      toast.success(`Sorted by "${col.label}" (A to Z - ${isDateCol ? 'Month Wise (Earliest First)' : 'Ascending'})`);
+    } else {
+      toast.success(`Sorted by "${col.label}" (Z to A - ${isDateCol ? 'Month Wise (Latest First)' : 'Descending'})`);
+    }
+  };
+
   // Sheet Tabs Actions
   const handleAddSheet = () => {
     const newSheetNumber = sheets.length + 1;
@@ -2159,7 +2280,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   return (
     <div 
-      className={`w-full h-full flex flex-col space-y-4 pb-6 select-none font-sans relative rounded-2xl ${dailyTasksWallpaper ? 'wallpaper-active' : ''}`}
+      className={`w-full h-full flex flex-col min-w-0 max-w-full space-y-4 pb-6 select-none font-sans relative rounded-2xl ${dailyTasksWallpaper ? 'wallpaper-active' : ''}`}
     >
       {/* Hidden File Input for Excel Import */}
       <input 
@@ -2497,9 +2618,9 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       )}
 
       {/* EXCEL SPREADSHEET MAIN CONTAINER */}
-      <div className={`daily-tasks-table-container border rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all ${dailyTasksWallpaper ? 'bg-[#0b1329]/35 backdrop-blur-xl border-white/15' : 'bg-[#0b1329] border-slate-800'}`}>
+      <div className={`daily-tasks-table-container min-w-0 max-w-full border rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all ${dailyTasksWallpaper ? 'bg-[#0b1329]/35 backdrop-blur-xl border-white/15' : 'bg-[#0b1329] border-slate-800'}`}>
         {/* SPREADSHEET TABLE GRID (Scrollable) */}
-        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar responsive-table-container border-b border-slate-800 max-h-[600px] min-h-[420px]">
+        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar responsive-table-container min-w-0 max-w-full border-b border-slate-800 max-h-[600px] min-h-[420px]">
           <table className="w-full border-collapse text-left text-xs sm:text-sm select-none">
             {/* TABLE HEADER (Cyan Excel Style like 2nd image) */}
             <thead className="sticky top-0 z-20 shadow-md">
@@ -2588,52 +2709,64 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 <MoreHorizontal className="w-3.5 h-3.5 text-slate-900" />
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-48 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1 rounded-xl shadow-2xl z-50">
-                              <div className="space-y-0.5 text-xs">
+                            <PopoverContent className="w-52 bg-[#0d162d] border border-cyan-500/40 text-slate-100 p-1.5 rounded-xl shadow-2xl z-50">
+                              <div className="space-y-1 text-xs">
                                 <button 
                                   onClick={() => startEditingHeader(col)}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200 transition-colors"
                                 >
                                   <Pencil className="w-3.5 h-3.5 text-cyan-400" /> Rename Header
                                 </button>
-                                <button 
-                                  onClick={() => {
-                                    // Sort ascending
-                                    const updatedSheets = sheets.map(s => {
-                                      if (s.id !== currentSheet.id) return s;
-                                      const sortedRows = [...s.rows].sort((a, b) => 
-                                        String(a[col.id] || '').localeCompare(String(b[col.id] || ''))
-                                      );
-                                      return { ...s, rows: sortedRows };
-                                    });
-                                    saveSheets(updatedSheets);
-                                    toast.success(`Sorted by "${col.label}" (A-Z)`);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> Sort (A to Z)
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    // Sort descending
-                                    const updatedSheets = sheets.map(s => {
-                                      if (s.id !== currentSheet.id) return s;
-                                      const sortedRows = [...s.rows].sort((a, b) => 
-                                        String(b[col.id] || '').localeCompare(String(a[col.id] || ''))
-                                      );
-                                      return { ...s, rows: sortedRows };
-                                    });
-                                    saveSheets(updatedSheets);
-                                    toast.success(`Sorted by "${col.label}" (Z-A)`);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5 text-cyan-400" /> Sort (Z to A)
-                                </button>
+
+                                {(() => {
+                                  const isDateCol = 
+                                    col.type === 'date' || 
+                                    col.id === 'birthday' || 
+                                    col.id === 'date' || 
+                                    col.id === 'dispatch' ||
+                                    /date|birthday|bday|dob|dispatch|month/i.test(col.id) ||
+                                    /date|birthday|bday|dob|dispatch|month/i.test(col.label);
+
+                                  return (
+                                    <>
+                                      <button 
+                                        onClick={() => handleSortColumn(col, 'asc')}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200 transition-colors"
+                                        title={`Sort ${col.label} in ascending order`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <ArrowUp className="w-3.5 h-3.5 text-cyan-400" />
+                                          <span>Sort (A to Z)</span>
+                                        </div>
+                                        {isDateCol && (
+                                          <span className="text-[10px] text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30 font-medium">
+                                            Month Wise
+                                          </span>
+                                        )}
+                                      </button>
+                                      <button 
+                                        onClick={() => handleSortColumn(col, 'desc')}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 hover:bg-[#19274e] rounded-lg text-slate-200 transition-colors"
+                                        title={`Sort ${col.label} in descending order`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                          <span>Sort (Z to A)</span>
+                                        </div>
+                                        {isDateCol && (
+                                          <span className="text-[10px] text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30 font-medium">
+                                            Reverse
+                                          </span>
+                                        )}
+                                      </button>
+                                    </>
+                                  );
+                                })()}
+
                                 <div className="border-t border-slate-700/60 my-1" />
                                 <button 
                                   onClick={() => handleDeleteColumn(col.id)}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg"
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" /> Delete Column
                                 </button>
@@ -2907,10 +3040,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
                               onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
                               onClick={(e) => {
-                                if (e.target === e.currentTarget) {
-                                  const inputEl = e.currentTarget.querySelector('input');
-                                  inputEl?.focus();
+                                const target = e.target as HTMLElement;
+                                if (target.closest('button') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[role="dialog"]')) {
+                                  return;
                                 }
+                                const inputEl = e.currentTarget.querySelector('input');
+                                inputEl?.focus();
                               }}
                               className={cellBaseClass}
                             >
@@ -2932,7 +3067,17 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                   }
                                 }}
                               >
-                                <div className="flex items-center justify-between w-full min-h-[22px] group/date relative">
+                                <div 
+                                  onClick={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    if (target.closest('button') || target.closest('[data-radix-popper-content-wrapper]')) {
+                                      return;
+                                    }
+                                    const inputEl = e.currentTarget.querySelector('input');
+                                    inputEl?.focus();
+                                  }}
+                                  className="flex items-center justify-between w-full min-h-[32px] group/date relative cursor-text"
+                                >
                                   <input 
                                     data-cell-id={`${row.id}-${col.id}`}
                                     type="text"
@@ -2961,9 +3106,26 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                       commitCellEdit(row.id, col.id, e.target.value);
                                     }}
                                     onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
-                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedCell({ rowId: row.id, colId: col.id });
+                                      setAnchorCell({ rowId: row.id, colId: col.id });
+                                      setSelectedRange({
+                                        startRowIdx: rowIdx,
+                                        endRowIdx: rowIdx,
+                                        startColIdx: colIdx,
+                                        endColIdx: colIdx
+                                      });
+                                      if (!isCellEditing) {
+                                        setEditingCell({ rowId: row.id, colId: col.id });
+                                        setCellEditValue(cellValue !== undefined && cellValue !== null ? String(cellValue) : '');
+                                      }
+                                    }}
+                                    onClick={(e) => {
+                                      e.currentTarget.focus();
+                                    }}
                                     onTouchStart={(e) => e.stopPropagation()}
-                                    className={`w-full min-h-[22px] px-1.5 py-0.5 rounded text-xs sm:text-sm font-semibold transition-colors focus:outline-none select-text touch-manipulation cursor-text ${
+                                    className={`w-full min-h-[32px] h-8 px-2.5 py-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors focus:outline-none select-text touch-manipulation cursor-text ${
                                       isCellEditing 
                                         ? 'bg-[#18264e] text-white border border-cyan-400 shadow-inner' 
                                         : 'bg-transparent text-cyan-200 border border-transparent hover:bg-white/5'
@@ -3166,10 +3328,12 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
                               onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
                               onClick={(e) => {
-                                if (e.target === e.currentTarget) {
-                                  const inputEl = e.currentTarget.querySelector('input');
-                                  inputEl?.focus();
+                                const target = e.target as HTMLElement;
+                                if (target.closest('button') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[role="dialog"]')) {
+                                  return;
                                 }
+                                const inputEl = e.currentTarget.querySelector('input');
+                                inputEl?.focus();
                               }}
                               className={cellBaseClass}
                             >
@@ -3201,9 +3365,26 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                   commitCellEdit(row.id, col.id, e.target.value);
                                 }}
                                 onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
-                                onMouseDown={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCell({ rowId: row.id, colId: col.id });
+                                  setAnchorCell({ rowId: row.id, colId: col.id });
+                                  setSelectedRange({
+                                    startRowIdx: rowIdx,
+                                    endRowIdx: rowIdx,
+                                    startColIdx: colIdx,
+                                    endColIdx: colIdx
+                                  });
+                                  if (!isCellEditing) {
+                                    setEditingCell({ rowId: row.id, colId: col.id });
+                                    setCellEditValue(cellValue !== undefined && cellValue !== null ? String(cellValue) : '');
+                                  }
+                                }}
+                                onClick={(e) => {
+                                  e.currentTarget.focus();
+                                }}
                                 onTouchStart={(e) => e.stopPropagation()}
-                                className={`w-full min-h-[22px] px-1.5 py-0.5 rounded text-xs sm:text-sm border border-transparent transition-colors focus:outline-none select-text touch-manipulation cursor-text ${
+                                className={`w-full min-h-[32px] h-8 px-2.5 py-1 rounded-xl text-xs sm:text-sm border border-transparent transition-colors focus:outline-none select-text touch-manipulation cursor-text ${
                                   isCellEditing 
                                     ? 'bg-[#18264e] text-white border-cyan-400 shadow-inner' 
                                     : 'bg-transparent text-slate-200 hover:bg-white/5'

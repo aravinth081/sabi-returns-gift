@@ -19,11 +19,9 @@ import {
   Images,
   ExternalLink,
   Pencil,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  copyProductCard,
   copyProductText,
   copyProductRawImage
 } from '@/lib/productCardGenerator';
@@ -50,8 +48,6 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
   const [isCopyingDesc, setIsCopyingDesc] = useState(false);
   const [isCopyingImg, setIsCopyingImg] = useState(false);
-  const [isCopyingAll, setIsCopyingAll] = useState(false);
-  const [isCopyingMainAndDesc, setIsCopyingMainAndDesc] = useState(false);
 
   // Reset active index when product changes or modal opens
   React.useEffect(() => {
@@ -168,61 +164,6 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
     }
   };
 
-  // 3. Copy ALL Images (Requirement 17: Copies ALL images belonging to listing)
-  const handleCopyAll = async () => {
-    if (images.length === 0) {
-      toast.error('No images to copy');
-      return;
-    }
-    try {
-      setIsCopyingAll(true);
-
-      // If single image, copy that image directly
-      if (images.length === 1) {
-        await handleCopyImage(images[0]);
-        toast.success('All images copied');
-        return;
-      }
-
-      // If multiple images: prepare rich HTML with all images + plain text fallback
-      const toastId = toast.loading(`Copying ${images.length} images...`);
-      try {
-        const html = images
-          .map(
-            (url, i) =>
-              `<img src="${url}" alt="Product Image ${i + 1}" style="max-width:100%;display:block;margin-bottom:12px;" />`
-          )
-          .join('\n');
-        const text = images.join('\n');
-
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            'text/html': new Blob([html], { type: 'text/html' }),
-            'text/plain': new Blob([text], { type: 'text/plain' }),
-          }),
-        ]);
-        toast.success('All images copied', { id: toastId });
-      } catch {
-        // Fallback write plain URLs
-        await navigator.clipboard.writeText(images.join('\n'));
-        toast.success('All images copied', { id: toastId });
-      }
-    } catch {
-      toast.error('Failed to copy all images');
-    } finally {
-      setTimeout(() => setIsCopyingAll(false), 1500);
-    }
-  };
-
-  // 4. Copy Main Image and Details (Name, Price, Description & Image) in a single action
-  const handleCopyMainImageAndDescription = async () => {
-    try {
-      setIsCopyingMainAndDesc(true);
-      await copyProductCard(product);
-    } finally {
-      setTimeout(() => setIsCopyingMainAndDesc(false), 1500);
-    }
-  };
 
   return (
     <div
@@ -379,21 +320,9 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
                 </div>
               )}
 
-              {/* 🟢 IMAGE COPY ACTIONS BAR (Requirement 17) */}
+              {/* 🟢 IMAGE COPY ACTIONS BAR */}
               <div className="bg-[#121b2f] p-3 rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Copy Product Card (Photo with Details) */}
-                  <button
-                    type="button"
-                    onClick={handleCopyMainImageAndDescription}
-                    disabled={isCopyingMainAndDesc}
-                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-emerald-900/30 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
-                    title="Copy Product Card (Photo with Name, Price & Description on it)"
-                  >
-                    <ImageIcon size={14} />
-                    <span>{isCopyingMainAndDesc ? 'Copied' : 'Copy Product Card'}</span>
-                  </button>
-
                   {/* Copy Details as Text */}
                   <button
                     type="button"
@@ -415,18 +344,6 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
                   >
                     <Copy size={14} />
                     <span>Copy Raw Photo</span>
-                  </button>
-
-                  {/* Copy All Button (Requirement 17: Copies ALL images) */}
-                  <button
-                    type="button"
-                    onClick={handleCopyAll}
-                    disabled={images.length === 0 || isCopyingAll}
-                    className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-purple-900/30 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95"
-                    title={`Copy all ${images.length} image(s)`}
-                  >
-                    <Images size={14} />
-                    <span>{isCopyingAll ? 'Copied All' : `Copy All (${images.length})`}</span>
                   </button>
                 </div>
 
@@ -595,13 +512,13 @@ export const ProductViewModal: React.FC<ProductViewModalProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleCopyMainImageAndDescription}
-                  disabled={isCopyingMainAndDesc}
+                  onClick={handleCopyDescription}
+                  disabled={isCopyingDesc || !product.description}
                   className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
-                  title="Copy Product Card (Photo with Name, Price & Description on it)"
+                  title="Copy Description Text"
                 >
-                  <ImageIcon size={13} />
-                  <span>{isCopyingMainAndDesc ? 'Copied Card' : 'Copy Product Card'}</span>
+                  <Copy size={13} />
+                  <span>{isCopyingDesc ? 'Copied' : 'Copy Description'}</span>
                 </button>
                 <button
                   type="button"

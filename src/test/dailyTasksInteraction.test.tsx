@@ -127,4 +127,121 @@ describe('DailyTasksBoard Input Field Interaction', () => {
     expect(firstInput.classList.contains('select-text')).toBe(true);
     expect(firstInput.classList.contains('touch-manipulation')).toBe(true);
   });
+
+  it('sorts date column month-wise (A to Z) without erasing data or putting empty rows on top', () => {
+    // Seed initial sheet data with October, November, December in reverse/random order
+    const mockSheets = [
+      {
+        id: 'sheet-test',
+        name: 'Test Sheet',
+        columns: [
+          { id: 'contactNumber', label: 'Contact Number', width: 170, type: 'text' },
+          { id: 'count', label: 'Count', width: 100, type: 'text' },
+          { id: 'birthday', label: 'Birthday', width: 140, type: 'date' },
+          { id: 'comments', label: 'Comments', width: 220, type: 'text' }
+        ],
+        rows: [
+          { id: 'r1', contactNumber: '999', count: '100', birthday: '28.11.2026', comments: 'Nov row' },
+          { id: 'r2', contactNumber: '888', count: '200', birthday: '28.10.2026', comments: 'Oct row' },
+          { id: 'r3', contactNumber: '777', count: '200', birthday: '20.12.2026', comments: 'Dec row' },
+          // Empty placeholder rows
+          { id: 'r4', contactNumber: '', count: '', birthday: '', comments: '' },
+          { id: 'r5', contactNumber: '', count: '', birthday: '', comments: '' }
+        ]
+      }
+    ];
+    localStorage.setItem('sabi_daily_tasks_excel_sheets_v3', JSON.stringify(mockSheets));
+
+    render(<DailyTasksBoard />);
+
+    // Query Birthday inputs
+    const birthdayInputs = Array.from(document.querySelectorAll('input[data-cell-id]')).filter(
+      input => input.getAttribute('data-cell-id')?.includes('birthday')
+    ) as HTMLInputElement[];
+
+    expect(birthdayInputs.length).toBeGreaterThanOrEqual(3);
+    // Initially: r1 (28.11.2026), r2 (28.10.2026), r3 (20.12.2026)
+    expect(birthdayInputs[0].value).toBe('28.11.2026');
+
+    // Click column header menu for Birthday
+    // Find Birthday header th
+    const birthdayTh = Array.from(document.querySelectorAll('th')).find(
+      th => th.textContent?.includes('Birthday')
+    );
+    expect(birthdayTh).toBeDefined();
+
+    // Click the 3-dot options button inside Birthday th
+    const moreBtn = birthdayTh?.querySelector('button[title="Column options"]');
+    expect(moreBtn).toBeDefined();
+    act(() => {
+      fireEvent.click(moreBtn!);
+    });
+
+    // Find and click Sort (A to Z) button
+    const sortAscBtn = screen.getByText(/Sort \(A to Z\)/i);
+    expect(sortAscBtn).toBeDefined();
+    act(() => {
+      fireEvent.click(sortAscBtn);
+    });
+
+    // Re-query inputs after sort
+    const sortedInputs = Array.from(document.querySelectorAll('input[data-cell-id]')).filter(
+      input => input.getAttribute('data-cell-id')?.includes('birthday')
+    ) as HTMLInputElement[];
+
+    // Expect: October (28.10.2026) -> November (28.11.2026) -> December (20.12.2026)
+    // and empty rows must NOT precede data rows!
+    expect(sortedInputs[0].value).toBe('28.10.2026');
+    expect(sortedInputs[1].value).toBe('28.11.2026');
+    expect(sortedInputs[2].value).toBe('20.12.2026');
+    expect(sortedInputs[3].value).toBe('');
+  });
+
+  it('sorts date column (Z to A) newest first with empty rows placed at the bottom', () => {
+    const mockSheets = [
+      {
+        id: 'sheet-test-2',
+        name: 'Test Sheet 2',
+        columns: [
+          { id: 'contactNumber', label: 'Contact Number', width: 170, type: 'text' },
+          { id: 'count', label: 'Count', width: 100, type: 'text' },
+          { id: 'birthday', label: 'Birthday', width: 140, type: 'date' },
+          { id: 'comments', label: 'Comments', width: 220, type: 'text' }
+        ],
+        rows: [
+          { id: 'r1', contactNumber: '999', count: '100', birthday: '28.11.2026', comments: 'Nov row' },
+          { id: 'r2', contactNumber: '888', count: '200', birthday: '28.10.2026', comments: 'Oct row' },
+          { id: 'r3', contactNumber: '777', count: '200', birthday: '20.12.2026', comments: 'Dec row' },
+          { id: 'r4', contactNumber: '', count: '', birthday: '', comments: '' }
+        ]
+      }
+    ];
+    localStorage.setItem('sabi_daily_tasks_excel_sheets_v3', JSON.stringify(mockSheets));
+
+    render(<DailyTasksBoard />);
+
+    const birthdayTh = Array.from(document.querySelectorAll('th')).find(
+      th => th.textContent?.includes('Birthday')
+    );
+    const moreBtn = birthdayTh?.querySelector('button[title="Column options"]');
+    act(() => {
+      fireEvent.click(moreBtn!);
+    });
+
+    const sortDescBtn = screen.getByText(/Sort \(Z to A\)/i);
+    act(() => {
+      fireEvent.click(sortDescBtn);
+    });
+
+    const sortedInputs = Array.from(document.querySelectorAll('input[data-cell-id]')).filter(
+      input => input.getAttribute('data-cell-id')?.includes('birthday')
+    ) as HTMLInputElement[];
+
+    // Expect: December (20.12.2026) -> November (28.11.2026) -> October (28.10.2026) -> empty
+    expect(sortedInputs[0].value).toBe('20.12.2026');
+    expect(sortedInputs[1].value).toBe('28.11.2026');
+    expect(sortedInputs[2].value).toBe('28.10.2026');
+    expect(sortedInputs[3].value).toBe('');
+  });
 });
+

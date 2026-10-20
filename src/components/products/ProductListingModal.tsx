@@ -422,7 +422,7 @@ export const ProductListingModal: React.FC<ProductListingModalProps> = ({
           <form
             id="listing-form"
             onSubmit={(e) => handleSubmit(e, false)}
-            className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6"
+            className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-5 sm:space-y-6"
           >
             {/* 1. PRODUCT TYPE TOGGLE (Single Product vs Combo Set) */}
             <div className="bg-[#121b2f] p-3.5 rounded-2xl border border-white/10">

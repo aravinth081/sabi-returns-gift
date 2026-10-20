@@ -1119,7 +1119,7 @@ function AttendanceLogContent({ isAdminOverride = true, onWallpaperChange }: { i
           </div>
 
           {/* Monthly Calendar View */}
-          <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-6 rounded-3xl shadow-xl border border-white/15 text-white">
+          <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] p-4 sm:p-6 rounded-3xl shadow-xl border border-white/15 text-white min-w-0 max-w-full overflow-hidden">
             
             {/* Calendar Header with Navigation and Eye Icon */}
             <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
@@ -1153,23 +1153,25 @@ function AttendanceLogContent({ isAdminOverride = true, onWallpaperChange }: { i
               </button>
             </div>
 
-            {/* Calendar Grid Header (Weekdays) */}
-            <div className="grid grid-cols-7 gap-2 text-center font-black text-xs uppercase tracking-wider mb-3">
-              <div className="py-2.5 text-rose-400 bg-rose-950/40 border border-rose-500/30 rounded-xl">Sun</div>
-              <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Mon</div>
-              <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Tue</div>
-              <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Wed</div>
-              <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Thu</div>
-              <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Fri</div>
-              <div className="py-2.5 text-rose-400 bg-rose-950/40 border border-rose-500/30 rounded-xl">Sat</div>
-            </div>
+            <div className="overflow-x-auto custom-scrollbar responsive-table-container min-w-0 max-w-full pb-2">
+              <div className="min-w-[560px] md:min-w-0">
+                {/* Calendar Grid Header (Weekdays) */}
+                <div className="grid grid-cols-7 gap-2 text-center font-black text-xs uppercase tracking-wider mb-3">
+                  <div className="py-2.5 text-rose-400 bg-rose-950/40 border border-rose-500/30 rounded-xl">Sun</div>
+                  <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Mon</div>
+                  <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Tue</div>
+                  <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Wed</div>
+                  <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Thu</div>
+                  <div className="py-2.5 text-amber-300 bg-[#162035] border border-white/10 rounded-xl">Fri</div>
+                  <div className="py-2.5 text-rose-400 bg-rose-950/40 border border-rose-500/30 rounded-xl">Sat</div>
+                </div>
 
-            {/* Calendar Cells */}
-            <div className="grid grid-cols-7 gap-2">
-              {calendarDays.map((d, idx) => {
-                if (d === null) {
-                  return <div key={`empty-${idx}`} className="h-20 md:h-24 bg-[#0c1427]/40 rounded-2xl border border-dashed border-white/10"></div>;
-                }
+                {/* Calendar Cells */}
+                <div className="grid grid-cols-7 gap-2">
+                  {calendarDays.map((d, idx) => {
+                    if (d === null) {
+                      return <div key={`empty-${idx}`} className="h-20 md:h-24 bg-[#0c1427]/40 rounded-2xl border border-dashed border-white/10"></div>;
+                    }
 
                 const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const rec = userAttendanceRecords.find(r => r.date === dayStr);
@@ -1261,6 +1263,8 @@ function AttendanceLogContent({ isAdminOverride = true, onWallpaperChange }: { i
                   </div>
                 );
               })}
+            </div>
+              </div>
             </div>
 
             {/* Calendar Legend */}
@@ -1375,7 +1379,7 @@ function AttendanceLogContent({ isAdminOverride = true, onWallpaperChange }: { i
           </div>
 
           {/* Admin Attendance Table */}
-          <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] rounded-3xl shadow-xl border border-white/15 overflow-hidden text-white">
+          <div style={{ backgroundColor: '#131c2e' }} className="bg-[#131c2e] rounded-3xl shadow-xl border border-white/15 overflow-hidden text-white min-w-0 max-w-full">
             <div className="p-4 bg-[#090e1a] border-b border-white/10 flex justify-between items-center">
               <h3 className="font-black text-sm text-amber-400 uppercase tracking-wider">
                 All Employee Attendance Records ({adminFilteredRecords.length})
@@ -1390,7 +1394,7 @@ function AttendanceLogContent({ isAdminOverride = true, onWallpaperChange }: { i
               )}
             </div>
 
-            <div className="overflow-x-auto overflow-y-auto max-h-[420px] custom-scrollbar">
+            <div className="overflow-x-auto overflow-y-auto max-h-[420px] custom-scrollbar responsive-table-container min-w-0 max-w-full">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="sticky top-0 z-10">
                   <tr style={{ backgroundColor: '#162035' }} className="bg-[#162035] text-amber-400 uppercase font-black tracking-wider border-b border-amber-500/30 shadow-sm">
