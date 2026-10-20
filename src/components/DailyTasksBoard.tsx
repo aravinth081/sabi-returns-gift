@@ -208,6 +208,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   const [isDraggingSelection, setIsDraggingSelection] = useState<boolean>(false);
   const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null);
   const [cellEditValue, setCellEditValue] = useState<string>('');
+  const shouldSelectOnFocusRef = useRef<boolean>(false);
 
   // Date Suggestion / Picker State
   const [datePickerCell, setDatePickerCell] = useState<{ rowId: string; colId: string } | null>(null);
@@ -643,11 +644,18 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     };
   }, [handleUndo, handleRedo]);
 
-  // Focus cell input when editing starts
+  // Focus cell input when editing starts (only if not already focused, and only select text if programmatic navigation)
   useEffect(() => {
-    if (editingCell && cellInputRef.current) {
-      cellInputRef.current.focus();
-      cellInputRef.current.select();
+    if (editingCell) {
+      const activeEl = document.activeElement;
+      const targetInput = document.querySelector(`input[data-cell-id="${editingCell.rowId}-${editingCell.colId}"]`) as HTMLInputElement | null;
+      if (targetInput && targetInput !== activeEl) {
+        targetInput.focus();
+        if (shouldSelectOnFocusRef.current) {
+          targetInput.select();
+          shouldSelectOnFocusRef.current = false;
+        }
+      }
     }
   }, [editingCell]);
 
@@ -836,7 +844,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
   }, []);
 
   // Cell Edit Handlers
-  const startEditingCell = (rowId: string, colId: string, initialValue: any) => {
+  const startEditingCell = (rowId: string, colId: string, initialValue: any, selectAll: boolean = false) => {
     setSelectedCell({ rowId, colId });
     setAnchorCell({ rowId, colId });
     const rIdx = paginatedRows.findIndex(r => r.id === rowId);
@@ -851,11 +859,35 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     }
     setEditingCell({ rowId, colId });
     setCellEditValue(initialValue !== undefined && initialValue !== null ? String(initialValue) : '');
+    shouldSelectOnFocusRef.current = selectAll;
+
+    setTimeout(() => {
+      const targetInput = document.querySelector(`input[data-cell-id="${rowId}-${colId}"]`) as HTMLInputElement | null;
+      if (targetInput && document.activeElement !== targetInput) {
+        targetInput.focus();
+        if (selectAll) {
+          targetInput.select();
+        }
+      }
+    }, 10);
   };
 
-  const commitCellEdit = () => {
-    if (!editingCell) return;
-    const { rowId, colId } = editingCell;
+  const commitCellEdit = (targetRowId?: string, targetColId?: string, targetValue?: string) => {
+    const rowId = targetRowId || editingCell?.rowId;
+    const colId = targetColId || editingCell?.colId;
+    if (!rowId || !colId) return;
+
+    const valueToCommit = targetValue !== undefined ? targetValue : cellEditValue;
+
+    // Avoid unnecessary writes and re-renders if value didn't change
+    const targetSheet = sheets.find(s => s.id === currentSheet.id) || currentSheet;
+    const targetRow = targetSheet?.rows?.find(r => r.id === rowId);
+    if (targetRow && String(targetRow[colId] ?? '') === String(valueToCommit ?? '')) {
+      if (editingCell?.rowId === rowId && editingCell?.colId === colId) {
+        setEditingCell(null);
+      }
+      return;
+    }
 
     const updatedSheets = sheets.map(sheet => {
       if (sheet.id !== currentSheet.id) return sheet;
@@ -863,14 +895,16 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
         if (row.id !== rowId) return row;
         return {
           ...row,
-          [colId]: cellEditValue
+          [colId]: valueToCommit
         };
       });
       return { ...sheet, rows: updatedRows };
     });
 
     saveSheets(updatedSheets);
-    setEditingCell(null);
+    if (editingCell?.rowId === rowId && editingCell?.colId === colId) {
+      setEditingCell(null);
+    }
   };
 
   const cancelCellEdit = () => {
@@ -925,9 +959,11 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   // Keyboard navigation inside an inline active input
   const handleInlineInputKeyDown = (e: React.KeyboardEvent, rowId: string, colId: string) => {
+    const liveVal = (e.currentTarget as HTMLInputElement)?.value ?? cellEditValue;
+
     if (e.key === 'Enter') {
       e.preventDefault();
-      commitCellEdit();
+      commitCellEdit(rowId, colId, liveVal);
       const currIdx = paginatedRows.findIndex(r => r.id === rowId);
       const currColIdx = currentSheet.columns.findIndex(c => c.id === colId);
       if (currIdx < paginatedRows.length - 1 && currColIdx !== -1) {
@@ -940,13 +976,20 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
           startColIdx: currColIdx,
           endColIdx: currColIdx
         });
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[data-cell-id="${nextRow.id}-${colId}"]`) as HTMLInputElement | null;
+          if (nextInput) {
+            shouldSelectOnFocusRef.current = true;
+            nextInput.focus();
+          }
+        }, 10);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       cancelCellEdit();
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      commitCellEdit();
+      commitCellEdit(rowId, colId, liveVal);
       const colIndex = currentSheet.columns.findIndex(c => c.id === colId);
       const currRowIdx = paginatedRows.findIndex(r => r.id === rowId);
       if (e.shiftKey) {
@@ -960,6 +1003,13 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             startColIdx: colIndex - 1,
             endColIdx: colIndex - 1
           });
+          setTimeout(() => {
+            const prevInput = document.querySelector(`input[data-cell-id="${rowId}-${prevCol.id}"]`) as HTMLInputElement | null;
+            if (prevInput) {
+              shouldSelectOnFocusRef.current = true;
+              prevInput.focus();
+            }
+          }, 10);
         }
       } else {
         if (colIndex < currentSheet.columns.length - 1) {
@@ -972,7 +1022,60 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
             startColIdx: colIndex + 1,
             endColIdx: colIndex + 1
           });
+          setTimeout(() => {
+            const nextInput = document.querySelector(`input[data-cell-id="${rowId}-${nextCol.id}"]`) as HTMLInputElement | null;
+            if (nextInput) {
+              shouldSelectOnFocusRef.current = true;
+              nextInput.focus();
+            }
+          }, 10);
         }
+      }
+    } else if (e.key === 'ArrowUp') {
+      const currIdx = paginatedRows.findIndex(r => r.id === rowId);
+      if (currIdx > 0) {
+        e.preventDefault();
+        commitCellEdit(rowId, colId, liveVal);
+        const prevRow = paginatedRows[currIdx - 1];
+        const cIdx = currentSheet.columns.findIndex(c => c.id === colId);
+        setSelectedCell({ rowId: prevRow.id, colId });
+        setAnchorCell({ rowId: prevRow.id, colId });
+        setSelectedRange({
+          startRowIdx: currIdx - 1,
+          endRowIdx: currIdx - 1,
+          startColIdx: cIdx,
+          endColIdx: cIdx
+        });
+        setTimeout(() => {
+          const prevInput = document.querySelector(`input[data-cell-id="${prevRow.id}-${colId}"]`) as HTMLInputElement | null;
+          if (prevInput) {
+            shouldSelectOnFocusRef.current = true;
+            prevInput.focus();
+          }
+        }, 10);
+      }
+    } else if (e.key === 'ArrowDown') {
+      const currIdx = paginatedRows.findIndex(r => r.id === rowId);
+      if (currIdx < paginatedRows.length - 1) {
+        e.preventDefault();
+        commitCellEdit(rowId, colId, liveVal);
+        const nextRow = paginatedRows[currIdx + 1];
+        const cIdx = currentSheet.columns.findIndex(c => c.id === colId);
+        setSelectedCell({ rowId: nextRow.id, colId });
+        setAnchorCell({ rowId: nextRow.id, colId });
+        setSelectedRange({
+          startRowIdx: currIdx + 1,
+          endRowIdx: currIdx + 1,
+          startColIdx: cIdx,
+          endColIdx: cIdx
+        });
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[data-cell-id="${nextRow.id}-${colId}"]`) as HTMLInputElement | null;
+          if (nextInput) {
+            shouldSelectOnFocusRef.current = true;
+            nextInput.focus();
+          }
+        }, 10);
       }
     }
   };
@@ -1619,16 +1722,23 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
     saveSheets
   ]);
 
-  // Auto-scroll and DOM focus on selected cell
+  // Auto-scroll and DOM focus on selected cell (do not steal focus if an input or textarea is active)
   useEffect(() => {
     if (selectedCell && !editingCell && !openDropdownCell && !datePickerCell) {
       const activeEl = document.activeElement;
-      if (activeEl && (activeEl.closest('[data-radix-popper-content-wrapper]') || activeEl.closest('[role="dialog"]'))) {
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.closest('[data-radix-popper-content-wrapper]') || 
+        activeEl.closest('[role="dialog"]')
+      )) {
         return;
       }
       const cellEl = document.querySelector(`[data-cell-id="${selectedCell.rowId}-${selectedCell.colId}"]`) as HTMLElement;
       if (cellEl && cellEl !== activeEl) {
-        cellEl.focus({ preventScroll: true });
+        if (cellEl.tagName === 'INPUT' || cellEl.tabIndex >= 0) {
+          cellEl.focus({ preventScroll: true });
+        }
         cellEl.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
       }
     }
@@ -2794,31 +2904,48 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                           return (
                             <td 
                               key={`${row.id}-${col.id}`}
-                              data-cell-id={`${row.id}-${col.id}`}
-                              tabIndex={0}
                               onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
                               onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
-                              onDoubleClick={() => {
-                                setDatePickerCell(null);
-                                startEditingCell(row.id, col.id, cellValue);
+                              onClick={(e) => {
+                                if (e.target === e.currentTarget) {
+                                  const inputEl = e.currentTarget.querySelector('input');
+                                  inputEl?.focus();
+                                }
                               }}
                               className={cellBaseClass}
                             >
-                              {isCellEditing ? (
-                                <input 
-                                  ref={cellInputRef}
-                                  type="text"
-                                  value={cellEditValue}
-                                  onChange={(e) => setCellEditValue(e.target.value)}
-                                  onBlur={commitCellEdit}
-                                  onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
-                                  className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs sm:text-sm border border-cyan-400 focus:outline-none shadow-inner"
-                                />
-                              ) : (
-                                <Popover 
-                                  open={isDateOpen} 
-                                  onOpenChange={(open) => {
-                                    if (open) {
+                              <Popover 
+                                open={isDateOpen} 
+                                onOpenChange={(open) => {
+                                  if (open) {
+                                    setSelectedCell({ rowId: row.id, colId: col.id });
+                                    setAnchorCell({ rowId: row.id, colId: col.id });
+                                    setSelectedRange({
+                                      startRowIdx: rowIdx,
+                                      endRowIdx: rowIdx,
+                                      startColIdx: colIdx,
+                                      endColIdx: colIdx
+                                    });
+                                    setDatePickerCell({ rowId: row.id, colId: col.id });
+                                  } else {
+                                    setDatePickerCell(null);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between w-full min-h-[22px] group/date relative">
+                                  <input 
+                                    data-cell-id={`${row.id}-${col.id}`}
+                                    type="text"
+                                    value={isCellEditing ? cellEditValue : (cellValue !== undefined && cellValue !== null ? String(cellValue) : '')}
+                                    onChange={(e) => {
+                                      if (!isCellEditing) {
+                                        setEditingCell({ rowId: row.id, colId: col.id });
+                                      }
+                                      setCellEditValue(e.target.value);
+                                    }}
+                                    onFocus={() => {
+                                      setDatePickerCell(null);
+                                      setOpenDropdownCell(null);
                                       setSelectedCell({ rowId: row.id, colId: col.id });
                                       setAnchorCell({ rowId: row.id, colId: col.id });
                                       setSelectedRange({
@@ -2827,42 +2954,43 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                         startColIdx: colIdx,
                                         endColIdx: colIdx
                                       });
-                                      setDatePickerCell({ rowId: row.id, colId: col.id });
-                                    } else {
-                                      setDatePickerCell(null);
-                                    }
-                                  }}
-                                >
-                                  <div className="flex items-center justify-between w-full min-h-[20px] group/date">
-                                    <div className="truncate flex items-center gap-1.5 flex-1 min-h-[20px]">
-                                      {cellValue ? (
-                                        <span className="font-semibold text-cyan-200">
-                                          {cellValue}
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                    <PopoverTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedCell({ rowId: row.id, colId: col.id });
-                                          setAnchorCell({ rowId: row.id, colId: col.id });
-                                          setSelectedRange({
-                                            startRowIdx: rowIdx,
-                                            endRowIdx: rowIdx,
-                                            startColIdx: colIdx,
-                                            endColIdx: colIdx
-                                          });
-                                          setDatePickerCell({ rowId: row.id, colId: col.id });
-                                        }}
-                                        className="p-0.5 text-cyan-400/60 hover:text-cyan-300 opacity-0 group-hover/date:opacity-100 transition-opacity ml-1 shrink-0 rounded hover:bg-cyan-500/20"
-                                        title="Open Date Recommendation"
-                                      >
-                                        <CalendarIcon className="w-3.5 h-3.5" />
-                                      </button>
-                                    </PopoverTrigger>
-                                  </div>
+                                      setEditingCell({ rowId: row.id, colId: col.id });
+                                      setCellEditValue(cellValue !== undefined && cellValue !== null ? String(cellValue) : '');
+                                    }}
+                                    onBlur={(e) => {
+                                      commitCellEdit(row.id, col.id, e.target.value);
+                                    }}
+                                    onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onTouchStart={(e) => e.stopPropagation()}
+                                    className={`w-full min-h-[22px] px-1.5 py-0.5 rounded text-xs sm:text-sm font-semibold transition-colors focus:outline-none select-text touch-manipulation cursor-text ${
+                                      isCellEditing 
+                                        ? 'bg-[#18264e] text-white border border-cyan-400 shadow-inner' 
+                                        : 'bg-transparent text-cyan-200 border border-transparent hover:bg-white/5'
+                                    }`}
+                                  />
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedCell({ rowId: row.id, colId: col.id });
+                                        setAnchorCell({ rowId: row.id, colId: col.id });
+                                        setSelectedRange({
+                                          startRowIdx: rowIdx,
+                                          endRowIdx: rowIdx,
+                                          startColIdx: colIdx,
+                                          endColIdx: colIdx
+                                        });
+                                        setDatePickerCell(prev => (prev?.rowId === row.id && prev?.colId === col.id ? null : { rowId: row.id, colId: col.id }));
+                                      }}
+                                      className="p-1 text-cyan-400/70 hover:text-cyan-300 opacity-60 group-hover/date:opacity-100 transition-opacity ml-1 shrink-0 rounded hover:bg-cyan-500/20"
+                                      title="Open Date Recommendation"
+                                    >
+                                      <CalendarIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  </PopoverTrigger>
+                                </div>
 
                                   <PopoverContent 
                                     className="w-80 sm:w-84 bg-[#0b1328] border-2 border-cyan-500/40 text-slate-100 p-3 rounded-2xl shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
@@ -3009,7 +3137,8 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                           <button
                                             onClick={() => {
                                               setDatePickerCell(null);
-                                              startEditingCell(row.id, col.id, cellValue);
+                                              const inputEl = document.querySelector(`input[data-cell-id="${row.id}-${col.id}"]`) as HTMLInputElement | null;
+                                              inputEl?.focus();
                                             }}
                                             className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 px-2 py-0.5 rounded flex items-center gap-1"
                                             title="Type custom date manually"
@@ -3021,7 +3150,65 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                     </div>
                                   </PopoverContent>
                                 </Popover>
-                              )}
+
+                                {/* Excel-style active cell corner marker */}
+                                {(isBottomRightCorner || (isCellActive && !normalizedRange)) && !isCellEditing && (
+                                  <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none z-20" />
+                                )}
+                              </td>
+                            );
+                          }
+
+                          // Regular Editable Cell
+                          return (
+                            <td 
+                              key={`${row.id}-${col.id}`}
+                              onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
+                              onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
+                              onClick={(e) => {
+                                if (e.target === e.currentTarget) {
+                                  const inputEl = e.currentTarget.querySelector('input');
+                                  inputEl?.focus();
+                                }
+                              }}
+                              className={cellBaseClass}
+                            >
+                              <input 
+                                data-cell-id={`${row.id}-${col.id}`}
+                                type={col.type === 'number' ? 'number' : 'text'}
+                                value={isCellEditing ? cellEditValue : (cellValue !== undefined && cellValue !== null ? String(cellValue) : '')}
+                                onChange={(e) => {
+                                  if (!isCellEditing) {
+                                    setEditingCell({ rowId: row.id, colId: col.id });
+                                  }
+                                  setCellEditValue(e.target.value);
+                                }}
+                                onFocus={() => {
+                                  setDatePickerCell(null);
+                                  setOpenDropdownCell(null);
+                                  setSelectedCell({ rowId: row.id, colId: col.id });
+                                  setAnchorCell({ rowId: row.id, colId: col.id });
+                                  setSelectedRange({
+                                    startRowIdx: rowIdx,
+                                    endRowIdx: rowIdx,
+                                    startColIdx: colIdx,
+                                    endColIdx: colIdx
+                                  });
+                                  setEditingCell({ rowId: row.id, colId: col.id });
+                                  setCellEditValue(cellValue !== undefined && cellValue !== null ? String(cellValue) : '');
+                                }}
+                                onBlur={(e) => {
+                                  commitCellEdit(row.id, col.id, e.target.value);
+                                }}
+                                onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                className={`w-full min-h-[22px] px-1.5 py-0.5 rounded text-xs sm:text-sm border border-transparent transition-colors focus:outline-none select-text touch-manipulation cursor-text ${
+                                  isCellEditing 
+                                    ? 'bg-[#18264e] text-white border-cyan-400 shadow-inner' 
+                                    : 'bg-transparent text-slate-200 hover:bg-white/5'
+                                } ${col.id === 'count' ? 'font-bold text-cyan-300' : ''}`}
+                              />
 
                               {/* Excel-style active cell corner marker */}
                               {(isBottomRightCorner || (isCellActive && !normalizedRange)) && !isCellEditing && (
@@ -3029,45 +3216,6 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               )}
                             </td>
                           );
-                        }
-
-                        // Regular Editable Cell
-                        return (
-                          <td 
-                            key={`${row.id}-${col.id}`}
-                            data-cell-id={`${row.id}-${col.id}`}
-                            tabIndex={0}
-                            onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
-                            onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
-                            onDoubleClick={() => startEditingCell(row.id, col.id, cellValue)}
-                            className={cellBaseClass}
-                          >
-                            {isCellEditing ? (
-                              <input 
-                                ref={cellInputRef}
-                                type={col.type === 'number' ? 'number' : 'text'}
-                                value={cellEditValue}
-                                onChange={(e) => setCellEditValue(e.target.value)}
-                                onBlur={commitCellEdit}
-                                onKeyDown={(e) => handleInlineInputKeyDown(e, row.id, col.id)}
-                                className="w-full bg-[#18264e] text-white px-2 py-1 rounded text-xs sm:text-sm border border-cyan-400 focus:outline-none shadow-inner"
-                              />
-                            ) : (
-                              <div className="truncate min-h-[20px] flex items-center">
-                                {cellValue ? (
-                                  <span className={col.id === 'count' ? 'font-bold text-cyan-300' : ''}>
-                                    {cellValue}
-                                  </span>
-                                ) : null}
-                              </div>
-                            )}
-
-                            {/* Excel-style active cell corner marker */}
-                            {(isBottomRightCorner || (isCellActive && !normalizedRange)) && !isCellEditing && (
-                              <div className="absolute right-0 bottom-0 w-2 h-2 bg-cyan-400 pointer-events-none z-20" />
-                            )}
-                          </td>
-                        );
                       })}
 
                       {/* Row Action Menu */}
