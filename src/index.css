@@ -1642,6 +1642,60 @@ main {
   letter-spacing: 0.04em !important;
 }
 
+/* Month & Year Dropdown navigation */
+.sabi-calendar-popover [class*="caption_dropdowns"],
+.sabi-calendar-popover .rdp-caption_dropdowns {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  z-index: 10 !important;
+}
+
+.sabi-calendar-popover select,
+.sabi-calendar-popover select.rdp-dropdown,
+.sabi-calendar-popover [class*="dropdown"] select,
+.sabi-calendar-popover [class*="dropdown"] {
+  background-color: #0b1329 !important;
+  background: #0b1329 !important;
+  color: #f59e0b !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0.6rem !important;
+  padding: 3px 8px !important;
+  outline: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.sabi-calendar-popover select:hover,
+.sabi-calendar-popover select:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3) !important;
+}
+
+.sabi-calendar-popover select option {
+  background-color: #090e1a !important;
+  background: #090e1a !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.sabi-calendar-popover .rdp-vhidden,
+.sabi-calendar-popover [class*="vhidden"] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border-width: 0 !important;
+}
+
+
 /* Nav chevron buttons (< >) */
 .sabi-calendar-popover button[name="previous-month"],
 .sabi-calendar-popover button[name="next-month"],

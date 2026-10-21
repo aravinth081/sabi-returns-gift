@@ -2922,7 +2922,31 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   // 🟢 Live Stock Balance Date-Wise Dispatch Filter State (Today & Calendar)
   const [dispatchDateFilter, setDispatchDateFilter] = useState<'today' | 'custom' | null>(null);
   const [selectedDispatchDate, setSelectedDispatchDate] = useState<string>(todayKolkataDate);
-  const liveStockDatePickerRef = useRef<HTMLInputElement>(null);
+  const [isLiveStockCalendarOpen, setIsLiveStockCalendarOpen] = useState<boolean>(false);
+
+  // Timezone-safe local date converters for the Live Stock date picker
+  const parseStandardToLocalDate = useCallback((dateStr: string): Date | undefined => {
+    if (!dateStr) return undefined;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m, d);
+      }
+    }
+    const fallback = new Date(dateStr);
+    return isNaN(fallback.getTime()) ? undefined : fallback;
+  }, []);
+
+  const formatLocalDateToStandard = useCallback((date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, []);
+
 
   const liveStockDispatchSummary: DateDispatchSummary = useMemo(() => {
     if (!dispatchDateFilter) {
@@ -7782,48 +7806,88 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         )}
                       </button>
 
-                      {/* Calendar Button with Native DatePicker */}
-                      <div className="relative inline-flex items-center">
-                        <button
-                          id="live-stock-calendar-btn"
-                          onClick={() => {
-                            if (liveStockDatePickerRef.current) {
-                              if (typeof liveStockDatePickerRef.current.showPicker === 'function') {
-                                liveStockDatePickerRef.current.showPicker();
-                              } else {
-                                liveStockDatePickerRef.current.focus();
-                                liveStockDatePickerRef.current.click();
-                              }
-                            }
-                          }}
-                          className={`px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${
-                            dispatchDateFilter === 'custom'
-                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-300 ring-2 ring-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105'
-                              : 'bg-[#131c2e] hover:bg-[#1c2942] text-cyan-400 hover:text-cyan-300 border-cyan-500/30 hover:border-cyan-400/60 hover:scale-105 active:scale-95'
-                          }`}
-                          title="Select a specific date to filter dispatch records"
+                      {/* Calendar Button with Interactive Popover DatePicker */}
+                      <Popover open={isLiveStockCalendarOpen} onOpenChange={setIsLiveStockCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            id="live-stock-calendar-btn"
+                            type="button"
+                            className={`px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${
+                              dispatchDateFilter === 'custom'
+                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-300 ring-2 ring-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105'
+                                : 'bg-[#131c2e] hover:bg-[#1c2942] text-cyan-400 hover:text-cyan-300 border-cyan-500/30 hover:border-cyan-400/60 hover:scale-105 active:scale-95'
+                            }`}
+                            title="Select a specific date to filter dispatch records"
+                          >
+                            <Calendar size={14} className={dispatchDateFilter === 'custom' ? 'text-white' : 'text-cyan-400'} />
+                            <span>
+                              {dispatchDateFilter === 'custom'
+                                ? `📅 ${liveStockDispatchSummary.displayDate || selectedDispatchDate}`
+                                : '📅 Calendar'}
+                            </span>
+                            {dispatchDateFilter === 'custom' && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                            )}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          sideOffset={8}
+                          className="sabi-calendar-popover p-3 border border-white/20 bg-[#090e1a]/95 text-white shadow-2xl rounded-2xl w-auto z-[150] backdrop-blur-xl animate-in fade-in-0 zoom-in-95"
                         >
-                          <Calendar size={14} className={dispatchDateFilter === 'custom' ? 'text-white' : 'text-cyan-400'} />
-                          <span>
-                            {dispatchDateFilter === 'custom'
-                              ? `📅 ${liveStockDispatchSummary.displayDate || selectedDispatchDate}`
-                              : '📅 Calendar'}
-                          </span>
-                        </button>
-                        <input
-                          ref={liveStockDatePickerRef}
-                          type="date"
-                          value={selectedDispatchDate}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              setSelectedDispatchDate(e.target.value);
-                              setDispatchDateFilter('custom');
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer pointer-events-auto w-full h-full"
-                          aria-label="Filter dispatches by date"
-                        />
-                      </div>
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 px-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                              <Calendar size={14} /> Filter Dispatches
+                            </span>
+                            {selectedDispatchDate && (
+                              <span className="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded-md">
+                                {liveStockDispatchSummary.displayDate || selectedDispatchDate}
+                              </span>
+                            )}
+                          </div>
+                          <CalendarComponent
+                            mode="single"
+                            captionLayout="dropdown-buttons"
+                            fromYear={2022}
+                            toYear={2035}
+                            selected={parseStandardToLocalDate(selectedDispatchDate)}
+                            onSelect={(date) => {
+                              if (date) {
+                                const formatted = formatLocalDateToStandard(date);
+                                setSelectedDispatchDate(formatted);
+                                setDispatchDateFilter('custom');
+                                setIsLiveStockCalendarOpen(false);
+                              }
+                            }}
+                            className="rounded-xl border-none"
+                          />
+                          <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-white/10 px-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDispatchDate(todayKolkataDate);
+                                setDispatchDateFilter('today');
+                                setIsLiveStockCalendarOpen(false);
+                              }}
+                              className="text-xs font-black text-amber-400 hover:text-amber-300 flex items-center gap-1.5 cursor-pointer transition-colors bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30"
+                            >
+                              <Clock size={12} /> Today ({todayKolkataDate})
+                            </button>
+                            {dispatchDateFilter && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDispatchDateFilter(null);
+                                  setIsLiveStockCalendarOpen(false);
+                                }}
+                                className="text-xs font-bold text-slate-300 hover:text-white cursor-pointer transition-colors bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg border border-white/20"
+                              >
+                                Clear Filter
+                              </button>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
 
                       {/* Return to Default / Clear Filter */}
                       {dispatchDateFilter && (
@@ -7894,7 +7958,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         <p className="text-sm sm:text-base font-black text-slate-300">
                           {dispatchDateFilter === 'today'
                             ? "No dispatch records found for today."
-                            : `No dispatch records found for ${liveStockDispatchSummary.displayDate || selectedDispatchDate}.`}
+                            : `No dispatch records found for the selected date (${liveStockDispatchSummary.displayDate || selectedDispatchDate}).`}
                         </p>
                         <p className="text-xs text-slate-400">
                           No chocolate dispatch deduction transactions have been processed on this date for {selectedInventoryTab}.
