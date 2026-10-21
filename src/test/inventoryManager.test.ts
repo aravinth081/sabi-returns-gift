@@ -3,6 +3,8 @@ import {
   calculateDateWiseInventory,
   prepareDispatchDeduction,
   validateDispatchStock,
+  getDateWiseDispatchDetails,
+  parseChocolateProductDetails,
   getOrderDispatchDate,
   isDateFuture,
   isDateToday,
@@ -344,11 +346,11 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
   });
 
   // -------------------------------------------------------------------------
-  // Test Case 7: Insufficient Stock
+  // Test Case 7: Stock Calculation - Support Negative Stock Balance
   // Initial stock: 100. Eligible dispatch quantity: 150.
-  // Expected result: reject or block the deduction, show error, do not create negative stock balance.
+  // Expected result: 100 - 150 = -50 negative stock balance.
   // -------------------------------------------------------------------------
-  it('Test Case 7: Insufficient Stock must block deduction and prevent negative balance', () => {
+  it('Test Case 7: Stock calculation accurately calculates and displays negative stock balance', () => {
     const logs: InventoryLogItem[] = [
       {
         date: '2026-10-10',
@@ -369,25 +371,32 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
       inventory: 'Inventory 1',
     };
 
-    // Stock calculation floors at 0 when order exceeds total stock
+    // Stock calculation supports negative stock balance: 100 - 150 = -50
     const summary = calculateDateWiseInventory(dynamicInventory, logs, [largeOrder], [], 'Inventory 1', todayStr);
-    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(0);
+    expect(summary.chocolates['10 rs dairy milk'].availableStock).toBe(-50);
+    expect(summary.chocolates['10 rs dairy milk'].remainingStock).toBe(-50);
 
     // Initial stock before deduction is 100
     const summaryBefore = calculateDateWiseInventory(dynamicInventory, logs, [], [], 'Inventory 1', todayStr);
     expect(summaryBefore.chocolates['10 rs dairy milk'].availableStock).toBe(100);
 
-    // Validation must fail because 150 > 100
-    const validation = validateDispatchStock(largeOrder, summaryBefore, dynamicInventory);
-    expect(validation.valid).toBe(false);
-    expect(validation.insufficientItems.length).toBe(1);
-    expect(validation.insufficientItems[0].available).toBe(100);
-    expect(validation.insufficientItems[0].required).toBe(150);
+    // When allowNegativeStock is false, strict validation flags insufficient stock
+    const strictValidation = validateDispatchStock(largeOrder, summaryBefore, dynamicInventory, false);
+    expect(strictValidation.valid).toBe(false);
+    expect(strictValidation.insufficientItems.length).toBe(1);
+    expect(strictValidation.insufficientItems[0].available).toBe(100);
+    expect(strictValidation.insufficientItems[0].required).toBe(150);
 
-    // Deduction must be blocked
+    // Default validation allows negative stock balance
+    const defaultValidation = validateDispatchStock(largeOrder, summaryBefore, dynamicInventory);
+    expect(defaultValidation.valid).toBe(true);
+
+    // Deduction creates transaction with accurate negative balance: 100 - 150 = -50
     const result = prepareDispatchDeduction(largeOrder, summaryBefore, [], dynamicInventory, todayStr);
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('Insufficient stock');
+    expect(result.success).toBe(true);
+    expect(result.transactions).toBeDefined();
+    expect(result.transactions![0].previousStockBalance).toBe(100);
+    expect(result.transactions![0].updatedStockBalance).toBe(-50);
   });
 
   // -------------------------------------------------------------------------
@@ -987,4 +996,401 @@ describe('Date-Wise Chocolate Inventory Management System (Section 12 Tests)', (
     expect(summary.chocolates['10 rs dairy milk'].totalDeducted).toBe(180);
   });
 });
+
+describe('Inventory Management System – Stock Calculation & Date Filter Enhancements', () => {
+  const dynamicInventory = [
+    '1 rs chocolate',
+    '10 rs dairy milk',
+    '10 rs kitkat',
+    '10 rs 5 star',
+    '5 rs 5 star',
+  ];
+  const testPricesMap = {
+    '5 rs 5 star': { retail: 15, wholesale: 15 },
+    '10 rs 5 star': { retail: 22, wholesale: 9 },
+    '10 rs kitkat': { retail: 20, wholesale: 20 },
+    'kitkat': { retail: 20, wholesale: 18 },
+    '5 star': { retail: 15, wholesale: 13 },
+  };
+
+  const todayDate = '2026-10-21';
+
+  // -------------------------------------------------------------------------
+  // Test Case 1: Negative Stock
+  // Opening Stock: 20, Dispatched: 200, Expected Stock Balance: -180
+  // -------------------------------------------------------------------------
+  it('Test Case 1: Negative Stock - Opening 20, Dispatched 200 => Stock Balance -180', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-20',
+        chocolate: '5 rs 5 star',
+        boxCount: 1,
+        itemsPerBox: 20,
+        totalChocolates: 20, // Opening Stock: 20
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const dispatchOrder = {
+      id: 101,
+      chocolate: '5 rs 5 star',
+      count: '200', // Today's Dispatch: 200
+      dispatchDate: todayDate,
+      status: 'Delivered',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(dynamicInventory, logs, [dispatchOrder], [], 'Inventory 1', todayDate);
+    // Formula: Closing Stock = Opening Stock + Stock Received - Total Stock Dispatched = 20 + 0 - 200 = -180
+    expect(summary.chocolates['5 rs 5 star'].totalReceived).toBe(20);
+    expect(summary.chocolates['5 rs 5 star'].totalDeducted).toBe(200);
+    expect(summary.chocolates['5 rs 5 star'].availableStock).toBe(-180);
+    expect(summary.chocolates['5 rs 5 star'].remainingStock).toBe(-180);
+
+    // Verify subsequent stock receipt updates balance accurately: -180 + 50 = -130
+    const subsequentLogs: InventoryLogItem[] = [
+      ...logs,
+      {
+        date: todayDate,
+        chocolate: '5 rs 5 star',
+        boxCount: 1,
+        itemsPerBox: 50,
+        totalChocolates: 50, // Receipt: 50
+        inventory: 'Inventory 1',
+      },
+    ];
+    const summaryAfterReceipt = calculateDateWiseInventory(dynamicInventory, subsequentLogs, [dispatchOrder], [], 'Inventory 1', todayDate);
+    expect(summaryAfterReceipt.chocolates['5 rs 5 star'].availableStock).toBe(-130);
+
+    // Verify further receipt brings it back positive: -130 + 150 = 20
+    const finalLogs: InventoryLogItem[] = [
+      ...subsequentLogs,
+      {
+        date: todayDate,
+        chocolate: '5 rs 5 star',
+        boxCount: 1,
+        itemsPerBox: 150,
+        totalChocolates: 150,
+        inventory: 'Inventory 1',
+      },
+    ];
+    const summaryFinal = calculateDateWiseInventory(dynamicInventory, finalLogs, [dispatchOrder], [], 'Inventory 1', todayDate);
+    expect(summaryFinal.chocolates['5 rs 5 star'].availableStock).toBe(20);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 2: Normal Stock
+  // Opening Stock: 500, Dispatched: 200, Expected Stock Balance: 300
+  // -------------------------------------------------------------------------
+  it('Test Case 2: Normal Stock - Opening 500, Dispatched 200 => Stock Balance 300', () => {
+    const logs: InventoryLogItem[] = [
+      {
+        date: '2026-10-20',
+        chocolate: '10 rs kitkat',
+        boxCount: 5,
+        itemsPerBox: 100,
+        totalChocolates: 500, // Opening Stock: 500
+        inventory: 'Inventory 1',
+      },
+    ];
+
+    const dispatchOrder = {
+      id: 102,
+      chocolate: '10 rs kitkat',
+      count: '200',
+      dispatchDate: todayDate,
+      status: 'Delivered',
+      inventory: 'Inventory 1',
+    };
+
+    const summary = calculateDateWiseInventory(dynamicInventory, logs, [dispatchOrder], [], 'Inventory 1', todayDate);
+    expect(summary.chocolates['10 rs kitkat'].totalReceived).toBe(500);
+    expect(summary.chocolates['10 rs kitkat'].totalDeducted).toBe(200);
+    expect(summary.chocolates['10 rs kitkat'].availableStock).toBe(300);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 3: Today's Dispatch Filter
+  // Create multiple dispatch transactions on the current date
+  // Expected Result: displays only the current date's dispatch records and their correct quantities
+  // -------------------------------------------------------------------------
+  it('Test Case 3: Today\'s Dispatch Filter displays only current date records with accurate quantities', () => {
+    const transactions: InventoryTransaction[] = [
+      {
+        transactionId: 'txn_1',
+        orderId: 201,
+        orderSerial: 'SR0201',
+        productName: '5 rs 5 star',
+        chocolate: '5 rs 5 star',
+        orderQuantity: 60,
+        quantityDeducted: 60,
+        dispatchDate: todayDate,
+        actualDispatchTimestamp: '2026-10-21T10:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 100,
+        updatedStockBalance: 40,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-21T10:00:00Z',
+      },
+      {
+        transactionId: 'txn_2',
+        orderId: 202,
+        orderSerial: 'SR0202',
+        productName: '10 rs kitkat',
+        chocolate: '10 rs kitkat',
+        orderQuantity: 50,
+        quantityDeducted: 50,
+        dispatchDate: todayDate,
+        actualDispatchTimestamp: '2026-10-21T11:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 200,
+        updatedStockBalance: 150,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-21T11:00:00Z',
+      },
+      // Historical transaction on past date - must NOT appear in Today's filter
+      {
+        transactionId: 'txn_past',
+        orderId: 199,
+        orderSerial: 'SR0199',
+        productName: '5 rs 5 star',
+        chocolate: '5 rs 5 star',
+        orderQuantity: 100,
+        quantityDeducted: 100,
+        dispatchDate: '2026-10-19',
+        actualDispatchTimestamp: '2026-10-19T10:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 300,
+        updatedStockBalance: 200,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-19T10:00:00Z',
+      },
+    ];
+
+    const todayFilter = getDateWiseDispatchDetails(todayDate, dynamicInventory, transactions, [], testPricesMap, 'Inventory 1', todayDate);
+    expect(todayFilter.isToday).toBe(true);
+    expect(todayFilter.totalDispatchedQuantity).toBe(110); // 60 + 50
+    expect(todayFilter.items.length).toBe(2);
+
+    const fiveStar = todayFilter.items.find(i => i.productName === '5 Star' && i.unitPrice === 5);
+    expect(fiveStar).toBeDefined();
+    expect(fiveStar!.dispatchedQuantity).toBe(60);
+    expect(fiveStar!.unitPriceDisplay).toBe('₹5');
+
+    const kitkat = todayFilter.items.find(i => i.productName === 'Kitkat');
+    expect(kitkat).toBeDefined();
+    expect(kitkat!.dispatchedQuantity).toBe(50);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 4: Historical Date Filter
+  // Select a previous date from the calendar
+  // Expected Result: Only the dispatch transactions for the selected date are displayed
+  // -------------------------------------------------------------------------
+  it('Test Case 4: Historical Date Filter displays only transactions for selected historical date', () => {
+    const historicalDate = '2026-10-19';
+    const transactions: InventoryTransaction[] = [
+      {
+        transactionId: 'txn_hist',
+        orderId: 180,
+        orderSerial: 'SR0180',
+        productName: '10 rs 5 star',
+        chocolate: '10 rs 5 star',
+        orderQuantity: 30,
+        quantityDeducted: 30,
+        dispatchDate: historicalDate,
+        actualDispatchTimestamp: '2026-10-19T09:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 100,
+        updatedStockBalance: 70,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-19T09:00:00Z',
+      },
+      {
+        transactionId: 'txn_today',
+        orderId: 201,
+        orderSerial: 'SR0201',
+        productName: '5 rs 5 star',
+        chocolate: '5 rs 5 star',
+        orderQuantity: 60,
+        quantityDeducted: 60,
+        dispatchDate: todayDate,
+        actualDispatchTimestamp: '2026-10-21T10:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 100,
+        updatedStockBalance: 40,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-21T10:00:00Z',
+      },
+    ];
+
+    const histFilter = getDateWiseDispatchDetails(historicalDate, dynamicInventory, transactions, [], testPricesMap, 'Inventory 1', todayDate);
+    expect(histFilter.isToday).toBe(false);
+    expect(histFilter.date).toBe(historicalDate);
+    expect(histFilter.totalDispatchedQuantity).toBe(30);
+    expect(histFilter.items.length).toBe(1);
+    expect(histFilter.items[0].productName).toBe('5 Star');
+    expect(histFilter.items[0].unitPriceDisplay).toBe('₹10');
+    expect(histFilter.items[0].dispatchedQuantity).toBe(30);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 5: Multiple Transactions
+  // Dispatch the same product multiple times on the same day
+  // Expected Result: Accurately aggregates the quantities without double-counting
+  // -------------------------------------------------------------------------
+  it('Test Case 5: Multiple Transactions - aggregates multiple dispatches of same product on same day accurately', () => {
+    const transactions: InventoryTransaction[] = [
+      {
+        transactionId: 'txn_a',
+        orderId: 301,
+        orderSerial: 'SR0301',
+        productName: '5 rs 5 star',
+        chocolate: '5 rs 5 star',
+        orderQuantity: 40,
+        quantityDeducted: 40,
+        dispatchDate: todayDate,
+        actualDispatchTimestamp: '2026-10-21T09:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 200,
+        updatedStockBalance: 160,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-21T09:00:00Z',
+      },
+      {
+        transactionId: 'txn_b',
+        orderId: 302,
+        orderSerial: 'SR0302',
+        productName: '5 rs 5 star',
+        chocolate: '5 rs 5 star',
+        orderQuantity: 60,
+        quantityDeducted: 60,
+        dispatchDate: todayDate,
+        actualDispatchTimestamp: '2026-10-21T11:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 160,
+        updatedStockBalance: 100,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-21T11:00:00Z',
+      },
+    ];
+
+    const filterResult = getDateWiseDispatchDetails(todayDate, dynamicInventory, transactions, [], testPricesMap, 'Inventory 1', todayDate);
+    expect(filterResult.items.length).toBe(1);
+    expect(filterResult.items[0].productName).toBe('5 Star');
+    expect(filterResult.items[0].unitPriceDisplay).toBe('₹5');
+    // 40 + 60 = 100 total dispatched quantity for this product
+    expect(filterResult.items[0].dispatchedQuantity).toBe(100);
+    expect(filterResult.items[0].transactionCount).toBe(2);
+    expect(filterResult.items[0].orderIds).toEqual(['SR0301', 'SR0302']);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 6: No Dispatch Records
+  // Select a date on which no dispatch transactions exist
+  // Expected Result: Display an appropriate empty-state message without breaking
+  // -------------------------------------------------------------------------
+  it('Test Case 6: No Dispatch Records - empty-state returns 0 items and empty array', () => {
+    const emptyDate = '2026-10-01';
+    const filterResult = getDateWiseDispatchDetails(emptyDate, dynamicInventory, [], [], testPricesMap, 'Inventory 1', todayDate);
+    expect(filterResult.items.length).toBe(0);
+    expect(filterResult.totalDispatchedQuantity).toBe(0);
+    expect(filterResult.totalProductsCount).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test Case 7: Filter Switching
+  // Switch between Today, a historical calendar date, and the default view
+  // Expected Result: Each view displays the correct data without retaining stale filter results
+  // -------------------------------------------------------------------------
+  it('Test Case 7: Filter Switching - returns distinct data for today vs historical date', () => {
+    const transactions: InventoryTransaction[] = [
+      {
+        transactionId: 'txn_today',
+        orderId: 401,
+        productName: '5 rs 5 star',
+        chocolate: '5 rs 5 star',
+        orderQuantity: 88,
+        quantityDeducted: 88,
+        dispatchDate: todayDate,
+        actualDispatchTimestamp: '2026-10-21T10:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 100,
+        updatedStockBalance: 12,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-21T10:00:00Z',
+      },
+      {
+        transactionId: 'txn_oct20',
+        orderId: 402,
+        productName: '10 rs kitkat',
+        chocolate: '10 rs kitkat',
+        orderQuantity: 44,
+        quantityDeducted: 44,
+        dispatchDate: '2026-10-20',
+        actualDispatchTimestamp: '2026-10-20T10:00:00Z',
+        dispatchStatus: 'Delivered',
+        stockDeductionStatus: 'Deducted',
+        transactionType: 'Dispatch Deduction',
+        previousStockBalance: 100,
+        updatedStockBalance: 56,
+        inventory: 'Inventory 1',
+        createdAt: '2026-10-20T10:00:00Z',
+      },
+    ];
+
+    // Today view
+    const todayView = getDateWiseDispatchDetails(todayDate, dynamicInventory, transactions, [], testPricesMap, 'Inventory 1', todayDate);
+    expect(todayView.totalDispatchedQuantity).toBe(88);
+    expect(todayView.items[0].productName).toBe('5 Star');
+
+    // Historical date view
+    const oct20View = getDateWiseDispatchDetails('2026-10-20', dynamicInventory, transactions, [], testPricesMap, 'Inventory 1', todayDate);
+    expect(oct20View.totalDispatchedQuantity).toBe(44);
+    expect(oct20View.items[0].productName).toBe('Kitkat');
+
+    // Dates remain distinct without stale cross-contamination
+    expect(todayView.totalDispatchedQuantity).not.toBe(oct20View.totalDispatchedQuantity);
+  });
+
+  // -------------------------------------------------------------------------
+  // Product Parsing Test: Matches prompt illustration exactly
+  // Product Name: 5 Star, Unit Price: ₹5, Dispatched: 100
+  // Product Name: KitKat, Unit Price: ₹20, Dispatched: 50
+  // Product Name: 5 Star, Unit Price: ₹10, Dispatched: 30
+  // -------------------------------------------------------------------------
+  it('Product details parsing matches illustrative example format accurately', () => {
+    const item1 = parseChocolateProductDetails('5 rs 5 star', testPricesMap);
+    expect(item1.cleanName).toBe('5 Star');
+    expect(item1.unitPriceDisplay).toBe('₹5');
+    expect(item1.unitPrice).toBe(5);
+
+    const item2 = parseChocolateProductDetails('KitKat', testPricesMap);
+    expect(item2.cleanName).toBe('Kitkat');
+    expect(item2.unitPriceDisplay).toBe('₹20');
+    expect(item2.unitPrice).toBe(20);
+
+    const item3 = parseChocolateProductDetails('10 rs 5 star', testPricesMap);
+    expect(item3.cleanName).toBe('5 Star');
+    expect(item3.unitPriceDisplay).toBe('₹10');
+    expect(item3.unitPrice).toBe(10);
+  });
+});
+
 

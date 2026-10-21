@@ -21,6 +21,9 @@ import {
   prepareDispatchDeduction,
   prepareDispatchReversal,
   validateDispatchStock,
+  getDateWiseDispatchDetails,
+  DateDispatchSummary,
+  DateDispatchItem,
   getOrderDispatchDate,
   getOrderChocolateItems,
   getTodayKolkata,
@@ -2916,6 +2919,36 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     return balances;
   }, [dynamicInventory, dateWiseInventorySummary]);
 
+  // 🟢 Live Stock Balance Date-Wise Dispatch Filter State (Today & Calendar)
+  const [dispatchDateFilter, setDispatchDateFilter] = useState<'today' | 'custom' | null>(null);
+  const [selectedDispatchDate, setSelectedDispatchDate] = useState<string>(todayKolkataDate);
+  const liveStockDatePickerRef = useRef<HTMLInputElement>(null);
+
+  const liveStockDispatchSummary: DateDispatchSummary = useMemo(() => {
+    if (!dispatchDateFilter) {
+      return {
+        date: todayKolkataDate,
+        displayDate: todayKolkataDate,
+        isToday: true,
+        totalDispatchedQuantity: 0,
+        totalProductsCount: 0,
+        totalTransactionsCount: 0,
+        totalValue: 0,
+        items: [],
+      };
+    }
+    const target = dispatchDateFilter === 'today' ? todayKolkataDate : selectedDispatchDate;
+    return getDateWiseDispatchDetails(
+      target,
+      dynamicInventory,
+      inventoryTransactions,
+      orders,
+      managedChocPricesMap,
+      selectedInventoryTab,
+      todayKolkataDate
+    );
+  }, [dispatchDateFilter, selectedDispatchDate, dynamicInventory, inventoryTransactions, orders, managedChocPricesMap, selectedInventoryTab, todayKolkataDate]);
+
   const currentInventoryValueData = useMemo(() => {
     const CURRENT_INVENTORY_RETAIL_PRICES: Record<string, number> = {
       "1 rs chocolate": 8,
@@ -3988,7 +4021,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
           prep.transactions.forEach(txn => {
             batch.set(doc(db, "inventory_transactions", txn.transactionId), txn);
             if (tempSummary.chocolates[txn.chocolate]) {
-              tempSummary.chocolates[txn.chocolate].availableStock = Math.max(0, tempSummary.chocolates[txn.chocolate].availableStock - txn.quantityDeducted);
+              tempSummary.chocolates[txn.chocolate].availableStock = tempSummary.chocolates[txn.chocolate].availableStock - txn.quantityDeducted;
             }
           });
           processedCount++;
@@ -7711,18 +7744,244 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     : 'bg-[#0d1527] border border-white/15 shadow-2xl'
                   }`}
               >
-                <div className="flex items-center justify-center gap-3 mb-6">
-                  <h2 className="text-3xl font-black text-amber-400 tracking-widest uppercase" style={{ textShadow: "0 0 12px rgba(245,158,11,0.3)" }}>
-                    Live Stock Balance ({selectedInventoryTab})
-                  </h2>
-                  <button
-                    onClick={() => setActiveTab('inventories_admin_panel' as any)}
-                    className="p-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-amber-400 hover:text-amber-300 rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] shrink-0"
-                    title="Open Admin Cost Analytics"
-                  >
-                    <Settings size={16} strokeWidth={2.5} />
-                  </button>
+                {/* 🟢 Live Stock Balance Inventory Header & Date Filters (Today & Calendar) */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2
+                      id="live-stock-heading"
+                      className="text-xl sm:text-2xl md:text-3xl font-black text-amber-400 tracking-wider sm:tracking-widest uppercase flex items-center gap-2"
+                      style={{ textShadow: "0 0 12px rgba(245,158,11,0.3)" }}
+                    >
+                      Live Stock Balance Inventory ({selectedInventoryTab})
+                    </h2>
+                    <span className="text-white/20 hidden sm:inline text-xl font-light">|</span>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Today Button */}
+                      <button
+                        id="live-stock-today-btn"
+                        onClick={() => {
+                          if (dispatchDateFilter === 'today') {
+                            setDispatchDateFilter(null);
+                          } else {
+                            setSelectedDispatchDate(todayKolkataDate);
+                            setDispatchDateFilter('today');
+                          }
+                        }}
+                        className={`px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${
+                          dispatchDateFilter === 'today'
+                            ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-black border-amber-300 ring-2 ring-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.5)] scale-105'
+                            : 'bg-[#131c2e] hover:bg-[#1c2942] text-amber-400 hover:text-amber-300 border-amber-500/30 hover:border-amber-400/60 hover:scale-105 active:scale-95'
+                        }`}
+                        title="Display only inventory dispatch details for the current date"
+                      >
+                        <Clock size={14} className={dispatchDateFilter === 'today' ? 'text-black' : 'text-amber-400'} />
+                        <span>Today</span>
+                        {dispatchDateFilter === 'today' && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                        )}
+                      </button>
+
+                      {/* Calendar Button with Native DatePicker */}
+                      <div className="relative inline-flex items-center">
+                        <button
+                          id="live-stock-calendar-btn"
+                          onClick={() => {
+                            if (liveStockDatePickerRef.current) {
+                              if (typeof liveStockDatePickerRef.current.showPicker === 'function') {
+                                liveStockDatePickerRef.current.showPicker();
+                              } else {
+                                liveStockDatePickerRef.current.focus();
+                                liveStockDatePickerRef.current.click();
+                              }
+                            }
+                          }}
+                          className={`px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${
+                            dispatchDateFilter === 'custom'
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-300 ring-2 ring-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-105'
+                              : 'bg-[#131c2e] hover:bg-[#1c2942] text-cyan-400 hover:text-cyan-300 border-cyan-500/30 hover:border-cyan-400/60 hover:scale-105 active:scale-95'
+                          }`}
+                          title="Select a specific date to filter dispatch records"
+                        >
+                          <Calendar size={14} className={dispatchDateFilter === 'custom' ? 'text-white' : 'text-cyan-400'} />
+                          <span>
+                            {dispatchDateFilter === 'custom'
+                              ? `📅 ${liveStockDispatchSummary.displayDate || selectedDispatchDate}`
+                              : '📅 Calendar'}
+                          </span>
+                        </button>
+                        <input
+                          ref={liveStockDatePickerRef}
+                          type="date"
+                          value={selectedDispatchDate}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setSelectedDispatchDate(e.target.value);
+                              setDispatchDateFilter('custom');
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer pointer-events-auto w-full h-full"
+                          aria-label="Filter dispatches by date"
+                        />
+                      </div>
+
+                      {/* Return to Default / Clear Filter */}
+                      {dispatchDateFilter && (
+                        <button
+                          id="live-stock-clear-filter-btn"
+                          onClick={() => setDispatchDateFilter(null)}
+                          className="px-3 py-1.5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/20 transition-all flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95 cursor-pointer"
+                          title="Return to default unfiltered view"
+                        >
+                          <RotateCcw size={12} />
+                          <span>Default View</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end md:self-center">
+                    <button
+                      onClick={() => setActiveTab('inventories_admin_panel' as any)}
+                      className="p-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-amber-400 hover:text-amber-300 rounded-xl shadow-sm cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center h-[34px] w-[34px] shrink-0"
+                      title="Open Admin Cost Analytics"
+                    >
+                      <Settings size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
                 </div>
+
+                {/* 🟢 Date Dispatch Details Section (Displayed when Today or Calendar filter is active) */}
+                {dispatchDateFilter && (
+                  <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-[#131c2e] border border-amber-500/40 shadow-2xl transition-all duration-300">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                          <Truck size={18} />
+                        </div>
+                        <div>
+                          <h3 className="text-base sm:text-lg font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">
+                            {dispatchDateFilter === 'today' ? "Today's Dispatch Details" : `Dispatch Details (${liveStockDispatchSummary.displayDate})`}
+                          </h3>
+                          <p className="text-xs text-slate-300 font-semibold">
+                            {dispatchDateFilter === 'today'
+                              ? `Active Filter: Current Date (${liveStockDispatchSummary.displayDate || todayKolkataDate})`
+                              : `Active Filter: Calendar Date (${liveStockDispatchSummary.displayDate})`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg font-bold">
+                          Dispatched: <strong className="text-white font-black">{liveStockDispatchSummary.totalDispatchedQuantity.toLocaleString()}</strong> units
+                        </span>
+                        <span className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-lg font-bold">
+                          Products: <strong className="text-white font-black">{liveStockDispatchSummary.totalProductsCount}</strong>
+                        </span>
+                        <button
+                          onClick={() => setDispatchDateFilter(null)}
+                          className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                          title="Close Filter"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {liveStockDispatchSummary.items.length === 0 ? (
+                      <div className="p-8 text-center flex flex-col items-center justify-center gap-2.5 my-2">
+                        <Package className="text-slate-500" size={38} />
+                        <p className="text-sm sm:text-base font-black text-slate-300">
+                          {dispatchDateFilter === 'today'
+                            ? "No dispatch records found for today."
+                            : `No dispatch records found for ${liveStockDispatchSummary.displayDate || selectedDispatchDate}.`}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          No chocolate dispatch deduction transactions have been processed on this date for {selectedInventoryTab}.
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          {dispatchDateFilter !== 'today' && (
+                            <button
+                              onClick={() => {
+                                setSelectedDispatchDate(todayKolkataDate);
+                                setDispatchDateFilter('today');
+                              }}
+                              className="px-3 py-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                            >
+                              Check Today's Dispatches
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setDispatchDateFilter(null)}
+                            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          >
+                            Return to Default View
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 custom-scrollbar">
+                        <table className="w-full text-left border-collapse min-w-[500px]">
+                          <thead className="bg-[#0b1329] border-b border-amber-500/30">
+                            <tr className="text-xs uppercase tracking-wider text-amber-400">
+                              <th className="p-3.5 font-black border-r border-white/10">Product Name</th>
+                              <th className="p-3.5 font-black border-r border-white/10 text-center">Unit Price</th>
+                              <th className="p-3.5 font-black text-center border-r border-white/10">
+                                {dispatchDateFilter === 'today' ? "Today's Dispatched Quantity" : "Dispatched Quantity"}
+                              </th>
+                              <th className="p-3.5 font-black text-center border-r border-white/10">Transactions Breakdown</th>
+                              <th className="p-3.5 font-black text-center">Total Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {liveStockDispatchSummary.items.map((item, idx) => (
+                              <tr key={idx} className="border-b border-white/5 text-xs sm:text-sm hover:bg-white/5 transition-colors">
+                                <td className="p-3.5 font-bold text-white border-r border-white/10">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                                    <span>{item.productName}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3.5 text-center font-mono font-bold text-cyan-300 border-r border-white/10">
+                                  {item.unitPriceDisplay}
+                                </td>
+                                <td className="p-3.5 text-center font-black text-orange-400 border-r border-white/10 text-sm sm:text-base">
+                                  {item.dispatchedQuantity.toLocaleString()}
+                                </td>
+                                <td className="p-3.5 text-center border-r border-white/10">
+                                  <span
+                                    className="text-[11px] text-slate-300 bg-white/5 px-2 py-1 rounded-md font-mono"
+                                    title={item.orderIds.join(', ')}
+                                  >
+                                    {item.transactionCount} dispatch{item.transactionCount > 1 ? 'es' : ''} ({item.orderIds.slice(0, 2).join(', ')}{item.orderIds.length > 2 ? ` +${item.orderIds.length - 2}` : ''})
+                                  </span>
+                                </td>
+                                <td className="p-3.5 text-center font-mono font-black text-emerald-400">
+                                  ₹{item.totalValue.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-[#0b1329] border-t border-amber-500/30 font-black text-xs uppercase tracking-wider text-amber-400">
+                            <tr>
+                              <td className="p-3.5 border-r border-white/10">Grand Total</td>
+                              <td className="p-3.5 text-center border-r border-white/10">—</td>
+                              <td className="p-3.5 text-center font-black text-orange-300 text-sm sm:text-base border-r border-white/10">
+                                {liveStockDispatchSummary.totalDispatchedQuantity.toLocaleString()}
+                              </td>
+                              <td className="p-3.5 text-center text-slate-300 border-r border-white/10 text-[11px]">
+                                {liveStockDispatchSummary.totalTransactionsCount} dispatches across {liveStockDispatchSummary.totalProductsCount} products
+                              </td>
+                              <td className="p-3.5 text-center font-mono font-black text-emerald-300">
+                                ₹{liveStockDispatchSummary.totalValue.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
                   {dynamicInventory.map((choc, i) => {
                     const norm = normalizeChocName(choc, dynamicInventory);
@@ -7806,9 +8065,23 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       <Plus size={16} /> Add Entry
                     </button>
                   ) : (
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
-                      Immutable Idempotent Audit Log
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {dispatchDateFilter && (
+                        <span className="text-xs font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                          Filtered: {dispatchDateFilter === 'today' ? 'Today (' + todayKolkataDate + ')' : selectedDispatchDate}
+                          <button
+                            onClick={() => setDispatchDateFilter(null)}
+                            className="hover:text-white cursor-pointer ml-1 text-slate-300"
+                            title="Show All Deductions"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )}
+                      <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
+                        Immutable Idempotent Audit Log
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -7883,12 +8156,20 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </thead>
                       <tbody>
                         {(() => {
-                          const currentTransactions = inventoryTransactions.filter(t => (t.inventory || 'Inventory 1') === selectedInventoryTab);
+                          const tabTransactions = inventoryTransactions.filter(t => (t.inventory || 'Inventory 1') === selectedInventoryTab);
+                          const currentTransactions = tabTransactions.filter(t => {
+                            if (!dispatchDateFilter) return true;
+                            const target = dispatchDateFilter === 'today' ? todayKolkataDate : selectedDispatchDate;
+                            return parseDateToStandard(t.dispatchDate) === target;
+                          });
+
                           if (currentTransactions.length === 0) {
                             return (
                               <tr>
                                 <td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
-                                  No dispatch deduction transactions recorded yet for {selectedInventoryTab}.
+                                  {dispatchDateFilter
+                                    ? `No dispatch deduction transactions recorded for ${dispatchDateFilter === 'today' ? 'today (' + todayKolkataDate + ')' : selectedDispatchDate} in ${selectedInventoryTab}.`
+                                    : `No dispatch deduction transactions recorded yet for ${selectedInventoryTab}.`}
                                 </td>
                               </tr>
                             );
@@ -7915,7 +8196,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                 </span>
                               </td>
                               <td className="p-3.5 text-center font-mono text-[11px] text-slate-300">
-                                {txn.previousStockBalance} → <span className="text-emerald-400 font-bold">{txn.updatedStockBalance}</span>
+                                {txn.previousStockBalance} → <span className={`font-bold ${txn.updatedStockBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{txn.updatedStockBalance}</span>
                               </td>
                               <td className="p-3.5 text-center">
                                 <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-black">

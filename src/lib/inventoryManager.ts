@@ -531,7 +531,7 @@ export function calculateDateWiseInventory(
   let sumDeducted = 0;
 
   Object.values(chocMetrics).forEach(m => {
-    m.availableStock = Math.max(0, m.totalReceived - m.totalDeducted);
+    m.availableStock = m.totalReceived - m.totalDeducted;
     m.remainingStock = m.availableStock;
 
     sumAvailable += m.availableStock;
@@ -571,12 +571,13 @@ export interface DispatchProcessingResult {
 
 /**
  * Validates whether sufficient stock is available to fulfill an order's chocolate dispatch.
- * Complies with Section 10 & Test Case 7: Blocks deduction if stock is insufficient, displays clear error.
+ * By default, supports negative stock values whenever business workflow allows dispatch quantities to exceed available stock.
  */
 export function validateDispatchStock(
   order: any,
   currentInventorySummary: OverallInventorySummary,
-  dynamicInventory: string[] = []
+  dynamicInventory: string[] = [],
+  allowNegativeStock: boolean = true
 ): { valid: boolean; insufficientItems: { chocolate: string; available: number; required: number }[] } {
   const items = getOrderChocolateItems(order, dynamicInventory);
   const insufficientItems: { chocolate: string; available: number; required: number }[] = [];
@@ -594,7 +595,7 @@ export function validateDispatchStock(
   });
 
   return {
-    valid: insufficientItems.length === 0,
+    valid: allowNegativeStock ? true : insufficientItems.length === 0,
     insufficientItems,
   };
 }
@@ -604,7 +605,7 @@ export function validateDispatchStock(
  * 
  * Rules:
  * - If order is already deducted, returns alreadyProcessed: true without re-deducting (Test Case 5: Idempotency).
- * - If stock is insufficient, rejects and returns error with details (Test Case 7).
+ * - Allows negative stock values whenever dispatched quantity exceeds available stock.
  * - If dispatch date is in the future, rejects premature deduction (Test Case 2 & 3).
  * - Records identifiable transaction with previous & updated balances (Section 5).
  */
@@ -641,8 +642,8 @@ export function prepareDispatchDeduction(
     };
   }
 
-  // 4. Validate available stock (Section 10 & Test Case 7)
-  const validation = validateDispatchStock(order, currentSummary, dynamicInventory);
+  // 4. Validate available stock - allow negative stock as per requirements
+  const validation = validateDispatchStock(order, currentSummary, dynamicInventory, true);
   if (!validation.valid) {
     const details = validation.insufficientItems
       .map(i => `${i.chocolate}: Available ${i.available}, Required ${i.required}`)
@@ -662,7 +663,8 @@ export function prepareDispatchDeduction(
   items.forEach(item => {
     const currentMetrics = currentSummary.chocolates[item.normalizedName];
     const prevBal = currentMetrics ? currentMetrics.availableStock : 0;
-    const updatedBal = Math.max(0, prevBal - item.quantity);
+    // Closing Stock = Opening Stock + Stock Received - Total Stock Dispatched (supports negative balances)
+    const updatedBal = prevBal - item.quantity;
 
     const transactionId = generateDispatchTransactionId(order.id || order.fireId, item.normalizedName);
 
@@ -738,5 +740,250 @@ export function prepareDispatchReversal(
     success: true,
     transactions: transactionsToCreate,
     message: `Stock reversal prepared for order #${order.id || order.fireId}.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 6. DATE-WISE DISPATCH FILTERING (Today & Calendar Filtering)
+// ---------------------------------------------------------------------------
+
+export interface DateDispatchItem {
+  productName: string;
+  rawName: string;
+  unitPrice: number;
+  unitPriceDisplay: string;
+  dispatchedQuantity: number;
+  transactionCount: number;
+  orderIds: (string | number)[];
+  totalValue: number;
+}
+
+export interface DateDispatchSummary {
+  date: string;
+  displayDate: string;
+  isToday: boolean;
+  totalDispatchedQuantity: number;
+  totalProductsCount: number;
+  totalTransactionsCount: number;
+  totalValue: number;
+  items: DateDispatchItem[];
+}
+
+/**
+ * Parses chocolate name and extracts clean product name, size/denomination, and unit price.
+ * Handles leading denominations ("5 rs 5 star" -> name: "5 Star", unitPrice: 5),
+ * trailing denominations ("KitKat 20 rs"), and price map lookups.
+ */
+export function parseChocolateProductDetails(
+  chocName: string,
+  managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {}
+): { cleanName: string; unitPrice: number; unitPriceDisplay: string; groupingKey: string } {
+  const trimmed = String(chocName || '').trim();
+  const lower = trimmed.toLowerCase();
+
+  // 1. Check for leading denomination e.g. "5 rs 5 star", "10 rs kitkat", "5rs dairy milk"
+  const leadingMatch = trimmed.match(/^(\d+)\s*(?:rs|₹)\s*(.+)$/i);
+  if (leadingMatch) {
+    const denom = Number(leadingMatch[1]);
+    const rawClean = leadingMatch[2].trim();
+    const cleanName = rawClean
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+    return {
+      cleanName,
+      unitPrice: denom,
+      unitPriceDisplay: `₹${denom}`,
+      groupingKey: `${cleanName.toLowerCase()}_${denom}`,
+    };
+  }
+
+  // 2. Check for trailing denomination e.g. "5 Star 5 rs" or "5 Star (₹5)"
+  const trailingMatch = trimmed.match(/^(.+?)\s*\(?(?:rs|₹)?\s*(\d+)\s*(?:rs)?\)?$/i);
+  if (trailingMatch && !trimmed.match(/^\d+$/)) {
+    const denom = Number(trailingMatch[2]);
+    const rawClean = trailingMatch[1].trim();
+    const cleanName = rawClean
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+    return {
+      cleanName,
+      unitPrice: denom,
+      unitPriceDisplay: `₹${denom}`,
+      groupingKey: `${cleanName.toLowerCase()}_${denom}`,
+    };
+  }
+
+  // 3. Fallback: Lookup in managedChocPricesMap or default prices
+  const priceObj = managedChocPricesMap[lower];
+  const price = priceObj?.retail || priceObj?.wholesale || 0;
+  const cleanName = trimmed
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+  return {
+    cleanName,
+    unitPrice: price,
+    unitPriceDisplay: price > 0 ? `₹${price}` : '—',
+    groupingKey: `${cleanName.toLowerCase()}_${price}`,
+  };
+}
+
+/**
+ * Retrieves and aggregates dispatch details for a specific date (Today or any selected calendar date).
+ * 
+ * - Filters dispatch transactions using the exact dispatch date.
+ * - Shows exact quantity dispatched for each product.
+ * - Extracts product names and denominations / unit prices.
+ * - Handles multiple dispatch transactions for the same product accurately without double-counting.
+ * - Returns clean items list and totals.
+ */
+export function getDateWiseDispatchDetails(
+  targetDate: string,
+  dynamicInventory: string[] = [],
+  transactions: InventoryTransaction[] = [],
+  orders: any[] = [],
+  managedChocPricesMap: Record<string, { retail: number; wholesale: number }> = {},
+  selectedInventoryTab: string = 'Inventory 1',
+  todayStr: string = getTodayKolkata()
+): DateDispatchSummary {
+  const standardTargetDate = parseDateToStandard(targetDate) || todayStr;
+  const isToday = standardTargetDate === todayStr;
+
+  const groupedMap: Record<string, DateDispatchItem> = {};
+  const processedKeys = new Set<string>();
+
+  // A. Deductions recorded in explicit transactions
+  transactions.forEach(t => {
+    if ((t.inventory || 'Inventory 1') !== selectedInventoryTab) return;
+    if (t.transactionType !== 'Dispatch Deduction' || t.stockDeductionStatus !== 'Deducted') return;
+
+    const dispatchDate = parseDateToStandard(t.dispatchDate);
+    if (dispatchDate !== standardTargetDate) return;
+
+    const norm = normalizeChocName(t.chocolate || t.productName || '', dynamicInventory);
+    const orderId = t.orderId || t.orderFireId || '';
+    const key = `${orderId}_${norm}`;
+
+    // Prevent duplicate counting
+    if (processedKeys.has(key)) return;
+    processedKeys.add(key);
+
+    const qty = Number(t.quantityDeducted || t.orderQuantity || 0);
+    if (qty <= 0) return;
+
+    const { cleanName, unitPrice, unitPriceDisplay, groupingKey } = parseChocolateProductDetails(
+      norm || t.chocolate || t.productName,
+      managedChocPricesMap
+    );
+
+    if (!groupedMap[groupingKey]) {
+      groupedMap[groupingKey] = {
+        productName: cleanName,
+        rawName: norm,
+        unitPrice,
+        unitPriceDisplay,
+        dispatchedQuantity: 0,
+        transactionCount: 0,
+        orderIds: [],
+        totalValue: 0,
+      };
+    }
+
+    groupedMap[groupingKey].dispatchedQuantity += qty;
+    groupedMap[groupingKey].transactionCount += 1;
+    if (t.orderSerial || orderId) {
+      groupedMap[groupingKey].orderIds.push(t.orderSerial || `#${orderId}`);
+    }
+    groupedMap[groupingKey].totalValue += qty * unitPrice;
+  });
+
+  // B. Also check orders that were dispatched/delivered on targetDate without separate transaction records
+  orders.forEach(order => {
+    if (isOrderCancelled(order)) return;
+    if (order.role === 'Self') return;
+    if ((order.inventory || 'Inventory 1') !== selectedInventoryTab) return;
+    if (order.category === 'product') return;
+
+    const dispatchDate = getOrderDispatchDate(order);
+    if (dispatchDate !== standardTargetDate) return;
+
+    // Must be dispatched / delivered
+    const isDispatched = order.status === 'Delivered' || order.status === 'Dispatched' || order.stockDeductionStatus === 'Deducted';
+    if (!isDispatched && !isToday) return;
+    if (order.stockDeductionStatus === 'Cancelled' || order.stockDeductionStatus === 'Reversed') return;
+
+    const items = getOrderChocolateItems(order, dynamicInventory);
+    items.forEach(item => {
+      const norm = item.normalizedName;
+      const orderId = order.id || order.fireId;
+      const key = `${orderId}_${norm}`;
+
+      // Prevent duplicate counting if already processed via transaction
+      if (processedKeys.has(key)) return;
+      processedKeys.add(key);
+
+      const qty = item.quantity;
+      if (qty <= 0) return;
+
+      const { cleanName, unitPrice, unitPriceDisplay, groupingKey } = parseChocolateProductDetails(
+        norm,
+        managedChocPricesMap
+      );
+
+      if (!groupedMap[groupingKey]) {
+        groupedMap[groupingKey] = {
+          productName: cleanName,
+          rawName: norm,
+          unitPrice,
+          unitPriceDisplay,
+          dispatchedQuantity: 0,
+          transactionCount: 0,
+          orderIds: [],
+          totalValue: 0,
+        };
+      }
+
+      groupedMap[groupingKey].dispatchedQuantity += qty;
+      groupedMap[groupingKey].transactionCount += 1;
+      const serial = order.id ? `SR${String(order.id).padStart(4, '0')}` : `#${orderId}`;
+      groupedMap[groupingKey].orderIds.push(serial);
+      groupedMap[groupingKey].totalValue += qty * unitPrice;
+    });
+  });
+
+  // Convert map to sorted list
+  const items = Object.values(groupedMap).sort((a, b) => b.dispatchedQuantity - a.dispatchedQuantity);
+
+  let totalDispatched = 0;
+  let totalValue = 0;
+  let totalTxnCount = 0;
+
+  items.forEach(i => {
+    totalDispatched += i.dispatchedQuantity;
+    totalValue += i.totalValue;
+    totalTxnCount += i.transactionCount;
+  });
+
+  // Format display date
+  let displayDate = standardTargetDate;
+  try {
+    const [y, m, d] = standardTargetDate.split('-');
+    if (y && m && d) {
+      const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+      displayDate = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  } catch {}
+
+  return {
+    date: standardTargetDate,
+    displayDate,
+    isToday,
+    totalDispatchedQuantity: totalDispatched,
+    totalProductsCount: items.length,
+    totalTransactionsCount: totalTxnCount,
+    totalValue,
+    items,
   };
 }
