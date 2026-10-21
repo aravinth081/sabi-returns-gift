@@ -7,7 +7,7 @@
 // Step 5: Start the application using `npm start` or `npm run dev`.
 // ==========================================
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 // --- FIREBASE SINGLETON & CONCURRENCY IMPORTS ---
 import { db } from "@/firebase";
 import {
