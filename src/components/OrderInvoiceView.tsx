@@ -228,6 +228,11 @@ export default function OrderInvoiceView({ order, onClose }: { order: any; onClo
           <p className="font-bold text-gray-500 mb-1">Customer Details:</p>
           <p className="font-black text-lg leading-snug mb-1 break-words max-w-[600px]">{order.name}</p>
           <p className="font-bold">Ph: {formatPhoneNumber(order.phone)}</p>
+          {order.address && String(order.address).trim() !== "" && (
+            <p className="font-semibold text-gray-800 break-words max-w-[600px] mt-0.5">
+              Address: <span className="font-normal">{order.address}</span>
+            </p>
+          )}
         </div>
 
         {/* Items Table */}

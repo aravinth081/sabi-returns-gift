@@ -382,6 +382,137 @@ const renderScreenshotLocation = (order: any) => {
   return <span className="screenshot-location-text screenshot-location-empty font-bold">—</span>;
 };
 
+export interface StructuredAddress {
+  doorNo: string;
+  street: string;
+  city: string;
+  district: string;
+  state: string;
+  pinCode: string;
+}
+
+export const parseAddressToStructured = (rawText: string): StructuredAddress => {
+  const result: StructuredAddress = {
+    doorNo: "",
+    street: "",
+    city: "",
+    district: "",
+    state: "",
+    pinCode: ""
+  };
+  if (!rawText || typeof rawText !== 'string') return result;
+
+  let text = rawText.trim();
+
+  // 1. Extract 6-digit Indian PIN code
+  const pinMatch = text.match(/\b([1-9][0-9]{5})\b/);
+  if (pinMatch) {
+    result.pinCode = pinMatch[1];
+    text = text.replace(pinMatch[0], '').trim();
+  }
+
+  // 2. Identify Indian State from known list
+  const knownStates = [
+    'Tamil Nadu', 'Tamilnadu', 'Kerala', 'Karnataka', 'Andhra Pradesh', 'Telangana',
+    'Maharashtra', 'Puducherry', 'Pondicherry', 'Goa', 'Gujarat', 'Delhi',
+    'Rajasthan', 'West Bengal', 'Uttar Pradesh', 'Madhya Pradesh', 'Bihar',
+    'Punjab', 'Haryana', 'Odisha', 'Assam'
+  ];
+  for (const s of knownStates) {
+    const regex = new RegExp(`\\b${s}\\b`, 'i');
+    if (regex.test(text)) {
+      result.state = s.toLowerCase() === 'tamilnadu' ? 'Tamil Nadu' : s;
+      text = text.replace(regex, '').trim();
+      break;
+    }
+  }
+
+  // 3. Clean trailing/leading commas or hyphens
+  text = text.replace(/^[,-\s]+|[,-\s]+$/g, '');
+
+  // 4. Split by newlines or commas
+  const rawParts = text
+    .split(/[\n,]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  if (rawParts.length === 0) return result;
+
+  // 5. Check if first part looks like Door/House/Flat/Plot No
+  const doorRegex = /^(no\.?|door(\s*no\.?)?|flat(\s*no\.?)?|plot(\s*no\.?)?|house(\s*no\.?)?|#|\d+[\w\/-]*\b)/i;
+  if (rawParts.length > 0 && doorRegex.test(rawParts[0])) {
+    result.doorNo = rawParts[0];
+    rawParts.shift();
+  }
+
+  // Known South Indian districts and major cities
+  const knownDistrictsAndCities = [
+    'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Trichy', 'Salem', 'Tirunelveli',
+    'Tiruppur', 'Erode', 'Vellore', 'Thanjavur', 'Dindigul', 'Kanchipuram', 'Cuddalore',
+    'Karur', 'Nagercoil', 'Kanyakumari', 'Hosur', 'Tuticorin', 'Thoothukudi', 'Sivakasi',
+    'Virudhunagar', 'Namakkal', 'Villupuram', 'Tiruvannamalai', 'Pudukkottai', 'Theni',
+    'Kallakurichi', 'Tenkasi', 'Ramanathapuram', 'Sivaganga', 'Krishnagiri', 'Dharmapuri',
+    'Ariyalur', 'Perambalur', 'Nagapattinam', 'Tiruvarur', 'Mayiladuthurai', 'Nilgiris',
+    'Kochi', 'Ernakulam', 'Trivandrum', 'Thiruvananthapuram', 'Kozhikode', 'Calicut',
+    'Bengaluru', 'Bangalore', 'Hyderabad', 'Vijayawada', 'Visakhapatnam'
+  ];
+
+  // 6. Look from the end for City and District
+  if (rawParts.length > 0) {
+    const lastPart = rawParts[rawParts.length - 1];
+    const matchedCity = knownDistrictsAndCities.find(c => c.toLowerCase() === lastPart.toLowerCase());
+    if (matchedCity) {
+      result.city = matchedCity;
+      rawParts.pop();
+    }
+  }
+
+  if (rawParts.length > 0 && !result.district) {
+    const lastPart = rawParts[rawParts.length - 1];
+    const matchedDist = knownDistrictsAndCities.find(c => c.toLowerCase() === lastPart.toLowerCase());
+    if (matchedDist) {
+      result.district = matchedDist;
+      rawParts.pop();
+    }
+  }
+
+  if (result.city && !result.district) {
+    result.district = result.city;
+  } else if (!result.city && rawParts.length > 0) {
+    result.city = rawParts.pop() || "";
+  }
+
+  // 7. Remaining parts form the Street / Area
+  if (rawParts.length > 0) {
+    result.street = rawParts.join(', ');
+  }
+
+  // Default state to Tamil Nadu if missing but city in Tamil Nadu
+  if (!result.state && (result.city || result.district)) {
+    result.state = "Tamil Nadu";
+  }
+
+  return result;
+};
+
+export const formatStructuredAddress = (addr: StructuredAddress): string => {
+  const parts: string[] = [];
+  if (addr.doorNo?.trim()) parts.push(addr.doorNo.trim());
+  if (addr.street?.trim()) parts.push(addr.street.trim());
+  if (addr.city?.trim()) parts.push(addr.city.trim());
+  if (addr.district?.trim() && addr.district.trim().toLowerCase() !== addr.city?.trim().toLowerCase()) {
+    parts.push(addr.district.trim());
+  }
+  let line = parts.join(', ');
+  if (addr.state?.trim()) {
+    line = line ? `${line}, ${addr.state.trim()}` : addr.state.trim();
+  }
+  if (addr.pinCode?.trim()) {
+    line = line ? `${line} - ${addr.pinCode.trim()}` : addr.pinCode.trim();
+  }
+  return line;
+};
+
 const PREDEFINED_CHOCOLATES = [
   "10 rs 5 Star", "10 rs Kitkat", "10 rs Dairy Milk", "5 rs Peanut Candy",
   "5 rs 5 Star", "5 rs Dairy Milk", "2 rs Dairymilk Shots", "5 rs Milky Bar",
@@ -2688,11 +2819,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
   const [isInvModalOpen, setIsInvModalOpen] = useState(false);
   const [invForm, setInvForm] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: "",
     chocolate: "",
     boxCount: "",
     itemsPerBox: "",
-    inventory: "Inventory 1"
+    inventory: "Inventory 1",
+    address: ""
   });
   const [editInvId, setEditInvId] = useState<string | null>(null);
   const [viewingInvLog, setViewingInvLog] = useState<any>(null);
@@ -2764,6 +2896,38 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale', inventory: "Inventory 1", location: "" });
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
+
+  const [showStructuredAddress, setShowStructuredAddress] = useState(false);
+  const [structuredAddr, setStructuredAddr] = useState<StructuredAddress>({
+    doorNo: "",
+    street: "",
+    city: "",
+    district: "",
+    state: "",
+    pinCode: ""
+  });
+
+  const handleParseCurrentAddress = () => {
+    const raw = String(formData.address || '').trim();
+    if (!raw) {
+      toast.info("Please enter or paste an address into the field first.");
+      return;
+    }
+    const parsed = parseAddressToStructured(raw);
+    setStructuredAddr(parsed);
+    setShowStructuredAddress(true);
+    toast.success("Address fields populated for review. Click 'Format & Apply' when ready.");
+  };
+
+  const handleFormatAndApplyAddress = () => {
+    const formatted = formatStructuredAddress(structuredAddr);
+    if (!formatted) {
+      toast.info("Please enter at least one address detail to format.");
+      return;
+    }
+    setFormData(prev => ({ ...prev, address: formatted }));
+    toast.success("Address formatted and applied!");
+  };
 
   // Header Visibility State (tab-specific)
   const [showHeaderMap, setShowHeaderMap] = useState<Record<string, boolean>>(() => {
@@ -4134,7 +4298,6 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   };
 
   const handleAddClick = (categoryOverride?: any) => {
-    const today = getTodayKolkata();
     const category = (categoryOverride === 'chocolate' || categoryOverride === 'product')
       ? categoryOverride
       : (activeTab === 'dashboard2' ? 'product' : 'chocolate');
@@ -4155,7 +4318,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const initialRole = userDefaultRole || "Others";
     const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
+    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
+    setStructuredAddr({ doorNo: "", street: "", city: "", district: "", state: "", pinCode: "" });
+    setShowStructuredAddress(false);
     setChocolateRows([{ chocolate: "", count: "" }]);
     setProductRows([{ productName: "", quantity: "", price: "" }]);
     setOrderTypeOthersToggle(initialRole !== 'Self');
@@ -4163,7 +4328,6 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   };
 
   const handleAddOrderFromNotification = async (n: any) => {
-    const today = new Date().toISOString().split('T')[0];
     const category = activeTab === 'dashboard2' ? 'product' : 'chocolate';
     const birthdayVal = n.birthdayDate ? parseDateToYYYYMMDD(n.birthdayDate) : "";
 
@@ -4196,9 +4360,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       fireId: null,
       name: n.cardTitle || "",
       phone: n.phoneNumber || "",
-      orderDate: today,
-      functionDate: birthdayVal,
-      deliveryDate: birthdayVal,
+      orderDate: "",
+      functionDate: birthdayVal || "",
+      deliveryDate: birthdayVal || "",
       chocolate: "",
       count: n.chocolateCount || "",
       address: n.comments || "",
@@ -4218,6 +4382,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       pricingType: 'retail',
       location: ""
     });
+    if (n.comments) {
+      setStructuredAddr(parseAddressToStructured(n.comments));
+    } else {
+      setStructuredAddr({ doorNo: "", street: "", city: "", district: "", state: "", pinCode: "" });
+    }
+    setShowStructuredAddress(false);
     setChocolateRows([{ chocolate: "", count: String(n.chocolateCount || "") }]);
     setOrderTypeOthersToggle(initialRole !== 'Self');
     setIsModalOpen(true);
@@ -4232,9 +4402,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       ...order,
       fireId: order.fireId, // 🟢 IMPORTANT: Ithu thaan edit aaga use aagum
       id: order.id,
-      orderDate: order.orderDate ? parseDateToYYYYMMDD(order.orderDate) : parseDateToYYYYMMDD(order.functionDate),
-      functionDate: parseDateToYYYYMMDD(order.functionDate),
-      deliveryDate: parseDateToYYYYMMDD(order.dispatchDate || order.deliveryDate || order.functionDate || order.orderDate),
+      orderDate: order.orderDate ? parseDateToYYYYMMDD(order.orderDate) : (order.functionDate ? parseDateToYYYYMMDD(order.functionDate) : ""),
+      functionDate: order.functionDate ? parseDateToYYYYMMDD(order.functionDate) : "",
+      deliveryDate: parseDateToYYYYMMDD(order.dispatchDate || order.deliveryDate || order.functionDate || order.orderDate || ""),
       address: order.address || "",
       discount: order.discount || 0,
       isDeliveryFree: order.isDeliveryFree || false,
@@ -4249,6 +4419,22 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       manualProductPrice: order.manualProductPrice || "",
       pricingType: order.pricingType || 'retail'
     });
+
+    if (order.addressDetails) {
+      setStructuredAddr({
+        doorNo: order.addressDetails.doorNo || "",
+        street: order.addressDetails.street || "",
+        city: order.addressDetails.city || "",
+        district: order.addressDetails.district || "",
+        state: order.addressDetails.state || "",
+        pinCode: order.addressDetails.pinCode || ""
+      });
+    } else if (order.address) {
+      setStructuredAddr(parseAddressToStructured(order.address));
+    } else {
+      setStructuredAddr({ doorNo: "", street: "", city: "", district: "", state: "", pinCode: "" });
+    }
+    setShowStructuredAddress(false);
 
     // Populate chocolateRows by splitting chocolate and count values
     const chocs = String(order.chocolate || "").split(',').map(c => c.trim()).filter(Boolean);
@@ -4711,17 +4897,19 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const finalPaymentStatus = formData.paymentStatus || 'Pending';
 
     const rawDispatchDate = formData.deliveryDate || (formData as any).dispatchDate;
-    const stdDispatchDate = parseDateToStandard(rawDispatchDate) || todayKolkataDate;
+    const stdDispatchDate = parseDateToStandard(rawDispatchDate) || "";
     const displayDispatchDate = formatToDisplayDate(rawDispatchDate);
 
     const formattedOrder: any = {
       ...formData,
       inventory: formData.inventory || "Inventory 1",
       phone: formatPhoneNumber(formData.phone),
-      orderDate: formatToDisplayDate(formData.orderDate) || formatToDisplayDate(formData.functionDate) || displayDispatchDate || formatToDisplayDate(new Date()),
+      orderDate: formatToDisplayDate(formData.orderDate) || formatToDisplayDate(formData.functionDate) || displayDispatchDate || "",
       functionDate: formatToDisplayDate(formData.functionDate) || "",
       deliveryDate: displayDispatchDate || "",
       dispatchDate: displayDispatchDate || stdDispatchDate,
+      address: formData.address ? String(formData.address).trim() : "",
+      addressDetails: (structuredAddr && (structuredAddr.doorNo || structuredAddr.street || structuredAddr.city || structuredAddr.district || structuredAddr.state || structuredAddr.pinCode)) ? structuredAddr : (formData.addressDetails || null),
       discount: Number(formData.discount) || 0,
       manualDeliveryFee: Number(formData.manualDeliveryFee) || 0,
       advanceAmount: rawAdvance,
@@ -4749,7 +4937,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     }
 
     // Determine whether this order is for current date (<= today) or future (> today)
-    const isFutureOrder = isDateFuture(stdDispatchDate, todayKolkataDate);
+    const isFutureOrder = stdDispatchDate ? isDateFuture(stdDispatchDate, todayKolkataDate) : false;
     formattedOrder.stockDeductionStatus = isFutureOrder ? 'Pending' : 'Deducted';
 
     try {
@@ -4923,8 +5111,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
       // Close modal and reset form immediately after main DB write
       setIsModalOpen(false);
-      const today = new Date().toISOString().split('T')[0];
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: today, functionDate: today, deliveryDate: today, chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', inventory: "Inventory 1", location: "" });
+      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', inventory: "Inventory 1", location: "" });
+      setStructuredAddr({ doorNo: "", street: "", city: "", district: "", state: "", pinCode: "" });
+      setShowStructuredAddress(false);
 
       // Fire-and-forget: Board card auto-move is non-critical
       if (formData.phone) {
@@ -4975,13 +5164,14 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     if (!invForm.boxCount || !invForm.itemsPerBox) return alert("Please fill all fields");
 
     const entryData = {
-      date: invForm.date,
+      date: invForm.date || "",
       chocolate: invForm.chocolate,
       boxCount: Number(invForm.boxCount),
       itemsPerBox: Number(invForm.itemsPerBox),
       totalChocolates: Number(invForm.boxCount) * Number(invForm.itemsPerBox),
       type: "Purchase",
-      inventory: invForm.inventory || "Inventory 1"
+      inventory: invForm.inventory || "Inventory 1",
+      address: invForm.address ? String(invForm.address).trim() : ""
     };
 
     try {
@@ -4999,7 +5189,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
         });
         logActivity(`Added Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox} = ${Number(invForm.boxCount) * Number(invForm.itemsPerBox)} pcs)`, 'Inventories');
       }
-      setInvForm(prev => ({ ...prev, boxCount: "", itemsPerBox: "" }));
+      setInvForm(prev => ({ ...prev, date: "", boxCount: "", itemsPerBox: "", address: "" }));
       setIsInvModalOpen(false);
     } catch (err) { console.error(err); }
   };
@@ -8117,11 +8307,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   {!showAuditLog ? (
                     <button onClick={() => {
                       setInvForm({
-                        date: new Date().toISOString().split('T')[0],
+                        date: "",
                         chocolate: managedChocolates[0]?.name || "",
                         boxCount: "",
                         itemsPerBox: "",
-                        inventory: selectedInventoryTab
+                        inventory: selectedInventoryTab,
+                        address: ""
                       });
                       setEditInvId(null);
                       setIsInvModalOpen(true);
@@ -8187,11 +8378,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                 <button onClick={() => setViewingInvLog(log)} className="text-sky-400 hover:text-sky-300 transition-colors" title="View Entry"><Eye size={18} /></button>
                                 <button onClick={() => {
                                   setInvForm({
-                                    date: log.date || new Date().toISOString().split('T')[0],
+                                    date: log.date || "",
                                     chocolate: log.chocolate || (managedChocolates[0]?.name || ""),
                                     boxCount: String(log.boxCount || ""),
                                     itemsPerBox: String(log.itemsPerBox || ""),
-                                    inventory: log.inventory || selectedInventoryTab || "Inventory 1"
+                                    inventory: log.inventory || selectedInventoryTab || "Inventory 1",
+                                    address: log.address || ""
                                   });
                                   setEditInvId(log.fireId);
                                   setIsInvModalOpen(true);
@@ -10240,6 +10432,11 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
                                 <td className={`py-2.5 px-4 font-bold align-middle ${isScreenshotMode ? 'text-white font-extrabold text-sm min-w-[200px]' : (isThaaruOrder(order.orderType) || isChocoWrapzOrder(order.orderType)) ? 'font-extrabold print:text-black' : 'text-amber-950 print:text-black'}`}>
                                   <span className={isThaaruOrder(order.orderType) ? 'text-[#38bdf8] order-name-thaaru font-black' : isChocoWrapzOrder(order.orderType) ? 'text-[#f43f5e] order-name-chocowrapz font-black' : ''} title={isThaaruOrder(order.orderType) ? 'Thaaru Order' : isChocoWrapzOrder(order.orderType) ? 'Choco Wrapz Order' : ''}>{order.name}</span>
+                                  {!isScreenshotMode && order.address && String(order.address).trim() !== "" && (
+                                    <span className="text-[10px] text-slate-400 font-medium block truncate max-w-[200px] mt-0.5" title={order.address}>
+                                      📍 {order.address}
+                                    </span>
+                                  )}
                                 </td>
 
                                 {!isScreenshotMode && (
@@ -11648,7 +11845,14 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Date</label>
-                  <input required type="date" value={invForm.date} onChange={(e) => setInvForm({ ...invForm, date: e.target.value })} style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }} className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner" />
+                  <input
+                    type="date"
+                    value={invForm.date || ""}
+                    onChange={(e) => setInvForm({ ...invForm, date: e.target.value })}
+                    onClick={(e) => { try { (e.currentTarget as any).showPicker?.(); } catch(_) {} }}
+                    style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                    className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner cursor-pointer"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">Inventory</label>
@@ -11698,6 +11902,21 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 </div>
               </div>
 
+              {/* Optional Address / Destination field for Inventory */}
+              <div>
+                <label className="block text-xs font-bold mb-1 text-slate-200 uppercase tracking-wider">
+                  Address / Destination <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={invForm.address || ""}
+                  onChange={(e) => setInvForm({ ...invForm, address: e.target.value })}
+                  style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                  className="w-full font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner text-xs resize-none transition-colors"
+                  placeholder="Optional supplier, branch or delivery address..."
+                />
+              </div>
+
               <div className="bg-slate-900/80 p-3.5 rounded-xl border border-amber-500/30 mt-2 text-center shadow-md">
                 <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Total Items to Add</p>
                 <p className="text-2xl font-black text-amber-300">
@@ -11724,7 +11943,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
             <div className="space-y-4 text-sm font-bold text-slate-200">
               <div className="flex justify-between border-b border-white/10 pb-2">
                 <span className="text-slate-400">Date:</span>
-                <span className="text-white font-extrabold">{formatToDisplayDate(viewingInvLog.date)}</span>
+                <span className="text-white font-extrabold">{formatToDisplayDate(viewingInvLog.date) || "—"}</span>
               </div>
               <div className="flex justify-between border-b border-white/10 pb-2">
                 <span className="text-slate-400">Chocolate Name:</span>
@@ -11738,6 +11957,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 <span className="text-slate-400">Items per Box:</span>
                 <span className="text-white font-extrabold">{viewingInvLog.itemsPerBox} items</span>
               </div>
+              {viewingInvLog.address && (
+                <div className="flex justify-between border-b border-white/10 pb-2">
+                  <span className="text-slate-400">Address / Location:</span>
+                  <span className="text-white font-medium max-w-[240px] text-right break-words">{viewingInvLog.address}</span>
+                </div>
+              )}
               <div className="flex justify-between bg-slate-900/80 p-4 rounded-xl border border-amber-500/30 text-center flex-col items-center shadow-md">
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Total Chocolates Added</span>
                 <span className="text-3xl font-black text-amber-300">+{viewingInvLog.totalChocolates}</span>
@@ -11925,25 +12150,25 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Function Date</label>
                       <input
-                        required
                         type="date"
                         name="functionDate"
-                        value={formData.functionDate}
+                        value={formData.functionDate || ""}
                         onChange={handleInputChange}
+                        onClick={(e) => { try { (e.currentTarget as any).showPicker?.(); } catch(_) {} }}
                         style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors"
+                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors cursor-pointer"
                       />
                     </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-slate-200 mb-1">Dispatch Date</label>
                       <input
-                        required
                         type="date"
                         name="deliveryDate"
-                        value={formData.deliveryDate}
+                        value={formData.deliveryDate || ""}
                         onChange={handleInputChange}
+                        onClick={(e) => { try { (e.currentTarget as any).showPicker?.(); } catch(_) {} }}
                         style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors"
+                        className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner transition-colors cursor-pointer"
                       />
                     </div>
                   </div>
@@ -11988,6 +12213,136 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         );
                       })}
                     </select>
+                  </div>
+
+                  {/* Address Field & Structured Address Breakdown (Requirement 2 & 3) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-200">
+                        Address <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowStructuredAddress(!showStructuredAddress)}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer transition-colors bg-amber-400/10 hover:bg-amber-400/20 px-2 py-0.5 rounded-lg border border-amber-400/30"
+                        title="Organize into structured fields: Door No, Street, City, District, State, PIN"
+                      >
+                        <MapPin size={10} />
+                        <span>{showStructuredAddress ? 'Hide Structured' : 'Structured Fields'}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      rows={2}
+                      name="address"
+                      value={formData.address || ""}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full text-xs font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner transition-colors resize-none custom-scrollbar"
+                      placeholder="Enter or paste complete delivery address..."
+                    />
+
+                    {/* Structured Address Organizer (Optional) */}
+                    {showStructuredAddress && (
+                      <div className="mt-2 p-2.5 rounded-xl border border-amber-500/30 bg-[#0f172a] shadow-inner space-y-2 animate-in fade-in-50 duration-200">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                            <MapPin size={11} /> Structured Address Breakdown
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleParseCurrentAddress}
+                              className="text-[9px] font-bold text-cyan-300 hover:text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900/60 px-2 py-0.5 rounded border border-cyan-500/30 transition-colors"
+                              title="Extract Door, Street, City, District, State, PIN from address text"
+                            >
+                              Extract from Text
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleFormatAndApplyAddress}
+                              className="text-[9px] font-bold text-amber-300 hover:text-amber-200 bg-amber-950/60 hover:bg-amber-900/60 px-2 py-0.5 rounded border border-amber-500/30 transition-colors"
+                              title="Format into consistent standard address order and update main address"
+                            >
+                              Format & Apply
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-left">
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">Door / House No</label>
+                            <input
+                              type="text"
+                              value={structuredAddr.doorNo}
+                              onChange={(e) => setStructuredAddr({ ...structuredAddr, doorNo: e.target.value })}
+                              placeholder="Door / Flat / Plot No"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-[11px] font-bold rounded-lg p-1.5 outline-none border focus:border-amber-400 text-white placeholder-slate-500 shadow-inner"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">Street / Area</label>
+                            <input
+                              type="text"
+                              value={structuredAddr.street}
+                              onChange={(e) => setStructuredAddr({ ...structuredAddr, street: e.target.value })}
+                              placeholder="Street, Nagar, Area"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-[11px] font-bold rounded-lg p-1.5 outline-none border focus:border-amber-400 text-white placeholder-slate-500 shadow-inner"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">City / Town</label>
+                            <input
+                              type="text"
+                              value={structuredAddr.city}
+                              onChange={(e) => setStructuredAddr({ ...structuredAddr, city: e.target.value })}
+                              placeholder="City / Town"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-[11px] font-bold rounded-lg p-1.5 outline-none border focus:border-amber-400 text-white placeholder-slate-500 shadow-inner"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">District</label>
+                            <input
+                              type="text"
+                              value={structuredAddr.district}
+                              onChange={(e) => setStructuredAddr({ ...structuredAddr, district: e.target.value })}
+                              placeholder="District"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-[11px] font-bold rounded-lg p-1.5 outline-none border focus:border-amber-400 text-white placeholder-slate-500 shadow-inner"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">State</label>
+                            <input
+                              type="text"
+                              value={structuredAddr.state}
+                              onChange={(e) => setStructuredAddr({ ...structuredAddr, state: e.target.value })}
+                              placeholder="State (e.g. Tamil Nadu)"
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-[11px] font-bold rounded-lg p-1.5 outline-none border focus:border-amber-400 text-white placeholder-slate-500 shadow-inner"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 mb-0.5 uppercase">PIN Code</label>
+                            <input
+                              type="text"
+                              value={structuredAddr.pinCode}
+                              onChange={(e) => setStructuredAddr({ ...structuredAddr, pinCode: e.target.value })}
+                              placeholder="6-digit PIN"
+                              maxLength={6}
+                              style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                              className="w-full text-[11px] font-bold rounded-lg p-1.5 outline-none border focus:border-amber-400 text-white placeholder-slate-500 shadow-inner"
+                            />
+                          </div>
+                        </div>
+
+                        <p className="text-[9px] text-slate-400 italic">
+                          * Consistent display order: Door No, Street, City, District, State - PIN. Formatting is only applied when you click "Format & Apply".
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -12703,6 +13058,11 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     <p className="font-extrabold text-[15px] mb-1 text-black">Shipping To:</p>
                     <p className="text-[15px] font-black text-black tracking-wide break-words max-w-[360px] leading-snug">{shippingOrder.name}</p>
                     <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {formatPhoneNumber(shippingOrder.phone)}</p>
+                    {shippingOrder.address && String(shippingOrder.address).trim() !== "" && (
+                      <p className="text-[13px] font-bold mt-1 text-black break-words max-w-[360px] leading-snug">
+                        Address: <span className="font-medium text-gray-800">{shippingOrder.address}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex-shrink-0 ml-4">
                     <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-md border border-amber-900/30 bg-[#0f0e0f] flex items-center justify-center">
