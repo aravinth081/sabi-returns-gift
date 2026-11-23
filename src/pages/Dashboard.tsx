@@ -4984,7 +4984,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       deliveryDate: displayDispatchDate || "",
       dispatchDate: displayDispatchDate || stdDispatchDate,
       address: formData.address ? String(formData.address).trim() : "",
-      addressDetails: (structuredAddr && (structuredAddr.doorNo || structuredAddr.street || structuredAddr.city || structuredAddr.district || structuredAddr.state || structuredAddr.pinCode)) ? structuredAddr : (formData.addressDetails || null),
+      addressDetails: (structuredAddr && (structuredAddr.doorNo || structuredAddr.street || structuredAddr.city || structuredAddr.district || structuredAddr.state || structuredAddr.pinCode)) ? structuredAddr : ((formData as any).addressDetails || null),
       discount: Number(formData.discount) || 0,
       manualDeliveryFee: Number(formData.manualDeliveryFee) || 0,
       advanceAmount: rawAdvance,
@@ -8565,6 +8565,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </span>
                     </div>
                   )}
+                  </div>
                 </div>
 
                 {!showAuditLog ? (
