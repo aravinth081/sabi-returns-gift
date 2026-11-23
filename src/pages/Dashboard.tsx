@@ -2547,9 +2547,73 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [reportDashboardFilter, setReportDashboardFilter] = useState("All");
-  const [reportInventoryFilter, setReportInventoryFilter] = useState("Inventory 1");
+  const [reportInventoryFilter, setReportInventoryFilter] = useState("All");
   const [reportFromMonth, setReportFromMonth] = useState("");
   const [reportToMonth, setReportToMonth] = useState("");
+  const [reportYearFilter, setReportYearFilter] = useState("All");
+  const [reportMonthFilter, setReportMonthFilter] = useState("All");
+  const [reportRoleFilter, setReportRoleFilter] = useState("All");
+
+  const reportsAvailableInventories = useMemo(() => {
+    const set = new Set<string>();
+    set.add('Inventory 1');
+    set.add('Inventory 2');
+    if (Array.isArray(inventoriesList) && inventoriesList.length > 0) {
+      inventoriesList.forEach((item: any, idx: number) => {
+        const name = getInventoryItemName(item);
+        if (name) set.add(name);
+      });
+    }
+    orders.forEach(o => {
+      if (o.inventory && typeof o.inventory === 'string' && o.inventory.trim()) {
+        set.add(o.inventory.trim());
+      }
+    });
+    return Array.from(set);
+  }, [inventoriesList, orders]);
+
+  const reportAvailableYears = useMemo(() => {
+    const set = new Set<string>();
+    const curY = new Date().getFullYear();
+    set.add(String(curY));
+    set.add(String(curY - 1));
+    set.add(String(curY + 1));
+    set.add('2027');
+    orders.forEach(o => {
+      const dt = parseDateToYYYYMMDD(o.deliveryDate || o.orderDate || o.functionDate);
+      if (dt) {
+        const y = dt.split('-')[0];
+        if (y && y.length === 4) set.add(y);
+      }
+    });
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [orders]);
+
+  const handleReportYearMonthChange = (newYear: string, newMonth: string) => {
+    setReportYearFilter(newYear);
+    setReportMonthFilter(newMonth);
+
+    if (newYear === "All" && newMonth === "All") {
+      setReportDateRange({ start: "", end: "" });
+      return;
+    }
+
+    const y = newYear !== "All" ? newYear : String(new Date().getFullYear());
+    if (newMonth === "All") {
+      setReportDateRange({
+        start: `${y}-01-01`,
+        end: `${y}-12-31`
+      });
+    } else {
+      const yearInt = parseInt(y, 10);
+      const monthInt = parseInt(newMonth, 10);
+      const lastDay = new Date(yearInt, monthInt, 0).getDate();
+      setReportDateRange({
+        start: `${y}-${newMonth}-01`,
+        end: `${y}-${newMonth}-${String(lastDay).padStart(2, '0')}`
+      });
+    }
+  };
 
   // Sequential serial number map: oldest order = SR001, next = SR002, etc.
   const orderSerialMap = useMemo(() => {
@@ -2748,7 +2812,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
     orders.forEach(order => {
       if (order.status === 'Cancelled') return;
-      if (reportInventoryFilter && (order.inventory || 'Inventory 1').toLowerCase() !== reportInventoryFilter.toLowerCase()) return;
+      if (reportInventoryFilter && reportInventoryFilter !== 'All' && (order.inventory || 'Inventory 1').toLowerCase() !== reportInventoryFilter.toLowerCase()) return;
       const targetDateStr = parseDateToYYYYMMDD(order.deliveryDate || order.functionDate || order.orderDate);
       if (!targetDateStr) return;
 
@@ -2828,6 +2892,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   });
   const [editInvId, setEditInvId] = useState<string | null>(null);
   const [viewingInvLog, setViewingInvLog] = useState<any>(null);
+  const [receiptChocolateFilter, setReceiptChocolateFilter] = useState("All");
 
   const [salesTrackerChoc, setSalesTrackerChoc] = useState("All");
   const [salesTrackerFrom, setSalesTrackerFrom] = useState("");
@@ -2893,7 +2958,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   const [isShippingOpen, setIsShippingOpen] = useState(false);
   const [shippingOrder, setShippingOrder] = useState<any>(null);
 
-  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale', inventory: "Inventory 1", location: "" });
+  const [formData, setFormData] = useState({ id: null as any, fireId: null as any, name: "", shippingName: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: "chocolate", manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail' as 'retail' | 'wholesale', inventory: "Inventory 1", location: "" });
 
   const [orderTypeOthersToggle, setOrderTypeOthersToggle] = useState(true);
 
@@ -3774,7 +3839,15 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       filtered = filtered.filter(order => (order.orderType || "Sabi") === reportOrderTypeFilter);
     }
 
-    if (reportInventoryFilter) {
+    if (reportRoleFilter !== "All") {
+      filtered = filtered.filter(order => {
+        const fallbackRole = order.orderType === 'Self' ? 'Self' : 'Others';
+        const orderRole = order.role || fallbackRole;
+        return String(orderRole).trim().toLowerCase() === reportRoleFilter.trim().toLowerCase();
+      });
+    }
+
+    if (reportInventoryFilter && reportInventoryFilter !== "All") {
       filtered = filtered.filter(order => (order.inventory || 'Inventory 1').toLowerCase() === reportInventoryFilter.toLowerCase());
     }
 
@@ -3819,7 +3892,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       totalCost,
       totalProfit: totalRev - totalCost
     };
-  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, reportInventoryFilter, reportOrderTypeFilter, managedChocPricesMap, managedChocStickersMap, currentUserAllowedOrderTypes, orderTypes]);
+  }, [orders, reportDateRange, customPricesMap, reportDashboardFilter, reportInventoryFilter, reportOrderTypeFilter, reportRoleFilter, managedChocPricesMap, managedChocStickersMap, currentUserAllowedOrderTypes, orderTypes]);
 
 
 
@@ -4318,7 +4391,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const initialRole = userDefaultRole || "Others";
     const initialInventory = (userDefaultInventory as 'Inventory 1' | 'Inventory 2') || "Inventory 1";
 
-    setFormData({ id: null, fireId: null, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
+    setFormData({ id: null, fireId: null, name: "", shippingName: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: initialOrderType, role: initialRole, inventory: initialInventory, orderStatus: "image edited (not paid)", category, manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', location: "" });
     setStructuredAddr({ doorNo: "", street: "", city: "", district: "", state: "", pinCode: "" });
     setShowStructuredAddress(false);
     setChocolateRows([{ chocolate: "", count: "" }]);
@@ -4359,6 +4432,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       id: null,
       fireId: null,
       name: n.cardTitle || "",
+      shippingName: "",
       phone: n.phoneNumber || "",
       orderDate: "",
       functionDate: birthdayVal || "",
@@ -4400,6 +4474,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     const orderCat = order.category || (activeTab === 'dashboard2' ? 'product' : 'chocolate');
     setFormData({
       ...order,
+      shippingName: order.shippingName || "",
       fireId: order.fireId, // 🟢 IMPORTANT: Ithu thaan edit aaga use aagum
       id: order.id,
       orderDate: order.orderDate ? parseDateToYYYYMMDD(order.orderDate) : (order.functionDate ? parseDateToYYYYMMDD(order.functionDate) : ""),
@@ -5111,7 +5186,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
       // Close modal and reset form immediately after main DB write
       setIsModalOpen(false);
-      setFormData({ id: null as any, fireId: null as any, name: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', inventory: "Inventory 1", location: "" });
+      setFormData({ id: null as any, fireId: null as any, name: "", shippingName: "", phone: "", orderDate: "", functionDate: "", deliveryDate: "", chocolate: "", count: "", address: "", status: "In Process", paymentStatus: "Pending", discount: 0, isDeliveryFree: false, isChennai: false, orderType: getOrderTypeName(orderTypes[0]) || "Sabi", role: "Others", orderStatus: "image edited (not paid)", category: activeTab === 'dashboard2' ? 'product' : 'chocolate', manualDeliveryFee: "", advanceAmount: "", manualProductPrice: "", pricingType: 'retail', inventory: "Inventory 1", location: "" });
       setStructuredAddr({ doorNo: "", street: "", city: "", district: "", state: "", pinCode: "" });
       setShowStructuredAddress(false);
 
@@ -5174,20 +5249,57 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       address: invForm.address ? String(invForm.address).trim() : ""
     };
 
+    const currentUserName = loggedInName || username || localStorage.getItem('loggedInName') || 'Admin';
+    const nowIso = new Date().toISOString();
+    const nowDateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
     try {
       if (editInvId) {
-        await updateDoc(doc(db, "inventory", editInvId), entryData);
-        setInventoryLogs(prev => prev.map(log => log.fireId === editInvId ? { ...log, ...entryData } : log));
+        const existingLog = inventoryLogs.find(l => l.fireId === editInvId);
+        const changeNotes: string[] = [];
+        if (existingLog) {
+          if (existingLog.date !== entryData.date) changeNotes.push(`Date: ${existingLog.date || 'None'} → ${entryData.date}`);
+          if (existingLog.chocolate !== entryData.chocolate) changeNotes.push(`Chocolate: ${existingLog.chocolate} → ${entryData.chocolate}`);
+          if (Number(existingLog.boxCount) !== entryData.boxCount) changeNotes.push(`Boxes: ${existingLog.boxCount} → ${entryData.boxCount}`);
+          if (Number(existingLog.itemsPerBox) !== entryData.itemsPerBox) changeNotes.push(`Items/Box: ${existingLog.itemsPerBox} → ${entryData.itemsPerBox}`);
+          if (Number(existingLog.totalChocolates) !== entryData.totalChocolates) changeNotes.push(`Total: ${existingLog.totalChocolates} → ${entryData.totalChocolates}`);
+          if (existingLog.inventory !== entryData.inventory) changeNotes.push(`Inventory: ${existingLog.inventory} → ${entryData.inventory}`);
+          if (existingLog.address !== entryData.address) changeNotes.push(`Address: ${existingLog.address || 'None'} → ${entryData.address || 'None'}`);
+        }
+        const historyItem = {
+          action: "Edited Entry",
+          userName: currentUserName,
+          timestamp: nowIso,
+          dateDisplay: nowDateStr,
+          timeDisplay: nowTimeStr,
+          details: changeNotes.length > 0 ? changeNotes.join('; ') : "Updated entry details"
+        };
+        const updatedHistory = [historyItem, ...(existingLog?.history || [])];
+        const dataToSave = { ...entryData, history: updatedHistory };
+
+        await updateDoc(doc(db, "inventory", editInvId), dataToSave);
+        setInventoryLogs(prev => prev.map(log => log.fireId === editInvId ? { ...log, ...dataToSave } : log));
         setEditInvId(null);
-        logActivity(`Edited Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox})`, 'Inventories');
+        logActivity(`Edited Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox}) by ${currentUserName}`, 'Inventories');
       } else {
-        const fireId = Date.now().toString();
-        setInventoryLogs(prev => [{ fireId, ...entryData, timestamp: Date.now() }, ...prev]);
-        await addDoc(collection(db, "inventory"), {
+        const historyItem = {
+          action: "Created Entry",
+          userName: currentUserName,
+          timestamp: nowIso,
+          dateDisplay: nowDateStr,
+          timeDisplay: nowTimeStr,
+          details: `Added ${entryData.boxCount} boxes x ${entryData.itemsPerBox} items = ${entryData.totalChocolates} pcs`
+        };
+        const dataToSave = {
           ...entryData,
+          history: [historyItem],
           timestamp: Date.now()
-        });
-        logActivity(`Added Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox} = ${Number(invForm.boxCount) * Number(invForm.itemsPerBox)} pcs)`, 'Inventories');
+        };
+        const fireId = Date.now().toString();
+        setInventoryLogs(prev => [{ fireId, ...dataToSave }, ...prev]);
+        await addDoc(collection(db, "inventory"), dataToSave);
+        logActivity(`Added Inventory: ${invForm.chocolate} (${invForm.boxCount} boxes x ${invForm.itemsPerBox} = ${entryData.totalChocolates} pcs) by ${currentUserName}`, 'Inventories');
       }
       setInvForm(prev => ({ ...prev, date: "", boxCount: "", itemsPerBox: "", address: "" }));
       setIsInvModalOpen(false);
@@ -8237,44 +8349,135 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   </div>
                 )}
                 <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
-                  {dynamicInventory.map((choc, i) => {
-                    const norm = normalizeChocName(choc, dynamicInventory);
-                    const metrics = dateWiseInventorySummary.chocolates[norm];
-                    const bal = metrics?.availableStock ?? (inventoryBalances[choc] || 0);
-                    return (
-                      <div
-                        key={i}
-                        className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[140px] sm:min-w-[160px] flex-1 flex flex-col justify-between items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
-                      >
-                        <span className="text-xs font-extrabold text-white uppercase leading-tight mb-2 h-8 flex items-center justify-center text-center px-1">
-                          {choc}
-                        </span>
-                        <div className="my-1">
-                          <span className={`text-2xl font-black ${bal < 0
-                              ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
-                              : bal === 0
-                                ? 'text-slate-400'
-                                : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]'
-                            }`}>{bal}</span>
-                          <span className="text-[10px] block text-slate-400 font-bold uppercase tracking-wider">Available</span>
+                  {(() => {
+                    const sortedStockBalance = [...dynamicInventory].sort((a, b) => {
+                      const normA = normalizeChocName(a, dynamicInventory);
+                      const normB = normalizeChocName(b, dynamicInventory);
+                      const balA = dateWiseInventorySummary.chocolates[normA]?.availableStock ?? (inventoryBalances[a] || 0);
+                      const balB = dateWiseInventorySummary.chocolates[normB]?.availableStock ?? (inventoryBalances[b] || 0);
+                      return balB - balA;
+                    });
+                    return sortedStockBalance.map((choc, i) => {
+                      const norm = normalizeChocName(choc, dynamicInventory);
+                      const metrics = dateWiseInventorySummary.chocolates[norm];
+                      const bal = metrics?.availableStock ?? (inventoryBalances[choc] || 0);
+                      return (
+                        <div
+                          key={i}
+                          className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[140px] sm:min-w-[160px] flex-1 flex flex-col justify-between items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
+                        >
+                          <span className="text-xs font-extrabold text-white uppercase leading-tight mb-2 h-8 flex items-center justify-center text-center px-1">
+                            {choc}
+                          </span>
+                          <div className="my-1">
+                            <span className={`text-2xl font-black ${bal < 0
+                                ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                                : bal === 0
+                                  ? 'text-slate-400'
+                                  : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                              }`}>{bal}</span>
+                            <span className="text-[10px] block text-slate-400 font-bold uppercase tracking-wider">Available</span>
+                          </div>
+                          <div className="w-full grid grid-cols-2 gap-1 pt-2 border-t border-white/10 text-[10px] font-bold">
+                            <span className="text-blue-300 bg-blue-900/30 px-1 py-0.5 rounded truncate" title="Total Received">
+                              Rec: {metrics?.totalReceived ?? 0}
+                            </span>
+                            <span className="text-orange-300 bg-orange-900/30 px-1 py-0.5 rounded truncate" title="Total Deducted">
+                              Ded: {metrics?.totalDeducted ?? 0}
+                            </span>
+                            <span className="text-amber-300 bg-amber-900/30 px-1 py-0.5 rounded truncate" title="Today's Scheduled">
+                              Today: {metrics?.todayScheduled ?? 0}
+                            </span>
+                            <span className="text-purple-300 bg-purple-900/30 px-1 py-0.5 rounded truncate" title="Future Scheduled (Undeducted)">
+                              Fut: {metrics?.futureScheduled ?? 0}
+                            </span>
+                          </div>
                         </div>
-                        <div className="w-full grid grid-cols-2 gap-1 pt-2 border-t border-white/10 text-[10px] font-bold">
-                          <span className="text-blue-300 bg-blue-900/30 px-1 py-0.5 rounded truncate" title="Total Received">
-                            Rec: {metrics?.totalReceived ?? 0}
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* 🟢 NEW: UPCOMING STOCK REQUIREMENTS SECTION */}
+              <div
+                className={`p-5 rounded-[2rem] transition-all duration-500 ${isWallpaperActive
+                    ? 'bg-[#0d1527]/80 backdrop-blur-xl border border-white/20 shadow-2xl'
+                    : 'bg-[#0d1527] border border-white/15 shadow-2xl'
+                  }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3.5 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <h2
+                      className="text-xl sm:text-2xl md:text-3xl font-black text-purple-400 tracking-wider sm:tracking-widest uppercase flex items-center gap-2"
+                      style={{ textShadow: "0 0 12px rgba(168,85,247,0.3)" }}
+                    >
+                      Upcoming Stock Requirements ({selectedInventoryTab})
+                    </h2>
+                    <span className="text-white/20 hidden sm:inline text-xl font-light">|</span>
+                    <span className="text-xs font-black text-purple-300 bg-purple-500/20 px-3 py-1 rounded-xl border border-purple-500/30">
+                      Fut: Demand
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-400">
+                      Sorted: <strong className="text-purple-300 font-extrabold">Highest to Lowest</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex overflow-x-auto gap-4 pb-3 custom-scrollbar flex-nowrap">
+                  {(() => {
+                    const sortedUpcoming = [...dynamicInventory].sort((a, b) => {
+                      const normA = normalizeChocName(a, dynamicInventory);
+                      const normB = normalizeChocName(b, dynamicInventory);
+                      const futA = dateWiseInventorySummary.chocolates[normA]?.futureScheduled ?? 0;
+                      const futB = dateWiseInventorySummary.chocolates[normB]?.futureScheduled ?? 0;
+                      return futB - futA;
+                    });
+                    return sortedUpcoming.map((choc, i) => {
+                      const norm = normalizeChocName(choc, dynamicInventory);
+                      const metrics = dateWiseInventorySummary.chocolates[norm];
+                      const fut = metrics?.futureScheduled ?? 0;
+                      const bal = metrics?.availableStock ?? (inventoryBalances[choc] || 0);
+                      const isCovered = bal >= fut;
+                      return (
+                        <div
+                          key={i}
+                          className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[140px] sm:min-w-[160px] flex-1 flex flex-col justify-between items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
+                        >
+                          <span className="text-xs font-extrabold text-white uppercase leading-tight mb-2 h-8 flex items-center justify-center text-center px-1">
+                            {choc}
                           </span>
-                          <span className="text-orange-300 bg-orange-900/30 px-1 py-0.5 rounded truncate" title="Total Deducted">
-                            Ded: {metrics?.totalDeducted ?? 0}
-                          </span>
-                          <span className="text-amber-300 bg-amber-900/30 px-1 py-0.5 rounded truncate" title="Today's Scheduled">
-                            Today: {metrics?.todayScheduled ?? 0}
-                          </span>
-                          <span className="text-purple-300 bg-purple-900/30 px-1 py-0.5 rounded truncate" title="Future Scheduled (Undeducted)">
-                            Fut: {metrics?.futureScheduled ?? 0}
-                          </span>
+                          <div className="my-1">
+                            <span className={`text-2xl font-black ${fut > 0
+                                ? 'text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]'
+                                : 'text-slate-400'
+                              }`}>{fut}</span>
+                            <span className="text-[10px] block text-purple-300/80 font-bold uppercase tracking-wider">Fut: Count</span>
+                          </div>
+                          <div className="w-full flex flex-col gap-1 pt-2 border-t border-white/10 text-[10px] font-bold">
+                            <div className="flex justify-between items-center px-1">
+                              <span className="text-slate-400">Available:</span>
+                              <span className={`font-mono font-black ${bal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{bal}</span>
+                            </div>
+                            <div className="flex justify-between items-center px-1">
+                              <span className="text-slate-400">Status:</span>
+                              <span className={`font-black text-[9px] px-1.5 py-0.5 rounded ${
+                                fut === 0
+                                  ? 'bg-slate-500/20 text-slate-300'
+                                  : isCovered
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              }`}>
+                                {fut === 0 ? 'No Demand' : isCovered ? 'In Stock' : `Short: ${fut - bal}`}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
@@ -8304,22 +8507,46 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     </button>
                   </div>
 
-                  {!showAuditLog ? (
-                    <button onClick={() => {
-                      setInvForm({
-                        date: "",
-                        chocolate: managedChocolates[0]?.name || "",
-                        boxCount: "",
-                        itemsPerBox: "",
-                        inventory: selectedInventoryTab,
-                        address: ""
-                      });
-                      setEditInvId(null);
-                      setIsInvModalOpen(true);
-                    }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
-                      <Plus size={16} /> Add Entry
-                    </button>
-                  ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!showAuditLog && (
+                      <div className="relative">
+                        <select
+                          value={receiptChocolateFilter}
+                          onChange={(e) => setReceiptChocolateFilter(e.target.value)}
+                          style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                          className="text-xs font-bold rounded-xl px-3 py-2 outline-none border focus:border-amber-400 text-amber-300 shadow-inner cursor-pointer"
+                          title="Filter Stock Receipts by Chocolate"
+                        >
+                          <option value="All" className="bg-[#0f172a] text-white">All Chocolates</option>
+                          {Array.from(new Set([
+                            ...managedChocolates.map(c => c.name),
+                            ...dynamicInventory,
+                            ...inventoryLogs.map(l => l.chocolate)
+                          ].filter(Boolean))).map((cName) => (
+                            <option key={cName} value={cName} className="bg-[#0f172a] text-white">
+                              {cName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {!showAuditLog ? (
+                      <button onClick={() => {
+                        setInvForm({
+                          date: "",
+                          chocolate: managedChocolates[0]?.name || "",
+                          boxCount: "",
+                          itemsPerBox: "",
+                          inventory: selectedInventoryTab,
+                          address: ""
+                        });
+                        setEditInvId(null);
+                        setIsInvModalOpen(true);
+                      }} className="bg-[#d35400] text-white px-4 py-2 rounded-xl font-black text-sm uppercase tracking-widest shadow-md hover:bg-[#a04000] hover:-translate-y-1 transition-all flex items-center gap-2">
+                        <Plus size={16} /> Add Entry
+                      </button>
+                    ) : (
                     <div className="flex items-center gap-2">
                       {dispatchDateFilter && (
                         <span className="text-xs font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
@@ -8356,10 +8583,14 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </thead>
                       <tbody>
                         {(() => {
-                          const currentInventoryLogs = inventoryLogs.filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab);
+                          const currentInventoryLogs = inventoryLogs
+                            .filter(log => (log.inventory || 'Inventory 1') === selectedInventoryTab)
+                            .filter(log => !receiptChocolateFilter || receiptChocolateFilter === 'All' || String(log.chocolate || '').trim().toLowerCase() === receiptChocolateFilter.trim().toLowerCase());
                           if (currentInventoryLogs.length === 0) {
                             return (
-                              <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">No inventory entries found for {selectedInventoryTab}.</td></tr>
+                              <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-bold">
+                                {receiptChocolateFilter !== 'All' ? `No inventory entries found for "${receiptChocolateFilter}" in ${selectedInventoryTab}.` : `No inventory entries found for ${selectedInventoryTab}.`}
+                              </td></tr>
                             );
                           }
                           return currentInventoryLogs.map(log => (
@@ -11049,8 +11280,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
                         title="Filter Analytics & Reports by Inventory"
                       >
-                        <option value="Inventory 1">Inventory 1</option>
-                        <option value="Inventory 2">Inventory 2</option>
+                        <option value="All">All Inventories</option>
+                        {reportsAvailableInventories.map(inv => (
+                          <option key={inv} value={inv}>{inv}</option>
+                        ))}
                       </select>
                       <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
                     </div>
@@ -11060,8 +11293,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         value={reportOrderTypeFilter}
                         onChange={(e) => setReportOrderTypeFilter(e.target.value)}
                         className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
+                        title="Filter Analytics & Reports by Type"
                       >
-                        <option value="All">All Order Types</option>
+                        <option value="All">All Types</option>
                         {orderTypes.map((ot, idx) => {
                           const name = getOrderTypeName(ot);
                           const id = getOrderTypeId(ot, idx);
@@ -11071,6 +11305,21 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                             </option>
                           );
                         })}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
+                    </div>
+
+                    {/* 🟢 ROLE DROPDOWN (Self / Others / All) */}
+                    <div className="relative">
+                      <select
+                        value={reportRoleFilter}
+                        onChange={(e) => setReportRoleFilter(e.target.value)}
+                        className="pl-3 pr-8 py-1.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-bold text-[#5d4037] outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm appearance-none"
+                        title="Filter Analytics & Reports by Role"
+                      >
+                        <option value="All">All Roles</option>
+                        <option value="Self">Self</option>
+                        <option value="Others">Others</option>
                       </select>
                       <ChevronDown size={14} className="absolute right-3 top-2.5 text-[#a46c3b] pointer-events-none" />
                     </div>
@@ -11145,6 +11394,40 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-300">
+                  {/* Year Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={reportYearFilter}
+                      onChange={(e) => handleReportYearMonthChange(e.target.value, reportMonthFilter)}
+                      className="pl-3 pr-7 py-2 bg-[#131c2e] hover:bg-[#18243b] border border-white/15 rounded-xl text-xs font-extrabold text-amber-300 outline-none focus:border-amber-400 cursor-pointer shadow-sm appearance-none"
+                      title="Select Year for Reports"
+                    >
+                      <option value="All" className="bg-[#0f172a] text-white">All Years</option>
+                      {reportAvailableYears.map(y => (
+                        <option key={y} value={y} className="bg-[#0f172a] text-white">{y}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-2.5 text-amber-400 pointer-events-none" />
+                  </div>
+
+                  {/* Month Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={reportMonthFilter}
+                      onChange={(e) => handleReportYearMonthChange(reportYearFilter, e.target.value)}
+                      className="pl-3 pr-7 py-2 bg-[#131c2e] hover:bg-[#18243b] border border-white/15 rounded-xl text-xs font-extrabold text-cyan-300 outline-none focus:border-cyan-400 cursor-pointer shadow-sm appearance-none"
+                      title="Select Month for Reports"
+                    >
+                      <option value="All" className="bg-[#0f172a] text-white">All Months</option>
+                      {PARETO_MONTHS_LIST.map(m => (
+                        <option key={m.value} value={m.value} className="bg-[#0f172a] text-white">
+                          {m.value} - {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-2.5 text-cyan-400 pointer-events-none" />
+                  </div>
+
                   {/* From Date Popover */}
                   <Popover>
                     <PopoverTrigger asChild>
@@ -11195,9 +11478,13 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     </PopoverContent>
                   </Popover>
 
-                  {(reportDateRange.start || reportDateRange.end) && (
+                  {(reportDateRange.start || reportDateRange.end || reportYearFilter !== "All" || reportMonthFilter !== "All") && (
                     <button
-                      onClick={() => setReportDateRange({ start: "", end: "" })}
+                      onClick={() => {
+                        setReportDateRange({ start: "", end: "" });
+                        setReportYearFilter("All");
+                        setReportMonthFilter("All");
+                      }}
                       className="text-red-400 hover:text-red-300 font-extrabold text-xs cursor-pointer bg-red-950/40 hover:bg-red-900/60 px-3 py-2 rounded-xl border border-red-500/30 transition-colors"
                     >
                       Clear
@@ -11936,8 +12223,8 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       {/* 🟢 NEW: MANUAL INVENTORY VIEW DETAILS MODAL */}
       {viewingInvLog && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setViewingInvLog(null)}>
-          <div className="rounded-[2rem] shadow-2xl w-full max-w-md p-8 bg-[#0c1427] border border-white/20 text-white" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-black mb-6 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
+          <div className="rounded-[2rem] shadow-2xl w-full max-w-lg p-6 sm:p-8 bg-[#0c1427] border border-white/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl sm:text-2xl font-black mb-5 text-white text-center tracking-wide border-b border-white/15 pb-4 uppercase">
               Manual Inventory Log Details
             </h2>
             <div className="space-y-4 text-sm font-bold text-slate-200">
@@ -11948,6 +12235,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
               <div className="flex justify-between border-b border-white/10 pb-2">
                 <span className="text-slate-400">Chocolate Name:</span>
                 <span className="text-amber-300 font-black">{viewingInvLog.chocolate}</span>
+              </div>
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-slate-400">Inventory:</span>
+                <span className="text-cyan-300 font-extrabold">{viewingInvLog.inventory || 'Inventory 1'}</span>
               </div>
               <div className="flex justify-between border-b border-white/10 pb-2">
                 <span className="text-slate-400">Boxes Added:</span>
@@ -11967,6 +12258,44 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Total Chocolates Added</span>
                 <span className="text-3xl font-black text-amber-300">+{viewingInvLog.totalChocolates}</span>
               </div>
+
+              {/* 🟢 CHANGE HISTORY & AUDIT TRAIL */}
+              <div className="pt-3 border-t border-white/10">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400 block mb-2 flex items-center gap-1.5">
+                  <Clock size={13} className="text-amber-400" /> Change History & Audit Log
+                </span>
+                <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
+                  {viewingInvLog.history && Array.isArray(viewingInvLog.history) && viewingInvLog.history.length > 0 ? (
+                    viewingInvLog.history.map((h: any, hIdx: number) => (
+                      <div key={hIdx} className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            h.action === 'Created Entry' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          }`}>
+                            {h.action || 'Updated'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {h.dateDisplay} {h.timeDisplay ? `• ${h.timeDisplay}` : ''}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-200">
+                          By User: <span className="text-cyan-300 font-extrabold">{h.userName || 'Admin'}</span>
+                        </div>
+                        {h.details && (
+                          <div className="text-[10px] text-slate-400 break-words leading-tight bg-black/20 p-1.5 rounded-lg border border-white/5">
+                            {h.details}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 italic text-center">
+                      Entry created on {formatToDisplayDate(viewingInvLog.date) || 'initial setup'}. No subsequent modifications recorded.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="pt-4 flex justify-center">
                 <button onClick={() => setViewingInvLog(null)} className="w-full px-4 py-3 rounded-xl font-black text-sm uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all">Close Details</button>
               </div>
@@ -12128,6 +12457,22 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                       className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner transition-colors"
                       placeholder="Enter Name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider mb-1 text-slate-200">
+                      Shipping Name <span className="text-slate-400 font-normal lowercase">(used on shipping label)</span>
+                    </label>
+                    <input
+                      autoComplete="off"
+                      type="text"
+                      name="shippingName"
+                      value={formData.shippingName || ""}
+                      onChange={handleInputChange}
+                      style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                      className="w-full text-sm font-bold rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white placeholder-slate-400 shadow-inner transition-colors"
+                      placeholder="Enter Shipping Name (defaults to Customer Name if empty)"
                     />
                   </div>
 
@@ -12471,8 +12816,36 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         </button>
                       </div>
                       {chocolateRows.map((row, idx) => (
-                        <div key={idx} style={{ backgroundColor: '#141d33', borderColor: 'rgba(255, 255, 255, 0.18)' }} className="flex gap-2.5 items-center p-3 rounded-2xl border shadow-sm">
-                          <div className="flex-1 min-w-0">
+                        <div key={idx} style={{ backgroundColor: '#141d33', borderColor: 'rgba(255, 255, 255, 0.18)' }} className="p-3 rounded-2xl border shadow-sm space-y-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                              Chocolate {idx + 1}
+                            </span>
+                            {chocolateRows.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newRows = chocolateRows.filter((_, i) => i !== idx);
+                                  setChocolateRows(newRows);
+                                  const chocsStr = newRows.map(r => r.chocolate.trim()).filter(Boolean).join(', ');
+                                  const countsStr = newRows.map(r => r.count.trim()).filter(Boolean).join(', ');
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    chocolate: chocsStr,
+                                    count: countsStr
+                                  }));
+                                }}
+                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 px-2 py-0.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Remove chocolate"
+                              >
+                                <Trash2 size={13} />
+                                <span>Remove</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Line 1: Select chocolate list box on its own line */}
+                          <div className="w-full min-w-0">
                             <ChocolateSingleSelect
                               value={row.chocolate}
                               onChange={(val) => {
@@ -12492,7 +12865,12 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                               placeholderText="Select chocolate..."
                             />
                           </div>
-                          <div className="w-24 shrink-0">
+
+                          {/* Line 2: Quantity box below chocolate list box */}
+                          <div className="w-full">
+                            <label className="block text-[10px] font-black text-slate-300 uppercase tracking-wider mb-1">
+                              Quantity
+                            </label>
                             <input
                               required
                               type="text"
@@ -12510,30 +12888,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                 }));
                               }}
                               style={{ backgroundColor: '#162035', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.25)' }}
-                              className="w-full text-sm font-black rounded-xl p-3 outline-none border focus:border-amber-400 text-white shadow-inner text-center min-h-[46px]"
-                              placeholder="Qty"
+                              className="w-full text-sm font-black rounded-xl p-2.5 outline-none border focus:border-amber-400 text-white shadow-inner text-left"
+                              placeholder="Enter Quantity (e.g. 50)"
                             />
                           </div>
-                          {chocolateRows.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newRows = chocolateRows.filter((_, i) => i !== idx);
-                                setChocolateRows(newRows);
-                                const chocsStr = newRows.map(r => r.chocolate.trim()).filter(Boolean).join(', ');
-                                const countsStr = newRows.map(r => r.count.trim()).filter(Boolean).join(', ');
-                                setFormData(prev => ({
-                                  ...prev,
-                                  chocolate: chocsStr,
-                                  count: countsStr
-                                }));
-                              }}
-                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-2 rounded-xl transition-colors shrink-0 cursor-pointer"
-                              title="Remove chocolate"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -13056,7 +13414,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                   <div className="flex-1 pt-2">
                     <h3 className="text-base font-extrabold text-black tracking-wide mb-3">Shipping Label</h3>
                     <p className="font-extrabold text-[15px] mb-1 text-black">Shipping To:</p>
-                    <p className="text-[15px] font-black text-black tracking-wide break-words max-w-[360px] leading-snug">{shippingOrder.name}</p>
+                    <p className="text-[15px] font-black text-black tracking-wide break-words max-w-[360px] leading-snug">
+                      {shippingOrder.shippingName && String(shippingOrder.shippingName).trim() !== "" ? shippingOrder.shippingName : shippingOrder.name}
+                    </p>
                     <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {formatPhoneNumber(shippingOrder.phone)}</p>
                     {shippingOrder.address && String(shippingOrder.address).trim() !== "" && (
                       <p className="text-[13px] font-bold mt-1 text-black break-words max-w-[360px] leading-snug">
@@ -13065,8 +13425,8 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     )}
                   </div>
                   <div className="flex-shrink-0 ml-4">
-                    <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-md border border-amber-900/30 bg-[#0f0e0f] flex items-center justify-center">
-                      <img src="/sabi-logo.png" alt="Logo" className="w-full h-full object-cover rounded-2xl" crossOrigin="anonymous" onError={(e) => (e.currentTarget.style.display = "none")} />
+                    <div className="w-36 h-36 rounded-2xl overflow-hidden border border-gray-200 bg-white flex items-center justify-center p-2 shadow-sm">
+                      <img src="/sabi-logo-red.png" alt="Logo" className="w-full h-full object-contain" crossOrigin="anonymous" onError={(e) => (e.currentTarget.style.display = "none")} />
                     </div>
                   </div>
                 </div>

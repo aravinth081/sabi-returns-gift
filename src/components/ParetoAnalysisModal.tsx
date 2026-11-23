@@ -97,7 +97,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
   orderTypes = []
 }) => {
   // Navigation / Tabs
-  const [activeTab, setActiveTab] = useState<'pareto' | 'weekly' | 'overview'>('pareto');
+  const [activeTab, setActiveTab] = useState<'pareto' | 'weekly' | 'monthly' | 'overview'>('pareto');
 
   // Filter 1: Date basis dropdown (Order Date, Dispatch Date, Function Date)
   const [dateType, setDateType] = useState<string>(
@@ -479,7 +479,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
   // 3. WEEK-WISE ANALYSIS DATA (Daily breakdown + 4-week comparison)
   const weekWiseData = useMemo(() => {
     const yearInt = parseInt(selectedYear, 10);
-    const monthInt = parseInt(selectedMonth, 10);
+    const monthInt = selectedMonth === 'all' ? 1 : parseInt(selectedMonth, 10);
     const daysInMonth = new Date(yearInt, monthInt, 0).getDate();
 
     // Determine day range for the current view
@@ -672,6 +672,124 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
     };
   }, [filteredOrders, orders, selectedYear, selectedMonth, selectedWeek, dateType, selectedRole, selectedType]);
 
+  // 4. MONTH-WISE ANALYSIS DATA (12-Month breakdown for the selected year)
+  const monthWiseData = useMemo(() => {
+    const monthsData = [];
+    let yearTotalCustomers = 0;
+    let yearTotalChocolates = 0;
+    let yearTotalSales = 0;
+
+    // Filter orders matching the selected year, role, type, inventory, dateType
+    const yearOrders = orders.filter(order => {
+      if (order.status === 'Cancelled' || order.orderStatus === 'cancelled') return false;
+      const targetDate = getOrderTargetDate(order);
+      if (!targetDate || !targetDate.startsWith(selectedYear)) return false;
+
+      // Role filter check
+      if (selectedRole !== 'All') {
+        const fallbackRole = order.orderType === 'Self' ? 'Self' : 'Others';
+        const orderRole = order.role || fallbackRole;
+        if (String(orderRole).trim().toLowerCase() !== selectedRole.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Order Type filter check
+      if (selectedType !== 'All') {
+        const orderTypeVal = order.orderType || 'Thaaru';
+        if (String(orderTypeVal).trim().toLowerCase() !== selectedType.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Inventory filter check
+      if (selectedInventory && selectedInventory !== 'All') {
+        const orderInv = order.inventory || 'Inventory 1';
+        if (orderInv.trim().toLowerCase() !== selectedInventory.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const fullMonthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    for (let m = 1; m <= 12; m++) {
+      const monthStr = String(m).padStart(2, '0');
+      const prefix = `${selectedYear}-${monthStr}`;
+
+      const mOrders = yearOrders.filter(o => {
+        const d = getOrderTargetDate(o);
+        return d && d.startsWith(prefix);
+      });
+
+      const customerSet = new Set<string>();
+      let mChocolates = 0;
+      let mRevenue = 0;
+
+      mOrders.forEach(o => {
+        const custKey = o.phone ? String(o.phone).trim() : (o.name ? String(o.name).trim().toLowerCase() : o.id);
+        customerSet.add(custKey);
+
+        const countParts = String(o.count || 0).split(',').map(c => Number(c.trim()) || 0);
+        const orderChocTotal = countParts.reduce((acc, val) => acc + val, 0);
+        mChocolates += orderChocTotal;
+
+        const total = Number(o.totalPrice || o.chocolatePrice || 0);
+        mRevenue += total;
+      });
+
+      const custCount = customerSet.size;
+      yearTotalCustomers += custCount;
+      yearTotalChocolates += mChocolates;
+      yearTotalSales += mRevenue;
+
+      monthsData.push({
+        monthNumber: m,
+        monthCode: monthStr,
+        monthShort: monthNames[m - 1],
+        monthFull: fullMonthNames[m - 1],
+        monthLabel: `${monthNames[m - 1]} ${selectedYear}`,
+        customersCount: custCount,
+        chocolatesSold: mChocolates,
+        salesAmount: mRevenue,
+        avgChocPerCustomer: custCount > 0 ? Math.round(mChocolates / custCount) : 0,
+        ordersCount: mOrders.length
+      });
+    }
+
+    const monthsWithPercent = monthsData.map(item => ({
+      ...item,
+      percentageOfYear: yearTotalChocolates > 0
+        ? Number(((item.chocolatesSold / yearTotalChocolates) * 100).toFixed(1))
+        : 0
+    }));
+
+    const monthlyAvgCustomers = (yearTotalCustomers / 12).toFixed(1);
+    const monthlyAvgChocolates = Math.round(yearTotalChocolates / 12);
+    const avgChocolatesPerCustomer = yearTotalCustomers > 0 ? Math.round(yearTotalChocolates / yearTotalCustomers) : 0;
+    const peakMonth = [...monthsWithPercent].sort((a, b) => b.chocolatesSold - a.chocolatesSold)[0] || null;
+
+    return {
+      months: monthsWithPercent,
+      yearTotalCustomers,
+      yearTotalChocolates,
+      yearTotalSales,
+      monthlyAvgCustomers,
+      monthlyAvgChocolates,
+      avgChocolatesPerCustomer,
+      peakMonth
+    };
+  }, [orders, selectedYear, selectedRole, selectedType, selectedInventory, dateType]);
+
   if (!isOpen) return null;
 
   return (
@@ -761,6 +879,7 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                   onChange={e => handleMonthChange(e.target.value)}
                   className="w-full bg-[#162035] text-cyan-300 font-bold text-xs rounded-xl px-3 py-2 border border-cyan-400/40 focus:border-cyan-400 outline-none cursor-pointer appearance-none shadow-sm"
                 >
+                  <option value="all">All Months ({selectedYear})</option>
                   {monthsList.map(m => (
                     <option key={m.value} value={m.value}>
                       {m.value} - {m.name}
@@ -990,6 +1109,19 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
             >
               <BarChart3 size={15} />
               <span>Week-wise Analysis</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('monthly')}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'monthly'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20 scale-102'
+                  : 'bg-[#162035] text-slate-300 hover:text-white hover:bg-[#1c2a47]'
+              }`}
+            >
+              <Calendar size={15} />
+              <span>Month-wise Analysis</span>
             </button>
 
             <button
@@ -1719,6 +1851,263 @@ export const ParetoAnalysisModal: React.FC<ParetoAnalysisModalProps> = ({
                         );
                       })}
                     </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: MONTH-WISE CUSTOMERS & SALES ANALYSIS */}
+          {activeTab === 'monthly' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Top Summary Cards for Monthly Analysis */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-[#111a2e] p-4 rounded-2xl border border-blue-500/30 shadow-lg">
+                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider block">
+                    Year Total Customers ({selectedYear})
+                  </span>
+                  <h3 className="text-2xl font-black text-white mt-1">
+                    {monthWiseData.yearTotalCustomers}{' '}
+                    <span className="text-xs font-bold text-slate-400">Customers</span>
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                    Monthly Average: <span className="text-blue-400 font-bold">{monthWiseData.monthlyAvgCustomers}</span> cust/mo
+                  </p>
+                </div>
+
+                <div className="bg-[#111a2e] p-4 rounded-2xl border border-amber-500/30 shadow-lg">
+                  <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
+                    Year Chocolates Sold
+                  </span>
+                  <h3 className="text-2xl font-black text-amber-300 mt-1">
+                    {monthWiseData.yearTotalChocolates.toLocaleString()}{' '}
+                    <span className="text-xs font-bold text-slate-400">Pcs</span>
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                    Monthly Average: <span className="text-amber-400 font-bold">{monthWiseData.monthlyAvgChocolates.toLocaleString()}</span> pcs/mo
+                  </p>
+                </div>
+
+                <div className="bg-[#111a2e] p-4 rounded-2xl border border-cyan-500/30 shadow-lg">
+                  <span className="text-[10px] font-black text-cyan-400 uppercase tracking-wider block">
+                    Avg Chocs / Customer
+                  </span>
+                  <h3 className="text-2xl font-black text-cyan-300 mt-1">
+                    {monthWiseData.avgChocolatesPerCustomer}{' '}
+                    <span className="text-xs font-bold text-slate-400">Pcs / Cust</span>
+                  </h3>
+                  <p className="text-[10px] text-cyan-400/90 font-semibold mt-1">
+                    Annual volume per buyer
+                  </p>
+                </div>
+
+                <div className="bg-[#111a2e] p-4 rounded-2xl border border-purple-500/30 shadow-lg">
+                  <span className="text-[10px] font-black text-purple-400 uppercase tracking-wider block">
+                    Peak Performance Month
+                  </span>
+                  <h3 className="text-xl font-black text-purple-300 mt-1 truncate">
+                    {monthWiseData.peakMonth ? `${monthWiseData.peakMonth.monthFull}` : 'N/A'}
+                  </h3>
+                  <p className="text-[10px] text-purple-400/90 font-bold mt-1">
+                    {monthWiseData.peakMonth?.chocolatesSold.toLocaleString() || 0} pcs &bull; {monthWiseData.peakMonth?.customersCount || 0} cust
+                  </p>
+                </div>
+              </div>
+
+              {/* Chart: Month-wise Customer Count & Chocolates Sold */}
+              <div className="bg-[#0e162a] p-4 sm:p-6 rounded-2xl border border-white/10 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      <BarChart3 size={18} className="text-blue-400" />
+                      Month-wise Breakdown: Customers & Chocolates Sold ({selectedYear})
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium">
+                      Left axis: Chocolates Sold (Amber Bars) | Right axis: Customer Count (Cyan Line with Points)
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-bold">
+                    <span className="flex items-center gap-1.5 text-amber-400">
+                      <span className="w-3 h-3 rounded bg-amber-400 inline-block" /> Chocolates Sold
+                    </span>
+                    <span className="flex items-center gap-1.5 text-cyan-400">
+                      <span className="w-3 h-3 rounded bg-cyan-400 inline-block" /> Customer Count
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-[320px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={monthWiseData.months}
+                      margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                      <XAxis
+                        dataKey="monthShort"
+                        stroke="#94a3b8"
+                        fontSize={11}
+                        fontWeight={700}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        stroke="#f59e0b"
+                        fontSize={10}
+                        fontWeight={700}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        stroke="#06b6d4"
+                        fontSize={10}
+                        fontWeight={700}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0c1424',
+                          borderColor: 'rgba(255,255,255,0.2)',
+                          borderRadius: '1rem',
+                          color: '#fff',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                        }}
+                        formatter={(val: any, name: any) => {
+                          if (name === 'chocolatesSold') return [`${Number(val).toLocaleString()} pcs`, 'Chocolates Sold'];
+                          if (name === 'customersCount') return [`${val} Customers`, 'Unique Customers'];
+                          return [val, name];
+                        }}
+                        labelFormatter={(label) => `${label} ${selectedYear}`}
+                      />
+                      <Bar
+                        yAxisId="left"
+                        dataKey="chocolatesSold"
+                        fill="#f59e0b"
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={38}
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="customersCount"
+                        stroke="#06b6d4"
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: '#06b6d4', stroke: '#0891b2', strokeWidth: 2 }}
+                        activeDot={{ r: 6, fill: '#22d3ee' }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Table: Full 12-Month Breakdown */}
+              <div className="bg-[#0e162a] rounded-2xl border border-white/10 shadow-xl overflow-hidden">
+                <div className="p-4 bg-[#111a2e] border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+                  <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <Calendar size={15} className="text-cyan-400" />
+                    12-Month Performance Table ({selectedYear})
+                  </h4>
+                  <span className="text-xs text-slate-400 font-semibold">
+                    Total Estimated Sales: <strong className="text-emerald-400 font-mono font-black">{formatINR(monthWiseData.yearTotalSales)}</strong>
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                    <thead className="bg-[#142038] text-amber-400 font-black uppercase tracking-wider border-b border-white/10">
+                      <tr>
+                        <th className="px-4 py-3">Month</th>
+                        <th className="px-4 py-3 text-center">Orders</th>
+                        <th className="px-4 py-3 text-center">Customers</th>
+                        <th className="px-4 py-3 text-right">Chocolates Sold</th>
+                        <th className="px-4 py-3 text-center">Avg Pcs / Cust</th>
+                        <th className="px-4 py-3 text-right">% Share of Year</th>
+                        <th className="px-4 py-3 text-right">Est. Sales</th>
+                        <th className="px-4 py-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-semibold text-slate-200">
+                      {monthWiseData.months.map((m) => {
+                        const isCurrentMonth = selectedMonth === m.monthCode;
+                        return (
+                          <tr
+                            key={m.monthNumber}
+                            className={`hover:bg-white/5 transition-colors ${
+                              isCurrentMonth ? 'bg-blue-500/10 border-l-4 border-l-blue-400' : ''
+                            }`}
+                          >
+                            <td className="px-4 py-3 font-bold text-white flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+                              <span>{m.monthFull}</span>
+                              {isCurrentMonth && (
+                                <span className="text-[9px] bg-blue-500/30 text-blue-300 font-black px-1.5 py-0.5 rounded uppercase">
+                                  Current
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center font-mono">
+                              {m.ordersCount}
+                            </td>
+                            <td className="px-4 py-3 text-center font-mono text-cyan-300 font-bold">
+                              {m.customersCount}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-black text-amber-300">
+                              {m.chocolatesSold.toLocaleString()} pcs
+                            </td>
+                            <td className="px-4 py-3 text-center font-mono text-slate-300">
+                              {m.avgChocPerCustomer}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
+                              {m.percentageOfYear}%
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-white">
+                              {formatINR(m.salesAmount)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleMonthChange(m.monthCode);
+                                  setActiveTab('weekly');
+                                }}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 hover:text-white transition-all cursor-pointer"
+                                title={`View detailed breakdown for ${m.monthFull}`}
+                              >
+                                View Month
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="bg-[#142038] font-black text-xs uppercase tracking-wider text-amber-300 border-t-2 border-amber-500/30">
+                      <tr>
+                        <td className="px-4 py-3 text-white">Full Year Total</td>
+                        <td className="px-4 py-3 text-center text-slate-200">
+                          {monthWiseData.months.reduce((s, m) => s + m.ordersCount, 0)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-cyan-300 font-bold">
+                          {monthWiseData.yearTotalCustomers}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-black text-amber-300">
+                          {monthWiseData.yearTotalChocolates.toLocaleString()} pcs
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-300 font-mono">
+                          {monthWiseData.avgChocolatesPerCustomer}
+                        </td>
+                        <td className="px-4 py-3 text-right text-emerald-300 font-mono font-bold">
+                          100.0%
+                        </td>
+                        <td className="px-4 py-3 text-right text-white font-mono font-bold">
+                          {formatINR(monthWiseData.yearTotalSales)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-400">—</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
