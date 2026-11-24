@@ -43,6 +43,7 @@ import {
   Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck, Copy, Printer
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
+import { SHIPPING_LOGO_DATA_URL } from "@/constants/shippingLogo";
 // --- CODE SPLIT: LAZY LOAD HEAVY SUB-VIEWS & MODALS ---
 const OrderInvoiceView = lazy(() => import("@/components/OrderInvoiceView"));
 const DailyTasksBoard = lazy(() => import("@/components/DailyTasksBoard"));
@@ -13675,14 +13676,14 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     <div className="flex-shrink-0">
                       <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border border-gray-200 bg-white flex items-center justify-center p-1.5 shadow-sm">
                         <img
-                          src="/sabi-shipping-logo.png"
+                          src={SHIPPING_LOGO_DATA_URL}
                           alt="Sabi Return Gifts"
-                          loading="lazy"
-                          decoding="async"
+                          loading="eager"
+                          decoding="sync"
+                          fetchPriority="high"
                           width="112"
                           height="112"
                           className="w-full h-full object-contain"
-                          crossOrigin="anonymous"
                           onError={(e) => {
                             (e.currentTarget as HTMLImageElement).src = '/sabi-shipping-logo.jpg';
                           }}
