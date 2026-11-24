@@ -7,8 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import Login from "./pages/Login";
 
-const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 
@@ -22,17 +22,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// Minimal seamless transition fallback - no intrusive intro scene or loading bars
 const RouteLoadingFallback = () => (
-  <div className="flex h-[100dvh] w-full items-center justify-center bg-[#0b1329] text-white">
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-amber-500/30 p-1 bg-[#131c2e] shadow-xl animate-pulse">
-        <img src="/favicon.png" alt="Loading" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
-      </div>
-      <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full animate-loading-bar"></div>
-      </div>
-    </div>
-  </div>
+  <div className="min-h-[100dvh] w-full bg-[#060a14]" />
 );
 
 const App = () => (

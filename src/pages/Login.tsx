@@ -215,108 +215,152 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }}
     >
       {/* ======================================================== */}
-      {/* MOBILE VIEW (Screens < md) - Matches Reference Layout with Sabi Return Gifts Luxury Gold & Navy Colors */}
+      {/* MOBILE VIEW (Screens < md) - Ultra-Luxury Golden Leaf Layout with Sabi Return Gifts Palette */}
       {/* ======================================================== */}
       <div className="md:hidden w-full min-h-[100dvh] flex flex-col justify-between py-6 px-5 relative z-10 overflow-y-auto">
         
         {/* 1. Corner Luxury Concentric Gold Arcs (Top-Left, Top-Right, Bottom-Left, Bottom-Right) */}
         {/* Top-Left Concentric Arcs */}
         <svg 
-          className="absolute -top-6 -left-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          className="absolute -top-6 -left-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
           viewBox="0 0 150 150"
           fill="none"
           aria-hidden="true"
         >
-          <circle cx="15" cy="15" r="45" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="15" cy="15" r="75" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="15" cy="15" r="105" stroke="#D9A928" strokeWidth="1.5" />
+          <defs>
+            <linearGradient id="goldArcTL" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.75" />
+              <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          <circle cx="15" cy="15" r="45" stroke="url(#goldArcTL)" strokeWidth="1.5" />
+          <circle cx="15" cy="15" r="75" stroke="url(#goldArcTL)" strokeWidth="1.5" />
+          <circle cx="15" cy="15" r="105" stroke="url(#goldArcTL)" strokeWidth="1.5" />
         </svg>
 
         {/* Top-Right Concentric Arcs */}
         <svg 
-          className="absolute -top-6 -right-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          className="absolute -top-6 -right-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
           viewBox="0 0 150 150"
           fill="none"
           aria-hidden="true"
         >
-          <circle cx="135" cy="15" r="45" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="135" cy="15" r="75" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="135" cy="15" r="105" stroke="#D9A928" strokeWidth="1.5" />
+          <defs>
+            <linearGradient id="goldArcTR" x1="100%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.75" />
+              <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          <circle cx="135" cy="15" r="45" stroke="url(#goldArcTR)" strokeWidth="1.5" />
+          <circle cx="135" cy="15" r="75" stroke="url(#goldArcTR)" strokeWidth="1.5" />
+          <circle cx="135" cy="15" r="105" stroke="url(#goldArcTR)" strokeWidth="1.5" />
         </svg>
 
         {/* Bottom-Left Concentric Arcs */}
         <svg 
-          className="absolute -bottom-6 -left-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          className="absolute -bottom-6 -left-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
           viewBox="0 0 150 150"
           fill="none"
           aria-hidden="true"
         >
-          <circle cx="15" cy="135" r="45" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="15" cy="135" r="75" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="15" cy="135" r="105" stroke="#D9A928" strokeWidth="1.5" />
+          <defs>
+            <linearGradient id="goldArcBL" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.75" />
+              <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          <circle cx="15" cy="135" r="45" stroke="url(#goldArcBL)" strokeWidth="1.5" />
+          <circle cx="15" cy="135" r="75" stroke="url(#goldArcBL)" strokeWidth="1.5" />
+          <circle cx="15" cy="135" r="105" stroke="url(#goldArcBL)" strokeWidth="1.5" />
         </svg>
 
         {/* Bottom-Right Concentric Arcs */}
         <svg 
-          className="absolute -bottom-6 -right-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          className="absolute -bottom-6 -right-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
           viewBox="0 0 150 150"
           fill="none"
           aria-hidden="true"
         >
-          <circle cx="135" cy="135" r="45" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="135" cy="135" r="75" stroke="#D9A928" strokeWidth="1.5" />
-          <circle cx="135" cy="135" r="105" stroke="#D9A928" strokeWidth="1.5" />
+          <defs>
+            <linearGradient id="goldArcBR" x1="100%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.75" />
+              <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          <circle cx="135" cy="135" r="45" stroke="url(#goldArcBR)" strokeWidth="1.5" />
+          <circle cx="135" cy="135" r="75" stroke="url(#goldArcBR)" strokeWidth="1.5" />
+          <circle cx="135" cy="135" r="105" stroke="url(#goldArcBR)" strokeWidth="1.5" />
         </svg>
 
-        {/* 2. Top Centered Brand Section */}
+        {/* 2. Top Centered Brand Section with Luxury Animated Effects */}
         <div className="relative z-10 flex flex-col items-center pt-2 sm:pt-4">
-          {/* Subtle Radial Golden Ambient Glow Behind Logo */}
+          
+          {/* Subtle Breathing Radial Golden Halo Aura Behind Logo */}
           <div 
-            className="absolute top-4 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-40" 
-            style={{ background: "radial-gradient(circle, #D9A928 0%, transparent 70%)" }}
+            className="absolute top-1 w-32 h-32 rounded-full pointer-events-none animate-gold-halo" 
+            style={{ background: "radial-gradient(circle, #D9A928 0%, rgba(245, 158, 11, 0.45) 35%, transparent 70%)" }}
           />
 
-          {/* Sabi Return Gifts Logo Badge */}
-          <div className="w-20 h-20 sm:w-24 sm:h-24 p-2 rounded-2xl bg-black border border-[#D9A928]/40 shadow-[0_12px_32px_rgba(0,0,0,0.7),0_0_20px_rgba(217,169,40,0.25)] relative z-10 flex items-center justify-center overflow-hidden transition-transform duration-300">
-            <img 
-              src="/logo.jpeg" 
-              alt="Sabi Return Gifts" 
-              className="w-full h-full object-cover rounded-xl"
-              loading="eager"
-              decoding="async"
-              fetchPriority="high"
-              width="96"
-              height="96"
-            />
+          {/* Sabi Return Gifts Luxury Logo Badge with Float & Shimmer Effect */}
+          <div className="relative z-10 animate-logo-float">
+            {/* Outer Metallic Gold Gradient Rim */}
+            <div className="w-[94px] h-[94px] sm:w-[106px] sm:h-[106px] p-[2.5px] rounded-3xl bg-gradient-to-tr from-[#9B7722] via-[#F5D88A] to-[#D4AF37] shadow-[0_14px_36px_rgba(0,0,0,0.85),0_0_28px_rgba(217,169,40,0.45)] relative group overflow-hidden transition-all duration-300">
+              
+              {/* Inner Black Logo Container */}
+              <div className="w-full h-full rounded-[1.35rem] bg-[#000000] p-1.5 flex items-center justify-center relative overflow-hidden">
+                
+                {/* Diagonal Light Shimmer Reflection Sweep Across Logo Glass */}
+                <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none animate-logo-shimmer z-20" />
+                
+                <img 
+                  src="/logo.jpeg" 
+                  alt="Sabi Return Gifts" 
+                  className="w-full h-full object-cover rounded-[1.1rem] relative z-10"
+                  loading="eager"
+                  decoding="sync"
+                  fetchPriority="high"
+                  width="104"
+                  height="104"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Brand Name */}
-          <h1 className="text-xl sm:text-2xl font-serif font-black tracking-[0.22em] text-[#F8F5ED] uppercase mt-3 text-center drop-shadow-md">
+          {/* Brand Name: Metallic Gold & Ivory Shimmer Gradient */}
+          <h1 className="text-2xl sm:text-[28px] font-serif font-black tracking-[0.24em] bg-gradient-to-r from-[#FFF9E6] via-[#F5D88A] to-[#D4AF37] bg-clip-text text-transparent uppercase mt-3.5 text-center drop-shadow-md">
             SABI RETURNS
           </h1>
 
           {/* Tagline */}
-          <p className="text-[10px] sm:text-[11px] font-black tracking-[0.28em] text-[#D9A928] uppercase mt-1 text-center drop-shadow-sm">
-            PREMIUM GIFTING SOLUTIONS
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="w-2 h-[1px] bg-[#D9A928]/70" />
+            <p className="text-[10px] sm:text-[11px] font-black tracking-[0.3em] text-[#D9A928] uppercase drop-shadow-sm">
+              PREMIUM GIFTING SOLUTIONS
+            </p>
+            <span className="w-2 h-[1px] bg-[#D9A928]/70" />
+          </div>
         </div>
 
         {/* 3. Form Content Section (Login or Register) */}
-        <div className="relative z-10 w-full max-w-[380px] mx-auto my-auto py-4">
+        <div className="relative z-10 w-full max-w-[380px] mx-auto my-auto py-3">
           {!isFlipped ? (
             /* --- MOBILE LOGIN FORM --- */
             <div className="space-y-4">
               {/* Screen Title */}
               <div className="text-center">
-                <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.16em] uppercase drop-shadow-sm">
+                <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.18em] uppercase drop-shadow-sm">
                   SIGN IN
                 </h2>
 
-                {/* Luxury Diamond Ornament Divider */}
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  <div className="w-12 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
-                  <div className="w-2 h-2 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(217,169,40,0.75)]" />
-                  <div className="w-12 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                {/* Luxury Jewelry Diamond Ornament Divider */}
+                <div className="flex items-center justify-center gap-2.5 mt-2.5">
+                  <div className="w-14 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
+                  <span className="w-2.5 h-2.5 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(245,216,138,0.85)] border border-[#FFF9E6]" />
+                  <div className="w-14 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
                 </div>
               </div>
 
@@ -337,8 +381,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     USERNAME
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <User className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
+                      <User className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
                     </div>
                     <input 
                       id="mobile-username" 
@@ -348,7 +392,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       placeholder="Enter your username" 
                       required 
                       autoComplete="username"
-                      className="w-full pl-12 pr-4 h-[52px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                      className="w-full pl-12 pr-4 h-[54px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
                     />
                   </div>
                 </div>
@@ -362,8 +406,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     PASSWORD
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <Lock className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
+                      <Lock className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
                     </div>
                     <input 
                       id="mobile-password" 
@@ -373,12 +417,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       placeholder="Enter password" 
                       required 
                       autoComplete="current-password"
-                      className="w-full pl-12 pr-12 h-[52px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                      className="w-full pl-12 pr-12 h-[54px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
                     />
                     <button 
                       type="button" 
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#E8BD45] transition-colors cursor-pointer"
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#F5D88A] transition-colors cursor-pointer"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -406,20 +450,21 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <button
                     type="button"
                     onClick={() => setIsFlipped(true)}
-                    className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                    className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#F5D88A] transition-colors underline underline-offset-4 cursor-pointer"
                   >
                     Register
                   </button>
                 </div>
 
-                {/* Action Button: High-End Gold with Key Icon */}
+                {/* Action Button: Luxury Gold Gradient with Dynamic Sheen */}
                 <div className="pt-2">
                   <Button 
                     type="submit" 
                     disabled={isLoading}
-                    className="w-full h-13 min-h-[50px] bg-gradient-to-r from-[#D9A928] via-[#E8BD45] to-[#D9A928] hover:brightness-110 active:scale-[0.98] text-[#080F23] font-black text-sm uppercase tracking-widest rounded-2xl shadow-[0_8px_25px_rgba(217,169,40,0.45)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.6)] transition-all flex items-center justify-center gap-2 border-none cursor-pointer"
+                    className="w-full h-13 min-h-[52px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.2em] rounded-2xl shadow-[0_10px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden group"
                   >
-                    <Key className="w-4.5 h-4.5 text-[#080F23] stroke-[2.5]" />
+                    <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] pointer-events-none -translate-x-[200%] group-hover:translate-x-[400%] transition-transform duration-1000" />
+                    <Key className="w-5 h-5 text-[#080F23] stroke-[2.7] group-hover:rotate-12 transition-transform duration-300" />
                     <span>{isLoading ? "Signing In..." : "SIGN IN"}</span>
                   </Button>
                 </div>
@@ -430,15 +475,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="space-y-4">
               {/* Screen Title */}
               <div className="text-center">
-                <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.16em] uppercase drop-shadow-sm">
+                <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.18em] uppercase drop-shadow-sm">
                   REGISTER
                 </h2>
 
-                {/* Luxury Diamond Ornament Divider */}
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  <div className="w-12 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
-                  <div className="w-2 h-2 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(217,169,40,0.75)]" />
-                  <div className="w-12 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                {/* Luxury Jewelry Diamond Ornament Divider */}
+                <div className="flex items-center justify-center gap-2.5 mt-2.5">
+                  <div className="w-14 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
+                  <span className="w-2.5 h-2.5 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(245,216,138,0.85)] border border-[#FFF9E6]" />
+                  <div className="w-14 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
                 </div>
               </div>
 
@@ -459,8 +504,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     FULL NAME
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <User className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
+                      <User className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
                     </div>
                     <input 
                       id="mobile-reg-name" 
@@ -469,7 +514,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       onChange={(e) => setRegName(e.target.value)} 
                       placeholder="Enter your full name" 
                       required 
-                      className="w-full pl-12 pr-4 h-[50px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                      className="w-full pl-12 pr-4 h-[52px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
                     />
                   </div>
                 </div>
@@ -483,8 +528,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     USERNAME
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <User className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
+                      <User className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
                     </div>
                     <input 
                       id="mobile-reg-username" 
@@ -494,7 +539,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       placeholder="Choose a username" 
                       required 
                       autoComplete="username"
-                      className="w-full pl-12 pr-4 h-[50px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                      className="w-full pl-12 pr-4 h-[52px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
                     />
                   </div>
                 </div>
@@ -508,8 +553,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     PASSWORD
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                      <Lock className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
+                      <Lock className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
                     </div>
                     <input 
                       id="mobile-reg-password" 
@@ -518,12 +563,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       onChange={(e) => setRegPassword(e.target.value)} 
                       placeholder="Create password" 
                       required 
-                      className="w-full pl-12 pr-12 h-[50px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                      className="w-full pl-12 pr-12 h-[52px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
                     />
                     <button 
                       type="button" 
                       onClick={() => setShowRegPassword(!showRegPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#E8BD45] transition-colors cursor-pointer"
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#F5D88A] transition-colors cursor-pointer"
                       aria-label={showRegPassword ? "Hide password" : "Show password"}
                     >
                       {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -539,20 +584,21 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <button
                     type="button"
                     onClick={() => setIsFlipped(false)}
-                    className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                    className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#F5D88A] transition-colors underline underline-offset-4 cursor-pointer"
                   >
                     Login
                   </button>
                 </div>
 
-                {/* Action Button: High-End Gold with UserPlus Icon */}
+                {/* Action Button: Luxury Gold Gradient with Dynamic Sheen */}
                 <div className="pt-2">
                   <Button 
                     type="submit" 
                     disabled={isRegistering}
-                    className="w-full h-13 min-h-[50px] bg-gradient-to-r from-[#D9A928] via-[#E8BD45] to-[#D9A928] hover:brightness-110 active:scale-[0.98] text-[#080F23] font-black text-sm uppercase tracking-widest rounded-2xl shadow-[0_8px_25px_rgba(217,169,40,0.45)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.6)] transition-all flex items-center justify-center gap-2 border-none cursor-pointer"
+                    className="w-full h-13 min-h-[52px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.2em] rounded-2xl shadow-[0_10px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden group"
                   >
-                    <UserPlus className="w-4.5 h-4.5 text-[#080F23] stroke-[2.5]" />
+                    <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] pointer-events-none -translate-x-[200%] group-hover:translate-x-[400%] transition-transform duration-1000" />
+                    <UserPlus className="w-5 h-5 text-[#080F23] stroke-[2.7] group-hover:scale-110 transition-transform duration-300" />
                     <span>{isRegistering ? "Creating..." : "CREATE ACCOUNT"}</span>
                   </Button>
                 </div>
@@ -561,11 +607,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           )}
         </div>
 
-        {/* 4. Bottom Security / Brand Micro-Badge */}
+        {/* 4. Bottom Security / Official Portal Micro-Badge */}
         <div className="relative z-10 text-center pb-1">
-          <p className="text-[10px] text-[#9DAAC2]/60 font-semibold tracking-wider uppercase">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#101a33]/60 border border-[#223354]/60 text-[10px] text-[#9DAAC2]/80 font-semibold tracking-wider uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
             Sabi Return Gifts • Secure Portal
-          </p>
+          </div>
         </div>
 
       </div>

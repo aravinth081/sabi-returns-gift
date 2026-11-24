@@ -175,6 +175,59 @@ All colors MUST be HSL.
   animation: loading-bar 2s ease-in-out infinite;
 }
 
+/* ==================== LUXURY LOGO EFFECTS ==================== */
+@keyframes logo-shimmer-sweep {
+  0% {
+    transform: translateX(-160%) skewX(-20deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  40% {
+    transform: translateX(260%) skewX(-20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(260%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+.animate-logo-shimmer {
+  animation: logo-shimmer-sweep 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes logo-gold-halo {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.4;
+    filter: blur(22px);
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.75;
+    filter: blur(30px);
+  }
+}
+
+.animate-gold-halo {
+  animation: logo-gold-halo 4s ease-in-out infinite;
+}
+
+@keyframes logo-gentle-hover {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-logo-float {
+  animation: logo-gentle-hover 3.2s ease-in-out infinite;
+}
+
 /* ==================== GLOBAL DARK BLUE THEME & GRAY SIDEBAR OVERRIDES ==================== */
 /* Entire platform main background */
 body, #root {
