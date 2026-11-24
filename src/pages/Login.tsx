@@ -310,14 +310,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           {/* Sabi Return Gifts Luxury Logo Badge - Standard & Grounded */}
           <div className="relative z-10 flex flex-col items-center">
-            {/* Elegant Royal Hallmark Pill */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#1b1509] border border-[#D9A928]/50 shadow-[0_0_12px_rgba(217,169,40,0.25)] mb-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F5D88A] animate-pulse" />
-              <span className="text-[10px] font-black tracking-[0.22em] text-[#F5D88A] uppercase">
-                OFFICIAL PORTAL
-              </span>
-            </div>
-
             {/* Outer Metallic Gold Gradient Rim */}
             <div className="w-[100px] h-[100px] sm:w-[110px] sm:h-[110px] p-[3px] rounded-[1.8rem] bg-gradient-to-tr from-[#8C6D1F] via-[#F5D88A] via-[#E8C15A] to-[#B38B28] shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_30px_rgba(217,169,40,0.4)] relative group overflow-hidden transition-all duration-300">
               
@@ -692,16 +684,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           
           {/* Left Panel Content */}
           <div className="relative z-10 flex flex-col items-center max-w-[400px] w-full">
-            
-            {/* Header Micro-Pill Tag */}
-            <div className="flex justify-center mb-3.5">
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#121c33]/90 border border-[#D9A928]/50 text-[11px] text-[#F5D88A] font-bold tracking-[0.24em] uppercase shadow-md">
-                <span className="text-[#D9A928] text-[10px]">✦</span>
-                OFFICIAL BRAND
-                <span className="text-[#D9A928] text-[10px]">✦</span>
-              </span>
-            </div>
-
             {/* Signature Luxury Logo Badge with Multilayer Glow & Shimmer */}
             <div className="relative group mb-6">
               {/* 1. Breathing Golden Halo Glow Aura */}
