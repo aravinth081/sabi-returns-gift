@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { User, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Key, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { collection, getDocs, doc, updateDoc, addDoc, query, where } from "firebase/firestore";
 import { db } from "@/firebase";
@@ -204,7 +204,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div 
-      className="min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 md:p-8 select-none relative overflow-x-hidden overflow-y-auto"
+      className="min-h-[100dvh] flex items-center justify-center p-0 md:p-8 select-none relative overflow-x-hidden overflow-y-auto"
       style={{
         backgroundColor: "#060a14",
         backgroundImage: `
@@ -214,8 +214,366 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         `
       }}
     >
-      {/* Main Split Card Container */}
-      <div className="w-full max-w-[1040px] min-h-[540px] md:min-h-[610px] rounded-2xl sm:rounded-[2.25rem] shadow-[0_25px_80px_rgba(0,0,0,0.65),0_0_50px_rgba(0,0,0,0.4)] flex flex-col md:flex-row overflow-hidden border border-white/15 relative z-10 my-auto transition-all duration-300">
+      {/* ======================================================== */}
+      {/* MOBILE VIEW (Screens < md) - Matches Reference Layout with Sabi Return Gifts Luxury Gold & Navy Colors */}
+      {/* ======================================================== */}
+      <div className="md:hidden w-full min-h-[100dvh] flex flex-col justify-between py-6 px-5 relative z-10 overflow-y-auto">
+        
+        {/* 1. Corner Luxury Concentric Gold Arcs (Top-Left, Top-Right, Bottom-Left, Bottom-Right) */}
+        {/* Top-Left Concentric Arcs */}
+        <svg 
+          className="absolute -top-6 -left-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 150 150"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle cx="15" cy="15" r="45" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="15" cy="15" r="75" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="15" cy="15" r="105" stroke="#D9A928" strokeWidth="1.5" />
+        </svg>
+
+        {/* Top-Right Concentric Arcs */}
+        <svg 
+          className="absolute -top-6 -right-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 150 150"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle cx="135" cy="15" r="45" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="135" cy="15" r="75" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="135" cy="15" r="105" stroke="#D9A928" strokeWidth="1.5" />
+        </svg>
+
+        {/* Bottom-Left Concentric Arcs */}
+        <svg 
+          className="absolute -bottom-6 -left-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 150 150"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle cx="15" cy="135" r="45" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="15" cy="135" r="75" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="15" cy="135" r="105" stroke="#D9A928" strokeWidth="1.5" />
+        </svg>
+
+        {/* Bottom-Right Concentric Arcs */}
+        <svg 
+          className="absolute -bottom-6 -right-6 w-36 h-36 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 150 150"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle cx="135" cy="135" r="45" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="135" cy="135" r="75" stroke="#D9A928" strokeWidth="1.5" />
+          <circle cx="135" cy="135" r="105" stroke="#D9A928" strokeWidth="1.5" />
+        </svg>
+
+        {/* 2. Top Centered Brand Section */}
+        <div className="relative z-10 flex flex-col items-center pt-2 sm:pt-4">
+          {/* Subtle Radial Golden Ambient Glow Behind Logo */}
+          <div 
+            className="absolute top-4 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-40" 
+            style={{ background: "radial-gradient(circle, #D9A928 0%, transparent 70%)" }}
+          />
+
+          {/* Sabi Return Gifts Logo Badge */}
+          <div className="w-20 h-20 sm:w-24 sm:h-24 p-2 rounded-2xl bg-black border border-[#D9A928]/40 shadow-[0_12px_32px_rgba(0,0,0,0.7),0_0_20px_rgba(217,169,40,0.25)] relative z-10 flex items-center justify-center overflow-hidden transition-transform duration-300">
+            <img 
+              src="/logo.jpeg" 
+              alt="Sabi Return Gifts" 
+              className="w-full h-full object-cover rounded-xl"
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              width="96"
+              height="96"
+            />
+          </div>
+
+          {/* Brand Name */}
+          <h1 className="text-xl sm:text-2xl font-serif font-black tracking-[0.22em] text-[#F8F5ED] uppercase mt-3 text-center drop-shadow-md">
+            SABI RETURNS
+          </h1>
+
+          {/* Tagline */}
+          <p className="text-[10px] sm:text-[11px] font-black tracking-[0.28em] text-[#D9A928] uppercase mt-1 text-center drop-shadow-sm">
+            PREMIUM GIFTING SOLUTIONS
+          </p>
+        </div>
+
+        {/* 3. Form Content Section (Login or Register) */}
+        <div className="relative z-10 w-full max-w-[380px] mx-auto my-auto py-4">
+          {!isFlipped ? (
+            /* --- MOBILE LOGIN FORM --- */
+            <div className="space-y-4">
+              {/* Screen Title */}
+              <div className="text-center">
+                <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.16em] uppercase drop-shadow-sm">
+                  SIGN IN
+                </h2>
+
+                {/* Luxury Diamond Ornament Divider */}
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-12 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                  <div className="w-2 h-2 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(217,169,40,0.75)]" />
+                  <div className="w-12 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {loginError && (
+                <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs font-medium px-3.5 py-2.5 rounded-xl text-center">
+                  {loginError}
+                </div>
+              )}
+
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {/* Username */}
+                <div>
+                  <label 
+                    htmlFor="mobile-username" 
+                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1.5 pl-1"
+                  >
+                    USERNAME
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <User className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    </div>
+                    <input 
+                      id="mobile-username" 
+                      type="text"
+                      value={username} 
+                      onChange={(e) => setUsername(e.target.value)} 
+                      placeholder="Enter your username" 
+                      required 
+                      autoComplete="username"
+                      className="w-full pl-12 pr-4 h-[52px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label 
+                    htmlFor="mobile-password" 
+                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1.5 pl-1"
+                  >
+                    PASSWORD
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <Lock className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    </div>
+                    <input 
+                      id="mobile-password" 
+                      type={showPassword ? "text" : "password"} 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      placeholder="Enter password" 
+                      required 
+                      autoComplete="current-password"
+                      className="w-full pl-12 pr-12 h-[52px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#E8BD45] transition-colors cursor-pointer"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me & Register */}
+                <div className="flex items-center justify-between px-1 pt-0.5">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="mobile-remember" 
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(!!checked)}
+                      className="w-4.5 h-4.5 rounded border-[#223354] data-[state=checked]:bg-[#D9A928] data-[state=checked]:border-[#D9A928] data-[state=checked]:text-[#080F23] focus-visible:ring-1 focus-visible:ring-[#D9A928]" 
+                    />
+                    <label
+                      htmlFor="mobile-remember"
+                      className="text-xs sm:text-sm font-semibold text-[#E8EAF0] cursor-pointer select-none"
+                    >
+                      Remember Me?
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFlipped(true)}
+                    className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                  >
+                    Register
+                  </button>
+                </div>
+
+                {/* Action Button: High-End Gold with Key Icon */}
+                <div className="pt-2">
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full h-13 min-h-[50px] bg-gradient-to-r from-[#D9A928] via-[#E8BD45] to-[#D9A928] hover:brightness-110 active:scale-[0.98] text-[#080F23] font-black text-sm uppercase tracking-widest rounded-2xl shadow-[0_8px_25px_rgba(217,169,40,0.45)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.6)] transition-all flex items-center justify-center gap-2 border-none cursor-pointer"
+                  >
+                    <Key className="w-4.5 h-4.5 text-[#080F23] stroke-[2.5]" />
+                    <span>{isLoading ? "Signing In..." : "SIGN IN"}</span>
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* --- MOBILE REGISTER FORM --- */
+            <div className="space-y-4">
+              {/* Screen Title */}
+              <div className="text-center">
+                <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.16em] uppercase drop-shadow-sm">
+                  REGISTER
+                </h2>
+
+                {/* Luxury Diamond Ornament Divider */}
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-12 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                  <div className="w-2 h-2 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(217,169,40,0.75)]" />
+                  <div className="w-12 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {registerError && (
+                <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs font-medium px-3.5 py-2.5 rounded-xl text-center">
+                  {registerError}
+                </div>
+              )}
+
+              <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                {/* Full Name */}
+                <div>
+                  <label 
+                    htmlFor="mobile-reg-name" 
+                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1 pl-1"
+                  >
+                    FULL NAME
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <User className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    </div>
+                    <input 
+                      id="mobile-reg-name" 
+                      type="text"
+                      value={regName} 
+                      onChange={(e) => setRegName(e.target.value)} 
+                      placeholder="Enter your full name" 
+                      required 
+                      className="w-full pl-12 pr-4 h-[50px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                {/* Username */}
+                <div>
+                  <label 
+                    htmlFor="mobile-reg-username" 
+                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1 pl-1"
+                  >
+                    USERNAME
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <User className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    </div>
+                    <input 
+                      id="mobile-reg-username" 
+                      type="text"
+                      value={regUsername} 
+                      onChange={(e) => setRegUsername(e.target.value)} 
+                      placeholder="Choose a username" 
+                      required 
+                      autoComplete="username"
+                      className="w-full pl-12 pr-4 h-[50px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label 
+                    htmlFor="mobile-reg-password" 
+                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1 pl-1"
+                  >
+                    PASSWORD
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                      <Lock className="h-5 w-5 text-[#D9A928] transition-colors group-focus-within:text-[#F0C64A]" />
+                    </div>
+                    <input 
+                      id="mobile-reg-password" 
+                      type={showRegPassword ? "text" : "password"} 
+                      value={regPassword} 
+                      onChange={(e) => setRegPassword(e.target.value)} 
+                      placeholder="Create password" 
+                      required 
+                      className="w-full pl-12 pr-12 h-[50px] bg-[#101A33] border border-[#223354] focus:border-[#D9A928] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#8995AA] text-sm font-medium outline-none transition-all duration-200 shadow-inner"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#E8BD45] transition-colors cursor-pointer"
+                      aria-label={showRegPassword ? "Hide password" : "Show password"}
+                    >
+                      {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Flip Back to Login Row */}
+                <div className="flex items-center justify-between px-1 pt-0.5">
+                  <span className="text-xs sm:text-sm text-[#9DAAC2] font-medium">
+                    Already have an account?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsFlipped(false)}
+                    className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#E8BD45] transition-colors underline underline-offset-4 cursor-pointer"
+                  >
+                    Login
+                  </button>
+                </div>
+
+                {/* Action Button: High-End Gold with UserPlus Icon */}
+                <div className="pt-2">
+                  <Button 
+                    type="submit" 
+                    disabled={isRegistering}
+                    className="w-full h-13 min-h-[50px] bg-gradient-to-r from-[#D9A928] via-[#E8BD45] to-[#D9A928] hover:brightness-110 active:scale-[0.98] text-[#080F23] font-black text-sm uppercase tracking-widest rounded-2xl shadow-[0_8px_25px_rgba(217,169,40,0.45)] hover:shadow-[0_12px_32px_rgba(232,189,69,0.6)] transition-all flex items-center justify-center gap-2 border-none cursor-pointer"
+                  >
+                    <UserPlus className="w-4.5 h-4.5 text-[#080F23] stroke-[2.5]" />
+                    <span>{isRegistering ? "Creating..." : "CREATE ACCOUNT"}</span>
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* 4. Bottom Security / Brand Micro-Badge */}
+        <div className="relative z-10 text-center pb-1">
+          <p className="text-[10px] text-[#9DAAC2]/60 font-semibold tracking-wider uppercase">
+            Sabi Return Gifts • Secure Portal
+          </p>
+        </div>
+
+      </div>
+
+      {/* ======================================================== */}
+      {/* DESKTOP VIEW (Screens >= md) - Split 3D Book Layout */}
+      {/* ======================================================== */}
+      <div className="hidden md:flex w-full max-w-[1040px] min-h-[540px] md:min-h-[610px] rounded-2xl sm:rounded-[2.25rem] shadow-[0_25px_80px_rgba(0,0,0,0.65),0_0_50px_rgba(0,0,0,0.4)] flex-row overflow-hidden border border-white/15 relative z-10 my-auto transition-all duration-300">
         
         {/* ================= LEFT SIDE (Rich Champagne Gold Branding: #D9A928) ================= */}
         <div className="w-full md:w-1/2 relative bg-[#D9A928] flex flex-col items-center justify-center p-6 sm:p-8 md:p-12 text-center overflow-hidden min-h-[220px] sm:min-h-[280px] md:min-h-auto">
