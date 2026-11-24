@@ -8438,41 +8438,98 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     return sortedUpcoming.map((choc, i) => {
                       const norm = normalizeChocName(choc, dynamicInventory);
                       const metrics = dateWiseInventorySummary.chocolates[norm];
-                      const fut = metrics?.futureScheduled ?? 0;
-                      const bal = metrics?.availableStock ?? (inventoryBalances[choc] || 0);
-                      const isCovered = bal >= fut;
+                      const totalCount = metrics?.futureScheduled ?? 0;
+                      const available = metrics?.availableStock ?? (inventoryBalances[choc] || 0);
+                      const need = Math.max(0, totalCount - available);
                       return (
                         <div
                           key={i}
-                          className="p-3.5 rounded-2xl text-center border border-white/10 transition-all duration-300 shrink-0 min-w-[140px] sm:min-w-[160px] flex-1 flex flex-col justify-between items-center transform hover:scale-105 transition-transform bg-[#131c2e] hover:bg-[#18243b] shadow-md"
+                          className="p-4 sm:p-5 rounded-3xl border border-blue-500/30 transition-all duration-300 shrink-0 min-w-[240px] sm:min-w-[260px] max-w-[280px] flex-1 flex flex-col justify-between bg-[#0b1224] hover:bg-[#0f1730] shadow-2xl hover:scale-[1.02] transform"
+                          style={{
+                            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+                          }}
                         >
-                          <span className="text-xs font-extrabold text-white uppercase leading-tight mb-2 h-8 flex items-center justify-center text-center px-1">
-                            {choc}
-                          </span>
-                          <div className="my-1">
-                            <span className={`text-2xl font-black ${fut > 0
-                                ? 'text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]'
-                                : 'text-slate-400'
-                              }`}>{fut}</span>
-                            <span className="text-[10px] block text-purple-300/80 font-bold uppercase tracking-wider">Fut: Count</span>
+                          {/* Chocolate Name Header */}
+                          <div className="mb-4 text-center">
+                            <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wider leading-snug min-h-[3rem] flex items-center justify-center px-1">
+                              {choc}
+                            </h3>
                           </div>
-                          <div className="w-full flex flex-col gap-1 pt-2 border-t border-white/10 text-[10px] font-bold">
-                            <div className="flex justify-between items-center px-1">
-                              <span className="text-slate-400">Available:</span>
-                              <span className={`font-mono font-black ${bal < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{bal}</span>
-                            </div>
-                            <div className="flex justify-between items-center px-1">
-                              <span className="text-slate-400">Status:</span>
-                              <span className={`font-black text-[9px] px-1.5 py-0.5 rounded ${
-                                fut === 0
-                                  ? 'bg-slate-500/20 text-slate-300'
-                                  : isCovered
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                              }`}>
-                                {fut === 0 ? 'No Demand' : isCovered ? 'In Stock' : `Short: ${fut - bal}`}
+
+                          {/* Middle Row: NEED and TOTAL COUNT boxes */}
+                          <div className="grid grid-cols-2 gap-3 mb-3.5">
+                            {/* NEED Box */}
+                            <div
+                              className="py-3 px-2 rounded-2xl border-2 flex flex-col items-center justify-center text-center transition-all"
+                              style={{
+                                backgroundColor: '#1c0f1d',
+                                borderColor: '#e11d48',
+                                boxShadow: need > 0 ? '0 0 16px rgba(225, 29, 72, 0.3)' : 'none'
+                              }}
+                            >
+                              <span
+                                className="text-2xl sm:text-3xl font-black tracking-tight"
+                                style={{
+                                  color: need > 0 ? '#fda4af' : '#94a3b8',
+                                  textShadow: need > 0 ? '0 0 12px rgba(244, 63, 94, 0.4)' : 'none'
+                                }}
+                              >
+                                {need}
+                              </span>
+                              <span className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-white mt-1">
+                                NEED
                               </span>
                             </div>
+
+                            {/* TOTAL COUNT Box */}
+                            <div
+                              className="py-3 px-2 rounded-2xl border-2 flex flex-col items-center justify-center text-center transition-all"
+                              style={{
+                                backgroundColor: '#190f2b',
+                                borderColor: '#a855f7',
+                                boxShadow: totalCount > 0 ? '0 0 16px rgba(168, 85, 247, 0.3)' : 'none'
+                              }}
+                            >
+                              <span
+                                className="text-2xl sm:text-3xl font-black tracking-tight"
+                                style={{
+                                  color: '#d8b4fe',
+                                  textShadow: '0 0 12px rgba(168, 85, 247, 0.4)'
+                                }}
+                              >
+                                {totalCount}
+                              </span>
+                              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white mt-1 whitespace-nowrap">
+                                TOTAL COUNT
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Divider Line */}
+                          <div className="border-t border-slate-700/70 my-1 mb-3.5"></div>
+
+                          {/* Available Box */}
+                          <div
+                            className="py-2.5 px-4 rounded-2xl border-2 flex items-center justify-between transition-all"
+                            style={{
+                              backgroundColor: '#091b2c',
+                              borderColor: '#06b6d4',
+                              boxShadow: '0 0 14px rgba(6, 182, 212, 0.25)'
+                            }}
+                          >
+                            <span className="text-base font-extrabold text-white tracking-wide">
+                              Available:
+                            </span>
+                            <span
+                              className={`text-xl font-black font-mono ${
+                                available < 0 ? 'text-rose-400' : 'text-[#34d399]'
+                              }`}
+                              style={{
+                                textShadow: available > 0 ? '0 0 10px rgba(52, 211, 153, 0.5)' : 'none'
+                              }}
+                            >
+                              {available}
+                            </span>
                           </div>
                         </div>
                       );
