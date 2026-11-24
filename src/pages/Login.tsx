@@ -642,27 +642,27 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       </div>
 
       {/* ======================================================== */}
-      {/* DESKTOP VIEW (Screens >= md) - Sabi Return Gifts Luxury Reference Layout */}
+      {/* DESKTOP VIEW (Screens >= md) - Grand Sabi Luxury Reference Layout */}
       {/* ======================================================== */}
-      <div className="hidden md:flex w-full max-w-[1060px] min-h-[580px] lg:min-h-[620px] rounded-[2.5rem] shadow-[0_25px_80px_rgba(0,0,0,0.85),0_0_60px_rgba(217,169,40,0.18)] flex-row overflow-hidden border border-[#D9A928]/35 relative z-10 my-auto bg-[#0a1122] transition-all duration-300">
+      <div className="hidden md:flex w-full max-w-[1180px] xl:max-w-[1260px] min-h-[640px] xl:min-h-[700px] rounded-[2.5rem] xl:rounded-[3rem] shadow-[0_30px_90px_rgba(0,0,0,0.9),0_0_70px_rgba(217,169,40,0.22)] flex-row overflow-hidden border-2 border-[#D9A928]/40 relative z-10 my-auto bg-[#0a1122] transition-all duration-300">
         
-        {/* ================= LEFT SIDE (Brand Presentation & Signature Luxury Logo) ================= */}
-        <div className="w-full md:w-1/2 relative bg-gradient-to-b from-[#0e172e] via-[#0c1427] to-[#080f20] flex flex-col items-center justify-center p-8 lg:p-12 text-center overflow-hidden border-r border-[#223354]/50">
+        {/* ================= LEFT SIDE (Brand Presentation & Signature Grand Luxury Logo) ================= */}
+        <div className="w-full md:w-1/2 relative bg-gradient-to-b from-[#0e172e] via-[#0c1427] to-[#080f20] flex flex-col items-center justify-center p-8 lg:p-12 xl:p-16 text-center overflow-hidden border-r border-[#223354]/60">
           
           {/* Subtle Ambient Radial Golden Warmth */}
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_35%,rgba(217,169,40,0.16)_0%,transparent_65%)]" />
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_35%,rgba(217,169,40,0.18)_0%,transparent_65%)]" />
 
           {/* Concentric Gold Arcs: Top-Left */}
           <svg 
-            className="absolute top-0 left-0 w-36 h-36 lg:w-44 lg:h-44 pointer-events-none opacity-40 select-none z-0" 
+            className="absolute top-0 left-0 w-40 h-40 lg:w-48 lg:h-48 pointer-events-none opacity-45 select-none z-0" 
             viewBox="0 0 150 150"
             fill="none"
             aria-hidden="true"
           >
             <defs>
               <linearGradient id="deskGoldArcTL" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.8" />
-                <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.45" />
+                <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.85" />
+                <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.5" />
                 <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
               </linearGradient>
             </defs>
@@ -673,15 +673,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           {/* Concentric Gold Arcs: Bottom-Left */}
           <svg 
-            className="absolute bottom-0 left-0 w-36 h-36 lg:w-44 lg:h-44 pointer-events-none opacity-40 select-none z-0" 
+            className="absolute bottom-0 left-0 w-40 h-40 lg:w-48 lg:h-48 pointer-events-none opacity-45 select-none z-0" 
             viewBox="0 0 150 150"
             fill="none"
             aria-hidden="true"
           >
             <defs>
               <linearGradient id="deskGoldArcBL" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.8" />
-                <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.45" />
+                <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.85" />
+                <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.5" />
                 <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
               </linearGradient>
             </defs>
@@ -691,63 +691,63 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </svg>
           
           {/* Left Panel Content */}
-          <div className="relative z-10 flex flex-col items-center max-w-[360px] w-full">
+          <div className="relative z-10 flex flex-col items-center max-w-[400px] w-full">
             
             {/* Header Micro-Pill Tag */}
-            <div className="flex justify-center mb-3">
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#121c33]/90 border border-[#D9A928]/40 text-[10px] text-[#F5D88A] font-bold tracking-[0.22em] uppercase shadow-md">
-                <span className="text-[#D9A928] text-[9px]">✦</span>
+            <div className="flex justify-center mb-3.5">
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#121c33]/90 border border-[#D9A928]/50 text-[11px] text-[#F5D88A] font-bold tracking-[0.24em] uppercase shadow-md">
+                <span className="text-[#D9A928] text-[10px]">✦</span>
                 OFFICIAL BRAND
-                <span className="text-[#D9A928] text-[9px]">✦</span>
+                <span className="text-[#D9A928] text-[10px]">✦</span>
               </span>
             </div>
 
             {/* Signature Luxury Logo Badge with Multilayer Glow & Shimmer */}
-            <div className="relative group mb-5">
+            <div className="relative group mb-6">
               {/* 1. Breathing Golden Halo Glow Aura */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-[#D9A928]/35 via-[#F5D88A]/45 to-[#D9A928]/35 rounded-full blur-2xl opacity-60 animate-gold-halo pointer-events-none" />
+              <div className="absolute -inset-5 bg-gradient-to-r from-[#D9A928]/40 via-[#F5D88A]/50 to-[#D9A928]/40 rounded-full blur-3xl opacity-70 animate-gold-halo pointer-events-none" />
 
-              {/* 2. Double Metallic Gold Squircle Bezel Container */}
-              <div className="w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] lg:w-[185px] lg:h-[185px] p-2.5 lg:p-3 rounded-[2rem] bg-[#070c18] border-2 border-[#D9A928]/70 shadow-[0_16px_40px_rgba(0,0,0,0.7),0_0_35px_rgba(217,169,40,0.25)] relative overflow-hidden transition-all duration-500 group-hover:scale-105 group-hover:border-[#F5D88A] group-hover:shadow-[0_20px_50px_rgba(217,169,40,0.4)]">
+              {/* 2. Double Metallic Gold Squircle Bezel Container (Enlarged) */}
+              <div className="w-[160px] h-[160px] sm:w-[190px] sm:h-[190px] lg:w-[220px] lg:h-[220px] xl:w-[240px] xl:h-[240px] p-3 xl:p-3.5 rounded-[2.25rem] xl:rounded-[2.5rem] bg-[#070c18] border-2 border-[#D9A928]/80 shadow-[0_20px_50px_rgba(0,0,0,0.75),0_0_40px_rgba(217,169,40,0.3)] relative overflow-hidden transition-all duration-500 group-hover:scale-105 group-hover:border-[#F5D88A] group-hover:shadow-[0_25px_60px_rgba(217,169,40,0.45)]">
                 
                 {/* Metallic Inner Inset Bezel */}
-                <div className="absolute inset-1 rounded-[1.65rem] border border-[#D9A928]/35 pointer-events-none z-10" />
+                <div className="absolute inset-1.5 rounded-[1.85rem] xl:rounded-[2.1rem] border border-[#D9A928]/40 pointer-events-none z-10" />
                 
                 {/* Glass Diagonal Shimmer Sweep Highlight */}
-                <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none z-20 animate-logo-shimmer" />
+                <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none z-20 animate-logo-shimmer" />
 
                 {/* The Royal Sabi Logo Image */}
                 <img 
                   src="/logo.jpeg" 
                   alt="Sabi Return Gifts" 
-                  className="w-full h-full object-cover rounded-[1.4rem] relative z-0 transition-transform duration-500 group-hover:scale-105" 
+                  className="w-full h-full object-cover rounded-[1.6rem] xl:rounded-[1.85rem] relative z-0 transition-transform duration-500 group-hover:scale-105" 
                   loading="eager"
                   decoding="async"
                   fetchPriority="high"
-                  width="185"
-                  height="185"
+                  width="240"
+                  height="240"
                 />
               </div>
             </div>
             
             {/* Brand Titles: Regal Ivory White #F8F5ED */}
-            <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-serif font-bold text-[#F8F5ED] tracking-[0.1em] mb-1 drop-shadow-md">
+            <h1 className="text-3xl lg:text-[36px] xl:text-[42px] font-serif font-bold text-[#F8F5ED] tracking-[0.12em] mb-1.5 drop-shadow-lg">
               SABI RETURNS
             </h1>
             {/* Subtitle: Radiant Gold #D9A928 */}
-            <p className="text-[11px] sm:text-xs font-bold tracking-[0.28em] text-[#D9A928] uppercase drop-shadow-sm mb-3">
+            <p className="text-xs lg:text-[13px] xl:text-sm font-bold tracking-[0.32em] text-[#D9A928] uppercase drop-shadow-sm mb-3.5">
               PREMIUM GIFTING SOLUTIONS
             </p>
             
             {/* Signature Gold Diamond Ornament Line */}
-            <div className="flex items-center justify-center gap-3 my-2 w-full max-w-[200px]">
-              <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+            <div className="flex items-center justify-center gap-3 my-2.5 w-full max-w-[220px]">
+              <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#D9A928]" />
               <span className="text-[#F5D88A] text-xs">◆</span>
-              <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+              <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#D9A928]" />
             </div>
             
             {/* Tagline: Muted Slate-White #A0AFC7 */}
-            <p className="text-[#A0AFC7] text-xs lg:text-[13px] font-medium px-4 leading-relaxed max-w-[320px] text-center">
+            <p className="text-[#A0AFC7] text-xs lg:text-sm xl:text-[15px] font-medium px-4 leading-relaxed max-w-[360px] text-center">
               Empowering your celebrations with elegant, secure, and seamless return gift solutions.
             </p>
           </div>
@@ -759,19 +759,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <div className={`book-card-inner ${isFlipped ? "is-flipped" : ""}`}>
             
             {/* ---------------- FRONT PAGE: SIGN IN ---------------- */}
-            <div className="book-face p-6 sm:p-8 lg:p-12 relative overflow-hidden bg-gradient-to-b from-[#0e172e] via-[#0c1427] to-[#080f20]">
+            <div className="book-face p-8 lg:p-12 xl:p-16 relative overflow-hidden bg-gradient-to-b from-[#0e172e] via-[#0c1427] to-[#080f20]">
               
               {/* Concentric Gold Arcs: Top-Right */}
               <svg 
-                className="absolute top-0 right-0 w-36 h-36 lg:w-44 lg:h-44 pointer-events-none opacity-40 select-none z-0" 
+                className="absolute top-0 right-0 w-40 h-40 lg:w-48 lg:h-48 pointer-events-none opacity-45 select-none z-0" 
                 viewBox="0 0 150 150"
                 fill="none"
                 aria-hidden="true"
               >
                 <defs>
                   <linearGradient id="deskGoldArcTR" x1="100%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.8" />
-                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.45" />
+                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.85" />
+                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.5" />
                     <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
                   </linearGradient>
                 </defs>
@@ -782,15 +782,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
               {/* Concentric Gold Arcs: Bottom-Right */}
               <svg 
-                className="absolute bottom-0 right-0 w-36 h-36 lg:w-44 lg:h-44 pointer-events-none opacity-40 select-none z-0" 
+                className="absolute bottom-0 right-0 w-40 h-40 lg:w-48 lg:h-48 pointer-events-none opacity-45 select-none z-0" 
                 viewBox="0 0 150 150"
                 fill="none"
                 aria-hidden="true"
               >
                 <defs>
                   <linearGradient id="deskGoldArcBR" x1="100%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.8" />
-                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.45" />
+                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.85" />
+                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.5" />
                     <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
                   </linearGradient>
                 </defs>
@@ -799,40 +799,42 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <circle cx="150" cy="150" r="125" stroke="url(#deskGoldArcBR)" strokeWidth="1.8" />
               </svg>
 
-              <div className="max-w-[380px] w-full mx-auto space-y-5 lg:space-y-6 relative z-10">
+              <div className="max-w-[420px] xl:max-w-[450px] w-full mx-auto space-y-6 xl:space-y-7 relative z-10">
                 
                 {/* Header: Regal Serif SIGN IN */}
-                <div className="text-center space-y-1">
-                  <h2 className="text-2xl sm:text-3xl lg:text-[34px] font-serif font-bold text-[#F8F5ED] tracking-[0.14em] drop-shadow-md">
+                <div className="text-center space-y-1.5">
+                  <h2 className="text-3xl lg:text-[38px] xl:text-[44px] font-serif font-bold text-[#F8F5ED] tracking-[0.16em] drop-shadow-lg">
                     SIGN IN
                   </h2>
-                  <div className="flex items-center justify-center gap-3 mt-2 w-full max-w-[160px] mx-auto">
-                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                  <div className="flex items-center justify-center gap-3 mt-2.5 w-full max-w-[180px] mx-auto">
+                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#D9A928]" />
                     <span className="text-[#F5D88A] text-xs">◆</span>
-                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#D9A928]" />
                   </div>
                 </div>
 
                 {/* Error Message Display */}
                 {loginError && (
-                  <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs sm:text-sm font-medium px-3.5 py-2 rounded-xl text-center shadow-inner">
+                  <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl text-center shadow-inner">
                     {loginError}
                   </div>
                 )}
 
                 {/* Login Form */}
-                <form onSubmit={handleLoginSubmit} className="space-y-4 lg:space-y-5">
-                  <div className="space-y-3.5">
+                <form onSubmit={handleLoginSubmit} className="space-y-5 xl:space-y-6">
+                  <div className="space-y-4 xl:space-y-5">
                     
-                    {/* USERNAME FIELD */}
-                    <div className="space-y-1.5 text-left">
-                      <label htmlFor="username" className="flex items-center gap-1.5 text-[11px] font-bold text-[#D9A928] uppercase tracking-[0.2em]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928]" />
-                        <span>USERNAME</span>
-                      </label>
-                      <div className="w-full h-[52px] rounded-xl bg-[#080e1d]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
-                        <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0">
-                          <User className="h-4.5 w-4.5 text-[#F5D88A]" />
+                    {/* USERNAME FIELD (Redesigned with glowing emblem & depth) */}
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="username" className="flex items-center gap-2 text-xs font-bold text-[#F5D88A] uppercase tracking-[0.22em]">
+                          <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#D9A928] to-[#F5D88A] shadow-[0_0_8px_rgba(217,169,40,0.8)]" />
+                          <span>USERNAME</span>
+                        </label>
+                      </div>
+                      <div className="group/input relative w-full h-[58px] xl:h-[62px] rounded-2xl bg-[#0f172e]/90 hover:bg-[#121c38]/95 border-1.5 border-[#2b3e63] hover:border-[#D9A928]/60 focus-within:border-[#F5D88A] focus-within:ring-4 focus-within:ring-[#D9A928]/20 shadow-[0_6px_20px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] px-4 flex items-center transition-all duration-300">
+                        <div className="w-10 h-10 xl:w-11 xl:h-11 rounded-xl bg-gradient-to-br from-[#D9A928]/25 via-[#C89B2B]/15 to-[#8C6D1F]/20 border border-[#D9A928]/50 flex items-center justify-center mr-3.5 shrink-0 shadow-sm group-focus-within/input:border-[#F5D88A] group-focus-within/input:bg-[#D9A928]/35 transition-all duration-300">
+                          <User className="h-5 w-5 text-[#F5D88A] group-focus-within/input:scale-110 transition-transform" />
                         </div>
                         <input 
                           id="username" 
@@ -842,20 +844,22 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                           placeholder="Enter your username" 
                           required 
                           autoComplete="username"
-                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0"
+                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#7E8EA8] text-base xl:text-[17px] font-medium shadow-none focus:ring-0 focus:outline-none p-0 tracking-wide"
                         />
                       </div>
                     </div>
                     
-                    {/* PASSWORD FIELD */}
-                    <div className="space-y-1.5 text-left">
-                      <label htmlFor="password" className="flex items-center gap-1.5 text-[11px] font-bold text-[#D9A928] uppercase tracking-[0.2em]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928]" />
-                        <span>PASSWORD</span>
-                      </label>
-                      <div className="w-full h-[52px] rounded-xl bg-[#080e1d]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
-                        <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0">
-                          <Lock className="h-4.5 w-4.5 text-[#F5D88A]" />
+                    {/* PASSWORD FIELD (Redesigned with glowing emblem & depth) */}
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="password" className="flex items-center gap-2 text-xs font-bold text-[#F5D88A] uppercase tracking-[0.22em]">
+                          <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#D9A928] to-[#F5D88A] shadow-[0_0_8px_rgba(217,169,40,0.8)]" />
+                          <span>PASSWORD</span>
+                        </label>
+                      </div>
+                      <div className="group/input relative w-full h-[58px] xl:h-[62px] rounded-2xl bg-[#0f172e]/90 hover:bg-[#121c38]/95 border-1.5 border-[#2b3e63] hover:border-[#D9A928]/60 focus-within:border-[#F5D88A] focus-within:ring-4 focus-within:ring-[#D9A928]/20 shadow-[0_6px_20px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] px-4 flex items-center transition-all duration-300">
+                        <div className="w-10 h-10 xl:w-11 xl:h-11 rounded-xl bg-gradient-to-br from-[#D9A928]/25 via-[#C89B2B]/15 to-[#8C6D1F]/20 border border-[#D9A928]/50 flex items-center justify-center mr-3.5 shrink-0 shadow-sm group-focus-within/input:border-[#F5D88A] group-focus-within/input:bg-[#D9A928]/35 transition-all duration-300">
+                          <Lock className="h-5 w-5 text-[#F5D88A] group-focus-within/input:scale-110 transition-transform" />
                         </div>
                         <input 
                           id="password" 
@@ -865,32 +869,32 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                           placeholder="Enter password" 
                           required 
                           autoComplete="current-password"
-                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0"
+                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#7E8EA8] text-base xl:text-[17px] font-medium shadow-none focus:ring-0 focus:outline-none p-0 tracking-wide"
                         />
                         <button 
                           type="button" 
                           onClick={() => setShowPassword(!showPassword)}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0 ml-1"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/20 transition-all cursor-pointer shrink-0 ml-1.5"
                           aria-label={showPassword ? "Hide password" : "Show password"}
                         >
-                          {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {/* Options Row: Remember Me & Register */}
-                  <div className="flex items-center justify-between px-0.5 pt-0.5">
-                    <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-between px-1 pt-1">
+                    <div className="flex items-center space-x-2.5">
                       <Checkbox 
                         id="remember" 
                         checked={rememberMe}
                         onCheckedChange={(checked) => setRememberMe(!!checked)}
-                        className="w-4.5 h-4.5 rounded border-[#223354] data-[state=checked]:bg-[#D9A928] data-[state=checked]:border-[#D9A928] data-[state=checked]:text-[#080F23] focus-visible:ring-1 focus-visible:ring-[#D9A928]" 
+                        className="w-5 h-5 rounded-lg border-[#2b3e63] data-[state=checked]:bg-[#D9A928] data-[state=checked]:border-[#D9A928] data-[state=checked]:text-[#080F23] focus-visible:ring-2 focus-visible:ring-[#D9A928]" 
                       />
                       <label
                         htmlFor="remember"
-                        className="text-xs sm:text-sm font-medium leading-none text-[#C8D1E0] cursor-pointer hover:text-white transition-colors select-none"
+                        className="text-xs sm:text-sm font-semibold leading-none text-[#C8D1E0] cursor-pointer hover:text-white transition-colors select-none"
                       >
                         Remember Me?
                       </label>
@@ -900,20 +904,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <button
                       type="button"
                       onClick={() => setIsFlipped(true)}
-                      className="text-xs sm:text-sm font-semibold text-[#D9A928] hover:text-[#F5D88A] transition-colors underline underline-offset-4 cursor-pointer"
+                      className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#F5D88A] transition-colors underline underline-offset-4 cursor-pointer"
                     >
                       Register
                     </button>
                   </div>
 
-                  {/* Action Button: Luxury Golden Key Sign In */}
+                  {/* Action Button: Grand Luxury Golden Key Sign In */}
                   <div className="pt-2">
                     <Button 
                       type="submit" 
                       disabled={isLoading}
-                      className="w-full h-13 min-h-[52px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.22em] rounded-2xl shadow-[0_12px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden group touch-friendly-btn"
+                      className="w-full h-14 min-h-[56px] xl:h-16 bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm xl:text-base uppercase tracking-[0.25em] rounded-2xl shadow-[0_14px_36px_rgba(217,169,40,0.55),0_2px_10px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-3 border-none cursor-pointer relative overflow-hidden group touch-friendly-btn"
                     >
-                      <Key className="w-5 h-5 text-[#080F23] stroke-[2.7] group-hover:rotate-12 transition-transform duration-300" />
+                      <Key className="w-5 h-5 xl:w-6 xl:h-6 text-[#080F23] stroke-[2.7] group-hover:rotate-12 transition-transform duration-300" />
                       <span>{isLoading ? "Signing In..." : "SIGN IN"}</span>
                     </Button>
                   </div>
@@ -923,38 +927,38 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             </div>
 
             {/* ---------------- BACK PAGE: REGISTER (3D Book Turned View) ---------------- */}
-            <div className="book-face-back p-6 sm:p-8 lg:p-12 relative overflow-hidden bg-gradient-to-b from-[#0e172e] via-[#0c1427] to-[#080f20]">
+            <div className="book-face-back p-8 lg:p-12 xl:p-16 relative overflow-hidden bg-gradient-to-b from-[#0e172e] via-[#0c1427] to-[#080f20]">
               
               {/* Concentric Gold Arcs: Top-Right */}
               <svg 
-                className="absolute top-0 right-0 w-36 h-36 lg:w-44 lg:h-44 pointer-events-none opacity-40 select-none z-0" 
+                className="absolute top-0 right-0 w-40 h-40 lg:w-48 lg:h-48 pointer-events-none opacity-45 select-none z-0" 
                 viewBox="0 0 150 150"
                 fill="none"
                 aria-hidden="true"
               >
                 <defs>
                   <linearGradient id="deskRegGoldArcTR" x1="100%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.8" />
-                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.45" />
+                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.85" />
+                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.5" />
                     <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
                   </linearGradient>
                 </defs>
                 <circle cx="150" cy="0" r="45" stroke="url(#deskRegGoldArcTR)" strokeWidth="1.8" />
                 <circle cx="150" cy="0" r="85" stroke="url(#deskRegGoldArcTR)" strokeWidth="1.8" />
-                <circle cx="150" cy="0" r="125" stroke="url(#deskRegGoldArcTR)" strokeWidth="1.8" />
+                <circle cx="150" cy="150" r="125" stroke="url(#deskRegGoldArcTR)" strokeWidth="1.8" />
               </svg>
 
               {/* Concentric Gold Arcs: Bottom-Right */}
               <svg 
-                className="absolute bottom-0 right-0 w-36 h-36 lg:w-44 lg:h-44 pointer-events-none opacity-40 select-none z-0" 
+                className="absolute bottom-0 right-0 w-40 h-40 lg:w-48 lg:h-48 pointer-events-none opacity-45 select-none z-0" 
                 viewBox="0 0 150 150"
                 fill="none"
                 aria-hidden="true"
               >
                 <defs>
                   <linearGradient id="deskRegGoldArcBR" x1="100%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.8" />
-                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.45" />
+                    <stop offset="0%" stopColor="#F5D88A" stopOpacity="0.85" />
+                    <stop offset="50%" stopColor="#D4AF37" stopOpacity="0.5" />
                     <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
                   </linearGradient>
                 </defs>
@@ -963,40 +967,40 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <circle cx="150" cy="150" r="125" stroke="url(#deskRegGoldArcBR)" strokeWidth="1.8" />
               </svg>
 
-              <div className="max-w-[380px] w-full mx-auto space-y-4 lg:space-y-5 relative z-10">
+              <div className="max-w-[420px] xl:max-w-[450px] w-full mx-auto space-y-5 xl:space-y-6 relative z-10">
                 
                 {/* Header: Regal Serif REGISTER */}
-                <div className="text-center space-y-1">
-                  <h2 className="text-2xl sm:text-3xl lg:text-[34px] font-serif font-bold text-[#F8F5ED] tracking-[0.14em] drop-shadow-md">
+                <div className="text-center space-y-1.5">
+                  <h2 className="text-3xl lg:text-[38px] xl:text-[44px] font-serif font-bold text-[#F8F5ED] tracking-[0.16em] drop-shadow-lg">
                     REGISTER
                   </h2>
-                  <div className="flex items-center justify-center gap-3 mt-2 w-full max-w-[160px] mx-auto">
-                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                  <div className="flex items-center justify-center gap-3 mt-2.5 w-full max-w-[180px] mx-auto">
+                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#D9A928]" />
                     <span className="text-[#F5D88A] text-xs">◆</span>
-                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D9A928]/60 to-[#D9A928]" />
+                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#D9A928]" />
                   </div>
                 </div>
 
                 {/* Error Message Display */}
                 {registerError && (
-                  <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs sm:text-sm font-medium px-3.5 py-2 rounded-xl text-center shadow-inner">
+                  <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl text-center shadow-inner">
                     {registerError}
                   </div>
                 )}
 
                 {/* Register Form */}
-                <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-                  <div className="space-y-3">
+                <form onSubmit={handleRegisterSubmit} className="space-y-4 xl:space-y-4.5">
+                  <div className="space-y-3.5 xl:space-y-4">
                     
                     {/* FULL NAME FIELD */}
-                    <div className="space-y-1 text-left">
-                      <label htmlFor="reg-name" className="flex items-center gap-1.5 text-[11px] font-bold text-[#D9A928] uppercase tracking-[0.2em]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928]" />
+                    <div className="space-y-1.5 text-left">
+                      <label htmlFor="reg-name" className="flex items-center gap-2 text-xs font-bold text-[#F5D88A] uppercase tracking-[0.22em]">
+                        <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#D9A928] to-[#F5D88A] shadow-[0_0_8px_rgba(217,169,40,0.8)]" />
                         <span>FULL NAME</span>
                       </label>
-                      <div className="w-full h-[50px] rounded-xl bg-[#080e1d]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
-                        <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0">
-                          <User className="h-4.5 w-4.5 text-[#F5D88A]" />
+                      <div className="group/input relative w-full h-[54px] xl:h-[58px] rounded-2xl bg-[#0f172e]/90 hover:bg-[#121c38]/95 border-1.5 border-[#2b3e63] hover:border-[#D9A928]/60 focus-within:border-[#F5D88A] focus-within:ring-4 focus-within:ring-[#D9A928]/20 shadow-[0_6px_20px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] px-4 flex items-center transition-all duration-300">
+                        <div className="w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-gradient-to-br from-[#D9A928]/25 via-[#C89B2B]/15 to-[#8C6D1F]/20 border border-[#D9A928]/50 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within/input:border-[#F5D88A] group-focus-within/input:bg-[#D9A928]/35 transition-all duration-300">
+                          <User className="h-4.5 w-4.5 text-[#F5D88A] group-focus-within/input:scale-110 transition-transform" />
                         </div>
                         <input 
                           id="reg-name" 
@@ -1005,20 +1009,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                           onChange={(e) => setRegName(e.target.value)} 
                           placeholder="Enter your full name" 
                           required 
-                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0"
+                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#7E8EA8] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0 tracking-wide"
                         />
                       </div>
                     </div>
 
                     {/* USERNAME FIELD */}
-                    <div className="space-y-1 text-left">
-                      <label htmlFor="reg-username" className="flex items-center gap-1.5 text-[11px] font-bold text-[#D9A928] uppercase tracking-[0.2em]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928]" />
+                    <div className="space-y-1.5 text-left">
+                      <label htmlFor="reg-username" className="flex items-center gap-2 text-xs font-bold text-[#F5D88A] uppercase tracking-[0.22em]">
+                        <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#D9A928] to-[#F5D88A] shadow-[0_0_8px_rgba(217,169,40,0.8)]" />
                         <span>USERNAME</span>
                       </label>
-                      <div className="w-full h-[50px] rounded-xl bg-[#080e1d]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
-                        <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0">
-                          <User className="h-4.5 w-4.5 text-[#F5D88A]" />
+                      <div className="group/input relative w-full h-[54px] xl:h-[58px] rounded-2xl bg-[#0f172e]/90 hover:bg-[#121c38]/95 border-1.5 border-[#2b3e63] hover:border-[#D9A928]/60 focus-within:border-[#F5D88A] focus-within:ring-4 focus-within:ring-[#D9A928]/20 shadow-[0_6px_20px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] px-4 flex items-center transition-all duration-300">
+                        <div className="w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-gradient-to-br from-[#D9A928]/25 via-[#C89B2B]/15 to-[#8C6D1F]/20 border border-[#D9A928]/50 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within/input:border-[#F5D88A] group-focus-within/input:bg-[#D9A928]/35 transition-all duration-300">
+                          <User className="h-4.5 w-4.5 text-[#F5D88A] group-focus-within/input:scale-110 transition-transform" />
                         </div>
                         <input 
                           id="reg-username" 
@@ -1028,20 +1032,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                           placeholder="Create username" 
                           required 
                           autoComplete="username"
-                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0"
+                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#7E8EA8] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0 tracking-wide"
                         />
                       </div>
                     </div>
                     
                     {/* PASSWORD FIELD */}
-                    <div className="space-y-1 text-left">
-                      <label htmlFor="reg-password" className="flex items-center gap-1.5 text-[11px] font-bold text-[#D9A928] uppercase tracking-[0.2em]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928]" />
+                    <div className="space-y-1.5 text-left">
+                      <label htmlFor="reg-password" className="flex items-center gap-2 text-xs font-bold text-[#F5D88A] uppercase tracking-[0.22em]">
+                        <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#D9A928] to-[#F5D88A] shadow-[0_0_8px_rgba(217,169,40,0.8)]" />
                         <span>PASSWORD</span>
                       </label>
-                      <div className="w-full h-[50px] rounded-xl bg-[#080e1d]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
-                        <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0">
-                          <Lock className="h-4.5 w-4.5 text-[#F5D88A]" />
+                      <div className="group/input relative w-full h-[54px] xl:h-[58px] rounded-2xl bg-[#0f172e]/90 hover:bg-[#121c38]/95 border-1.5 border-[#2b3e63] hover:border-[#D9A928]/60 focus-within:border-[#F5D88A] focus-within:ring-4 focus-within:ring-[#D9A928]/20 shadow-[0_6px_20px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] px-4 flex items-center transition-all duration-300">
+                        <div className="w-9 h-9 xl:w-10 xl:h-10 rounded-xl bg-gradient-to-br from-[#D9A928]/25 via-[#C89B2B]/15 to-[#8C6D1F]/20 border border-[#D9A928]/50 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within/input:border-[#F5D88A] group-focus-within/input:bg-[#D9A928]/35 transition-all duration-300">
+                          <Lock className="h-4.5 w-4.5 text-[#F5D88A] group-focus-within/input:scale-110 transition-transform" />
                         </div>
                         <input 
                           id="reg-password" 
@@ -1050,12 +1054,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                           onChange={(e) => setRegPassword(e.target.value)} 
                           placeholder="Create password" 
                           required 
-                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0"
+                          className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#7E8EA8] text-sm sm:text-base font-medium shadow-none focus:ring-0 focus:outline-none p-0 tracking-wide"
                         />
                         <button 
                           type="button" 
                           onClick={() => setShowRegPassword(!showRegPassword)}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0 ml-1"
+                          className="w-9 h-9 rounded-xl flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/20 transition-all cursor-pointer shrink-0 ml-1.5"
                           aria-label={showRegPassword ? "Hide password" : "Show password"}
                         >
                           {showRegPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
@@ -1065,14 +1069,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   </div>
 
                   {/* Flip Back to Login Row */}
-                  <div className="flex items-center justify-between px-0.5 pt-0.5">
-                    <span className="text-xs sm:text-sm text-[#A0AFC7] font-medium">
+                  <div className="flex items-center justify-between px-1 pt-1">
+                    <span className="text-xs sm:text-sm text-[#A0AFC7] font-semibold">
                       Already have an account?
                     </span>
                     <button
                       type="button"
                       onClick={() => setIsFlipped(false)}
-                      className="text-xs sm:text-sm font-semibold text-[#D9A928] hover:text-[#F5D88A] transition-colors underline underline-offset-4 cursor-pointer"
+                      className="text-xs sm:text-sm font-bold text-[#D9A928] hover:text-[#F5D88A] transition-colors underline underline-offset-4 cursor-pointer"
                     >
                       Sign In
                     </button>
@@ -1083,9 +1087,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <Button 
                       type="submit" 
                       disabled={isRegistering}
-                      className="w-full h-13 min-h-[52px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.22em] rounded-2xl shadow-[0_12px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden group touch-friendly-btn"
+                      className="w-full h-14 min-h-[56px] xl:h-16 bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm xl:text-base uppercase tracking-[0.25em] rounded-2xl shadow-[0_14px_36px_rgba(217,169,40,0.55),0_2px_10px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-3 border-none cursor-pointer relative overflow-hidden group touch-friendly-btn"
                     >
-                      <UserPlus className="w-5 h-5 text-[#080F23] stroke-[2.7]" />
+                      <UserPlus className="w-5 h-5 xl:w-6 xl:h-6 text-[#080F23] stroke-[2.7]" />
                       <span>{isRegistering ? "Creating..." : "CREATE ACCOUNT"}</span>
                     </Button>
                   </div>
