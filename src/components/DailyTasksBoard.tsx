@@ -2280,7 +2280,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
 
   return (
     <div 
-      className={`w-full h-full flex flex-col min-w-0 max-w-full space-y-4 pb-6 select-none font-sans relative rounded-2xl ${dailyTasksWallpaper ? 'wallpaper-active' : ''}`}
+      className={`w-full min-h-full lg:h-full flex flex-col min-w-0 max-w-full space-y-4 pb-8 lg:pb-6 font-sans relative rounded-2xl ${dailyTasksWallpaper ? 'wallpaper-active' : ''}`}
     >
       {/* Hidden File Input for Excel Import */}
       <input 
@@ -2618,10 +2618,22 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
       )}
 
       {/* EXCEL SPREADSHEET MAIN CONTAINER */}
-      <div className={`daily-tasks-table-container min-w-0 max-w-full border rounded-2xl shadow-2xl flex-1 flex flex-col overflow-hidden relative transition-all ${dailyTasksWallpaper ? 'bg-[#0b1329]/35 backdrop-blur-xl border-white/15' : 'bg-[#0b1329] border-slate-800'}`}>
+      <div className={`daily-tasks-table-container min-w-0 max-w-full border rounded-2xl shadow-2xl flex flex-col overflow-hidden relative transition-all ${dailyTasksWallpaper ? 'bg-[#0b1329]/35 backdrop-blur-xl border-white/15' : 'bg-[#0b1329] border-slate-800'}`}>
         {/* SPREADSHEET TABLE GRID (Scrollable) */}
-        <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar responsive-table-container min-w-0 max-w-full border-b border-slate-800 max-h-[600px] min-h-[420px]">
-          <table className="w-full border-collapse text-left text-xs sm:text-sm select-none">
+        <div 
+          className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar responsive-table-container min-w-0 max-w-full border-b border-slate-800 min-h-[380px] h-[440px] sm:h-[500px] lg:h-[580px] max-h-[75vh]"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'auto',
+            overscrollBehavior: 'contain'
+          }}
+        >
+          <table 
+            className="w-full border-collapse text-left text-xs sm:text-sm"
+            style={{
+              minWidth: `${Math.max(760, currentSheet.columns.reduce((sum, col) => sum + (col.width || 140), 110))}px`
+            }}
+          >
             {/* TABLE HEADER (Cyan Excel Style like 2nd image) */}
             <thead className="sticky top-0 z-20 shadow-md">
               {/* Top Row: Excel Column Letters (A, B, C, D...) */}
@@ -2633,7 +2645,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                   <th 
                     key={`letter-${col.id}`} 
                     className={`py-1 px-3 border-r text-center tracking-wider ${dailyTasksWallpaper ? 'border-white/10' : 'border-slate-800/80'}`}
-                    style={{ width: col.width ? `${col.width}px` : 'auto' }}
+                    style={{ width: col.width ? `${col.width}px` : 'auto', minWidth: col.width ? `${col.width}px` : '120px' }}
                   >
                     {getColumnLetter(idx)}
                   </th>
@@ -2884,6 +2896,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                               onMouseDown={(e) => handleCellMouseDown(row.id, col.id, rowIdx, colIdx, e)}
                               onMouseEnter={() => handleCellMouseEnter(row.id, col.id, rowIdx, colIdx)}
                               className={cellBaseClass}
+                              style={{ width: col.width ? `${col.width}px` : 'auto', minWidth: col.width ? `${col.width}px` : '120px' }}
                             >
                               <Popover 
                                 open={isDropdownOpen}
@@ -3048,6 +3061,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 inputEl?.focus();
                               }}
                               className={cellBaseClass}
+                              style={{ width: col.width ? `${col.width}px` : 'auto', minWidth: col.width ? `${col.width}px` : '120px' }}
                             >
                               <Popover 
                                 open={isDateOpen} 
@@ -3336,6 +3350,7 @@ export default function DailyTasksBoard({ onWallpaperChange }: { onWallpaperChan
                                 inputEl?.focus();
                               }}
                               className={cellBaseClass}
+                              style={{ width: col.width ? `${col.width}px` : 'auto', minWidth: col.width ? `${col.width}px` : '120px' }}
                             >
                               <input 
                                 data-cell-id={`${row.id}-${col.id}`}

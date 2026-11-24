@@ -7323,7 +7323,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-3 md:p-4 print:p-0 print:overflow-visible flex flex-col min-h-0 min-w-0 max-w-full">
 
           {activeTab === 'daily_tasks' && (
-            <div className="w-full h-full animate-in fade-in duration-300">
+            <div className="w-full min-h-full pb-16 lg:pb-0 lg:h-full animate-in fade-in duration-300">
               <Suspense fallback={<div className="p-12 text-center text-slate-400 font-bold animate-pulse">Loading Tasks Board...</div>}>
                 <DailyTasksBoard
                   onWallpaperChange={() => {

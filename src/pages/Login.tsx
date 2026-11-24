@@ -217,7 +217,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       {/* ======================================================== */}
       {/* MOBILE VIEW (Screens < md) - Strictly Locked (No Horizontal Movement) */}
       {/* ======================================================== */}
-      <div className="md:hidden w-full max-w-[100vw] h-[100dvh] max-h-[100dvh] flex flex-col justify-between py-4 px-5 relative z-10 overflow-x-hidden overflow-y-auto overscroll-none touch-manipulation">
+      <div 
+        className="md:hidden w-full max-w-[100vw] h-[100dvh] max-h-[100dvh] flex flex-col justify-between py-4 px-5 relative z-10 overflow-x-hidden overflow-y-auto overscroll-none touch-pan-y"
+        style={{ touchAction: 'pan-y' }}
+      >
         
         {/* 1. Corner Luxury Concentric Gold Arcs (Pinned strictly within viewport edges) */}
         {/* Top-Left Concentric Arcs */}
