@@ -100,6 +100,7 @@ function MockLiveStockHeader({
             captionLayout="dropdown-buttons"
             fromYear={2022}
             toYear={2035}
+            defaultMonth={parseStandardToLocalDate(selectedDispatchDate) || new Date(2026, 9, 1)}
             selected={parseStandardToLocalDate(selectedDispatchDate)}
             onSelect={(date) => {
               if (date) {

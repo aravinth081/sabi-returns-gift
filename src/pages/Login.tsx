@@ -267,6 +267,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 src="/logo.jpeg" 
                 alt="Sabi Return Gifts" 
                 className="w-full h-full object-cover rounded-xl sm:rounded-[1.4rem]" 
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
+                width="220"
+                height="220"
               />
             </div>
             

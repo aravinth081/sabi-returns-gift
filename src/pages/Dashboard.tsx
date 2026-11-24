@@ -7,7 +7,7 @@
 // Step 5: Start the application using `npm start` or `npm run dev`.
 // ==========================================
 
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 // --- FIREBASE SINGLETON & CONCURRENCY IMPORTS ---
 import { db } from "@/firebase";
 import {
@@ -43,15 +43,16 @@ import {
   Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck, Copy, Printer
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
-import OrderInvoiceView from "@/components/OrderInvoiceView";
-import DailyTasksBoard from "@/components/DailyTasksBoard";
-import MonthlyWinnerPicker from "@/components/MonthlyWinnerPicker";
-import AttendanceLog from "@/components/AttendanceLog";
-import { ProductListingModal } from "@/components/products/ProductListingModal";
-import { CategoryManagementModal } from "@/components/products/CategoryManagementModal";
-import { AddCategoryModal } from "@/components/products/AddCategoryModal";
-import { ProductViewModal } from "@/components/products/ProductViewModal";
-import { ParetoAnalysisModal } from "@/components/ParetoAnalysisModal";
+// --- CODE SPLIT: LAZY LOAD HEAVY SUB-VIEWS & MODALS ---
+const OrderInvoiceView = lazy(() => import("@/components/OrderInvoiceView"));
+const DailyTasksBoard = lazy(() => import("@/components/DailyTasksBoard"));
+const MonthlyWinnerPicker = lazy(() => import("@/components/MonthlyWinnerPicker"));
+const AttendanceLog = lazy(() => import("@/components/AttendanceLog"));
+const ProductListingModal = lazy(() => import("@/components/products/ProductListingModal").then(m => ({ default: m.ProductListingModal })));
+const CategoryManagementModal = lazy(() => import("@/components/products/CategoryManagementModal").then(m => ({ default: m.CategoryManagementModal })));
+const AddCategoryModal = lazy(() => import("@/components/products/AddCategoryModal").then(m => ({ default: m.AddCategoryModal })));
+const ProductViewModal = lazy(() => import("@/components/products/ProductViewModal").then(m => ({ default: m.ProductViewModal })));
+const ParetoAnalysisModal = lazy(() => import("@/components/ParetoAnalysisModal"));
 import Login from "./Login";
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -687,10 +688,47 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
   const [invAdminReportMenuOpen, setInvAdminReportMenuOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
-  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
+  // --- STALE-WHILE-REVALIDATE FAST LOCAL CACHE FOR INSTANT LOADING ---
+  const [orders, setOrders] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('sabi_orders_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [employees, setEmployees] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('sabi_employees_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [inventoryLogs, setInventoryLogs] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('sabi_inventory_logs_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() => {
+    try {
+      const cached = localStorage.getItem('sabi_inventory_transactions_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('sabi_orders_cache');
+      return !cached || cached === '[]';
+    } catch (e) {
+      return true;
+    }
+  });
   const [showAuditLog, setShowAuditLog] = useState<boolean>(false);
   const [isProcessingDispatches, setIsProcessingDispatches] = useState<boolean>(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -1402,18 +1440,35 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       });
       ordersList.sort((a: any, b: any) => b.id - a.id);
       setOrders(ordersList);
-    }, (err) => console.warn("Firestore orders onSnapshot error:", err));
+      setIsDataLoading(false);
+      try {
+        localStorage.setItem('sabi_orders_cache', JSON.stringify(ordersList));
+      } catch (e) {}
+    }, (err) => {
+      console.warn("Firestore orders onSnapshot error:", err);
+      setIsDataLoading(false);
+    });
     const unsubEmployees = onSnapshot(collection(db, "employees"), (snapshot) => {
-      setEmployees(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
+      const empList = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
+      setEmployees(empList);
+      try {
+        localStorage.setItem('sabi_employees_cache', JSON.stringify(empList));
+      } catch (e) {}
     }, (err) => console.warn("Firestore employees onSnapshot error:", err));
     const unsubInventory = onSnapshot(collection(db, "inventory"), (snapshot) => {
       const invList = snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() }));
       invList.sort((a: any, b: any) => b.timestamp - a.timestamp);
       setInventoryLogs(invList);
+      try {
+        localStorage.setItem('sabi_inventory_logs_cache', JSON.stringify(invList));
+      } catch (e) {}
     }, (err) => console.warn("Firestore inventory onSnapshot error:", err));
     const unsubTransactions = onSnapshot(collection(db, "inventory_transactions"), (snapshot) => {
       const txnList = snapshot.docs.map(doc => ({ fireId: doc.id, id: doc.id, ...doc.data() })) as InventoryTransaction[];
       setInventoryTransactions(txnList);
+      try {
+        localStorage.setItem('sabi_inventory_transactions_cache', JSON.stringify(txnList));
+      } catch (e) {}
     }, (err) => console.warn("Firestore inventory_transactions onSnapshot error:", err));
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
       setCustomProducts(snapshot.docs.map(doc => ({ fireId: doc.id, ...doc.data() })));
@@ -6983,6 +7038,8 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
               <img
                 src="/logo.jpeg"
                 alt="Logo"
+                loading="eager"
+                decoding="async"
                 className="w-full h-full object-cover select-none"
                 onError={(e) => {
                   // Fallback icon if logo fails to load
@@ -7056,7 +7113,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
               </button>
               <div className="relative w-20 h-20 mb-3 rounded-full p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-[0_0_15px_rgba(59,130,246,0.8)] flex items-center justify-center">
                 <div className="w-full h-full rounded-full border-[3px] border-white overflow-hidden bg-slate-900 shadow-inner">
-                  <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
 
@@ -7255,7 +7312,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 className="w-10 h-10 sm:w-14 sm:h-14 rounded-full p-0.5 sm:p-1 bg-gradient-to-br from-blue-400 via-blue-600 to-indigo-800 shadow-md flex items-center justify-center select-none shrink-0"
               >
                 <div className="w-full h-full rounded-full border sm:border-2 border-white overflow-hidden bg-slate-900 shadow-inner">
-                  <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
             </div>
@@ -7266,11 +7323,13 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
           {activeTab === 'daily_tasks' && (
             <div className="w-full h-full animate-in fade-in duration-300">
-              <DailyTasksBoard
-                onWallpaperChange={() => {
-                  setDailyTasksWallpaper(localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
-                }}
-              />
+              <Suspense fallback={<div className="p-12 text-center text-slate-400 font-bold animate-pulse">Loading Tasks Board...</div>}>
+                <DailyTasksBoard
+                  onWallpaperChange={() => {
+                    setDailyTasksWallpaper(localStorage.getItem('sabi_daily_tasks_wallpaper') || "");
+                  }}
+                />
+              </Suspense>
             </div>
           )}
 
@@ -7710,6 +7769,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                                     <img
                                       src={prod.images[0]}
                                       alt={prod.name}
+                                      loading="lazy"
+                                      decoding="async"
+                                      width="40"
+                                      height="40"
                                       onClick={() => setProductViewModalProduct(prod)}
                                       className="w-10 h-10 rounded-xl object-cover border border-white/20 shadow-sm cursor-pointer hover:scale-110 transition-transform shrink-0"
                                       title="Click to view product details and images"
@@ -8217,6 +8280,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                             captionLayout="dropdown-buttons"
                             fromYear={2022}
                             toYear={2035}
+                            defaultMonth={parseStandardToLocalDate(selectedDispatchDate) || new Date()}
                             selected={parseStandardToLocalDate(selectedDispatchDate)}
                             onSelect={(date) => {
                               if (date) {
@@ -10701,7 +10765,24 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       </thead>
                       <tbody>
                         {(isScreenshotMode ? screenshotChunkOrders : paginatedOrders).length === 0 ? (
-                          <tr><td colSpan={20} className="p-8 text-center text-amber-400 font-extrabold text-sm tracking-wide bg-[#0d1527]">No records found for the selected filters.</td></tr>
+                          isDataLoading && orders.length === 0 ? (
+                            Array.from({ length: 6 }).map((_, sIdx) => (
+                              <tr key={`skel-row-${sIdx}`} className={`border-b border-white/5 animate-pulse ${sIdx % 2 === 0 ? 'bg-[#0d1527]' : 'bg-[#121c33]'}`}>
+                                <td className="py-4 px-4 text-center"><div className="h-4 w-12 bg-white/10 rounded mx-auto" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-28 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-24 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-20 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-16 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-20 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-16 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-16 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-20 bg-white/10 rounded" /></td>
+                                <td className="py-4 px-4"><div className="h-4 w-16 bg-white/10 rounded" /></td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr><td colSpan={20} className="p-8 text-center text-amber-400 font-extrabold text-sm tracking-wide bg-[#0d1527]">No records found for the selected filters.</td></tr>
+                          )
                         ) : (
                           (isScreenshotMode ? screenshotChunkOrders : paginatedOrders).map((order, idx) => {
                             const priceData = calculatePriceInfo(order.chocolate, order.count, order.discount, order.isDeliveryFree, order.paymentStatus, order.category, customPricesMap, order.manualDeliveryFee, order.orderStatus, managedChocPricesMap, order.pricingType, order.manualProductPrice);
@@ -11361,14 +11442,16 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
 
           {activeTab === 'attendance' && (
             <div className="space-y-6 print:hidden">
-              <AttendanceLog
-                isAdminOverride={role === 'Admin'}
-                onWallpaperChange={() => {
-                  const activeUser = profile?.username || localStorage.getItem('loggedInName') || "";
-                  const userWp = (activeUser && localStorage.getItem(`sabi_wallpaper_attendance_${activeUser}`)) || localStorage.getItem('sabi_wallpaper_attendance') || "";
-                  setAttendanceWallpaper(userWp);
-                }}
-              />
+              <Suspense fallback={<div className="p-12 text-center text-slate-400 font-bold animate-pulse">Loading Attendance Log...</div>}>
+                <AttendanceLog
+                  isAdminOverride={role === 'Admin'}
+                  onWallpaperChange={() => {
+                    const activeUser = profile?.username || localStorage.getItem('loggedInName') || "";
+                    const userWp = (activeUser && localStorage.getItem(`sabi_wallpaper_attendance_${activeUser}`)) || localStorage.getItem('sabi_wallpaper_attendance') || "";
+                    setAttendanceWallpaper(userWp);
+                  }}
+                />
+              </Suspense>
             </div>
           )}
 
@@ -12192,56 +12275,70 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
       </main>
 
       {/* 🟢 REUSABLE PRODUCT LISTING MODAL (Requirement 10, 11, 12, 13, 14, 15, 16, 22, 23) */}
-      <ProductListingModal
-        isOpen={isProductListingModalOpen || isAddProductModalOpen}
-        onClose={() => {
-          setIsProductListingModalOpen(false);
-          setIsAddProductModalOpen(false);
-          setSelectedEditingProduct(null);
-        }}
-        editingProduct={selectedEditingProduct}
-        categories={productCategories}
-        onAddCategory={handleAddCategory}
-        allSingleProducts={allSingleProducts}
-        productSoldCountMap={productSoldCountMap}
-        onSave={handleSaveListingModal}
-        isSaving={isSavingProduct}
-      />
+      {(isProductListingModalOpen || isAddProductModalOpen) && (
+        <Suspense fallback={null}>
+          <ProductListingModal
+            isOpen={isProductListingModalOpen || isAddProductModalOpen}
+            onClose={() => {
+              setIsProductListingModalOpen(false);
+              setIsAddProductModalOpen(false);
+              setSelectedEditingProduct(null);
+            }}
+            editingProduct={selectedEditingProduct}
+            categories={productCategories}
+            onAddCategory={handleAddCategory}
+            allSingleProducts={allSingleProducts}
+            productSoldCountMap={productSoldCountMap}
+            onSave={handleSaveListingModal}
+            isSaving={isSavingProduct}
+          />
+        </Suspense>
+      )}
 
       {/* 🟢 CATEGORY MANAGEMENT MODAL (Requirement 6, 7, 8) */}
-      <CategoryManagementModal
-        isOpen={isCategoryManagementOpen}
-        onClose={() => setIsCategoryManagementOpen(false)}
-        categories={productCategories}
-        products={customProducts}
-        onAddCategory={handleAddCategory}
-        onEditCategory={handleEditCategory}
-        onDeleteCategory={handleDeleteCategory}
-      />
+      {isCategoryManagementOpen && (
+        <Suspense fallback={null}>
+          <CategoryManagementModal
+            isOpen={isCategoryManagementOpen}
+            onClose={() => setIsCategoryManagementOpen(false)}
+            categories={productCategories}
+            products={customProducts}
+            onAddCategory={handleAddCategory}
+            onEditCategory={handleEditCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+        </Suspense>
+      )}
 
       {/* 🟢 QUICK ADD CATEGORY MODAL */}
-      <AddCategoryModal
-        isOpen={isQuickAddCategoryOpen}
-        onClose={() => setIsQuickAddCategoryOpen(false)}
-        onSave={handleAddCategory}
-        existingCategories={productCategories.map(c => c.name)}
-      />
+      {isQuickAddCategoryOpen && (
+        <Suspense fallback={null}>
+          <AddCategoryModal
+            isOpen={isQuickAddCategoryOpen}
+            onClose={() => setIsQuickAddCategoryOpen(false)}
+            onSave={handleAddCategory}
+            existingCategories={productCategories.map(c => c.name)}
+          />
+        </Suspense>
+      )}
 
       {/* 🟢 PRODUCT VIEW DETAILS & GALLERY MODAL (Requirement 17: Copy Description, Copy Image, Copy All) */}
       {Boolean(productViewModalProduct) && (
-        <ProductViewModal
-          isOpen={Boolean(productViewModalProduct)}
-          onClose={() => setProductViewModalProduct(null)}
-          product={productViewModalProduct}
-          soldCount={productViewModalProduct ? (productSoldCountMap[(productViewModalProduct.name || '').trim().toLowerCase()] || 0) : 0}
-          onEdit={(prod) => {
-            setProductViewModalProduct(null);
-            setSelectedEditingProduct(prod);
-            setIsProductListingModalOpen(true);
-          }}
-          onImageUpload={handleImageUpload}
-          onDeleteImage={handleDeleteImage}
-        />
+        <Suspense fallback={null}>
+          <ProductViewModal
+            isOpen={Boolean(productViewModalProduct)}
+            onClose={() => setProductViewModalProduct(null)}
+            product={productViewModalProduct}
+            soldCount={productViewModalProduct ? (productSoldCountMap[(productViewModalProduct.name || '').trim().toLowerCase()] || 0) : 0}
+            onEdit={(prod) => {
+              setProductViewModalProduct(null);
+              setSelectedEditingProduct(prod);
+              setIsProductListingModalOpen(true);
+            }}
+            onImageUpload={handleImageUpload}
+            onDeleteImage={handleDeleteImage}
+          />
+        </Suspense>
       )}
 
       {/* 🟢 NEW: INVENTORY MODAL */}
@@ -13351,7 +13448,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                 <div className="flex justify-between items-center mb-4 border-b-2 border-dashed border-[#d7ccc8] pb-4 pt-1">
                   <div className="text-left flex flex-col justify-center">
                     <div className="w-14 h-14 rounded-xl mb-2 flex items-center justify-center border-[3px] bg-amber-50 border-amber-200 text-amber-600 overflow-hidden shadow-inner relative">
-                      <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                      <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover" loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.display = "none")} />
                       <User size={24} className="absolute -z-10" />
                     </div>
                     <h2 className="text-xl font-black text-[#3e2723]">{previewData.name}</h2>
@@ -13368,6 +13465,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=8220638753@upi%26pn=SUBASH%20G%26am=${previewPrice.totalPrice}%26cu=INR&color=78350f&bgcolor=fffcf9`}
                       alt="Payment QR Code"
+                      loading="lazy"
+                      decoding="async"
+                      width="64"
+                      height="64"
                       className="w-16 h-16 rounded-lg"
                       crossOrigin="anonymous"
                     />
@@ -13576,6 +13677,10 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         <img
                           src="/sabi-shipping-logo.png"
                           alt="Sabi Return Gifts"
+                          loading="lazy"
+                          decoding="async"
+                          width="112"
+                          height="112"
                           className="w-full h-full object-contain"
                           crossOrigin="anonymous"
                           onError={(e) => {
@@ -13606,6 +13711,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                       <img
                         src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${getSerial(shippingOrder.id)}&scale=2&height=10`}
                         alt="Barcode"
+                        loading="lazy"
+                        decoding="async"
+                        height="40"
                         className="h-10 w-auto mix-blend-multiply"
                         crossOrigin="anonymous"
                       />
@@ -14293,21 +14401,25 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
         </div>
       )}
 
-      {/* 🟢 PARETO ANALYSES POPUP MODAL */}
-      <ParetoAnalysisModal
-        isOpen={isParetoModalOpen}
-        onClose={() => setIsParetoModalOpen(false)}
-        orders={orders}
-        initialDateType={revenueDateType}
-        initialRole={roleFilter !== 'All' ? roleFilter : 'All'}
-        initialType={tableTypeFilter !== 'All' ? tableTypeFilter : 'All'}
-        initialDashboard={activeTab === 'dashboard2' ? 'Dashboard 2' : 'Dashboard 1'}
-        initialInventory={activeTab === 'reports' ? reportInventoryFilter : (activeTab === 'dashboard1' && d1InventoryFilter !== 'All' ? d1InventoryFilter : 'Inventory 1')}
-        inventoriesList={inventoriesList}
-        customPricesMap={customPricesMap}
-        managedChocPricesMap={managedChocPricesMap}
-        orderTypes={orderTypes}
-      />
+      {/* 🟢 PARETO ANALYSES POPUP MODAL (LAZY LOADED ON DEMAND) */}
+      {isParetoModalOpen && (
+        <Suspense fallback={null}>
+          <ParetoAnalysisModal
+            isOpen={isParetoModalOpen}
+            onClose={() => setIsParetoModalOpen(false)}
+            orders={orders}
+            initialDateType={revenueDateType}
+            initialRole={roleFilter !== 'All' ? roleFilter : 'All'}
+            initialType={tableTypeFilter !== 'All' ? tableTypeFilter : 'All'}
+            initialDashboard={activeTab === 'dashboard2' ? 'Dashboard 2' : 'Dashboard 1'}
+            initialInventory={activeTab === 'reports' ? reportInventoryFilter : (activeTab === 'dashboard1' && d1InventoryFilter !== 'All' ? d1InventoryFilter : 'Inventory 1')}
+            inventoriesList={inventoriesList}
+            customPricesMap={customPricesMap}
+            managedChocPricesMap={managedChocPricesMap}
+            orderTypes={orderTypes}
+          />
+        </Suspense>
+      )}
 
       {/* 🟢 NEW: HISTORY AUTHENTICATION MODAL */}
       {isHistoryAuthModalOpen && (
@@ -15913,32 +16025,34 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
             className="relative w-full max-w-4xl my-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <OrderInvoiceView
-              order={(() => {
-                const invoicePriceData = calculatePriceInfo(
-                  selectedOrderForInvoice.chocolate,
-                  selectedOrderForInvoice.count,
-                  selectedOrderForInvoice.discount,
-                  selectedOrderForInvoice.isDeliveryFree,
-                  selectedOrderForInvoice.paymentStatus,
-                  selectedOrderForInvoice.category,
-                  customPricesMap,
-                  selectedOrderForInvoice.manualDeliveryFee,
-                  selectedOrderForInvoice.orderStatus,
-                  managedChocPricesMap,
-                  selectedOrderForInvoice.pricingType,
-                  selectedOrderForInvoice.manualProductPrice
-                );
-                return {
-                  ...selectedOrderForInvoice,
-                  totalPrice: invoicePriceData.fullTotalPrice,
-                  totalOrderPrice: invoicePriceData.fullTotalPrice,
-                  itemSubtotal: invoicePriceData.fullChocolatePrice,
-                  calculatedDeliveryFee: invoicePriceData.fullDeliveryCharge
-                };
-              })()}
-              onClose={() => setIsInvoiceOpen(false)}
-            />
+            <Suspense fallback={<div className="p-12 text-center text-white bg-slate-900 rounded-3xl font-bold animate-pulse">Loading Invoice...</div>}>
+              <OrderInvoiceView
+                order={(() => {
+                  const invoicePriceData = calculatePriceInfo(
+                    selectedOrderForInvoice.chocolate,
+                    selectedOrderForInvoice.count,
+                    selectedOrderForInvoice.discount,
+                    selectedOrderForInvoice.isDeliveryFree,
+                    selectedOrderForInvoice.paymentStatus,
+                    selectedOrderForInvoice.category,
+                    customPricesMap,
+                    selectedOrderForInvoice.manualDeliveryFee,
+                    selectedOrderForInvoice.orderStatus,
+                    managedChocPricesMap,
+                    selectedOrderForInvoice.pricingType,
+                    selectedOrderForInvoice.manualProductPrice
+                  );
+                  return {
+                    ...selectedOrderForInvoice,
+                    totalPrice: invoicePriceData.fullTotalPrice,
+                    totalOrderPrice: invoicePriceData.fullTotalPrice,
+                    itemSubtotal: invoicePriceData.fullChocolatePrice,
+                    calculatedDeliveryFee: invoicePriceData.fullDeliveryCharge
+                  };
+                })()}
+                onClose={() => setIsInvoiceOpen(false)}
+              />
+            </Suspense>
           </div>
         </div>
       )}
@@ -16074,7 +16188,9 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
             onClick={(e) => e.stopPropagation()}
             className="relative bg-transparent max-w-sm w-full animate-in fade-in zoom-in-95 slide-in-from-bottom-8 ease-out duration-300 cursor-default"
           >
-            <MonthlyWinnerPicker orders={orders} onClose={() => setIsWinnerPickerModalOpen(false)} />
+            <Suspense fallback={null}>
+              <MonthlyWinnerPicker orders={orders} onClose={() => setIsWinnerPickerModalOpen(false)} />
+            </Suspense>
           </div>
         </div>
       )}
@@ -16307,6 +16423,8 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                         crossOrigin="anonymous"
                         src={currentImage}
                         alt={`Product ${galleryActiveIndex + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="max-w-full max-h-full object-contain p-3"
                       />
                     )}
@@ -16341,7 +16459,7 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                             onClick={() => setGalleryActiveIndex(idx)}
                             className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === galleryActiveIndex ? 'border-amber-400 shadow-lg shadow-amber-400/30 scale-110' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'}`}
                           >
-                            <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                            <img src={img} alt={`Thumb ${idx + 1}`} loading="lazy" decoding="async" width="48" height="48" className="w-full h-full object-cover" />
                           </button>
                         ))}
                       </div>
