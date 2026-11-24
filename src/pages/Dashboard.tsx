@@ -40,7 +40,7 @@ import {
 
 import {
   Home, User, Plus, Download, Eye, EyeOff, Pencil, Trash2, Calendar, CalendarDays, CheckCircle, Clock, ShoppingBag, Search, TrendingUp, Package, MapPin, X, IndianRupee, Menu, Filter, Camera, Power, Lock, MessageSquare, MessageCircle, Share2, Upload, MoreVertical, Truck, ChevronDown, ChevronUp, GripVertical, Archive, Book, Receipt, ChevronLeft, ChevronRight, DollarSign, Settings, History, ClipboardList,
-  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck, Copy
+  Bell, Gift, Image as ImageIcon, CheckSquare, Square, RotateCcw, Target, Check, Tag, Loader2, Boxes, Layers, CheckCircle2, UserCheck, Copy, Printer
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line } from 'recharts';
 import OrderInvoiceView from "@/components/OrderInvoiceView";
@@ -6598,15 +6598,80 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
     if (element) {
       try {
         const html2canvas = (await import("html2canvas")).default;
-        const canvas = await html2canvas(element, { backgroundColor: "#ffffff", scale: 3, useCORS: true });
+        // 4in x 6in standard at 300 DPI = 1200 x 1800 px
+        // 384px CSS * 3.125 = 1200px, 576px CSS * 3.125 = 1800px
+        const canvas = await html2canvas(element, {
+          backgroundColor: "#ffffff",
+          scale: 3.125,
+          useCORS: true,
+          logging: false
+        });
         const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
         const link = document.createElement("a");
-        link.download = `Shipping_Label_${getSerial(shippingOrder.id)}.jpg`;
+        link.download = `Shipping_Label_4x6_${getSerial(shippingOrder.id)}.jpg`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
         alert("Error downloading shipping label.");
       }
+    }
+  };
+
+  const handlePrintShipping = () => {
+    const element = document.getElementById("shipping-label-content");
+    if (!element) return;
+    const printWindow = window.open("", "_blank", "width=600,height=800");
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Shipping Label 4x6 - ${getSerial(shippingOrder.id)}</title>
+            <style>
+              @page {
+                size: 4in 6in;
+                margin: 0;
+              }
+              * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+              }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                background: #ffffff;
+                color: #000000;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .label-wrap {
+                width: 4in;
+                height: 6in;
+                padding: 0.22in;
+                background: #ffffff;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="label-wrap">
+              ${element.innerHTML}
+            </div>
+            <script>
+              window.onload = function() {
+                window.focus();
+                window.print();
+                window.close();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
     }
   };
 
@@ -13455,70 +13520,135 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
         );
       })()}
 
-      {/* 🟢 NEW: SHIPPING LABEL MODAL */}
+      {/* 🟢 NEW: SHIPPING LABEL MODAL (4x6 INCH STANDARD) */}
       {isShippingOpen && shippingOrder && (
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-3 sm:p-4 print:hidden backdrop-blur-sm" onClick={() => setIsShippingOpen(false)}>
-          <div className="rounded-3xl shadow-2xl w-full max-w-2xl bg-gray-100 flex flex-col max-h-[90dvh]" onClick={(e) => e.stopPropagation()}>
+          <div className="rounded-3xl shadow-2xl w-full max-w-xl bg-gray-100 flex flex-col max-h-[92dvh]" onClick={(e) => e.stopPropagation()}>
 
             <div className="p-4 flex justify-between bg-white border-b border-gray-200 rounded-t-3xl items-center">
-              <h2 className="text-lg sm:text-xl font-extrabold text-black">Shipping Label Preview</h2>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-lg sm:text-xl font-extrabold text-black">Shipping Label Preview</h2>
+                <span className="text-[11px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 border border-purple-300 px-2.5 py-0.5 rounded-full">
+                  4 × 6 Inch Standard
+                </span>
+              </div>
               <button onClick={() => setIsShippingOpen(false)} className="text-gray-500 hover:text-red-600 transition-colors bg-gray-100 p-2 rounded-full cursor-pointer"><X size={20} /></button>
             </div>
 
-            <div className="p-3 sm:p-6 overflow-y-auto overflow-x-auto flex-1 flex justify-center bg-gray-100 custom-scrollbar responsive-table-container">
+            <div className="p-4 sm:p-6 overflow-y-auto overflow-x-auto flex-1 flex flex-col items-center justify-start bg-slate-200/80 custom-scrollbar">
 
-              <div id="shipping-label-content" className="bg-white p-4 sm:p-8 w-full max-w-xl text-black font-sans shadow-lg border border-gray-200 h-max shrink-0">
-                <div className="flex justify-between items-start pb-4 border-b-2 border-black">
-                  <div className="flex-1 pt-2">
-                    <h3 className="text-base font-extrabold text-black tracking-wide mb-3">Shipping Label</h3>
-                    <p className="font-extrabold text-[15px] mb-1 text-black">Shipping To:</p>
-                    <p className="text-[15px] font-black text-black tracking-wide break-words max-w-[360px] leading-snug">
-                      {shippingOrder.shippingName && String(shippingOrder.shippingName).trim() !== "" ? shippingOrder.shippingName : shippingOrder.name}
-                    </p>
-                    <p className="text-[15px] font-extrabold mt-1 text-black">Phone: {formatPhoneNumber(shippingOrder.phone)}</p>
-                    {shippingOrder.address && String(shippingOrder.address).trim() !== "" && (
-                      <p className="text-[13px] font-bold mt-1 text-black break-words max-w-[360px] leading-snug">
-                        Address: <span className="font-medium text-gray-800">{shippingOrder.address}</span>
+              {/* 4x6 INCH LABEL CONTAINER */}
+              <div
+                id="shipping-label-content"
+                className="bg-white text-black font-sans shadow-2xl border-2 border-gray-300 flex flex-col justify-between shrink-0"
+                style={{
+                  width: '4in',
+                  height: '6in',
+                  maxWidth: '100%',
+                  padding: '0.22in',
+                  boxSizing: 'border-box',
+                  position: 'relative',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                {/* TOP SECTION: Recipient & Brand Logo */}
+                <div>
+                  <div className="flex justify-between items-start pb-3 border-b-2 border-black">
+                    <div className="flex-1 pr-2">
+                      <div className="inline-block bg-black text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded mb-1.5">
+                        STANDARD SHIPPING
+                      </div>
+                      <p className="font-extrabold text-[12px] uppercase text-gray-500 tracking-wider">Shipping To:</p>
+                      <p className="text-[15px] font-black text-black tracking-wide break-words max-w-[210px] leading-tight mt-0.5">
+                        {shippingOrder.shippingName && String(shippingOrder.shippingName).trim() !== "" ? shippingOrder.shippingName : shippingOrder.name}
                       </p>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-36 h-36 rounded-2xl overflow-hidden border border-gray-200 bg-white flex items-center justify-center p-2 shadow-sm">
-                      <img src="/sabi-logo-red.png" alt="Logo" className="w-full h-full object-contain" crossOrigin="anonymous" onError={(e) => (e.currentTarget.style.display = "none")} />
+                      <p className="text-[13px] font-extrabold mt-1 text-black">
+                        📞 {formatPhoneNumber(shippingOrder.phone)}
+                      </p>
+                      {shippingOrder.address && String(shippingOrder.address).trim() !== "" && (
+                        <p className="text-[11px] font-semibold mt-1 text-gray-800 break-words max-w-[210px] leading-snug">
+                          {shippingOrder.address}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border border-gray-200 bg-white flex items-center justify-center p-1.5 shadow-sm">
+                        <img
+                          src="/sabi-shipping-logo.png"
+                          alt="Sabi Return Gifts"
+                          className="w-full h-full object-contain"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/sabi-shipping-logo.jpg';
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
+
+                  {/* MIDDLE SECTION: Order / Package Details & Barcode */}
+                  <div className="flex justify-between items-center py-2.5 border-b-2 border-black">
+                    <div className="text-[11px] leading-tight space-y-0.5">
+                      <p className="font-black text-black">
+                        INVOICE NO: <span className="font-mono font-extrabold text-[12px]">{getSerial(shippingOrder.id)}</span>
+                      </p>
+                      <p className="font-extrabold text-gray-700">
+                        DATE: {shippingOrder.deliveryDate || shippingOrder.functionDate || shippingOrder.orderDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                      </p>
+                      <p className="font-extrabold text-black truncate max-w-[190px]" title={shippingOrder.chocolate}>
+                        ITEM: {shippingOrder.chocolate}
+                      </p>
+                      <p className="font-black text-black">
+                        QTY: <span className="font-black text-[12px]">{shippingOrder.count}</span>
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-center shrink-0">
+                      <img
+                        src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${getSerial(shippingOrder.id)}&scale=2&height=10`}
+                        alt="Barcode"
+                        className="h-10 w-auto mix-blend-multiply"
+                        crossOrigin="anonymous"
+                      />
+                      <p className="text-[8px] font-black mt-0.5 tracking-wider font-mono">{getSerial(shippingOrder.id)}</p>
+                    </div>
+                  </div>
+
+                  {/* SENDER DETAILS */}
+                  <div className="pt-2 text-[11px] leading-tight space-y-0.5">
+                    <p className="font-black text-[10px] uppercase text-gray-500 tracking-wider">Sender Details (From):</p>
+                    <p className="font-black text-black text-xs">Sabi Return Gifts</p>
+                    <p className="font-semibold text-gray-800 leading-snug">
+                      No.2/35 ayyavupuram, 57th st street, West k.k.nagar, near pondicherry guest house
+                    </p>
+                    <p className="font-semibold text-gray-800">Chennai City South, TAMIL NADU - 600078</p>
+                    <p className="font-bold text-black mt-0.5">Phone: 8220638753</p>
+                  </div>
                 </div>
 
-                <div className="flex justify-between items-center py-3 border-b-2 border-black">
-                  <div>
-                    <p className="text-[14px] font-extrabold mb-1 text-black">Invoice No: {getSerial(shippingOrder.id)}</p>
-                    <p className="text-[14px] font-extrabold mb-1 text-black">Invoice Date: {shippingOrder.deliveryDate || shippingOrder.functionDate || shippingOrder.orderDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
-                    <p className="text-[14px] font-extrabold mb-1 text-black">Item: {shippingOrder.chocolate}</p>
-                    <p className="text-[14px] font-extrabold text-black">Qty: {shippingOrder.count}</p>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <img src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${getSerial(shippingOrder.id)}&scale=2&height=10`} alt="Barcode" className="h-12 w-auto mix-blend-multiply" crossOrigin="anonymous" />
-                    <p className="text-[8px] font-extrabold mt-0.5 tracking-wider">{getSerial(shippingOrder.id)}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <p className="text-[14px] font-extrabold mb-1 text-black">Sender Details:</p>
-                  <p className="text-[14px] font-extrabold text-black">Sabi Return Gifts</p>
-                  <p className="text-[14px] font-extrabold text-black leading-snug">No.2/35 ayyavupuram, 57th st street, West k.k.nagar, near pondicherry guest house</p>
-                  <p className="text-[14px] font-extrabold text-black">Chennai City South, TAMIL NADU</p>
-                  <p className="text-[14px] font-extrabold mb-2 text-black">600078</p>
-                  <p className="text-[14px] font-extrabold text-black">Phone: 8220638753</p>
+                {/* BOTTOM FOOTER OF LABEL */}
+                <div className="border-t border-dashed border-gray-400 pt-1.5 flex justify-between items-center text-[9px] font-black text-gray-500 uppercase tracking-wider">
+                  <span>FRAGILE • HANDLE WITH CARE</span>
+                  <span>STANDARD 4×6"</span>
                 </div>
               </div>
 
             </div>
 
-            <div className="p-5 bg-white border-t border-gray-200 rounded-b-3xl flex justify-end gap-4 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10">
-              <button onClick={() => setIsShippingOpen(false)} className="px-6 py-2.5 rounded-xl font-bold border-2 border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">Close</button>
-              <button onClick={handleDownloadShipping} className="px-8 py-2.5 rounded-xl font-extrabold text-white bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2 tracking-wide">
-                <Download size={20} /> Download Label
-              </button>
+            <div className="p-4 bg-white border-t border-gray-200 rounded-b-3xl flex flex-wrap justify-between items-center gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-10">
+              <span className="text-xs font-bold text-gray-500 hidden sm:inline">
+                Label Format: <strong className="text-black font-black">4 × 6 Inch (1200×1800 px @ 300 DPI)</strong>
+              </span>
+              <div className="flex items-center gap-2.5 ml-auto">
+                <button onClick={() => setIsShippingOpen(false)} className="px-5 py-2.5 rounded-xl font-bold border-2 border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm">
+                  Close
+                </button>
+                <button onClick={handlePrintShipping} className="px-5 py-2.5 rounded-xl font-extrabold text-slate-800 bg-gray-100 hover:bg-gray-200 border border-gray-300 shadow-sm transition-all flex items-center gap-1.5 text-sm tracking-wide">
+                  <Printer size={16} /> Print (4×6")
+                </button>
+                <button onClick={handleDownloadShipping} className="px-6 py-2.5 rounded-xl font-extrabold text-white bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm tracking-wide">
+                  <Download size={16} /> Download (4×6")
+                </button>
+              </div>
             </div>
 
           </div>
