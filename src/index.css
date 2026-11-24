@@ -200,14 +200,14 @@ All colors MUST be HSL.
 
 @keyframes logo-gold-halo {
   0%, 100% {
-    transform: scale(0.95);
-    opacity: 0.4;
-    filter: blur(22px);
+    transform: scale(0.97);
+    opacity: 0.35;
+    filter: blur(20px);
   }
   50% {
-    transform: scale(1.12);
-    opacity: 0.75;
-    filter: blur(30px);
+    transform: scale(1.05);
+    opacity: 0.6;
+    filter: blur(26px);
   }
 }
 
@@ -215,17 +215,14 @@ All colors MUST be HSL.
   animation: logo-gold-halo 4s ease-in-out infinite;
 }
 
-@keyframes logo-gentle-hover {
-  0%, 100% {
-    transform: translateY(0px);
+/* Prevent iOS & mobile browser auto-zoom shift on input focus */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="tel"] {
+    font-size: 16px !important;
   }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-.animate-logo-float {
-  animation: logo-gentle-hover 3.2s ease-in-out infinite;
 }
 
 /* ==================== GLOBAL DARK BLUE THEME & GRAY SIDEBAR OVERRIDES ==================== */

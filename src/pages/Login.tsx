@@ -215,9 +215,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }}
     >
       {/* ======================================================== */}
-      {/* MOBILE VIEW (Screens < md) - Ultra-Luxury Golden Leaf Layout with Sabi Return Gifts Palette */}
+      {/* MOBILE VIEW (Screens < md) - Standard Stable Layout with Luxury Gold & Navy Palette */}
       {/* ======================================================== */}
-      <div className="md:hidden w-full min-h-[100dvh] flex flex-col justify-between py-6 px-5 relative z-10 overflow-y-auto">
+      <div className="md:hidden w-full h-[100dvh] max-h-[100dvh] flex flex-col justify-between py-5 px-5 relative z-10 overflow-y-auto overscroll-none touch-manipulation">
         
         {/* 1. Corner Luxury Concentric Gold Arcs (Top-Left, Top-Right, Bottom-Left, Bottom-Right) */}
         {/* Top-Left Concentric Arcs */}
@@ -296,22 +296,27 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <circle cx="135" cy="135" r="105" stroke="url(#goldArcBR)" strokeWidth="1.5" />
         </svg>
 
-        {/* 2. Top Centered Brand Section with Luxury Animated Effects */}
-        <div className="relative z-10 flex flex-col items-center pt-2 sm:pt-4">
+        {/* 2. Top Centered Brand Section - Rock-Solid & Standard (Stationary) */}
+        <div className="relative z-10 flex flex-col items-center pt-1 sm:pt-3">
           
-          {/* Subtle Breathing Radial Golden Halo Aura Behind Logo */}
+          {/* Subtle Steady Golden Halo Aura Behind Logo */}
           <div 
             className="absolute top-1 w-32 h-32 rounded-full pointer-events-none animate-gold-halo" 
-            style={{ background: "radial-gradient(circle, #D9A928 0%, rgba(245, 158, 11, 0.45) 35%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, #D9A928 0%, rgba(245, 158, 11, 0.4) 35%, transparent 70%)" }}
           />
 
-          {/* Sabi Return Gifts Luxury Logo Badge with Float & Shimmer Effect */}
-          <div className="relative z-10 animate-logo-float">
+          {/* Sabi Return Gifts Luxury Logo Badge - Standard & Grounded */}
+          <div className="relative z-10 flex flex-col items-center">
+            {/* Elegant Royal Hallmark */}
+            <span className="text-[#D9A928] text-[10px] font-black tracking-[0.25em] mb-1.5 opacity-90 drop-shadow-[0_0_6px_rgba(217,169,40,0.8)]">
+              ✦ OFFICIAL BRAND ✦
+            </span>
+
             {/* Outer Metallic Gold Gradient Rim */}
-            <div className="w-[94px] h-[94px] sm:w-[106px] sm:h-[106px] p-[2.5px] rounded-3xl bg-gradient-to-tr from-[#9B7722] via-[#F5D88A] to-[#D4AF37] shadow-[0_14px_36px_rgba(0,0,0,0.85),0_0_28px_rgba(217,169,40,0.45)] relative group overflow-hidden transition-all duration-300">
+            <div className="w-[96px] h-[96px] sm:w-[108px] sm:h-[108px] p-[3px] rounded-[1.75rem] bg-gradient-to-tr from-[#9B7722] via-[#F5D88A] via-[#E8C15A] to-[#B38B28] shadow-[0_16px_40px_rgba(0,0,0,0.9),0_0_30px_rgba(217,169,40,0.4)] relative group overflow-hidden transition-all duration-300">
               
               {/* Inner Black Logo Container */}
-              <div className="w-full h-full rounded-[1.35rem] bg-[#000000] p-1.5 flex items-center justify-center relative overflow-hidden">
+              <div className="w-full h-full rounded-[1.55rem] bg-gradient-to-b from-[#18181b] via-[#09090b] to-[#000000] p-1.5 border border-[#F5D88A]/30 relative overflow-hidden flex items-center justify-center">
                 
                 {/* Diagonal Light Shimmer Reflection Sweep Across Logo Glass */}
                 <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none animate-logo-shimmer z-20" />
@@ -319,24 +324,24 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <img 
                   src="/logo.jpeg" 
                   alt="Sabi Return Gifts" 
-                  className="w-full h-full object-cover rounded-[1.1rem] relative z-10"
+                  className="w-full h-full object-cover rounded-[1.25rem] relative z-10"
                   loading="eager"
                   decoding="sync"
                   fetchPriority="high"
-                  width="104"
-                  height="104"
+                  width="108"
+                  height="108"
                 />
               </div>
             </div>
           </div>
 
           {/* Brand Name: Metallic Gold & Ivory Shimmer Gradient */}
-          <h1 className="text-2xl sm:text-[28px] font-serif font-black tracking-[0.24em] bg-gradient-to-r from-[#FFF9E6] via-[#F5D88A] to-[#D4AF37] bg-clip-text text-transparent uppercase mt-3.5 text-center drop-shadow-md">
+          <h1 className="text-2xl sm:text-[28px] font-serif font-black tracking-[0.24em] bg-gradient-to-r from-[#FFF9E6] via-[#F5D88A] to-[#D4AF37] bg-clip-text text-transparent uppercase mt-3 text-center drop-shadow-md">
             SABI RETURNS
           </h1>
 
           {/* Tagline */}
-          <div className="flex items-center justify-center gap-2 mt-1">
+          <div className="flex items-center justify-center gap-2 mt-0.5">
             <span className="w-2 h-[1px] bg-[#D9A928]/70" />
             <p className="text-[10px] sm:text-[11px] font-black tracking-[0.3em] text-[#D9A928] uppercase drop-shadow-sm">
               PREMIUM GIFTING SOLUTIONS
@@ -346,10 +351,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* 3. Form Content Section (Login or Register) */}
-        <div className="relative z-10 w-full max-w-[380px] mx-auto my-auto py-3">
+        <div className="relative z-10 w-full max-w-[390px] mx-auto my-auto py-2">
           {!isFlipped ? (
             /* --- MOBILE LOGIN FORM --- */
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {/* Screen Title */}
               <div className="text-center">
                 <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.18em] uppercase drop-shadow-sm">
@@ -357,7 +362,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 </h2>
 
                 {/* Luxury Jewelry Diamond Ornament Divider */}
-                <div className="flex items-center justify-center gap-2.5 mt-2.5">
+                <div className="flex items-center justify-center gap-2.5 mt-2">
                   <div className="w-14 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
                   <span className="w-2.5 h-2.5 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(245,216,138,0.85)] border border-[#FFF9E6]" />
                   <div className="w-14 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
@@ -371,62 +376,70 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 </div>
               )}
 
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
-                {/* Username */}
+              <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+                {/* Username Input Box - Upgraded Luxury Design */}
                 <div>
                   <label 
                     htmlFor="mobile-username" 
-                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1.5 pl-1"
+                    className="flex items-center gap-1.5 text-[11px] font-black tracking-[0.16em] text-[#A0AFC7] uppercase mb-1.5 pl-1"
                   >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     USERNAME
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
-                      <User className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
+                    <div className="w-full h-[58px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
+                      {/* Left Icon Emblem Badge */}
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
+                        <User className="h-5 w-5 text-[#F5D88A]" />
+                      </div>
+                      <input 
+                        id="mobile-username" 
+                        type="text"
+                        value={username} 
+                        onChange={(e) => setUsername(e.target.value)} 
+                        placeholder="Enter your username" 
+                        required 
+                        autoComplete="username"
+                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none"
+                      />
                     </div>
-                    <input 
-                      id="mobile-username" 
-                      type="text"
-                      value={username} 
-                      onChange={(e) => setUsername(e.target.value)} 
-                      placeholder="Enter your username" 
-                      required 
-                      autoComplete="username"
-                      className="w-full pl-12 pr-4 h-[54px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    />
                   </div>
                 </div>
 
-                {/* Password */}
+                {/* Password Input Box - Upgraded Luxury Design */}
                 <div>
                   <label 
                     htmlFor="mobile-password" 
-                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1.5 pl-1"
+                    className="flex items-center gap-1.5 text-[11px] font-black tracking-[0.16em] text-[#A0AFC7] uppercase mb-1.5 pl-1"
                   >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     PASSWORD
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
-                      <Lock className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
+                    <div className="w-full h-[58px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
+                      {/* Left Icon Emblem Badge */}
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
+                        <Lock className="h-5 w-5 text-[#F5D88A]" />
+                      </div>
+                      <input 
+                        id="mobile-password" 
+                        type={showPassword ? "text" : "password"} 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        placeholder="Enter password" 
+                        required 
+                        autoComplete="current-password"
+                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none pr-1"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
                     </div>
-                    <input 
-                      id="mobile-password" 
-                      type={showPassword ? "text" : "password"} 
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                      placeholder="Enter password" 
-                      required 
-                      autoComplete="current-password"
-                      className="w-full pl-12 pr-12 h-[54px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    />
-                    <button 
-                      type="button" 
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#F5D88A] transition-colors cursor-pointer"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
                   </div>
                 </div>
 
@@ -472,7 +485,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             </div>
           ) : (
             /* --- MOBILE REGISTER FORM --- */
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {/* Screen Title */}
               <div className="text-center">
                 <h2 className="text-2xl font-serif font-bold text-[#F8F5ED] tracking-[0.18em] uppercase drop-shadow-sm">
@@ -480,7 +493,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 </h2>
 
                 {/* Luxury Jewelry Diamond Ornament Divider */}
-                <div className="flex items-center justify-center gap-2.5 mt-2.5">
+                <div className="flex items-center justify-center gap-2.5 mt-2">
                   <div className="w-14 h-[1.5px] bg-gradient-to-r from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
                   <span className="w-2.5 h-2.5 rotate-45 bg-[#D9A928] shadow-[0_0_8px_rgba(245,216,138,0.85)] border border-[#FFF9E6]" />
                   <div className="w-14 h-[1.5px] bg-gradient-to-l from-transparent via-[#D9A928]/70 to-[#F5D88A]" />
@@ -499,23 +512,26 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <div>
                   <label 
                     htmlFor="mobile-reg-name" 
-                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1 pl-1"
+                    className="flex items-center gap-1.5 text-[11px] font-black tracking-[0.16em] text-[#A0AFC7] uppercase mb-1.5 pl-1"
                   >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     FULL NAME
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
-                      <User className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
+                    <div className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
+                        <User className="h-5 w-5 text-[#F5D88A]" />
+                      </div>
+                      <input 
+                        id="mobile-reg-name" 
+                        type="text"
+                        value={regName} 
+                        onChange={(e) => setRegName(e.target.value)} 
+                        placeholder="Enter your full name" 
+                        required 
+                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none"
+                      />
                     </div>
-                    <input 
-                      id="mobile-reg-name" 
-                      type="text"
-                      value={regName} 
-                      onChange={(e) => setRegName(e.target.value)} 
-                      placeholder="Enter your full name" 
-                      required 
-                      className="w-full pl-12 pr-4 h-[52px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    />
                   </div>
                 </div>
 
@@ -523,24 +539,27 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <div>
                   <label 
                     htmlFor="mobile-reg-username" 
-                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1 pl-1"
+                    className="flex items-center gap-1.5 text-[11px] font-black tracking-[0.16em] text-[#A0AFC7] uppercase mb-1.5 pl-1"
                   >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     USERNAME
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
-                      <User className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
+                    <div className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
+                        <User className="h-5 w-5 text-[#F5D88A]" />
+                      </div>
+                      <input 
+                        id="mobile-reg-username" 
+                        type="text"
+                        value={regUsername} 
+                        onChange={(e) => setRegUsername(e.target.value)} 
+                        placeholder="Choose a username" 
+                        required 
+                        autoComplete="username"
+                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none"
+                      />
                     </div>
-                    <input 
-                      id="mobile-reg-username" 
-                      type="text"
-                      value={regUsername} 
-                      onChange={(e) => setRegUsername(e.target.value)} 
-                      placeholder="Choose a username" 
-                      required 
-                      autoComplete="username"
-                      className="w-full pl-12 pr-4 h-[52px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    />
                   </div>
                 </div>
 
@@ -548,31 +567,34 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <div>
                   <label 
                     htmlFor="mobile-reg-password" 
-                    className="block text-[11px] font-black tracking-widest text-[#9DAAC2] uppercase mb-1 pl-1"
+                    className="flex items-center gap-1.5 text-[11px] font-black tracking-[0.16em] text-[#A0AFC7] uppercase mb-1.5 pl-1"
                   >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     PASSWORD
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4.5 pointer-events-none">
-                      <Lock className="h-5 w-5 text-[#D9A928] group-focus-within:text-[#F5D88A] transition-colors" />
+                    <div className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
+                        <Lock className="h-5 w-5 text-[#F5D88A]" />
+                      </div>
+                      <input 
+                        id="mobile-reg-password" 
+                        type={showRegPassword ? "text" : "password"} 
+                        value={regPassword} 
+                        onChange={(e) => setRegPassword(e.target.value)} 
+                        placeholder="Create password" 
+                        required 
+                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none pr-1"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0"
+                        aria-label={showRegPassword ? "Hide password" : "Show password"}
+                      >
+                        {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
                     </div>
-                    <input 
-                      id="mobile-reg-password" 
-                      type={showRegPassword ? "text" : "password"} 
-                      value={regPassword} 
-                      onChange={(e) => setRegPassword(e.target.value)} 
-                      placeholder="Create password" 
-                      required 
-                      className="w-full pl-12 pr-12 h-[52px] bg-[#0c1427]/85 backdrop-blur-md border border-[#223354] hover:border-[#D9A928]/50 focus:border-[#F5D88A] focus:ring-2 focus:ring-[#D9A928]/25 rounded-2xl text-[#E8EAF0] placeholder-[#7D8B9E] text-sm font-medium outline-none transition-all duration-200 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    />
-                    <button 
-                      type="button" 
-                      onClick={() => setShowRegPassword(!showRegPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#D9A928] hover:text-[#F5D88A] transition-colors cursor-pointer"
-                      aria-label={showRegPassword ? "Hide password" : "Show password"}
-                    >
-                      {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
                   </div>
                 </div>
 
