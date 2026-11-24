@@ -204,7 +204,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div 
-      className="min-h-[100dvh] flex items-center justify-center p-0 md:p-8 select-none relative overflow-x-hidden overflow-y-auto"
+      className="fixed inset-0 w-full h-[100dvh] max-w-[100vw] flex items-center justify-center p-0 md:p-8 select-none overflow-x-hidden overflow-y-auto"
       style={{
         backgroundColor: "#060a14",
         backgroundImage: `
@@ -215,15 +215,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }}
     >
       {/* ======================================================== */}
-      {/* MOBILE VIEW (Screens < md) - Standard Stable Layout with Luxury Gold & Navy Palette */}
+      {/* MOBILE VIEW (Screens < md) - Strictly Locked (No Horizontal Movement) */}
       {/* ======================================================== */}
-      <div className="md:hidden w-full h-[100dvh] max-h-[100dvh] flex flex-col justify-between py-5 px-5 relative z-10 overflow-y-auto overscroll-none touch-manipulation">
+      <div className="md:hidden w-full max-w-[100vw] h-[100dvh] max-h-[100dvh] flex flex-col justify-between py-4 px-5 relative z-10 overflow-x-hidden overflow-y-auto overscroll-none touch-manipulation">
         
-        {/* 1. Corner Luxury Concentric Gold Arcs (Top-Left, Top-Right, Bottom-Left, Bottom-Right) */}
+        {/* 1. Corner Luxury Concentric Gold Arcs (Pinned strictly within viewport edges) */}
         {/* Top-Left Concentric Arcs */}
         <svg 
-          className="absolute -top-6 -left-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
-          viewBox="0 0 150 150"
+          className="absolute top-0 left-0 w-28 h-28 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 120 120"
           fill="none"
           aria-hidden="true"
         >
@@ -234,15 +234,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
             </linearGradient>
           </defs>
-          <circle cx="15" cy="15" r="45" stroke="url(#goldArcTL)" strokeWidth="1.5" />
-          <circle cx="15" cy="15" r="75" stroke="url(#goldArcTL)" strokeWidth="1.5" />
-          <circle cx="15" cy="15" r="105" stroke="url(#goldArcTL)" strokeWidth="1.5" />
+          <circle cx="0" cy="0" r="35" stroke="url(#goldArcTL)" strokeWidth="1.5" />
+          <circle cx="0" cy="0" r="65" stroke="url(#goldArcTL)" strokeWidth="1.5" />
+          <circle cx="0" cy="0" r="95" stroke="url(#goldArcTL)" strokeWidth="1.5" />
         </svg>
 
         {/* Top-Right Concentric Arcs */}
         <svg 
-          className="absolute -top-6 -right-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
-          viewBox="0 0 150 150"
+          className="absolute top-0 right-0 w-28 h-28 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 120 120"
           fill="none"
           aria-hidden="true"
         >
@@ -253,15 +253,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
             </linearGradient>
           </defs>
-          <circle cx="135" cy="15" r="45" stroke="url(#goldArcTR)" strokeWidth="1.5" />
-          <circle cx="135" cy="15" r="75" stroke="url(#goldArcTR)" strokeWidth="1.5" />
-          <circle cx="135" cy="15" r="105" stroke="url(#goldArcTR)" strokeWidth="1.5" />
+          <circle cx="120" cy="0" r="35" stroke="url(#goldArcTR)" strokeWidth="1.5" />
+          <circle cx="120" cy="0" r="65" stroke="url(#goldArcTR)" strokeWidth="1.5" />
+          <circle cx="120" cy="0" r="95" stroke="url(#goldArcTR)" strokeWidth="1.5" />
         </svg>
 
         {/* Bottom-Left Concentric Arcs */}
         <svg 
-          className="absolute -bottom-6 -left-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
-          viewBox="0 0 150 150"
+          className="absolute bottom-0 left-0 w-28 h-28 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 120 120"
           fill="none"
           aria-hidden="true"
         >
@@ -272,15 +272,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
             </linearGradient>
           </defs>
-          <circle cx="15" cy="135" r="45" stroke="url(#goldArcBL)" strokeWidth="1.5" />
-          <circle cx="15" cy="135" r="75" stroke="url(#goldArcBL)" strokeWidth="1.5" />
-          <circle cx="15" cy="135" r="105" stroke="url(#goldArcBL)" strokeWidth="1.5" />
+          <circle cx="0" cy="120" r="35" stroke="url(#goldArcBL)" strokeWidth="1.5" />
+          <circle cx="0" cy="120" r="65" stroke="url(#goldArcBL)" strokeWidth="1.5" />
+          <circle cx="0" cy="120" r="95" stroke="url(#goldArcBL)" strokeWidth="1.5" />
         </svg>
 
         {/* Bottom-Right Concentric Arcs */}
         <svg 
-          className="absolute -bottom-6 -right-6 w-36 h-36 pointer-events-none opacity-45 select-none z-0" 
-          viewBox="0 0 150 150"
+          className="absolute bottom-0 right-0 w-28 h-28 pointer-events-none opacity-40 select-none z-0" 
+          viewBox="0 0 120 120"
           fill="none"
           aria-hidden="true"
         >
@@ -291,13 +291,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               <stop offset="100%" stopColor="#8C6D1F" stopOpacity="0.1" />
             </linearGradient>
           </defs>
-          <circle cx="135" cy="135" r="45" stroke="url(#goldArcBR)" strokeWidth="1.5" />
-          <circle cx="135" cy="135" r="75" stroke="url(#goldArcBR)" strokeWidth="1.5" />
-          <circle cx="135" cy="135" r="105" stroke="url(#goldArcBR)" strokeWidth="1.5" />
+          <circle cx="120" cy="120" r="35" stroke="url(#goldArcBR)" strokeWidth="1.5" />
+          <circle cx="120" cy="120" r="65" stroke="url(#goldArcBR)" strokeWidth="1.5" />
+          <circle cx="120" cy="120" r="95" stroke="url(#goldArcBR)" strokeWidth="1.5" />
         </svg>
 
         {/* 2. Top Centered Brand Section - Rock-Solid & Standard (Stationary) */}
-        <div className="relative z-10 flex flex-col items-center pt-1 sm:pt-3">
+        <div className="relative z-10 flex flex-col items-center pt-1">
           
           {/* Subtle Steady Golden Halo Aura Behind Logo */}
           <div 
@@ -307,16 +307,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           {/* Sabi Return Gifts Luxury Logo Badge - Standard & Grounded */}
           <div className="relative z-10 flex flex-col items-center">
-            {/* Elegant Royal Hallmark */}
-            <span className="text-[#D9A928] text-[10px] font-black tracking-[0.25em] mb-1.5 opacity-90 drop-shadow-[0_0_6px_rgba(217,169,40,0.8)]">
-              ✦ OFFICIAL BRAND ✦
-            </span>
+            {/* Elegant Royal Hallmark Pill */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#1b1509] border border-[#D9A928]/50 shadow-[0_0_12px_rgba(217,169,40,0.25)] mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5D88A] animate-pulse" />
+              <span className="text-[10px] font-black tracking-[0.22em] text-[#F5D88A] uppercase">
+                OFFICIAL PORTAL
+              </span>
+            </div>
 
             {/* Outer Metallic Gold Gradient Rim */}
-            <div className="w-[96px] h-[96px] sm:w-[108px] sm:h-[108px] p-[3px] rounded-[1.75rem] bg-gradient-to-tr from-[#9B7722] via-[#F5D88A] via-[#E8C15A] to-[#B38B28] shadow-[0_16px_40px_rgba(0,0,0,0.9),0_0_30px_rgba(217,169,40,0.4)] relative group overflow-hidden transition-all duration-300">
+            <div className="w-[100px] h-[100px] sm:w-[110px] sm:h-[110px] p-[3px] rounded-[1.8rem] bg-gradient-to-tr from-[#8C6D1F] via-[#F5D88A] via-[#E8C15A] to-[#B38B28] shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_30px_rgba(217,169,40,0.4)] relative group overflow-hidden transition-all duration-300">
               
               {/* Inner Black Logo Container */}
-              <div className="w-full h-full rounded-[1.55rem] bg-gradient-to-b from-[#18181b] via-[#09090b] to-[#000000] p-1.5 border border-[#F5D88A]/30 relative overflow-hidden flex items-center justify-center">
+              <div className="w-full h-full rounded-[1.6rem] bg-gradient-to-b from-[#18181b] via-[#09090b] to-[#000000] p-1.5 border border-[#F5D88A]/35 relative overflow-hidden flex items-center justify-center">
                 
                 {/* Diagonal Light Shimmer Reflection Sweep Across Logo Glass */}
                 <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none animate-logo-shimmer z-20" />
@@ -324,12 +327,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <img 
                   src="/logo.jpeg" 
                   alt="Sabi Return Gifts" 
-                  className="w-full h-full object-cover rounded-[1.25rem] relative z-10"
+                  className="w-full h-full object-cover rounded-[1.3rem] relative z-10"
                   loading="eager"
                   decoding="sync"
                   fetchPriority="high"
-                  width="108"
-                  height="108"
+                  width="110"
+                  height="110"
                 />
               </div>
             </div>
@@ -377,7 +380,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               )}
 
               <form onSubmit={handleLoginSubmit} className="space-y-3.5">
-                {/* Username Input Box - Upgraded Luxury Design */}
+                {/* Username Input Box - Unified Seamless Luxury Card */}
                 <div>
                   <label 
                     htmlFor="mobile-username" 
@@ -386,11 +389,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     USERNAME
                   </label>
-                  <div className="relative group">
-                    <div className="w-full h-[58px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
-                      {/* Left Icon Emblem Badge */}
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
-                        <User className="h-5 w-5 text-[#F5D88A]" />
+                  <div className="relative group w-full">
+                    <div className="w-full h-[54px] rounded-2xl bg-[#0c1427]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 group-focus-within:bg-[#D9A928]/25 group-focus-within:border-[#F5D88A] transition-all">
+                        <User className="h-4.5 w-4.5 text-[#F5D88A]" />
                       </div>
                       <input 
                         id="mobile-username" 
@@ -400,13 +402,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         placeholder="Enter your username" 
                         required 
                         autoComplete="username"
-                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none"
+                        className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-[16px] font-medium shadow-none focus:ring-0 focus:outline-none p-0"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Password Input Box - Upgraded Luxury Design */}
+                {/* Password Input Box - Unified Seamless Luxury Card */}
                 <div>
                   <label 
                     htmlFor="mobile-password" 
@@ -415,11 +417,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     PASSWORD
                   </label>
-                  <div className="relative group">
-                    <div className="w-full h-[58px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
-                      {/* Left Icon Emblem Badge */}
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
-                        <Lock className="h-5 w-5 text-[#F5D88A]" />
+                  <div className="relative group w-full">
+                    <div className="w-full h-[54px] rounded-2xl bg-[#0c1427]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 group-focus-within:bg-[#D9A928]/25 group-focus-within:border-[#F5D88A] transition-all">
+                        <Lock className="h-4.5 w-4.5 text-[#F5D88A]" />
                       </div>
                       <input 
                         id="mobile-password" 
@@ -429,15 +430,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         placeholder="Enter password" 
                         required 
                         autoComplete="current-password"
-                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none pr-1"
+                        className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-[16px] font-medium shadow-none focus:ring-0 focus:outline-none p-0"
                       />
                       <button 
                         type="button" 
                         onClick={() => setShowPassword(!showPassword)}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0 ml-1"
                         aria-label={showPassword ? "Hide password" : "Show password"}
                       >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                       </button>
                     </div>
                   </div>
@@ -474,10 +475,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <Button 
                     type="submit" 
                     disabled={isLoading}
-                    className="w-full h-13 min-h-[52px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.2em] rounded-2xl shadow-[0_10px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden group"
+                    className="w-full h-14 min-h-[56px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.22em] rounded-2xl shadow-[0_12px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden"
                   >
-                    <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] pointer-events-none -translate-x-[200%] group-hover:translate-x-[400%] transition-transform duration-1000" />
-                    <Key className="w-5 h-5 text-[#080F23] stroke-[2.7] group-hover:rotate-12 transition-transform duration-300" />
+                    <Key className="w-5 h-5 text-[#080F23] stroke-[2.7]" />
                     <span>{isLoading ? "Signing In..." : "SIGN IN"}</span>
                   </Button>
                 </div>
@@ -517,10 +517,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     FULL NAME
                   </label>
-                  <div className="relative group">
-                    <div className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
-                        <User className="h-5 w-5 text-[#F5D88A]" />
+                  <div className="relative group w-full">
+                    <div className="w-full h-[54px] rounded-2xl bg-[#0c1427]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 group-focus-within:bg-[#D9A928]/25 group-focus-within:border-[#F5D88A] transition-all">
+                        <User className="h-4.5 w-4.5 text-[#F5D88A]" />
                       </div>
                       <input 
                         id="mobile-reg-name" 
@@ -529,7 +529,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegName(e.target.value)} 
                         placeholder="Enter your full name" 
                         required 
-                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none"
+                        className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-[16px] font-medium shadow-none focus:ring-0 focus:outline-none p-0"
                       />
                     </div>
                   </div>
@@ -544,10 +544,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     USERNAME
                   </label>
-                  <div className="relative group">
-                    <div className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
-                        <User className="h-5 w-5 text-[#F5D88A]" />
+                  <div className="relative group w-full">
+                    <div className="w-full h-[54px] rounded-2xl bg-[#0c1427]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 group-focus-within:bg-[#D9A928]/25 group-focus-within:border-[#F5D88A] transition-all">
+                        <User className="h-4.5 w-4.5 text-[#F5D88A]" />
                       </div>
                       <input 
                         id="mobile-reg-username" 
@@ -557,7 +557,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         placeholder="Choose a username" 
                         required 
                         autoComplete="username"
-                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none"
+                        className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-[16px] font-medium shadow-none focus:ring-0 focus:outline-none p-0"
                       />
                     </div>
                   </div>
@@ -572,10 +572,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#D9A928] shadow-[0_0_6px_rgba(217,169,40,0.8)]" />
                     PASSWORD
                   </label>
-                  <div className="relative group">
-                    <div className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-[#0d162b] to-[#09101f] border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] px-3 flex items-center transition-all duration-300">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2a2210] to-[#12192c] border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 shadow-sm group-focus-within:border-[#F5D88A] group-focus-within:shadow-[0_0_12px_rgba(245,216,138,0.25)] transition-all">
-                        <Lock className="h-5 w-5 text-[#F5D88A]" />
+                  <div className="relative group w-full">
+                    <div className="w-full h-[54px] rounded-2xl bg-[#0c1427]/90 border border-[#223354] hover:border-[#D9A928]/50 focus-within:border-[#F5D88A] focus-within:ring-2 focus-within:ring-[#D9A928]/25 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] px-3.5 flex items-center transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-[#D9A928]/15 border border-[#D9A928]/35 flex items-center justify-center mr-3 shrink-0 group-focus-within:bg-[#D9A928]/25 group-focus-within:border-[#F5D88A] transition-all">
+                        <Lock className="h-4.5 w-4.5 text-[#F5D88A]" />
                       </div>
                       <input 
                         id="mobile-reg-password" 
@@ -584,15 +584,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegPassword(e.target.value)} 
                         placeholder="Create password" 
                         required 
-                        className="flex-1 h-full bg-transparent text-[#E8EAF0] placeholder-[#7D8B9E] text-[16px] font-medium outline-none pr-1"
+                        className="w-full flex-1 bg-transparent border-none outline-none text-[#F8F5ED] placeholder-[#73829C] text-[16px] font-medium shadow-none focus:ring-0 focus:outline-none p-0"
                       />
                       <button 
                         type="button" 
                         onClick={() => setShowRegPassword(!showRegPassword)}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#D9A928] hover:text-[#F5D88A] hover:bg-[#D9A928]/15 transition-all cursor-pointer shrink-0 ml-1"
                         aria-label={showRegPassword ? "Hide password" : "Show password"}
                       >
-                        {showRegPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showRegPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                       </button>
                     </div>
                   </div>
@@ -617,10 +617,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <Button 
                     type="submit" 
                     disabled={isRegistering}
-                    className="w-full h-13 min-h-[52px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.2em] rounded-2xl shadow-[0_10px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden group"
+                    className="w-full h-14 min-h-[56px] bg-gradient-to-r from-[#C89B2B] via-[#F4CF68] to-[#C89B2B] hover:brightness-110 active:scale-[0.985] text-[#080F23] font-black text-sm uppercase tracking-[0.22em] rounded-2xl shadow-[0_12px_32px_rgba(217,169,40,0.5),0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 flex items-center justify-center gap-2.5 border-none cursor-pointer relative overflow-hidden"
                   >
-                    <div className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-[-25deg] pointer-events-none -translate-x-[200%] group-hover:translate-x-[400%] transition-transform duration-1000" />
-                    <UserPlus className="w-5 h-5 text-[#080F23] stroke-[2.7] group-hover:scale-110 transition-transform duration-300" />
+                    <UserPlus className="w-5 h-5 text-[#080F23] stroke-[2.7]" />
                     <span>{isRegistering ? "Creating..." : "CREATE ACCOUNT"}</span>
                   </Button>
                 </div>
@@ -631,8 +630,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         {/* 4. Bottom Security / Official Portal Micro-Badge */}
         <div className="relative z-10 text-center pb-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#101a33]/60 border border-[#223354]/60 text-[10px] text-[#9DAAC2]/80 font-semibold tracking-wider uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0c1427]/80 border border-[#223354] text-[10px] text-[#A0AFC7] font-semibold tracking-wider uppercase shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#34D399] shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
             Sabi Return Gifts • Secure Portal
           </div>
         </div>

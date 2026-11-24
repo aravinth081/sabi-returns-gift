@@ -230,6 +230,11 @@ All colors MUST be HSL.
 body, #root {
   background-color: #0b1329 !important;
   color: #f8fafc !important;
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Sidebar default & wallpaper mode - Cool Dark Gray (Image 1 style) */
