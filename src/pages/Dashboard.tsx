@@ -8483,9 +8483,40 @@ export default function Dashboard({ initialTab }: { initialTab?: any } = {}) {
                     const sortedStockBalance = [...dynamicInventory].sort((a, b) => {
                       const normA = normalizeChocName(a, dynamicInventory);
                       const normB = normalizeChocName(b, dynamicInventory);
-                      const balA = dateWiseInventorySummary.chocolates[normA]?.availableStock ?? (inventoryBalances[a] || 0);
-                      const balB = dateWiseInventorySummary.chocolates[normB]?.availableStock ?? (inventoryBalances[b] || 0);
-                      return balB - balA;
+                      const rawBalA = dateWiseInventorySummary.chocolates[normA]?.availableStock ?? (inventoryBalances[a] || 0);
+                      const rawBalB = dateWiseInventorySummary.chocolates[normB]?.availableStock ?? (inventoryBalances[b] || 0);
+                      const balA = Number(rawBalA) || 0;
+                      const balB = Number(rawBalB) || 0;
+
+                      // Priority ranking:
+                      // 1. Positive stock (> 0) sorted descending
+                      // 2. Negative stock (< 0) placed before zero cards (highest deficit first)
+                      // 3. Zero stock (=== 0) placed at the end
+                      const getRank = (bal: number) => {
+                        if (bal > 0) return 1;
+                        if (bal < 0) return 2;
+                        return 3;
+                      };
+
+                      const rankA = getRank(balA);
+                      const rankB = getRank(balB);
+
+                      if (rankA !== rankB) {
+                        return rankA - rankB;
+                      }
+
+                      // If both are positive: highest available stock first
+                      if (rankA === 1) {
+                        return balB - balA;
+                      }
+
+                      // If both are negative: largest shortage / deficit first (e.g. -27 before -5)
+                      if (rankA === 2) {
+                        return balA - balB;
+                      }
+
+                      // If both are zero: preserve default order
+                      return 0;
                     });
                     return sortedStockBalance.map((choc, i) => {
                       const norm = normalizeChocName(choc, dynamicInventory);

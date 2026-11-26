@@ -337,4 +337,113 @@ describe('Live Stock Balance Inventory Calendar & Date Filter', () => {
     // Calendar closed, date updated to November 2025
     expect(screen.getByRole('button', { name: /12 Nov 2025|2025-11-12/i })).toBeInTheDocument();
   });
+
+  describe('Live Stock Balance Cards Sorting Order', () => {
+    it('sorts positive stock first (descending), negative stock before zero, and zero at the end', () => {
+      const inventory = [
+        '10 RS KITKAT',
+        'ELLU MITTAI',
+        '5 RS MILKY BAR',
+        '10 RS 5 STAR',
+        '5RS DARK FANTASY',
+        '10RS PEANUT CANDY',
+        '5 RS 5 STAR'
+      ];
+
+      const balances: Record<string, number> = {
+        '10 RS KITKAT': 19,
+        'ELLU MITTAI': 10,
+        '5 RS MILKY BAR': 4,
+        '10 RS 5 STAR': 0,
+        '5RS DARK FANTASY': 0,
+        '10RS PEANUT CANDY': 0,
+        '5 RS 5 STAR': -27
+      };
+
+      const sorted = [...inventory].sort((a, b) => {
+        const balA = Number(balances[a]) || 0;
+        const balB = Number(balances[b]) || 0;
+
+        const getRank = (bal: number) => {
+          if (bal > 0) return 1;
+          if (bal < 0) return 2;
+          return 3;
+        };
+
+        const rankA = getRank(balA);
+        const rankB = getRank(balB);
+
+        if (rankA !== rankB) {
+          return rankA - rankB;
+        }
+
+        if (rankA === 1) {
+          return balB - balA;
+        }
+
+        if (rankA === 2) {
+          return balA - balB;
+        }
+
+        return 0;
+      });
+
+      expect(sorted).toEqual([
+        '10 RS KITKAT',     // 19 (positive, highest)
+        'ELLU MITTAI',      // 10 (positive)
+        '5 RS MILKY BAR',   // 4 (positive)
+        '5 RS 5 STAR',      // -27 (negative, placed before zero, not at the last)
+        '10 RS 5 STAR',     // 0
+        '5RS DARK FANTASY', // 0
+        '10RS PEANUT CANDY' // 0
+      ]);
+    });
+
+    it('sorts multiple negative stocks before zero with largest shortage first', () => {
+      const inventory = ['Item A', 'Item B', 'Item C', 'Item D', 'Item E'];
+      const balances: Record<string, number> = {
+        'Item A': 0,
+        'Item B': -5,
+        'Item C': 15,
+        'Item D': -27,
+        'Item E': 0
+      };
+
+      const sorted = [...inventory].sort((a, b) => {
+        const balA = Number(balances[a]) || 0;
+        const balB = Number(balances[b]) || 0;
+
+        const getRank = (bal: number) => {
+          if (bal > 0) return 1;
+          if (bal < 0) return 2;
+          return 3;
+        };
+
+        const rankA = getRank(balA);
+        const rankB = getRank(balB);
+
+        if (rankA !== rankB) {
+          return rankA - rankB;
+        }
+
+        if (rankA === 1) {
+          return balB - balA;
+        }
+
+        if (rankA === 2) {
+          return balA - balB;
+        }
+
+        return 0;
+      });
+
+      expect(sorted).toEqual([
+        'Item C', // 15
+        'Item D', // -27 (larger deficit)
+        'Item B', // -5 (smaller deficit)
+        'Item A', // 0
+        'Item E'  // 0
+      ]);
+    });
+  });
 });
